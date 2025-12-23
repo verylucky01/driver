@@ -1,0 +1,20 @@
+  --full                            Install full mode
+    --install-path=<path>             Install to specific dir
+    --install-username=<username>     Install to specific username
+    --install-usergroup=<usergroup>   Install to specific usergroup
+    --install-for-all                 Install for all user
+  --run                             Install run mode
+    --install-path=<path>             Install to specific dir
+    --install-username=<username>     Install to specific username
+    --install-usergroup=<usergroup>   Install to specific usergroup
+    --install-for-all                 Install for all user
+  --devel                           Install devel mode
+    --install-path=<path>             Install to specific dir
+    --install-username=<username>     Install to specific username
+    --install-usergroup=<usergroup>   Install to specific usergroup
+    --install-for-all                 Install for all user
+  --upgrade                         Upgrade product immediately
+    --install-for-all                 Install for all user
+  --docker                          Install docker mode
+  --uninstall                       Uninstall product
+  --version                         Query the package version

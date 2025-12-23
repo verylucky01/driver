@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config name="driver">
+    <mod_info value="driver" project_name="driver" project_version="1.1.1">
+        <path value="inc/driver/ascend_hal.h" />
+    </mod_info>
+    <mod_info value="dsmi" project_name="dsmi" project_version="1.1.1">
+        <path value="inc/driver/dsmi_common_interface.h" />
+        <path value="inc/driver/dms_device_node_type.h" />
+    </mod_info>
+</config>

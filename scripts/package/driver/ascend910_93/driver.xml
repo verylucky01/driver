@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config name="driver" copy_type="delivery" src_path="lib/host" dst_path="usr/local/Ascend" install_own="root:root" install_type="run;docker;devel">
+    <package_info>
+        <product_name>Ascend-hdk</product_name>
+        <chip_name>910_93</chip_name>
+        <func_name>driver</func_name>
+        <suffix>run</suffix>
+        <install_script>driver/script/install.sh</install_script>
+        <help>driver/script/help.info</help>
+        <version>scripts/package/driver/ascend910B/scripts/sys_version/sys_version.conf</version>
+        <parallel>true</parallel>
+        <check_features>true</check_features>
+    </package_info>
+    <generate_info value="scene.info" dst_path="driver" install_path="driver" install_own="root:root" install_mod="440" install_type="run">
+        <os>$(OS_NAME)</os>
+        <os_version>$(OS_VER)</os_version>
+        <arch>$(ARCH)</arch>
+    </generate_info>
+    <version_info>
+        <interface itf_version="scripts/package/driver/common/conf/itf_ver.conf"/>
+        <interface itf_version="scripts/package/driver/ascend910B/conf/itf_ver.conf"/>
+    </version_info>
+    <dir_info value="driver" install_mod="550" install_own="root:root">
+        <path value="driver" install_mod="755"/>
+        <path value="driver/bin" install_mod="755"/>
+        <path value="driver/device" install_type="run"/>
+        <path value="driver/host" install_type="run"/>
+        <path value="driver/vnpu_host" install_type="run"/>
+        <path value="driver/vnpu_guest" install_type="run"/>
+        <path value="driver/include" install_own="$username:$usergroup" install_type="devel"/>
+        <path value="driver/lib64" install_mod="755"/>
+        <path value="driver/script" install_type="run;devel;docker"/>
+        <path value="driver/tools" install_mod="755" install_type="run;devel;docker"/>
+    </dir_info>
+    <dir_info value="driver" install_mod="755">
+        <path value="driver/lib64/driver"/>
+        <path value="driver/lib64/common"/>
+    </dir_info>
+    <file_info value="install_scripts" copy_type="source" src_path="build/release/config/driver/common/scripts" dst_path="driver/script" install_path="driver/script" install_mod="550" install_own="root:root">
+        <file value="install.sh"/>
+        <file value="setenv.bash" file_type="bash" install_type="run;docker;devel" install_path="driver/bin" install_mod="644"/>
+        <file value="help.info" src_path="build/release/config/driver/hi1980B/scripts" install_mod="440"/>
+        <file value="device_hot_reset.sh" install_type="run"/>
+        <file value="device_crl_check.sh"/>
+        <file value="run_driver_install.sh"/>
+        <file value="run_driver_uninstall.sh"/>
+        <file value="uninstall.sh"/>
+        <file value="ver_check.sh"/>
+        <file value="common.sh"/>
+        <file value="livepatch_sys_init.sh" install_mod="500"/>
+        <file value="specific_func.inc" src_path="build/release/config/driver/hi1980C/scripts" install_mod="440" pkg_feature="Ascend910_93"/>
+        <file value="feature.conf" src_path="build/release/config/driver/hi1980B" install_mod="440"/>
+        <file value="hccn_weak_dict.conf" src_path="drivers/network/crypt/priv" install_path="/etc" install_mod="644"/>
+        <file value="common_func.inc" src_path="build/release/scripts/package"/>
+        <file value="version_compatiable.inc" src_path="build/release/scripts/package"/>
+        <file value="filelist.csv" copy_type="delivery" src_path="" dst_path="" install_mod="440"/>
+        <file value="install_common_parser.sh" copy_type="delivery" src_path="" dst_path=""/>
+        <file value="common_func_v2.inc" copy_type="delivery" src_path="" dst_path=""/>
+        <file value="common_func_v3.inc" copy_type="delivery" src_path="" dst_path=""/>
+        <file value="common_installer.inc" copy_type="source" src_path="vendor/hisi/build/package" dst_path=""/>
+        <file value="hdcBasic.cfg" copy_type="delivery" src_path="lib/host" install_path="/etc" install_mod="644" install_own="root:root"/>
+        <file value="dms_events_conf.lst" src_path="build/product/cloud/hi1980B/config" install_path="/etc" install_mod="400" install_own="root:root"/>
+        <file value="script_operator.inc" copy_type="source" src_path="vendor/hisi/build/package" dst_path=""/>
+    </file_info>
+    <file_info value="script" copy_type="source" src_path="inc/driver/" dst_path="driver/pkg_inc" install_path="driver/pkg_inc" install_mod="440" install_own="$username:$usergroup" install_type="devel">
+        <file value="dsmi_common_interface.h"/>
+        <file value="dsmi_common_interface_base.h"/>
+        <file value="dms_device_node_type.h"/>
+        <file value="ascend_hal_error.h"/>
+    </file_info>
+    <file_info value="device" copy_type="delivery" src_path="lib/device" dst_path="driver/device" install_path="driver/device" install_mod="440" install_own="root:root" install_type="run">
+        <file value="device_sw.img" file_type="other"/>
+        <file value="device_sw.bin"/>
+        <file value="hisserika.bin"/>
+        <file value="itrustee.img"/>
+        <file value="device_boot.img"/>
+        <file value="IMU_task.bin"/>
+        <file value="hbm_img.bin"/>
+        <file value="sysBaseConfig.bin"/>
+        <file value="network_fw_offline_2PF_asic.bin"/>
+        <file value="device_config.bin"/>
+        <file value="device_config_16g.bin"/>
+    </file_info>
+    <file_info value="install_scripts" copy_type="source" src_path="build/release/config/driver/common/scripts" dst_path="" install_path="" install_mod="550" install_own="root:root" install_type="run">
+        <file value="host_sys_init.sh" src_path="build/release/config/driver/hi1980B/scripts"/>
+        <file value="host_servers_setup.sh"/>
+        <file value="host_servers_remove.sh"/>
+        <file value="host_services_setup.sh"/>
+        <file value="host_services_exit.sh"/>
+    </file_info>
+    <file_info value="host" copy_type="delivery" src_path="lib/host" dst_path="driver/host" install_path="driver/host" install_mod="440" install_own="root:root" install_type="run">
+        <file value="asdrv_pbl.ko" file_type="ko"/>
+        <file value="ascend_kernel_open_adapt.ko" file_type="ko"/>
+        <file value="asdrv_esched.ko" file_type="ko"/>
+        <file value="ascend_soc_platform.ko" file_type="ko"/>
+        <file value="asdrv_fms.ko" file_type="ko"/>
+        <file value="asdrv_trsbase.ko" file_type="ko"/>
+        <file value="asdrv_trs.ko" file_type="ko"/>
+        <file value="asdrv_svm.ko" file_type="ko"/>
+        <file value="asdrv_dms.ko" file_type="ko"/>
+        <file value="asdrv_dpa.ko" file_type="ko"/>
+        <file value="drv_pcie_hdc_host.ko" file_type="ko"/>
+        <file value="drv_pcie_host.ko" file_type="ko"/>
+        <file value="asdrv_vnic.ko" file_type="ko"/>
+        <file value="drv_seclib_host.ko" file_type="ko"/>
+        <file value="asdrv_queue.ko" file_type="ko"/>
+        <file value="asdrv_buff.ko" file_type="ko"/>
+        <file value="drv_vascend_stub.ko" file_type="ko"/>
+        <file value="asdrv_vmng.ko" file_type="ko"/>
+        <file value="drv_vascend.ko" file_type="ko"/>
+        <file value="asdrv_vpc.ko" file_type="ko"/>
+        <file value="ts_agent.ko" file_type="ko"/>
+        <file value="asdrv_vvpc.ko" file_type="ko"/>
+        <file value="drv_virtmng_host_stub.ko" file_type="ko"/>
+        <file value="asdrv_vtrs.ko" file_type="ko"/>
+        <file value="ts_agent_vm.ko" file_type="ko"/>
+    </file_info>
+    <file_info value="lib64" copy_type="delivery" src_path="lib/host" dst_path="driver/lib64/driver" install_path="driver/lib64/driver" install_mod="444" install_type="run;devel;docker">
+        <file value="libascend_hal.so" file_type="shared"/>
+        <file value="libascend_kms.so" file_type="shared"/>
+        <file value="libtls_adp.so" file_type="shared"/>
+        <file value="libdrvdsmi_host.so" file_type="shared"/>
+        <file value="libascend_rdma_lite.so" file_type="shared"/>
+    </file_info>
+    <file_info value="lib64" copy_type="delivery" src_path="lib/host" dst_path="driver/lib64/common" install_path="driver/lib64/common" install_mod="444" install_type="run;devel;docker">
+        <file value="libc_sec.so" file_type="shared"/>
+        <file value="libmmpa.so" file_type="shared"/>
+        <file value="dcache_lock_mix.o"/>
+    </file_info>
+    <file_info value="tools" copy_type="delivery" src_path="lib/host" dst_path="driver/tools" install_path="driver/tools" install_mod="550" install_own="$username:$usergroup">
+        <file value="device_boot_init.sh" copy_type="source" src_path="build/release/config/driver/common/scripts" install_own="root:root"/>
+        <file value="msnpureport_auto_export.sh" install_mod="500" install_own="root:root"/>
+        <file value="upgrade-tool" file_type="executable" install_own="root:root" install_type="run"/>
+        <file value="hccn_tool" file_type="executable" install_mod="555" install_own="root:root"/>
+        <file value="ascend_check.bin" file_type="executable" install_mod="500" install_own="root:root"/>
+        <file value="ascend_upgrade_crl.sh" install_mod="500" install_own="root:root"/>
+    </file_info>
+    <file_info value="script" copy_type="source" src_path="build/product/cloud/hi1980/scripts" dst_path="driver/tools" install_path="driver/tools">
+        <file value="docker/install_npudrv.sh" install_own="root:root" install_mod="550" install_type="run;docker"/>
+    </file_info>
+
+    <!--**************************************************tools******************************************************************-->
+    <file_info value="tools" copy_type="delivery" src_path="lib/host" dst_path="driver/tools" install_path="driver/tools" install_mod="555" install_own="$username:$usergroup" install_type="run">
+        <!-- log -->
+        <file value="msnpureport" file_type="executable" install_own="root:root"/>
+    </file_info>
+</config>

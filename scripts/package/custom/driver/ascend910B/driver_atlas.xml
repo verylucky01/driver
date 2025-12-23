@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config name="driver" copy_type="delivery" src_path="lib/host" dst_path="usr/local/Ascend" install_own="root:root" install_type="run;docker;devel">
+    <dir_info value="driver" install_mod="550" install_own="root:root" >
+        <path value="/usr/local/dcmi" install_mod="755"/>
+    </dir_info>
+
+    <file_info value="include" copy_type="source" src_path="iNPUManager/src/include" dst_path="driver/include" install_path="driver/include"
+    install_mod="444" install_own="$username:$usergroup" install_type="run;devel">
+        <file value="dcmi_interface_api.h" install_type="devel"/>
+        <file value="dsmi_common_interface_custom.h" install_type="devel"/>
+        <file value="dcmi_interface_api.h" install_path="/usr/local/dcmi" install_mod="444" install_own="root:root"/>
+        <file value="dsmi_common_interface_custom.h" install_path="/usr/local/dcmi" install_mod="444" install_own="root:root"/>
+    </file_info>
+    <file_info value="lib64" copy_type="delivery" src_path="lib/host" dst_path="driver/lib64" install_path="driver/lib64/driver"
+    install_mod="444" install_type="run;devel">
+        <file value="libdcmi.so" file_type="shared"/>
+        <file value="libdcmi.so" file_type="shared" install_path="/usr/local/dcmi"/>
+    </file_info>
+    <file_info value="install_scripts" copy_type="delivery" src_path="lib/host" dst_path="driver/tools"
+    install_mod="444" install_own="root:root" install_type="run;devel">
+        <file value="build.info" src_path="lib/host" install_path="driver"/>
+        <file value="version.info" src_path="lib/host" install_path=""/>
+    </file_info>
+    <file_info value="tools" copy_type="source" src_path="iNPUManager/tools" dst_path="" install_mod="644" install_type="run;devel">
+        <file value="nputool-log" install_path="/etc/logrotate.d"/>
+    </file_info>
+
+    <file_info value="script" copy_type="source" src_path="iNPUManager/tools" dst_path="">
+        <file value="npu-healthcheck.sh" install_own="root:root" install_mod="555" install_type="run;devel" install_path="/usr/local/bin"/>
+        <file value="npu-healthcheck.sh" install_own="root:root" install_mod="555" install_type="run;devel" install_path="/usr/local/sbin"/>
+        <file value="npu_log_collect.sh" install_own="root:root" install_mod="500" install_type="run" install_path="driver/tools/" dst_path="driver/tools"/>
+        <file value="vnpu_config_recover.sh" install_own="root:root" install_mod="500" install_type="run;devel" install_path="driver/script/" dst_path="driver/script"/>
+        <file value="msn_config_recover.sh" install_own="root:root" install_mod="500" install_type="run;devel" install_path="driver/script/" dst_path="driver/script"/>
+        <file value="custom_op_config_recover.sh" install_own="root:root" install_mod="500" install_type="run;devel" install_path="driver/script/" dst_path="driver/script"/>
+    </file_info>
+    <file_info value="tools" copy_type="delivery" src_path="lib/host" dst_path="driver/tools"
+    install_mod="555" install_own="root:root">
+        <file value="npu-smi" file_type="executable" install_mod="555" install_own="root:root" install_type="run;devel" install_path="/usr/local/bin"/>
+        <file value="npu-smi" file_type="executable" install_mod="555" install_own="root:root" install_type="run;devel" install_path="/usr/local/sbin"/>
+    </file_info>
+
+</config>

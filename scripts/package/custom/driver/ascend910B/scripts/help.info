@@ -1,0 +1,22 @@
+  --repack [package_name]           Build a precompiled kernel module for the currently running kernel and repack
+                                    the .run file. The new .run file will be renamed to package_name or append
+                                    the string \"-custom\" to its name when package_name not present.
+  --repack-path=<path> [package_name]   Build a precompiled kernel module for the currently running kernel from
+                                    path and repack the .run file. The new .run file will be renamed to
+                                    package_name or append the string \"-custom\" to its name when
+                                    package_name not present.
+  --full                            Install full type
+  --run                             Install run type
+  --debug                           Install debug type
+  --devel                           Install devel type
+  --docker                          Install docker type
+  --upgrade                         Upgrade product immediately
+  --vnpu_guest                      Install vnpu_guest mode, eg: ./xxx.run --full/--run --vnpu_guest
+  --install-path=<path>             Install to specific dir
+  --install-username=<username>     Install to specific username
+  --install-usergroup=<usergroup>   Install to specific usrgroup
+  --uninstall                       Uninstall product
+  --version                         Query the package version
+  --install-for-all                 Install for all user
+  --force                           Forcibly install, upgrade, or uninstall the package, and take effect after host restart
+  --norebuild                       Forcibly no kernel module rebuild

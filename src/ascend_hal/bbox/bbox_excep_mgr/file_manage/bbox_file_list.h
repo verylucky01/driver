@@ -1,0 +1,111 @@
+/**
+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
+
+#ifndef BBOX_FILE_LIST_H
+#define BBOX_FILE_LIST_H
+
+#define MODULE_MNTN_FILE_NAME(filename) (filename ".txt")
+#define MODULE_MNTN_FILE_NAME_BIN(filename) (filename ".bin")
+#define MODULE_MNTN_FILE_NAME_LOG(filename) (filename ".log")
+#define MODULE_MNTN_FILE_NAME_REG(filename) (filename ".reg")
+
+// file name list
+// bbox/
+#define BBOX_FILE_NAME_DRIVER           MODULE_MNTN_FILE_NAME("driver")
+#define BBOX_FILE_NAME_TS               MODULE_MNTN_FILE_NAME("ts")
+#define BBOX_FILE_NAME_DVPP             MODULE_MNTN_FILE_NAME("dvpp")
+#define BBOX_FILE_NAME_UB               MODULE_MNTN_FILE_NAME("ub")
+#define BBOX_FILE_NAME_BIOS             MODULE_MNTN_FILE_NAME("bios")
+#define BBOX_FILE_NAME_LPM              MODULE_MNTN_FILE_NAME("lpm")
+#define BBOX_FILE_NAME_LPM_BIN          MODULE_MNTN_FILE_NAME_BIN("lpm")
+#define BBOX_FILE_NAME_HSM              MODULE_MNTN_FILE_NAME("hsm")
+#define BBOX_FILE_NAME_HSM_BIN          MODULE_MNTN_FILE_NAME_BIN("hsm")
+#define BBOX_FILE_NAME_ISP              MODULE_MNTN_FILE_NAME("isp")
+#define BBOX_FILE_NAME_ISP_BIN          MODULE_MNTN_FILE_NAME_BIN("isp")
+#define BBOX_FILE_NAME_TEE              MODULE_MNTN_FILE_NAME("teeos")
+#define BBOX_FILE_NAME_TF               MODULE_MNTN_FILE_NAME("atf")
+#define BBOX_FILE_NAME_LPFW             MODULE_MNTN_FILE_NAME("lpfw")
+#define BBOX_FILE_NAME_LPFW_BIN         MODULE_MNTN_FILE_NAME_BIN("lpfw")
+#define BBOX_FILE_NAME_MICROWATT        MODULE_MNTN_FILE_NAME("microwatt")
+#define BBOX_FILE_NAME_MICROWATT_BIN    MODULE_MNTN_FILE_NAME_BIN("microwatt")
+#define BBOX_FILE_NAME_NETWORK          MODULE_MNTN_FILE_NAME("network")
+#define BBOX_FILE_NAME_BBOXDDR_BIN      MODULE_MNTN_FILE_NAME_BIN("bbox_ddr")
+#define BBOX_FILE_NAME_AOS_LINUX        MODULE_MNTN_FILE_NAME("aos_linux_kbox")
+#define BBOX_FILE_NAME_AOS_CORE         MODULE_MNTN_FILE_NAME("aos_core_kbox")
+#define BBOX_FILE_NAME_DP               MODULE_MNTN_FILE_NAME("aos_dp_kbox")
+#define BBOX_FILE_NAME_SD               MODULE_MNTN_FILE_NAME("aos_sd_kbox")
+#define BBOX_FILE_NAME_SAFETYISLAND     MODULE_MNTN_FILE_NAME("safetyisland")
+#define BBOX_FILE_NAME_CPUCORE          MODULE_MNTN_FILE_NAME("cpucore")
+#define BBOX_FILE_NAME_IMU_RUN          MODULE_MNTN_FILE_NAME("imu")
+
+// bbox/os/regs/ or bbox/ for dc
+#define BBOX_FILE_NAME_KBOX             MODULE_MNTN_FILE_NAME("kbox")
+
+// bbox/os/regs/
+#define BBOX_FILE_NAME_RESET_REG        MODULE_MNTN_FILE_NAME("reset_regs")
+#define BBOX_FILE_NAME_SCTRL_REG        "sctrl_reg"
+
+// log/
+#define BBOX_FILE_NAME_IMU_BOOT         MODULE_MNTN_FILE_NAME_LOG("imu_boot")
+#define BBOX_FILE_NAME_UEFI_BOOT        MODULE_MNTN_FILE_NAME_LOG("uefi_boot")
+#define BBOX_FILE_NAME_EARLY_KLOG       MODULE_MNTN_FILE_NAME_LOG("early_kernel")
+#define BBOX_FILE_NAME_KLOG             MODULE_MNTN_FILE_NAME_LOG("kernel")
+#define BBOX_FILE_NAME_KLOG_BIN         MODULE_MNTN_FILE_NAME_BIN("kernel_log")
+#define BBOX_FILE_NAME_LPM_LOG          MODULE_MNTN_FILE_NAME_LOG("lpm")
+#define BBOX_FILE_NAME_HSM_LOG          MODULE_MNTN_FILE_NAME_LOG("hsm")
+#define BBOX_FILE_NAME_TS_LOG           MODULE_MNTN_FILE_NAME_LOG("ts")
+// log/slog/debug, run, security
+#define BBOX_FILE_NAME_DEV_OS_LOG       MODULE_MNTN_FILE_NAME_LOG("device_os")
+#define BBOX_FILE_NAME_DEBUG_DEV_FW_LOG MODULE_MNTN_FILE_NAME_LOG("device_fw")
+#define BBOX_FILE_NAME_RUN_EVENT_LOG    MODULE_MNTN_FILE_NAME_LOG("event")
+
+// mntn/
+#define BBOX_FILE_NAME_BIOS_SRAM        MODULE_MNTN_FILE_NAME("bios_mntn")
+#define BBOX_FILE_NAME_DDR_SRAM         MODULE_MNTN_FILE_NAME("ddr_mntn")
+#define BBOX_FILE_NAME_LPM_SRAM         MODULE_MNTN_FILE_NAME("ddr_mntn")
+#define BBOX_FILE_NAME_LPFW_SRAM        MODULE_MNTN_FILE_NAME("ddr_mntn")
+#define BBOX_FILE_NAME_MICROWATT_SRAM   MODULE_MNTN_FILE_NAME("ddr_mntn")
+#define BBOX_FILE_NAME_LPM_SRAM_BIN     MODULE_MNTN_FILE_NAME_BIN("ddr_mntn")
+#define BBOX_FILE_NAME_REGISTER         MODULE_MNTN_FILE_NAME_REG("tsensor")
+#define BBOX_FILE_NAME_PMU              MODULE_MNTN_FILE_NAME_REG("pmu")
+#define BBOX_FILE_NAME_PMU_BIN          MODULE_MNTN_FILE_NAME_BIN("pmu")
+#define BBOX_FILE_NAME_CDR_FULL         MODULE_MNTN_FILE_NAME("chip_dfx_full")
+#define BBOX_FILE_NAME_CDR_FULL_BIN     MODULE_MNTN_FILE_NAME_BIN("chip_dfx_full")
+#define BBOX_FILE_NAME_CDR_MIN          MODULE_MNTN_FILE_NAME("chip_dfx_min")
+#define BBOX_FILE_NAME_CDR_MIN_BIN      MODULE_MNTN_FILE_NAME_BIN("chip_dfx_min")
+#define BBOX_FILE_NAME_HBM              MODULE_MNTN_FILE_NAME("hbm")
+#define BBOX_FILE_NAME_HBM_BIN          MODULE_MNTN_FILE_NAME_BIN("hbm")
+
+/* sram */
+#define BBOX_FILE_NAME_SRAM_SNAPSHOT    MODULE_MNTN_FILE_NAME("snapshot")
+#define BBOX_FILE_NAME_BIOS_HISS        MODULE_MNTN_FILE_NAME("bios_hiss-r52")
+#define BBOX_FILE_NAME_HBOOT            MODULE_MNTN_FILE_NAME("hboot")
+
+// snapshot
+#define BBOX_FILE_NAME_HDR              MODULE_MNTN_FILE_NAME("hdr")
+#define BBOX_FILE_NAME_HDR_LOG          MODULE_MNTN_FILE_NAME_LOG("hdr")
+#define BBOX_FILE_NAME_HDR_STATUS       MODULE_MNTN_FILE_NAME("hdr_status")
+#define BBOX_FILE_NAME_HDR_REBOOT_INFO  MODULE_MNTN_FILE_NAME("hdr_reboot_info")
+#define BBOX_FILE_NAME_REG_DUMP         MODULE_MNTN_FILE_NAME("reg_dump")
+
+// dir name list
+#define DIR_BBOXDUMP    "bbox"
+#define DIR_AP          "os"
+#define DIR_FLASHDUMP   "flash"
+#define DIR_MODULELOG   "log"
+#define DIR_SNAPSHOT    "snapshot"
+#define DIR_MNTN        "mntn"
+#define DIR_REGS        "regs"
+#define DIR_SLOG        "slog"
+#define DIR_DEBUG       "debug"
+#define DIR_RUN         "run"
+#define DIR_SEC         "security"
+
+#endif // BBOX_FILE_LIST_H

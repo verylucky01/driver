@@ -1,0 +1,291 @@
+# dcmi\_get\_netdev\_pkt\_stats\_info<a name="ZH-CN_TOPIC_0000002517615327"></a>
+
+**函数原型<a name="zh-cn_topic_0000001251107199_zh-cn_topic_0000001223414423_zh-cn_topic_0000001146259777_toc533412077"></a>**
+
+**int dcmi\_get\_netdev\_pkt\_stats\_info\(int card\_id, int device\_id, int port\_id, struct dcmi\_network\_pkt\_stats\_info \*network\_pkt\_stats\_info\)**
+
+**功能说明<a name="zh-cn_topic_0000001251107199_zh-cn_topic_0000001223414423_zh-cn_topic_0000001146259777_toc533412078"></a>**
+
+查询NPU设备网口当前收发包数统计。
+
+**参数说明<a name="zh-cn_topic_0000001251107199_zh-cn_topic_0000001223414423_zh-cn_topic_0000001146259777_toc533412079"></a>**
+
+<a name="zh-cn_topic_0000001251107199_zh-cn_topic_0000001223414423_zh-cn_topic_0000001146259777_table10480683"></a>
+<table><thead align="left"><tr id="zh-cn_topic_0000001251107199_zh-cn_topic_0000001223414423_zh-cn_topic_0000001146259777_row7580267"><th class="cellrowborder" valign="top" width="17%" id="mcps1.1.5.1.1"><p id="zh-cn_topic_0000001251107199_zh-cn_topic_0000001223414423_zh-cn_topic_0000001146259777_p10021890"><a name="zh-cn_topic_0000001251107199_zh-cn_topic_0000001223414423_zh-cn_topic_0000001146259777_p10021890"></a><a name="zh-cn_topic_0000001251107199_zh-cn_topic_0000001223414423_zh-cn_topic_0000001146259777_p10021890"></a>参数名称</p>
+</th>
+<th class="cellrowborder" valign="top" width="16.99%" id="mcps1.1.5.1.2"><p id="zh-cn_topic_0000001251107199_zh-cn_topic_0000001223414423_zh-cn_topic_0000001146259777_p6466753"><a name="zh-cn_topic_0000001251107199_zh-cn_topic_0000001223414423_zh-cn_topic_0000001146259777_p6466753"></a><a name="zh-cn_topic_0000001251107199_zh-cn_topic_0000001223414423_zh-cn_topic_0000001146259777_p6466753"></a>输入/输出</p>
+</th>
+<th class="cellrowborder" valign="top" width="16.009999999999998%" id="mcps1.1.5.1.3"><p id="zh-cn_topic_0000001251107199_zh-cn_topic_0000001223414423_zh-cn_topic_0000001146259777_p54045009"><a name="zh-cn_topic_0000001251107199_zh-cn_topic_0000001223414423_zh-cn_topic_0000001146259777_p54045009"></a><a name="zh-cn_topic_0000001251107199_zh-cn_topic_0000001223414423_zh-cn_topic_0000001146259777_p54045009"></a>类型</p>
+</th>
+<th class="cellrowborder" valign="top" width="50%" id="mcps1.1.5.1.4"><p id="zh-cn_topic_0000001251107199_zh-cn_topic_0000001223414423_zh-cn_topic_0000001146259777_p15569626"><a name="zh-cn_topic_0000001251107199_zh-cn_topic_0000001223414423_zh-cn_topic_0000001146259777_p15569626"></a><a name="zh-cn_topic_0000001251107199_zh-cn_topic_0000001223414423_zh-cn_topic_0000001146259777_p15569626"></a>描述</p>
+</th>
+</tr>
+</thead>
+<tbody><tr id="zh-cn_topic_0000001251107199_zh-cn_topic_0000001223414423_zh-cn_topic_0000001146259777_row5908907"><td class="cellrowborder" valign="top" width="17%" headers="mcps1.1.5.1.1 "><p id="p1290353951711"><a name="p1290353951711"></a><a name="p1290353951711"></a>card_id</p>
+</td>
+<td class="cellrowborder" valign="top" width="16.99%" headers="mcps1.1.5.1.2 "><p id="p13903193920176"><a name="p13903193920176"></a><a name="p13903193920176"></a>输入</p>
+</td>
+<td class="cellrowborder" valign="top" width="16.009999999999998%" headers="mcps1.1.5.1.3 "><p id="p09048390172"><a name="p09048390172"></a><a name="p09048390172"></a>int</p>
+</td>
+<td class="cellrowborder" valign="top" width="50%" headers="mcps1.1.5.1.4 "><p id="p119041539161713"><a name="p119041539161713"></a><a name="p119041539161713"></a>设备ID，当前实际支持的ID通过dcmi_get_card_list接口获取。</p>
+</td>
+</tr>
+<tr id="row1684271132614"><td class="cellrowborder" valign="top" width="17%" headers="mcps1.1.5.1.1 "><p id="p11708131185016"><a name="p11708131185016"></a><a name="p11708131185016"></a>device_id</p>
+</td>
+<td class="cellrowborder" valign="top" width="16.99%" headers="mcps1.1.5.1.2 "><p id="p1070811311504"><a name="p1070811311504"></a><a name="p1070811311504"></a>输入</p>
+</td>
+<td class="cellrowborder" valign="top" width="16.009999999999998%" headers="mcps1.1.5.1.3 "><p id="p970973119509"><a name="p970973119509"></a><a name="p970973119509"></a>int</p>
+</td>
+<td class="cellrowborder" valign="top" width="50%" headers="mcps1.1.5.1.4 "><p id="p870915316504"><a name="p870915316504"></a><a name="p870915316504"></a>芯片ID，通过dcmi_get_device_id_in_card接口获取。取值范围如下：</p>
+<p id="zh-cn_topic_0000001148530297_p1377514432141"><a name="zh-cn_topic_0000001148530297_p1377514432141"></a><a name="zh-cn_topic_0000001148530297_p1377514432141"></a>NPU芯片：[0, device_id_max-1]。</p>
+<p id="p128324578469"><a name="p128324578469"></a><a name="p128324578469"></a></p>
+<div class="note" id="note102181227171418"><a name="note102181227171418"></a><a name="note102181227171418"></a><span class="notetitle"> 说明： </span><div class="notebody"><p id="zh-cn_topic_0000002517535283_p10218227151413"><a name="zh-cn_topic_0000002517535283_p10218227151413"></a><a name="zh-cn_topic_0000002517535283_p10218227151413"></a>device_id_max值为1，当device_id为0时表示NPU芯片；当device_id为1时表示MCU芯片。</p>
+</div></div>
+</td>
+</tr>
+<tr id="row5354192415172"><td class="cellrowborder" valign="top" width="17%" headers="mcps1.1.5.1.1 "><p id="p1824103514419"><a name="p1824103514419"></a><a name="p1824103514419"></a>port_id</p>
+</td>
+<td class="cellrowborder" valign="top" width="16.99%" headers="mcps1.1.5.1.2 "><p id="p424143514417"><a name="p424143514417"></a><a name="p424143514417"></a>输入</p>
+</td>
+<td class="cellrowborder" valign="top" width="16.009999999999998%" headers="mcps1.1.5.1.3 "><p id="p1424112357410"><a name="p1424112357410"></a><a name="p1424112357410"></a>int</p>
+</td>
+<td class="cellrowborder" valign="top" width="50%" headers="mcps1.1.5.1.4 "><p id="p1224183544119"><a name="p1224183544119"></a><a name="p1224183544119"></a>NPU设备的网口端口号，当前仅支持配置0。</p>
+</td>
+</tr>
+<tr id="row1459681913429"><td class="cellrowborder" valign="top" width="17%" headers="mcps1.1.5.1.1 "><p id="p4908193110424"><a name="p4908193110424"></a><a name="p4908193110424"></a>network_pkt_stats_info</p>
+</td>
+<td class="cellrowborder" valign="top" width="16.99%" headers="mcps1.1.5.1.2 "><p id="p7908931124212"><a name="p7908931124212"></a><a name="p7908931124212"></a>输出</p>
+</td>
+<td class="cellrowborder" valign="top" width="16.009999999999998%" headers="mcps1.1.5.1.3 "><p id="p3908831194215"><a name="p3908831194215"></a><a name="p3908831194215"></a>dcmi_network_pkt_stats_info</p>
+</td>
+<td class="cellrowborder" valign="top" width="50%" headers="mcps1.1.5.1.4 "><p id="p1290823174218"><a name="p1290823174218"></a><a name="p1290823174218"></a>struct dcmi_network_pkt_stats_info {</p>
+<p id="p17908133111429"><a name="p17908133111429"></a><a name="p17908133111429"></a>unsigned long long mac_tx_mac_pause_num;</p>
+<p id="p8908163184219"><a name="p8908163184219"></a><a name="p8908163184219"></a>MAC发送的pause帧总报文数</p>
+<p id="p11908183144213"><a name="p11908183144213"></a><a name="p11908183144213"></a>unsigned long long mac_rx_mac_pause_num;</p>
+<p id="p18908931114213"><a name="p18908931114213"></a><a name="p18908931114213"></a>MAC接收的pause帧总报文数</p>
+<p id="p99081531154210"><a name="p99081531154210"></a><a name="p99081531154210"></a>unsigned long long mac_tx_pfc_pkt_num;</p>
+<p id="p19087311426"><a name="p19087311426"></a><a name="p19087311426"></a>MAC发送的PFC帧总报文数</p>
+<p id="p29081731114212"><a name="p29081731114212"></a><a name="p29081731114212"></a>unsigned long long mac_tx_pfc_pri0_pkt_num;</p>
+<p id="p1590863194214"><a name="p1590863194214"></a><a name="p1590863194214"></a>MAC 0号调度队列发送的PFC帧总报文数</p>
+<p id="p1890810315427"><a name="p1890810315427"></a><a name="p1890810315427"></a>unsigned long long mac_tx_pfc_pri1_pkt_num;</p>
+<p id="p17908193194218"><a name="p17908193194218"></a><a name="p17908193194218"></a>MAC 1号调度队列发送的PFC帧总报文数</p>
+<p id="p20908173117422"><a name="p20908173117422"></a><a name="p20908173117422"></a>unsigned long long mac_tx_pfc_pri2_pkt_num;</p>
+<p id="p18908203144210"><a name="p18908203144210"></a><a name="p18908203144210"></a>MAC 2号调度队列发送的PFC帧总报文数</p>
+<p id="p1090819318427"><a name="p1090819318427"></a><a name="p1090819318427"></a>unsigned long long mac_tx_pfc_pri3_pkt_num;</p>
+<p id="p990893174219"><a name="p990893174219"></a><a name="p990893174219"></a>MAC 3号调度队列发送的PFC帧总报文数</p>
+<p id="p9908143117423"><a name="p9908143117423"></a><a name="p9908143117423"></a>unsigned long long mac_tx_pfc_pri4_pkt_num;</p>
+<p id="p79081231194217"><a name="p79081231194217"></a><a name="p79081231194217"></a>MAC 4号调度队列发送的PFC帧总报文数</p>
+<p id="p1190833119426"><a name="p1190833119426"></a><a name="p1190833119426"></a>unsigned long long mac_tx_pfc_pri5_pkt_num;</p>
+<p id="p1490893113421"><a name="p1490893113421"></a><a name="p1490893113421"></a>MAC 5号调度队列发送的PFC帧总报文数</p>
+<p id="p1490833117422"><a name="p1490833117422"></a><a name="p1490833117422"></a>unsigned long long mac_tx_pfc_pri6_pkt_num;</p>
+<p id="p14908103104214"><a name="p14908103104214"></a><a name="p14908103104214"></a>MAC 6号调度队列发送的PFC帧总报文数</p>
+<p id="p1790893117420"><a name="p1790893117420"></a><a name="p1790893117420"></a>unsigned long long mac_tx_pfc_pri7_pkt_num;</p>
+<p id="p169081731144210"><a name="p169081731144210"></a><a name="p169081731144210"></a>MAC 7号调度队列发送的PFC帧总报文数</p>
+<p id="p20908123154211"><a name="p20908123154211"></a><a name="p20908123154211"></a>unsigned long long mac_rx_pfc_pkt_num;</p>
+<p id="p290843184213"><a name="p290843184213"></a><a name="p290843184213"></a>MAC接收的PFC帧总报文数</p>
+<p id="p109081631104212"><a name="p109081631104212"></a><a name="p109081631104212"></a>unsigned long long mac_rx_pfc_pri0_pkt_num;</p>
+<p id="p189082310429"><a name="p189082310429"></a><a name="p189082310429"></a>MAC 0号调度队列接收的PFC帧总报文数</p>
+<p id="p7908631154220"><a name="p7908631154220"></a><a name="p7908631154220"></a>unsigned long long mac_rx_pfc_pri1_pkt_num;</p>
+<p id="p590912317424"><a name="p590912317424"></a><a name="p590912317424"></a>MAC 1号调度队列接收的PFC帧总报文数</p>
+<p id="p2909143116429"><a name="p2909143116429"></a><a name="p2909143116429"></a>unsigned long long mac_rx_pfc_pri2_pkt_num;</p>
+<p id="p2090963164213"><a name="p2090963164213"></a><a name="p2090963164213"></a>MAC 2号调度队列接收的PFC帧总报文数</p>
+<p id="p0909173112427"><a name="p0909173112427"></a><a name="p0909173112427"></a>unsigned long long mac_rx_pfc_pri3_pkt_num;</p>
+<p id="p9909231204216"><a name="p9909231204216"></a><a name="p9909231204216"></a>MAC 3号调度队列接收的PFC帧总报文数</p>
+<p id="p159091431144215"><a name="p159091431144215"></a><a name="p159091431144215"></a>unsigned long long mac_rx_pfc_pri4_pkt_num;</p>
+<p id="p190933120421"><a name="p190933120421"></a><a name="p190933120421"></a>MAC 4号调度队列接收的PFC帧总报文数</p>
+<p id="p1790917316421"><a name="p1790917316421"></a><a name="p1790917316421"></a>unsigned long long mac_rx_pfc_pri5_pkt_num;</p>
+<p id="p8909431184217"><a name="p8909431184217"></a><a name="p8909431184217"></a>MAC 5号调度队列接收的PFC帧总报文数</p>
+<p id="p690973124215"><a name="p690973124215"></a><a name="p690973124215"></a>unsigned long long mac_rx_pfc_pri6_pkt_num;</p>
+<p id="p17909193104216"><a name="p17909193104216"></a><a name="p17909193104216"></a>MAC 6号调度队列接收的PFC帧总报文数</p>
+<p id="p49097315422"><a name="p49097315422"></a><a name="p49097315422"></a>unsigned long long mac_rx_pfc_pri7_pkt_num;</p>
+<p id="p69093313420"><a name="p69093313420"></a><a name="p69093313420"></a>MAC 7号调度队列接收的PFC帧总报文数</p>
+<p id="p4909331174211"><a name="p4909331174211"></a><a name="p4909331174211"></a>unsigned long long mac_tx_total_pkt_num;</p>
+<p id="p29095313426"><a name="p29095313426"></a><a name="p29095313426"></a>MAC发送的总报文数</p>
+<p id="p1490933194218"><a name="p1490933194218"></a><a name="p1490933194218"></a>unsigned long long mac_tx_total_oct_num;</p>
+<p id="p79091631184211"><a name="p79091631184211"></a><a name="p79091631184211"></a>MAC发送的总报文字节数</p>
+<p id="p179094314425"><a name="p179094314425"></a><a name="p179094314425"></a>unsigned long long mac_tx_bad_pkt_num;</p>
+<p id="p1590973124211"><a name="p1590973124211"></a><a name="p1590973124211"></a>MAC发送的坏包总报文数</p>
+<p id="p8909231104214"><a name="p8909231104214"></a><a name="p8909231104214"></a>unsigned long long mac_tx_bad_oct_num;</p>
+<p id="p69091231134219"><a name="p69091231134219"></a><a name="p69091231134219"></a>MAC发送的坏包总报文字节数</p>
+<p id="p13909731154215"><a name="p13909731154215"></a><a name="p13909731154215"></a>unsigned long long mac_rx_total_pkt_num;</p>
+<p id="p590943119423"><a name="p590943119423"></a><a name="p590943119423"></a>MAC接收的总报文数</p>
+<p id="p5909331114215"><a name="p5909331114215"></a><a name="p5909331114215"></a>unsigned long long mac_rx_total_oct_num;</p>
+<p id="p59091531104217"><a name="p59091531104217"></a><a name="p59091531104217"></a>MAC接收的总报文字节数</p>
+<p id="p490973104214"><a name="p490973104214"></a><a name="p490973104214"></a>unsigned long long mac_rx_bad_pkt_num;</p>
+<p id="p19909731104211"><a name="p19909731104211"></a><a name="p19909731104211"></a>MAC接收的坏包总报文数</p>
+<p id="p990963110427"><a name="p990963110427"></a><a name="p990963110427"></a>unsigned long long mac_rx_bad_oct_num;</p>
+<p id="p13909113124211"><a name="p13909113124211"></a><a name="p13909113124211"></a>MAC接收的坏包总报文字节数</p>
+<p id="p18909193118427"><a name="p18909193118427"></a><a name="p18909193118427"></a>unsigned long long mac_rx_fcs_err_pkt_num;</p>
+<p id="p7909113194210"><a name="p7909113194210"></a><a name="p7909113194210"></a>MAC接收的存在FCS错误的报文数</p>
+<p id="p14909183114213"><a name="p14909183114213"></a><a name="p14909183114213"></a>unsigned long long roce_rx_rc_pkt_num;</p>
+<p id="p19909103116423"><a name="p19909103116423"></a><a name="p19909103116423"></a>RoCEE接收的RC类型报文数</p>
+<p id="p5909931174218"><a name="p5909931174218"></a><a name="p5909931174218"></a>unsigned long long roce_rx_all_pkt_num;</p>
+<p id="p1690963194213"><a name="p1690963194213"></a><a name="p1690963194213"></a>RoCEE接收的总报文数</p>
+<p id="p4909123113423"><a name="p4909123113423"></a><a name="p4909123113423"></a>unsigned long long roce_rx_err_pkt_num;</p>
+<p id="p99091231184211"><a name="p99091231184211"></a><a name="p99091231184211"></a>RoCEE接收的坏包总报文数</p>
+<p id="p490914317429"><a name="p490914317429"></a><a name="p490914317429"></a>unsigned long long roce_tx_rc_pkt_num;</p>
+<p id="p2909531184212"><a name="p2909531184212"></a><a name="p2909531184212"></a>RoCEE发送的RC类型报文数</p>
+<p id="p189099312429"><a name="p189099312429"></a><a name="p189099312429"></a>unsigned long long roce_tx_all_pkt_num;</p>
+<p id="p6909531174211"><a name="p6909531174211"></a><a name="p6909531174211"></a>RoCEE发送的总报文数</p>
+<p id="p4909103119426"><a name="p4909103119426"></a><a name="p4909103119426"></a>unsigned long long roce_tx_err_pkt_num;</p>
+<p id="p7909103116422"><a name="p7909103116422"></a><a name="p7909103116422"></a>RoCEE发送的坏包总报文数</p>
+<p id="p190983110426"><a name="p190983110426"></a><a name="p190983110426"></a>unsigned long long roce_cqe_num;</p>
+<p id="p190943134215"><a name="p190943134215"></a><a name="p190943134215"></a>RoCEE任务完成的总元素个数</p>
+<p id="p149093310426"><a name="p149093310426"></a><a name="p149093310426"></a>unsigned long long roce_rx_cnp_pkt_num;</p>
+<p id="p18909531194213"><a name="p18909531194213"></a><a name="p18909531194213"></a>RoCEE接收的CNP类型报文数</p>
+<p id="p8909153112428"><a name="p8909153112428"></a><a name="p8909153112428"></a>unsigned long long roce_tx_cnp_pkt_num;</p>
+<p id="p3909143118429"><a name="p3909143118429"></a><a name="p3909143118429"></a>RoCEE发送的CNP类型报文数</p>
+<p id="p49091131114215"><a name="p49091131114215"></a><a name="p49091131114215"></a>unsigned long long roce_err_ack_num;</p>
+<p id="p0909173164220"><a name="p0909173164220"></a><a name="p0909173164220"></a>RoCEE接收的非预期ACK报文数，NPU做丢弃处理，不影响业务</p>
+<p id="p3909143114213"><a name="p3909143114213"></a><a name="p3909143114213"></a>unsigned long long roce_err_psn_num;</p>
+<p id="p6909231124210"><a name="p6909231124210"></a><a name="p6909231124210"></a>RoCEE接收的PSN&gt;预期PSN的报文，或重复PSN报文数。乱序或丢包，会触发重传</p>
+<p id="p19091831134218"><a name="p19091831134218"></a><a name="p19091831134218"></a>unsigned long long roce_verification_err_num;</p>
+<p id="p1090912314422"><a name="p1090912314422"></a><a name="p1090912314422"></a>RoCEE接收的域段校验错误的报文数，如：icrc、报文长度、目的端口号等校验失败</p>
+<p id="p1290973144219"><a name="p1290973144219"></a><a name="p1290973144219"></a>unsigned long long roce_err_qp_status_num;</p>
+<p id="p189092314421"><a name="p189092314421"></a><a name="p189092314421"></a>RoCEE接收的QP连接状态异常产生的报文数</p>
+<p id="p49091031124213"><a name="p49091031124213"></a><a name="p49091031124213"></a>unsigned long long roce_new_pkt_rty_num;</p>
+<p id="p15909731114217"><a name="p15909731114217"></a><a name="p15909731114217"></a>RoCEE发送的超次重传的数量统计</p>
+<p id="p1890916310424"><a name="p1890916310424"></a><a name="p1890916310424"></a>unsigned long long roce_ecn_db_num;</p>
+<p id="p490933117428"><a name="p490933117428"></a><a name="p490933117428"></a>RoCEE接收的存在ECN标记位的报文数</p>
+<p id="p190973144218"><a name="p190973144218"></a><a name="p190973144218"></a>unsigned long long nic_tx_all_pkg_num;</p>
+<p id="p10909631134212"><a name="p10909631134212"></a><a name="p10909631134212"></a>NIC发送的总报文数</p>
+<p id="p590913311424"><a name="p590913311424"></a><a name="p590913311424"></a>unsigned long long nic_tx_all_oct_num;</p>
+<p id="p890920316422"><a name="p890920316422"></a><a name="p890920316422"></a>NIC发送的总报文字节数</p>
+<p id="p1990919315428"><a name="p1990919315428"></a><a name="p1990919315428"></a>unsigned long long nic_rx_all_pkg_num;</p>
+<p id="p6910131114220"><a name="p6910131114220"></a><a name="p6910131114220"></a>NIC接收的总报文数</p>
+<p id="p199101131114218"><a name="p199101131114218"></a><a name="p199101131114218"></a>unsigned long long nic_rx_all_oct_num;</p>
+<p id="p891003119424"><a name="p891003119424"></a><a name="p891003119424"></a>NIC接收的总报文字节数</p>
+<p id="p391093104213"><a name="p391093104213"></a><a name="p391093104213"></a>long tv_sec;</p>
+<p id="p7910031144216"><a name="p7910031144216"></a><a name="p7910031144216"></a>查询发生时的当前系统时间（单位s）</p>
+<p id="p18910103110426"><a name="p18910103110426"></a><a name="p18910103110426"></a>long tv_usec;</p>
+<p id="p091023118421"><a name="p091023118421"></a><a name="p091023118421"></a>查询发生时的当前系统时间（单位us）</p>
+<p id="p79104317427"><a name="p79104317427"></a><a name="p79104317427"></a>unsigned char reserved[64];</p>
+<p id="p3910183194216"><a name="p3910183194216"></a><a name="p3910183194216"></a>};</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+**返回值说明<a name="zh-cn_topic_0000001206627196_zh-cn_topic_0000001178213188_zh-cn_topic_0000001146459833_section1256282115569"></a>**
+
+<a name="zh-cn_topic_0000002485295458_zh-cn_topic_0000001251227149_zh-cn_topic_0000001178213202_zh-cn_topic_0000001097675636_zh-cn_topic_0000001170223803_table19654399"></a>
+<table><thead align="left"><tr id="zh-cn_topic_0000002485295458_zh-cn_topic_0000001251227149_zh-cn_topic_0000001178213202_zh-cn_topic_0000001097675636_zh-cn_topic_0000001170223803_zh-cn_topic_0160151812_row59025204"><th class="cellrowborder" valign="top" width="24.18%" id="mcps1.1.3.1.1"><p id="zh-cn_topic_0000002485295458_zh-cn_topic_0000001251227149_zh-cn_topic_0000001178213202_zh-cn_topic_0000001097675636_zh-cn_topic_0000001170223803_zh-cn_topic_0160151812_p16312252"><a name="zh-cn_topic_0000002485295458_zh-cn_topic_0000001251227149_zh-cn_topic_0000001178213202_zh-cn_topic_0000001097675636_zh-cn_topic_0000001170223803_zh-cn_topic_0160151812_p16312252"></a><a name="zh-cn_topic_0000002485295458_zh-cn_topic_0000001251227149_zh-cn_topic_0000001178213202_zh-cn_topic_0000001097675636_zh-cn_topic_0000001170223803_zh-cn_topic_0160151812_p16312252"></a>类型</p>
+</th>
+<th class="cellrowborder" valign="top" width="75.82%" id="mcps1.1.3.1.2"><p id="zh-cn_topic_0000002485295458_zh-cn_topic_0000001251227149_zh-cn_topic_0000001178213202_zh-cn_topic_0000001097675636_zh-cn_topic_0000001170223803_zh-cn_topic_0160151812_p46224020"><a name="zh-cn_topic_0000002485295458_zh-cn_topic_0000001251227149_zh-cn_topic_0000001178213202_zh-cn_topic_0000001097675636_zh-cn_topic_0000001170223803_zh-cn_topic_0160151812_p46224020"></a><a name="zh-cn_topic_0000002485295458_zh-cn_topic_0000001251227149_zh-cn_topic_0000001178213202_zh-cn_topic_0000001097675636_zh-cn_topic_0000001170223803_zh-cn_topic_0160151812_p46224020"></a>描述</p>
+</th>
+</tr>
+</thead>
+<tbody><tr id="zh-cn_topic_0000002485295458_zh-cn_topic_0000001251227149_zh-cn_topic_0000001178213202_zh-cn_topic_0000001097675636_zh-cn_topic_0000001170223803_zh-cn_topic_0160151812_row13362997"><td class="cellrowborder" valign="top" width="24.18%" headers="mcps1.1.3.1.1 "><p id="zh-cn_topic_0000002485295458_zh-cn_topic_0000001251227149_zh-cn_topic_0000001178213202_zh-cn_topic_0000001097675636_zh-cn_topic_0000001170223803_zh-cn_topic_0160151812_p8661001"><a name="zh-cn_topic_0000002485295458_zh-cn_topic_0000001251227149_zh-cn_topic_0000001178213202_zh-cn_topic_0000001097675636_zh-cn_topic_0000001170223803_zh-cn_topic_0160151812_p8661001"></a><a name="zh-cn_topic_0000002485295458_zh-cn_topic_0000001251227149_zh-cn_topic_0000001178213202_zh-cn_topic_0000001097675636_zh-cn_topic_0000001170223803_zh-cn_topic_0160151812_p8661001"></a>int</p>
+</td>
+<td class="cellrowborder" valign="top" width="75.82%" headers="mcps1.1.3.1.2 "><p id="zh-cn_topic_0000002485295458_zh-cn_topic_0000001251227149_zh-cn_topic_0000001178213202_zh-cn_topic_0000001097675636_zh-cn_topic_0000001170223803_zh-cn_topic_0160151812_p79561110476"><a name="zh-cn_topic_0000002485295458_zh-cn_topic_0000001251227149_zh-cn_topic_0000001178213202_zh-cn_topic_0000001097675636_zh-cn_topic_0000001170223803_zh-cn_topic_0160151812_p79561110476"></a><a name="zh-cn_topic_0000002485295458_zh-cn_topic_0000001251227149_zh-cn_topic_0000001178213202_zh-cn_topic_0000001097675636_zh-cn_topic_0000001170223803_zh-cn_topic_0160151812_p79561110476"></a>处理结果：</p>
+<a name="zh-cn_topic_0000002485295458_zh-cn_topic_0000001251227149_zh-cn_topic_0000001178213202_zh-cn_topic_0000001097675636_zh-cn_topic_0000001170223803_zh-cn_topic_0160151812_ul55711364478"></a><a name="zh-cn_topic_0000002485295458_zh-cn_topic_0000001251227149_zh-cn_topic_0000001178213202_zh-cn_topic_0000001097675636_zh-cn_topic_0000001170223803_zh-cn_topic_0160151812_ul55711364478"></a><ul id="zh-cn_topic_0000002485295458_zh-cn_topic_0000001251227149_zh-cn_topic_0000001178213202_zh-cn_topic_0000001097675636_zh-cn_topic_0000001170223803_zh-cn_topic_0160151812_ul55711364478"><li>成功：返回0。</li><li>失败：返回码请参见<a href="return_codes.md">return_codes</a>。</li></ul>
+</td>
+</tr>
+</tbody>
+</table>
+
+**异常处理<a name="zh-cn_topic_0000001206627196_zh-cn_topic_0000001178213188_zh-cn_topic_0000001146459833_toc533412081"></a>**
+
+无。
+
+**约束说明<a name="zh-cn_topic_0000001251107199_zh-cn_topic_0000001223414423_zh-cn_topic_0000001146259777_toc533412082"></a>**
+
+**表 1** 不同部署场景下的支持情况
+
+<a name="table13875158355"></a>
+<table><thead align="left"><tr id="zh-cn_topic_0000002485295476_row979954933113"><th class="cellrowborder" valign="top" width="27.02%" id="mcps1.2.5.1.1"><p id="zh-cn_topic_0000002485295476_p259621143212"><a name="zh-cn_topic_0000002485295476_p259621143212"></a><a name="zh-cn_topic_0000002485295476_p259621143212"></a>产品形态</p>
+</th>
+<th class="cellrowborder" valign="top" width="18.94%" id="mcps1.2.5.1.2"><p id="zh-cn_topic_0000002485295476_p185961211133216"><a name="zh-cn_topic_0000002485295476_p185961211133216"></a><a name="zh-cn_topic_0000002485295476_p185961211133216"></a>物理机场景（裸机）root用户</p>
+</th>
+<th class="cellrowborder" valign="top" width="27.02%" id="mcps1.2.5.1.3"><p id="zh-cn_topic_0000002485295476_p3596161118320"><a name="zh-cn_topic_0000002485295476_p3596161118320"></a><a name="zh-cn_topic_0000002485295476_p3596161118320"></a>物理机场景（裸机）运行用户组（非root用户）</p>
+</th>
+<th class="cellrowborder" valign="top" width="27.02%" id="mcps1.2.5.1.4"><p id="zh-cn_topic_0000002485295476_p13596101193211"><a name="zh-cn_topic_0000002485295476_p13596101193211"></a><a name="zh-cn_topic_0000002485295476_p13596101193211"></a>物理机+普通容器场景root用户</p>
+</th>
+</tr>
+</thead>
+<tbody><tr id="zh-cn_topic_0000002485295476_row279917498314"><td class="cellrowborder" valign="top" width="27.02%" headers="mcps1.2.5.1.1 "><p id="zh-cn_topic_0000002485295476_p879924993116"><a name="zh-cn_topic_0000002485295476_p879924993116"></a><a name="zh-cn_topic_0000002485295476_p879924993116"></a><span id="zh-cn_topic_0000002485295476_ph3799204963110"><a name="zh-cn_topic_0000002485295476_ph3799204963110"></a><a name="zh-cn_topic_0000002485295476_ph3799204963110"></a><span id="zh-cn_topic_0000002485295476_text579974910315"><a name="zh-cn_topic_0000002485295476_text579974910315"></a><a name="zh-cn_topic_0000002485295476_text579974910315"></a>Atlas 900 A2 PoD 集群基础单元</span></span></p>
+</td>
+<td class="cellrowborder" valign="top" width="18.94%" headers="mcps1.2.5.1.2 "><p id="zh-cn_topic_0000002485295476_p18370822173217"><a name="zh-cn_topic_0000002485295476_p18370822173217"></a><a name="zh-cn_topic_0000002485295476_p18370822173217"></a>Y</p>
+</td>
+<td class="cellrowborder" valign="top" width="27.02%" headers="mcps1.2.5.1.3 "><p id="zh-cn_topic_0000002485295476_p1737914223329"><a name="zh-cn_topic_0000002485295476_p1737914223329"></a><a name="zh-cn_topic_0000002485295476_p1737914223329"></a>Y</p>
+</td>
+<td class="cellrowborder" valign="top" width="27.02%" headers="mcps1.2.5.1.4 "><p id="zh-cn_topic_0000002485295476_p78004497311"><a name="zh-cn_topic_0000002485295476_p78004497311"></a><a name="zh-cn_topic_0000002485295476_p78004497311"></a>NA</p>
+</td>
+</tr>
+<tr id="zh-cn_topic_0000002485295476_row10800749163116"><td class="cellrowborder" valign="top" width="27.02%" headers="mcps1.2.5.1.1 "><p id="zh-cn_topic_0000002485295476_p11800114913117"><a name="zh-cn_topic_0000002485295476_p11800114913117"></a><a name="zh-cn_topic_0000002485295476_p11800114913117"></a><span id="zh-cn_topic_0000002485295476_text8800164911319"><a name="zh-cn_topic_0000002485295476_text8800164911319"></a><a name="zh-cn_topic_0000002485295476_text8800164911319"></a>Atlas 800T A2 训练服务器</span></p>
+</td>
+<td class="cellrowborder" valign="top" width="18.94%" headers="mcps1.2.5.1.2 "><p id="zh-cn_topic_0000002485295476_p1638911222323"><a name="zh-cn_topic_0000002485295476_p1638911222323"></a><a name="zh-cn_topic_0000002485295476_p1638911222323"></a>Y</p>
+</td>
+<td class="cellrowborder" valign="top" width="27.02%" headers="mcps1.2.5.1.3 "><p id="zh-cn_topic_0000002485295476_p17392222113213"><a name="zh-cn_topic_0000002485295476_p17392222113213"></a><a name="zh-cn_topic_0000002485295476_p17392222113213"></a>Y</p>
+</td>
+<td class="cellrowborder" valign="top" width="27.02%" headers="mcps1.2.5.1.4 "><p id="zh-cn_topic_0000002485295476_p168008496318"><a name="zh-cn_topic_0000002485295476_p168008496318"></a><a name="zh-cn_topic_0000002485295476_p168008496318"></a>NA</p>
+</td>
+</tr>
+<tr id="zh-cn_topic_0000002485295476_row5800184916315"><td class="cellrowborder" valign="top" width="27.02%" headers="mcps1.2.5.1.1 "><p id="zh-cn_topic_0000002485295476_p9800164914316"><a name="zh-cn_topic_0000002485295476_p9800164914316"></a><a name="zh-cn_topic_0000002485295476_p9800164914316"></a><span id="zh-cn_topic_0000002485295476_text980012496318"><a name="zh-cn_topic_0000002485295476_text980012496318"></a><a name="zh-cn_topic_0000002485295476_text980012496318"></a>Atlas 800I A2 推理服务器</span></p>
+</td>
+<td class="cellrowborder" valign="top" width="18.94%" headers="mcps1.2.5.1.2 "><p id="zh-cn_topic_0000002485295476_p7397222133210"><a name="zh-cn_topic_0000002485295476_p7397222133210"></a><a name="zh-cn_topic_0000002485295476_p7397222133210"></a>Y</p>
+</td>
+<td class="cellrowborder" valign="top" width="27.02%" headers="mcps1.2.5.1.3 "><p id="zh-cn_topic_0000002485295476_p194011622143211"><a name="zh-cn_topic_0000002485295476_p194011622143211"></a><a name="zh-cn_topic_0000002485295476_p194011622143211"></a>Y</p>
+</td>
+<td class="cellrowborder" valign="top" width="27.02%" headers="mcps1.2.5.1.4 "><p id="zh-cn_topic_0000002485295476_p178001449123113"><a name="zh-cn_topic_0000002485295476_p178001449123113"></a><a name="zh-cn_topic_0000002485295476_p178001449123113"></a>NA</p>
+</td>
+</tr>
+<tr id="zh-cn_topic_0000002485295476_row7800104915312"><td class="cellrowborder" valign="top" width="27.02%" headers="mcps1.2.5.1.1 "><p id="zh-cn_topic_0000002485295476_p1580044933111"><a name="zh-cn_topic_0000002485295476_p1580044933111"></a><a name="zh-cn_topic_0000002485295476_p1580044933111"></a><span id="zh-cn_topic_0000002485295476_text9800184912315"><a name="zh-cn_topic_0000002485295476_text9800184912315"></a><a name="zh-cn_topic_0000002485295476_text9800184912315"></a>Atlas 200T A2 Box16 异构子框</span></p>
+</td>
+<td class="cellrowborder" valign="top" width="18.94%" headers="mcps1.2.5.1.2 "><p id="zh-cn_topic_0000002485295476_p104051222163215"><a name="zh-cn_topic_0000002485295476_p104051222163215"></a><a name="zh-cn_topic_0000002485295476_p104051222163215"></a>Y</p>
+</td>
+<td class="cellrowborder" valign="top" width="27.02%" headers="mcps1.2.5.1.3 "><p id="zh-cn_topic_0000002485295476_p440822211325"><a name="zh-cn_topic_0000002485295476_p440822211325"></a><a name="zh-cn_topic_0000002485295476_p440822211325"></a>Y</p>
+</td>
+<td class="cellrowborder" valign="top" width="27.02%" headers="mcps1.2.5.1.4 "><p id="zh-cn_topic_0000002485295476_p38001949193113"><a name="zh-cn_topic_0000002485295476_p38001949193113"></a><a name="zh-cn_topic_0000002485295476_p38001949193113"></a>NA</p>
+</td>
+</tr>
+<tr id="zh-cn_topic_0000002485295476_row18800194983115"><td class="cellrowborder" valign="top" width="27.02%" headers="mcps1.2.5.1.1 "><p id="zh-cn_topic_0000002485295476_p1180013499315"><a name="zh-cn_topic_0000002485295476_p1180013499315"></a><a name="zh-cn_topic_0000002485295476_p1180013499315"></a><span id="zh-cn_topic_0000002485295476_text10800649183116"><a name="zh-cn_topic_0000002485295476_text10800649183116"></a><a name="zh-cn_topic_0000002485295476_text10800649183116"></a>A200I A2 Box 异构组件</span></p>
+</td>
+<td class="cellrowborder" valign="top" width="18.94%" headers="mcps1.2.5.1.2 "><p id="zh-cn_topic_0000002485295476_p18410722203220"><a name="zh-cn_topic_0000002485295476_p18410722203220"></a><a name="zh-cn_topic_0000002485295476_p18410722203220"></a>Y</p>
+</td>
+<td class="cellrowborder" valign="top" width="27.02%" headers="mcps1.2.5.1.3 "><p id="zh-cn_topic_0000002485295476_p3413182217322"><a name="zh-cn_topic_0000002485295476_p3413182217322"></a><a name="zh-cn_topic_0000002485295476_p3413182217322"></a>Y</p>
+</td>
+<td class="cellrowborder" valign="top" width="27.02%" headers="mcps1.2.5.1.4 "><p id="zh-cn_topic_0000002485295476_p1880012499317"><a name="zh-cn_topic_0000002485295476_p1880012499317"></a><a name="zh-cn_topic_0000002485295476_p1880012499317"></a>NA</p>
+</td>
+</tr>
+<tr id="zh-cn_topic_0000002485295476_row13800174918315"><td class="cellrowborder" valign="top" width="27.02%" headers="mcps1.2.5.1.1 "><p id="zh-cn_topic_0000002485295476_p7800124914316"><a name="zh-cn_topic_0000002485295476_p7800124914316"></a><a name="zh-cn_topic_0000002485295476_p7800124914316"></a><span id="zh-cn_topic_0000002485295476_text980013499315"><a name="zh-cn_topic_0000002485295476_text980013499315"></a><a name="zh-cn_topic_0000002485295476_text980013499315"></a>Atlas 300I A2 推理卡</span></p>
+</td>
+<td class="cellrowborder" valign="top" width="18.94%" headers="mcps1.2.5.1.2 "><p id="zh-cn_topic_0000002485295476_p18415112223217"><a name="zh-cn_topic_0000002485295476_p18415112223217"></a><a name="zh-cn_topic_0000002485295476_p18415112223217"></a>N</p>
+</td>
+<td class="cellrowborder" valign="top" width="27.02%" headers="mcps1.2.5.1.3 "><p id="zh-cn_topic_0000002485295476_p10417422113216"><a name="zh-cn_topic_0000002485295476_p10417422113216"></a><a name="zh-cn_topic_0000002485295476_p10417422113216"></a>N</p>
+</td>
+<td class="cellrowborder" valign="top" width="27.02%" headers="mcps1.2.5.1.4 "><p id="zh-cn_topic_0000002485295476_p14800449103115"><a name="zh-cn_topic_0000002485295476_p14800449103115"></a><a name="zh-cn_topic_0000002485295476_p14800449103115"></a>NA</p>
+</td>
+</tr>
+<tr id="zh-cn_topic_0000002485295476_row1680016498317"><td class="cellrowborder" valign="top" width="27.02%" headers="mcps1.2.5.1.1 "><p id="zh-cn_topic_0000002485295476_p8800124920315"><a name="zh-cn_topic_0000002485295476_p8800124920315"></a><a name="zh-cn_topic_0000002485295476_p8800124920315"></a><span id="zh-cn_topic_0000002485295476_text2800174910316"><a name="zh-cn_topic_0000002485295476_text2800174910316"></a><a name="zh-cn_topic_0000002485295476_text2800174910316"></a>Atlas 300T A2 训练卡</span></p>
+</td>
+<td class="cellrowborder" valign="top" width="18.94%" headers="mcps1.2.5.1.2 "><p id="zh-cn_topic_0000002485295476_p134191622183215"><a name="zh-cn_topic_0000002485295476_p134191622183215"></a><a name="zh-cn_topic_0000002485295476_p134191622183215"></a>Y</p>
+</td>
+<td class="cellrowborder" valign="top" width="27.02%" headers="mcps1.2.5.1.3 "><p id="zh-cn_topic_0000002485295476_p0422822103214"><a name="zh-cn_topic_0000002485295476_p0422822103214"></a><a name="zh-cn_topic_0000002485295476_p0422822103214"></a>Y</p>
+</td>
+<td class="cellrowborder" valign="top" width="27.02%" headers="mcps1.2.5.1.4 "><p id="zh-cn_topic_0000002485295476_p19800144917310"><a name="zh-cn_topic_0000002485295476_p19800144917310"></a><a name="zh-cn_topic_0000002485295476_p19800144917310"></a>NA</p>
+</td>
+</tr>
+<tr id="zh-cn_topic_0000002485295476_row2800104920311"><td class="cellrowborder" colspan="4" valign="top" headers="mcps1.2.5.1.1 mcps1.2.5.1.2 mcps1.2.5.1.3 mcps1.2.5.1.4 "><p id="zh-cn_topic_0000002485295476_p4800194933110"><a name="zh-cn_topic_0000002485295476_p4800194933110"></a><a name="zh-cn_topic_0000002485295476_p4800194933110"></a><span id="zh-cn_topic_0000002485295476_zh-cn_topic_0000002485295476_ph209063317554"><a name="zh-cn_topic_0000002485295476_zh-cn_topic_0000002485295476_ph209063317554"></a><a name="zh-cn_topic_0000002485295476_zh-cn_topic_0000002485295476_ph209063317554"></a>注：Y表示支持；N表示不支持；NA表示不涉及，当前未规划此场景。</span></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+**调用示例<a name="zh-cn_topic_0000001251107199_zh-cn_topic_0000001223414423_zh-cn_topic_0000001146259777_toc533412083"></a>**
+
+```
+…
+int ret = 0;
+int card_id=0;
+int device_id=0;
+int port_id=0;
+struct dcmi_network_pkt_stats_info network_pkt_stats_info = {0};
+ret = dcmi_get_netdev_pkt_stats_info (card_id, device_id, port_id, &network_pkt_stats_info);
+if (ret != 0){
+    //todo：记录日志
+    return ret;
+}
+…
+```
+

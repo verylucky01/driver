@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--   Copyright (c) 2025 Huawei Technologies Co., Ltd.
+       This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+       CANN Open Software License Agreement Version 2.0 (the "License").
+       Please refer to the License for details. You may not use this file except in compliance with the License.
+       THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+       INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+       See LICENSE in the root of the software repository for the full text of the License.
+-->
+
+<configuration>
+    <oatconfig>
+        <licensefile></licensefile>
+        <policylist>
+            <policy name="projectPolicy" desc="">
+                <policyitem type="license" name="CANN License" path=".*" desc="License for CANN Open Software"/>
+                <policyitem type="license" name="GPL-2.0-only" path=".*" desc="License for CANN Open Software"/>
+                <policyitem type="license" name="GPLStyleLicense" path=".*" desc="License for CANN Open Software"/>
+                <policyitem type="license" name="SPDX:GPL-2.0 WITH Linux-syscall-note" path=".*" desc="License for CANN Open Software"/>
+                <policyitem type="copyright" name="Copyright (c) 2025 Huawei Technologies Co., Ltd." path=".*" rule="may" group="defaultGroup" filefilter="copyrightPolicyFilter" desc=""/>
+                <policyitem type="copyright" name="Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved." path=".*" rule="may" group="defaultGroup" filefilter="copyrightPolicyFilter" desc=""/>
+            </policy>
+        </policylist>
+
+        <filefilterlist>
+            <filefilter name="defaultFilter" desc="Files not to check">
+                <filteritem type="filename" name="*.cfg|*.conf|*.config|*.csv|*.gitignore|*.info|*.list|*.lst|*nputool-log|*.map|*.md|*.png|*.xml|*.yml|*.txt" desc="desc files; config file"/>
+                <filteritem type="filepath" name="LICENSES/.*" desc="license files"/>
+            </filefilter>
+            <filefilter name="defaultPolicyFilter" desc="Filters for compatibility,license header policies">
+            </filefilter>
+            <filefilter name="copyrightPolicyFilter" desc="Filters for copyright header policies">
+            </filefilter>
+            <filefilter name="licenseFileNamePolicyFilter" desc="Filters for LICENSE file policies">
+            </filefilter>
+            <filefilter name="readmeFileNamePolicyFilter" desc="Filters for README file policies">
+            </filefilter>
+            <filefilter name="readmeOpenSourcefileNamePolicyFilter" desc="Filters for README.OpenSource file policies">
+            </filefilter>
+            <filefilter name="binaryFileTypePolicyFilter" desc="Filters for binary file policies">
+            </filefilter>
+        </filefilterlist>
+		<licensematcherlist>
+            <licensematcher name="CANN License" desc="License for CANN Open Software">
+                <licensetext name="
+                    Copyright (c) 2025 Huawei Technologies Co., Ltd.
+                    This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+                    CANN Open Software License Agreement Version 2.0 (the &quot;License&quot;).
+                    Please refer to the License for details. You may not use this file except in compliance with the License.
+                    THIS SOFTWARE IS PROVIDED ON AN &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+                    INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+                    See LICENSE in the root of the software repository for the full text of the License.
+                " desc=""/>
+            </licensematcher>
+        </licensematcherlist>
+    </oatconfig>
+</configuration>

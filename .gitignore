@@ -1,0 +1,29 @@
+# binary files
+*.so
+
+cmake-build-debugindocker/
+.DS_Store
+# distribution and packaging
+build/
+build_out/
+output/
+dist/
+third_party/
+!cmake/third_party
+*.egg-info/
+*.egg
+*.whl
+
+# vim cache
+*.swp
+
+# python cache
+*.pyc
+__pycache__
+MANIFEST.in
+
+# Visual Studio
+.vs
+
+# Visual Studio Code
+.vscode

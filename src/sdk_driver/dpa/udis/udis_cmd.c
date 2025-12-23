@@ -1,0 +1,229 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ */
+
+#include <linux/uaccess.h>
+
+#include "securec.h"
+#include "pbl/pbl_uda.h"
+#include "urd_acc_ctrl.h"
+#include "dms/dms_cmd_def.h"
+#include "pbl_urd_sub_cmd_def.h"
+#include "udis_management.h"
+#include "udis_log.h"
+#include "udis_cmd.h"
+
+int udis_feature_get_device_info(struct urd_cmd *cmd, struct urd_cmd_kernel_para *kernel_para,
+    struct urd_cmd_para *cmd_para);
+int udis_feature_set_device_info(struct urd_cmd *cmd, struct urd_cmd_kernel_para *kernel_para,
+    struct urd_cmd_para *cmd_para);
+
+#define DMS_MODULE_UDIS "udis"
+INIT_MODULE_FUNC(DMS_MODULE_UDIS);
+EXIT_MODULE_FUNC(DMS_MODULE_UDIS);
+BEGIN_DMS_MODULE_DECLARATION(DMS_MODULE_UDIS)
+BEGIN_FEATURE_COMMAND()
+#ifdef DRV_HOST
+ADD_DEV_FEATURE_COMMAND(DMS_MODULE_UDIS, DMS_GET_UDIS_DEVICE_INFO_CMD, ZERO_CMD,
+    NULL, NULL, DMS_SUPPORT_ALL, udis_feature_get_device_info)
+ADD_DEV_FEATURE_COMMAND(DMS_MODULE_UDIS, DMS_SET_UDIS_DEVICE_INFO_CMD, ZERO_CMD,
+    NULL, NULL, DMS_ACC_ROOT_ONLY | DMS_ENV_ALL | DMS_VDEV_ALL, udis_feature_set_device_info)
+#else
+ADD_DEV_FEATURE_COMMAND(DMS_MODULE_UDIS, DMS_GET_UDIS_DEVICE_INFO_CMD, ZERO_CMD,
+    NULL, NULL, DMS_SUPPORT_ALL_USER, udis_feature_get_device_info)
+ADD_DEV_FEATURE_COMMAND(DMS_MODULE_UDIS, DMS_SET_UDIS_DEVICE_INFO_CMD, ZERO_CMD,
+    NULL, "dmp_daemon", DMS_SUPPORT_ALL, udis_feature_set_device_info)
+#endif
+END_FEATURE_COMMAND()
+END_MODULE_DECLARATION();
+
+STATIC int udis_ioctl_input_check(unsigned int udevid, unsigned int module_type, const char *name,
+    const void *buf, unsigned int buf_len)
+{
+    unsigned int name_len = 0;
+
+    if (module_type >= UDIS_MODULE_MAX) {
+        udis_err("Invalid module_type. (udevid=%u; module_type=%u; name=%s; max_module_type=%u)\n",
+            udevid, module_type, name, UDIS_MODULE_MAX - 1);
+        return -EINVAL;
+    }
+
+    name_len = strnlen(name, UDIS_MAX_NAME_LEN);
+    if ((name_len == 0) || (name_len>= UDIS_MAX_NAME_LEN)) {
+        udis_err("Invalid name. (udevid=%u; module_type=%u; name_len=%u; max_name_len=%d)\n",
+            udevid, module_type, name_len, UDIS_MAX_NAME_LEN - 1);
+        return -EINVAL;
+    }
+
+    if (buf == NULL) {
+        udis_err("Invalid param, buf is NULL. (udevid=%u; module_type=%u; name=%s)\n",
+            udevid, module_type, name);
+        return -EINVAL;
+    }
+
+    if ((buf_len == 0) || (buf_len > UDIS_MAX_DATA_LEN)) {
+        udis_err("Invalid buf len. (udevid=%u; module_type=%u; name=%s; buf_len=%u; max_buf_len=%u)\n",
+            udevid, module_type, name, buf_len, UDIS_MAX_DATA_LEN);
+        return -EINVAL;
+    }
+    return 0;
+}
+
+STATIC int udis_get_device_info(unsigned int udevid, struct udis_get_ioctl_in *input,
+    struct udis_get_ioctl_out *output)
+{
+    int ret;
+    struct udis_dev_info info = {{0}};
+
+    ret = strcpy_s(info.name, UDIS_MAX_NAME_LEN, input->name);
+    if (ret != 0) {
+        udis_err("Strcpy_s failed. (udevid=%u; module_type=%u; name=%s; ret=%d)\n",
+            udevid, input->module_type, input->name, ret);
+        return -EINVAL;
+    }
+
+    ret = hal_kernel_get_udis_info(udevid, input->module_type, &info);
+    if (ret != 0) {
+        /* If a certain type of information does not support VF, the driver will not register or set the `name` for VF.
+         * In this case, `get intf` will return `-ENODATA` because it cannot find the same name,
+         * so `-ENODATA` is considered equivalent to `-EOPNOTSUPP` here.
+         */
+        ret = (ret == -ENODATA ? -EOPNOTSUPP : ret);
+        udis_ex_notsupport_err(ret, "Get udis info failed. (udevid=%u; module_type=%u; name=%s; ret=%d)\n",
+            udevid, input->module_type, info.name, ret);
+        return ret;
+    }
+
+    if (input->in_len < info.data_len) {
+        udis_err("User buf length is too small. (udevid=%u; module_type=%u; name=%s; in_len=%u; data_len=%u)\n",
+            udevid, input->module_type, info.name, input->in_len, info.data_len);
+        return -EINVAL;
+    }
+
+    ret = (int)copy_to_user((void *)((uintptr_t)input->data), &info.data, info.data_len);
+    if (ret != 0) {
+        udis_err("Copy_to_user failed. (udevid=%u; module_type=%u; name=%s; ret=%d)\n",
+            udevid, input->module_type, info.name, ret);
+        return ret;
+    }
+
+    output->out_len = info.data_len;
+    output->last_update_time = info.last_update_time;
+    output->acc_ctrl = info.acc_ctrl;
+
+    return 0;
+}
+
+STATIC int udis_set_device_info(unsigned int udevid, const struct udis_set_ioctl_in *input)
+{
+    int ret;
+    struct udis_dev_info info = {{0}};
+
+    ret = strcpy_s(info.name, UDIS_MAX_NAME_LEN, input->name);
+    if (ret != 0) {
+        udis_err("Strcpy_s failed. (udevid=%u; module_type=%u; name=%s; ret=%d)\n",
+            udevid, input->module_type, input->name, ret);
+        return -EINVAL;
+    }
+
+    ret = (int)copy_from_user(&info.data, (void *)((uintptr_t)input->data), input->data_len);
+    if (ret != 0) {
+        udis_err("Copy_from_user failed. (udevid=%u; module_type=%u; name=%s; ret=%d)\n",
+            udevid, input->module_type, info.name, ret);
+        return ret;
+    }
+    info.acc_ctrl = input->acc_ctrl;
+    info.data_len = input->data_len;
+
+    ret = hal_kernel_set_udis_info(udevid, input->module_type, &info);
+    if (ret != 0) {
+        udis_ex_notsupport_err(ret, "Set udis info failed. (udevid=%u; module_type=%u; name=%s; ret=%d)\n",
+            udevid, input->module_type, info.name, ret);
+        return ret;
+    }
+
+    return 0;
+}
+
+int udis_feature_get_device_info(struct urd_cmd *cmd, struct urd_cmd_kernel_para *kernel_para,
+    struct urd_cmd_para *cmd_para)
+{
+    int ret;
+    struct udis_get_ioctl_in *input = NULL;
+    struct udis_get_ioctl_out *output = NULL;
+
+    if ((cmd_para->input == NULL) || (cmd_para->input_len != sizeof(struct udis_get_ioctl_in))) {
+        udis_err("Invalid input. (in_is_null=%d; in_len=%d; valid_in_len=%zu)\n",
+            cmd_para->input == NULL, cmd_para->input_len, sizeof(struct udis_get_ioctl_in));
+        return -EINVAL;
+    }
+
+    if ((cmd_para->output == NULL) || (cmd_para->output_len != sizeof(struct udis_get_ioctl_out))) {
+        udis_err("Invalid output. (out_is_null=%d; out_len=%d; valid_out_len=%zu)\n",
+            cmd_para->output == NULL, cmd_para->output_len, sizeof(struct udis_get_ioctl_out));
+        return -EINVAL;
+    }
+
+    input = (struct udis_get_ioctl_in *)cmd_para->input;
+    output = (struct udis_get_ioctl_out *)cmd_para->output;
+
+    ret = udis_ioctl_input_check(kernel_para->udevid, input->module_type, input->name, input->data, input->in_len);
+    if (ret != 0) {
+        return ret;
+    }
+
+    ret = udis_get_device_info(kernel_para->udevid, input, output);
+    if (ret != 0) {
+        return ret;
+    }
+
+    return 0;
+}
+
+int udis_feature_set_device_info(struct urd_cmd *cmd, struct urd_cmd_kernel_para *kernel_para,
+    struct urd_cmd_para *cmd_para)
+{
+    int ret;
+    struct udis_set_ioctl_in *input = NULL;
+
+    if ((cmd_para->input == NULL) || (cmd_para->input_len != sizeof(struct udis_set_ioctl_in))) {
+        udis_err("Invalid input. (in_is_null=%d; in_len=%d; valid_in_len=%zu)\n",
+            cmd_para->input == NULL, cmd_para->input_len, sizeof(struct udis_set_ioctl_in));
+        return -EINVAL;
+    }
+
+    input = (struct udis_set_ioctl_in *)cmd_para->input;
+
+    ret = udis_ioctl_input_check(kernel_para->udevid, input->module_type, input->name, input->data, input->data_len);
+    if (ret != 0) {
+        return ret;
+    }
+
+    ret = udis_set_device_info(kernel_para->udevid, input);
+    if (ret != 0) {
+        return ret;
+    }
+
+    return 0;
+}
+
+void udis_cmd_init(void)
+{
+    CALL_INIT_MODULE(DMS_MODULE_UDIS);
+    udis_info("Udis register urd handle success.\n");
+}
+
+void udis_cmd_exit(void)
+{
+    CALL_EXIT_MODULE(DMS_MODULE_UDIS);
+    udis_info("Udis unregister urd handle success.\n");
+}

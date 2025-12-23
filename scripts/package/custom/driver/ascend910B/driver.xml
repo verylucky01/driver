@@ -1,0 +1,81 @@
+<config name="driver" copy_type="delivery" src_path="lib/host" dst_path="usr/local/Ascend" install_own="root:root" install_type="run;docker;devel">
+     <file_info value="install_scripts" copy_type="source" src_path="build/release/config/driver/common/scripts" dst_path="driver/script" install_path="driver/script" install_mod="550" install_own="root:root">
+        <file value="run_driver_upgrade_check.sh" install_type="run" src_path="aquarius/build/release/config/driver/common/scripts"/>
+        <file value="setenv.bash" file_type="bash" install_type="run;docker;devel" install_path="driver/bin" install_mod="644"/>
+        <file value="check_tools.conf" install_type="run" install_mod="440"/>
+        <file value="ascend_driver_config.sh" install_own="root:root" install_mod="500" install_type="run"/>
+        <file value="kmsagent.service" install_own="root:root" install_mod="500" install_type="run"/>
+        <file value="version_cap.map" install_mod="440"/>
+        <file value="deal_ko.sh" install_type="run"/>
+        <file value="driver_install.sh" install_type="run"/>
+        <file value="env_check.sh" install_type="run"/>
+        <file value="file_copy.sh" install_type="run"/>
+        <file value="log_common.sh" install_type="run"/>
+        <file value="args_parse.sh" install_type="run"/>
+        <file value="repack_driver.sh" install_type="run"/>
+    </file_info>
+    <file_info value="install_scripts" copy_type="source" src_path="open_source/makeself" dst_path="driver/script" install_path="driver/script"
+         install_mod="550" install_own="root:root" install_type="run;docker">
+        <file value="makeself-header.sh" install_type="run"/>
+        <file value="makeself.sh" install_type="run"/>
+    </file_info>
+    <file_info value="device" copy_type="delivery" src_path="lib/device" dst_path="driver/device" install_path="driver/device" install_mod="440" install_own="root:root" install_type="run">
+        <file value="sysBaseConfig.bin"/>
+        <file value="itrustee.img"/>
+    </file_info>
+    <file_info value="host" copy_type="delivery" src_path="lib/host" dst_path="driver/host" install_path="driver/host" install_mod="440" install_own="root:root" install_type="run">
+        <file value="ts_debug.ko" file_type="ko"/>
+        <file value="debug_switch.ko" file_type="ko"/>
+        <file value="npu_peermem.ko" file_type="ko"/>
+    </file_info>
+    <dir_info value="driver" install_mod="550" install_own="root:root" install_type="run">
+        <path value="driver/lib64/inner" install_mod="755"/>
+    </dir_info>
+    <file_info value="tools" copy_type="source" src_path="build/release/config/driver/common/scripts" dst_path="driver/tools" install_path="driver/tools"
+         install_mod="550" install_own="root:root" install_type="run">
+        <file value="ascend_bug_report.sh" install_own="root:root"/>
+    </file_info>
+    <file_info value="install_scripts" copy_type="delivery" src_path="lib/host" dst_path="driver/script" install_path="driver/script"
+         install_mod="550" install_own="root:root" install_type="run">
+        <file value="kmsagent_backup_conf.sh" install_type="run"/>
+        <file value="kmsagent_install.sh" install_type="run"/>
+        <file value="kmsagent_restore_conf.sh" install_type="run"/>
+        <file value="kmsagent_uninstall.sh" install_type="run"/>
+    </file_info>
+    <file_info value="tools" copy_type="delivery" src_path="lib/host" dst_path="driver/tools" install_path="driver/tools"
+        install_mod="500" install_own="$username:$usergroup">
+        <file value="kmsagent" install_type="run"/>
+    </file_info>
+    <file_info value="lib64" copy_type="delivery" src_path="lib/host" dst_path="driver/lib64/stub" install_path="driver/lib64/inner"
+        install_mod="400" install_own="$username:$usergroup" install_type="run">
+        <file value="libssl.so" file_type="shared"/>
+        <file value="libcrypto.so" file_type="shared"/>
+    </file_info>
+    <file_info value="lib64" copy_type="delivery" src_path="lib/host" dst_path="driver/lib64/driver" install_path="driver/script"
+        install_mod="400" install_own="$username:$usergroup" install_type="run">
+        <file value="kmsagent.conf" file_type="shared"/>
+    </file_info>
+    <file_info value="lib64" copy_type="delivery" src_path="lib/host" dst_path="driver/lib64/driver" install_path="driver/lib64/common"
+        install_mod="400" install_own="$username:$usergroup" install_type="run">
+        <file value="libaivault.so" file_type="shared"/>
+        <file value="libaivaulttee.so" file_type="shared"/>
+        <file value="libkmc.so.20" file_type="shared"/>
+        <file value="libsdp.so.20" file_type="shared"/>
+        <file value="libsecurec.so" file_type="shared"/>
+    </file_info>
+    <file_info value="lib64" copy_type="source" src_path="ALARM_MNG_DRV/output" dst_path="driver/lib64/driver" install_path="driver/lib64/driver" install_mod="444" install_type="run;devel;docker">
+        <file value="libdsmi_network.so" file_type="shared"/>
+    </file_info>
+    <dir_info value="cert" install_mod="700" install_own="root:root" >
+        <path value="driver/cert" install_mod="700"/>
+        <path value="driver/cert/ca" install_mod="700"/>
+    </dir_info>
+    <file_info value="cert" copy_type="source" src_path="aquarius/build/release/config/driver/common/cert/ca" dst_path="driver/cert/ca" install_path="driver/cert/ca" install_mod="700" install_own="root:root">
+        <file value="Equipment_Root_CA_2041.pem"  install_type="run" install_own="root:root" install_mod="420"/>
+        <file value="IT_Product_CA_2041.pem"  install_type="run" install_own="root:root" install_mod="420"/>
+        <file value="RSA_Equipment_Root_CA_2071.pem"  install_type="run" install_own="root:root" install_mod="420"/>
+        <file value="Computing_RSA-PSS_Equipment_CA_2071.pem"  install_type="run" install_own="root:root" install_mod="420"/>
+        <file value="RSA-PSS_Equipment_Root_CA_2099.pem"  install_type="run" install_own="root:root" install_mod="420"/>
+        <file value="Computing_RSA-PSS_Equipment_CA_2099.pem" install_type="run" install_own="root:root" install_mod="420"/>
+    </file_info>
+</config>

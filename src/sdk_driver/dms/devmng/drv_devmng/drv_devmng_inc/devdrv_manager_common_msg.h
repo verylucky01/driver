@@ -1,0 +1,1 @@
+../../../command/msg/devdrv_manager_common_msg.h

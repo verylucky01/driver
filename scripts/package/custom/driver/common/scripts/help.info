@@ -1,0 +1,20 @@
+  --repack [package_name]           Build a precompiled kernel module for the currently running kernel and repack
+                                    the .run file. The new .run file will be renamed to package_name or append
+                                    the string \"-custom\" to its name when package_name not present.
+  --repack-path=<path> [package_name]   Build a precompiled kernel module for the currently running kernel from
+                                    path and repack the .run file. The new .run file will be renamed to
+                                    package_name or append the string \"-custom\" to its name when
+                                    package_name not present.
+  --full                            Install full mode
+  --run                             Install run mode
+  --devel                           Install devel mode
+  --docker                          Install docker mode
+  --upgrade                         Upgrade product immediately
+  --install-path=<path>             Install to specific dir
+  --install-username=<username>     Install to specific username
+  --install-usergroup=<usergroup>   Install to specific usrgroup
+  --uninstall                       Uninstall product
+  --version                         Query the package version
+  --install-for-all                 Install for all user
+  --force                           Install and take effect later
+  --norebuild                       Forcibly no kernel module rebuild

@@ -1,0 +1,11 @@
+/var/log/nputools_LOG_ERR.log
+/var/log/nputools_LOG_INFO.log
+/var/log/nputools_LOG_OP.log
+{
+    missingok
+    rotate 1
+    notifempty
+    nocompress
+    copytruncate
+    size 2M
+}
