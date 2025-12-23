@@ -5,6 +5,7 @@ cmake-build-debugindocker/
 .DS_Store
 # distribution and packaging
 build/
+!src/ascend_hal/build
 build_out/
 output/
 dist/
