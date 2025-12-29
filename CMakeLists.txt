@@ -9,7 +9,7 @@
 # ------------------------------------------------------------------------------------------------------------
 
 cmake_minimum_required(VERSION 3.16)
-project(ABL LANGUAGES C CXX ASM)
+project(npu_driver LANGUAGES C CXX ASM)
 if (ENABLE_TEST)
     add_subdirectory(test)
     return()

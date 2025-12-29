@@ -24,7 +24,7 @@ usage()
   echo ""
   echo "Options:"
   echo "    -h | -help             Print usage"
-  echo "    -j[n]                  Set the number of threads used for building ABL, default is 8"
+  echo "    -j[n]                  Set the number of threads used for building npu_driver, default is 8"
   echo "                           Examples: bash build.sh -j16 --pkg --soc=ascend910b"
   echo "    -v                     Display build command"
   echo "    -k                     Set kernel source path, default \"/lib/modules/\$(uname -r)/build\""
@@ -78,9 +78,9 @@ clean_build_out_all() {
 check_param()
 {
   if [ "x${COMPUTE_UNIT}" = "x" ]; then
-      echo "Missing option: --soc"
-      usage
-      exit 1
+    echo "Missing option: --soc"
+    usage
+    exit 1
   fi
 }
 
@@ -160,10 +160,10 @@ checkopts()
 checkopts "$@"
 
 mk_dir() {
-    local create_dir="$1"  # the target to make
+  local create_dir="$1"  # the target to make
 
-    mkdir -pv "${create_dir}"
-    echo "created ${create_dir}"
+  mkdir -pv "${create_dir}"
+  echo "created ${create_dir}"
 }
 
 prepare_src()
@@ -178,9 +178,9 @@ prepare_src()
 
   #prepare source for asdrv_dms.ko
   mv ./src/sdk_driver/dms/devmng/product/dms_product.c ./src/sdk_driver/dms/devmng/product/dms_product.c.org
-	mv ./src/sdk_driver/dms/devmng/product/dms_product.h ./src/sdk_driver/dms/devmng/product/dms_product.h.org
-	mv ./src/sdk_driver/dms/devmng/product/dms_product.mk ./src/sdk_driver/dms/devmng/product/dms_product.mk.org
-	mv ./scripts/package/driver/ascend910_93/scripts/specific_func.inc ./scripts/package/driver/ascend910_93/scripts/specific_func.inc.org
+  mv ./src/sdk_driver/dms/devmng/product/dms_product.h ./src/sdk_driver/dms/devmng/product/dms_product.h.org
+  mv ./src/sdk_driver/dms/devmng/product/dms_product.mk ./src/sdk_driver/dms/devmng/product/dms_product.mk.org
+  mv ./scripts/package/driver/ascend910_93/scripts/specific_func.inc ./scripts/package/driver/ascend910_93/scripts/specific_func.inc.org
   mv ./scripts/package/driver/ascend910B/scripts/specific_func.inc ./scripts/package/driver/ascend910B/scripts/specific_func.inc.org
 
   cp -rf ./src/custom/dev_prod/kernel/drv_devmng/* ./src/sdk_driver/dms/devmng/drv_devmng/drv_devmng_host/ascend910/
@@ -211,15 +211,15 @@ clean_src()
   echo "clean source"
   pushd $BASE_PATH
   rm -rf ./src/ascend_hal/dmc/dsmi/dsmi_product_ext
-	rm -rf ./src/sdk_driver/dms/devmng/drv_devmng/drv_devmng_host/ascend910/devdrv_manager_dev_share.c
-	rm -rf ./src/sdk_driver/dms/devmng/drv_devmng/drv_devmng_host/ascend910/devdrv_manager_dev_share.h
-	rm -rf ./src/sdk_driver/dms/devmng/product/dms_product_host.c
-	rm -rf ./src/sdk_driver/dms/devmng/product/dms_product_host.h
-	rm -rf ./src/sdk_driver/dms/devmng/product/dms_product_ioctl.h
-	mv ./src/sdk_driver/dms/devmng/product/dms_product.c.org ./src/sdk_driver/dms/devmng/product/dms_product.c
-	mv ./src/sdk_driver/dms/devmng/product/dms_product.h.org ./src/sdk_driver/dms/devmng/product/dms_product.h
-	mv ./src/sdk_driver/dms/devmng/product/dms_product.mk.org ./src/sdk_driver/dms/devmng/product/dms_product.mk
-	mv ./scripts/package/driver/ascend910_93/scripts/specific_func.inc.org ./scripts/package/driver/ascend910_93/scripts/specific_func.inc
+  rm -rf ./src/sdk_driver/dms/devmng/drv_devmng/drv_devmng_host/ascend910/devdrv_manager_dev_share.c
+  rm -rf ./src/sdk_driver/dms/devmng/drv_devmng/drv_devmng_host/ascend910/devdrv_manager_dev_share.h
+  rm -rf ./src/sdk_driver/dms/devmng/product/dms_product_host.c
+  rm -rf ./src/sdk_driver/dms/devmng/product/dms_product_host.h
+  rm -rf ./src/sdk_driver/dms/devmng/product/dms_product_ioctl.h
+  mv ./src/sdk_driver/dms/devmng/product/dms_product.c.org ./src/sdk_driver/dms/devmng/product/dms_product.c
+  mv ./src/sdk_driver/dms/devmng/product/dms_product.h.org ./src/sdk_driver/dms/devmng/product/dms_product.h
+  mv ./src/sdk_driver/dms/devmng/product/dms_product.mk.org ./src/sdk_driver/dms/devmng/product/dms_product.mk
+  mv ./scripts/package/driver/ascend910_93/scripts/specific_func.inc.org ./scripts/package/driver/ascend910_93/scripts/specific_func.inc
   mv ./scripts/package/driver/ascend910B/scripts/specific_func.inc.org ./scripts/package/driver/ascend910B/scripts/specific_func.inc
 
   if [ "${ASCEND910_93_EX}" = "TRUE" ]; then
@@ -232,17 +232,17 @@ clean_src()
 }
 
 cleanup() {
-    clean_src
-    exit 0
+  clean_src
+  exit 0
 }
 
 # cleanup temporary source files after pressing Ctrl+C
 trap cleanup INT
 
 # create build path
-build_abl()
+build_npu_driver()
 {
-  echo "create build directory and build ABL";
+  echo "create build directory and build npu_driver";
   export PROJECT_VERSION=$(cat scripts/package/driver/ascend910B/scripts/sys_version/sys_version.conf)
   mk_dir "${BUILD_PATH}"
   cd "${BUILD_PATH}"
@@ -309,7 +309,7 @@ build_abl()
     return 1
   fi
 
-  echo "ABL build success!"
+  echo "npu_driver build success!"
 }
 
 # generate output package in tar form, including ut/st libraries/executables
@@ -324,19 +324,19 @@ generate_package()
   echo "Generate package success."
 }
 
-# ABL build start
-echo "---------------- ABL build start ------------------"
+# npu_driver build start
+echo "---------------- npu_driver build start ------------------"
 g++ -v
 
 prepare_src
 
-build_abl || { echo "ABL build failed."; clean_src; exit -1; }
-echo "---------------- ABL build finished ----------------"
+build_npu_driver || { echo "npu_driver build failed."; clean_src; exit -1; }
+echo "---------------- npu_driver build finished ----------------"
 
 if [[ "X$ENABLE_GE_UT" = "Xn" && "$ENABLE_PACKAGE" = "TRUE" ]]; then
-    echo "-------------- ABL package generate start ----------------"
+    echo "-------------- npu_driver package generate start ----------------"
     generate_package
-    echo "-------------- ABL package generate finished -------------"
+    echo "-------------- npu_driver package generate finished -------------"
 fi
 
 clean_src
