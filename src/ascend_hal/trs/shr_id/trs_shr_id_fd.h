@@ -11,9 +11,8 @@
 #define TRS_SHR_ID_FD_H
 
 #include "ascend_hal_error.h"
-#include "ascend_kernel_hal.h"
 
-drvError_t shrid_ioctl(u32 cmd, void *para);
+drvError_t shrid_ioctl(uint32_t cmd, void *para);
 void shrid_set_fd(int fd);
 #endif
 

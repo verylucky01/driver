@@ -40,7 +40,6 @@ target_include_directories(trs_drv_obj PRIVATE
     ${BASE_DIR}/core/urma
     ${DRIVER_USER_DIR}/inc
     ${DRIVER_USER_DIR}/ascend_base_hal
-    ${DRIVER_KERNEL_DIR}/inc
     ${DRIVER_USER_DIR}/msnpureport/inc/slog/
     ${C_SEC_INCLUDE}/
     ${DRIVER_HAL_INC_DIR}
@@ -49,6 +48,7 @@ target_include_directories(trs_drv_obj PRIVATE
     ${DRIVER_KERNEL_DIR}/trs/shr_id/command/ioctl
     ${DRIVER_KERNEL_DIR}/trs/trs_core/command/ioctl
     ${DRIVER_KERNEL_DIR}/pbl/dev_urd/command/ioctl
+    ${DRIVER_KERNEL_DIR}/dms/command/ioctl
     ${DRIVER_USER_DIR}/inc/dms
     ${DRIVER_USER_DIR}/trs/core/command/msg
 )
