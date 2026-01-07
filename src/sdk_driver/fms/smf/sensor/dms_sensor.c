@@ -687,15 +687,24 @@ static int dms_generated_alarm_serial(unsigned int *alarm_serial_no)
 
 int dms_mgnt_clockid_init(void)
 {
-    char buffer[CMDLINE_BUFFER_SIZE] = {0};
+    int ret = 0;
+    char *buffer = NULL;
     struct file *fp = NULL;
     char *ptr = NULL;
     long read_num;
     loff_t pos = 0;
+
+    buffer = (char *)dbl_kzalloc(CMDLINE_BUFFER_SIZE, GFP_KERNEL | __GFP_ACCOUNT);
+    if (buffer == NULL) {
+        dms_err("Failed to malloc for cmdline.\n");
+        return -ENOMEM;
+    }
+
     fp = filp_open(CMDLINE_FILE_PATH, O_RDONLY, 0);
     if (IS_ERR_OR_NULL(fp)) {
         dms_err("Open file failed. (file=%s; errno=%ld)\n", CMDLINE_FILE_PATH, PTR_ERR(fp));
-        return -EINVAL;
+        ret = -EINVAL;
+        goto buff_free_exit;
     }
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
     read_num = kernel_read(fp, buffer, CMDLINE_BUFFER_SIZE - 1, &pos);
@@ -704,9 +713,8 @@ int dms_mgnt_clockid_init(void)
 #endif
     if ((read_num <= 0) || (read_num >= CMDLINE_BUFFER_SIZE)) {
         dms_err("Read len error. (read_num=%ld; valid_range=[%d, %d])\n", read_num, 0, CMDLINE_BUFFER_SIZE - 1);
-        (void)filp_close(fp, NULL);
-        fp = NULL;
-        return -EINVAL;
+        ret = -EINVAL;
+        goto file_close_exit;
     }
     buffer[read_num] = '\0';
     ptr = strstr(buffer, "dpclk=100");
@@ -714,9 +722,14 @@ int dms_mgnt_clockid_init(void)
         g_dms_mgnt_clock_id = CLOCK_REAL;
     }
     dms_info("Parse clock config. (clock_id=%d)\n", g_dms_mgnt_clock_id);
+
+file_close_exit:
     (void)filp_close(fp, NULL);
     fp = NULL;
-    return 0;
+buff_free_exit:
+    dbl_kfree(buffer);
+    buffer = NULL;
+    return ret;
 }
 
 /* Get system time */
