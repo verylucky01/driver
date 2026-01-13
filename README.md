@@ -94,6 +94,11 @@ Driver在CANN软件栈的位置参考[昇腾社区](https://www.hiascend.com/can
 │       └── vpc                                    # VPC（Virtual Physical Communication）物理机与虚拟机通信
 └── test                                           # 测试代码目录
 ```
+
+# 项目路标
+- 具体参考Driver仓SIG信息链接：
+https://gitcode.com/cann/community/blob/master/CANN/sigs/driver/README.md
+
 ## 📝相关信息
 - [贡献指南](./CONTRIBUTING.md)
 - [安全声明](./SECURITY.md)
