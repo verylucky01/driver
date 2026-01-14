@@ -35,7 +35,7 @@ export LD_LIBRARY_PATH=~/usr/local/dcmi/:$LD_LIBRARY_PATH
 # 1_query_npuinfo     -- query
 # 2_chip_reset        -- reset
 # 3_mcu_upgrade       -- upgrade
-cd ${git_clone_path}/example/dcmi/dcmi/
+cd ${git_clone_path}/examples/dcmi/dcmi/
 ```
 
 3.执行以下命令运行样例。
