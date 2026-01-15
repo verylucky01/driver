@@ -49,8 +49,8 @@ int main(int argc, char **argv)
     0：功耗和算力档位为low
     1：功耗和算力档位为middle
     2：功耗和算力档位为high
-    3：功耗和算力档位为full 
+    3：功耗和算力档位为full
     */
-    printf("level =%d\n");
+    printf("level =%d\n", level);
     return ret;
 }

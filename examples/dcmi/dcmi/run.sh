@@ -9,10 +9,10 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # ------------------------------------------------------------------------------------------------------------
 MAIN_DIR_ALIASES=(
-    "user=0_configure_manager"   
-    "query=1_query_npuinfo"      
-    "reset=2_chip_reset" 
-    "upgrade=3_mcu_upgrade" 
+    "user=0_configure_manager"
+    "query=1_query_npuinfo"
+    "reset=2_chip_reset"
+    "upgrade=3_mcu_upgrade"
 )
 
 BUILD_CMD="gcc main.c -I/usr/local/dcmi/ -L/usr/local/dcmi/ -ldcmi -o main"
@@ -28,7 +28,7 @@ get_real_main_dir() {
             return 0
         fi
     done
-    echo "" 
+    echo ""
     return 1
 }
 
@@ -111,14 +111,14 @@ if [ ${#MATCHED_DIRS[@]} -eq 0 ]; then
 fi
 
 for dir in "${MATCHED_DIRS[@]}"; do
-    local sub_dir=$(basename "$dir")
+    sub_dir=$(basename "$dir")
     echo "  - [${ALIAS}/${sub_dir}] → 实际路径: ${dir}"
 done
 echo
 
 
 for target_dir in "${MATCHED_DIRS[@]}"; do
-    local sub_dir=$(basename "$target_dir")
+    sub_dir=$(basename "$target_dir")
     echo "======================================"
     echo "正在处理：[${ALIAS}/${sub_dir}]"
     echo "======================================"
@@ -145,6 +145,6 @@ for target_dir in "${MATCHED_DIRS[@]}"; do
     else
         echo "警告：[${ALIAS}/${sub_dir}] 编译失败，跳过该目录"
     fi
-    cd - > /dev/null  
+    cd - > /dev/null
     echo
 done

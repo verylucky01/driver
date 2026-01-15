@@ -62,7 +62,7 @@
         <file value="dms_events_conf.lst" src_path="build/product/cloud/hi1980B/config" install_path="/etc" install_mod="400" install_own="root:root"/>
         <file value="script_operator.inc" copy_type="source" src_path="vendor/hisi/build/package" dst_path=""/>
     </file_info>
-    <file_info value="script" copy_type="source" src_path="inc/driver/" dst_path="driver/pkg_inc" install_path="driver/pkg_inc" install_mod="440" install_own="$username:$usergroup" install_type="devel">
+    <file_info value="script" copy_type="source" src_path="inc/driver/" dst_path="driver/include" install_path="driver/include" install_mod="440" install_own="$username:$usergroup" install_type="devel">
         <file value="dsmi_common_interface.h"/>
         <file value="dsmi_common_interface_base.h"/>
         <file value="dms_device_node_type.h"/>

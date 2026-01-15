@@ -88,7 +88,7 @@ set(HEADER_FILES
     ${source_prefix}/pkg_inc/ascend_hal_error.h
 )
 install(FILES ${HEADER_FILES}
-    DESTINATION driver/pkg_inc
+    DESTINATION driver/include
 )
 
 set(device_delivery_prefix ${CMAKE_BINARY_DIR}/lib/host)
