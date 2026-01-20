@@ -242,7 +242,7 @@ trap cleanup INT
 # create build path
 build_npu_driver()
 {
-  echo "create build directory and build npu_driver";
+  echo "create build directory and build npu_driver"
   export PROJECT_VERSION=$(cat scripts/package/driver/ascend910B/scripts/sys_version/sys_version.conf)
   mk_dir "${BUILD_PATH}"
   cd "${BUILD_PATH}"
@@ -317,7 +317,7 @@ generate_package()
 {
   make package -j${THREAD_NUM}
   if [ $? -ne 0 ]; then
-    echo "Generate package ${BUILD_COMPONENT} success."
+    echo "Failed to generate ${BUILD_COMPONENT} package."
     return 1
   fi
   find ${BUILD_OUT_PATH} -maxdepth 1 ! -name "Ascend-hdk-*" ! -path ${BUILD_OUT_PATH} -exec rm -rf {} \;
