@@ -58,7 +58,7 @@
 <p id="p1351164218365"><a name="p1351164218365"></a><a name="p1351164218365"></a>DCMI_TOPO_TYPE_PXB,//通过PCIe连接穿过多个PCIe switch</p>
 <p id="p1851114243611"><a name="p1851114243611"></a><a name="p1851114243611"></a>DCMI_TOPO_TYPE_PIX,//通过PCIe连接穿过一个PCIe switch</p>
 <p id="p212771911216"><a name="p212771911216"></a><a name="p212771911216"></a>DCMI_TOPO_TYPE_BUTT = 6,//未知关系</p>
-<p id="p976131345320"><a name="p976131345320"></a><a name="p976131345320"></a>DCMI_TOPO_TYOE_MAX,</p>
+<p id="p976131345320"><a name="p976131345320"></a><a name="p976131345320"></a>DCMI_TOPO_TYPE_MAX,</p>
 <p id="p1959153111466"><a name="p1959153111466"></a><a name="p1959153111466"></a>};</p>
 </td>
 </tr>
@@ -181,7 +181,7 @@ int card_id2 = 1;
 int device_id1 = 0;
 int device_id2 = 1;
 int result;
-ret = dcmi_get_topo_info_by_device_id(card_id1, device_id1, card_id2, device_id2, &result); 
+ret = dcmi_get_topo_info_by_device_id(card_id1, device_id1, card_id2, device_id2, &result);
 …
 ```
 

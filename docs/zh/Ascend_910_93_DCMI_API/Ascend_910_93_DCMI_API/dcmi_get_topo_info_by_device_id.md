@@ -60,7 +60,7 @@
 <p id="p131171620141416"><a name="p131171620141416"></a><a name="p131171620141416"></a>DCMI_TOPO_TYPE_SIO,//通过SIO总线链接</p>
 <p id="p2702144191411"><a name="p2702144191411"></a><a name="p2702144191411"></a>DCMI_TOPO_TYPE_HCCS_SW,//通过交换机交换的HCCS链接</p>
 <p id="p05111442153615"><a name="p05111442153615"></a><a name="p05111442153615"></a>DCMI_TOPO_TYPE_BUTT,//未知关系</p>
-<p id="p976131345320"><a name="p976131345320"></a><a name="p976131345320"></a>DCMI_TOPO_TYOE_MAX,</p>
+<p id="p976131345320"><a name="p976131345320"></a><a name="p976131345320"></a>DCMI_TOPO_TYPE_MAX,</p>
 <p id="p1959153111466"><a name="p1959153111466"></a><a name="p1959153111466"></a>};</p>
 </td>
 </tr>
@@ -165,7 +165,7 @@ int card_id2 = 1;
 int device_id1 = 0;
 int device_id2 = 1;
 int result;
-ret = dcmi_get_topo_info_by_device_id(card_id1, device_id1, card_id2, device_id2, &result); 
+ret = dcmi_get_topo_info_by_device_id(card_id1, device_id1, card_id2, device_id2, &result);
 …
 ```
 

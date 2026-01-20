@@ -1344,7 +1344,7 @@ enum {
     DCMI_TOPO_TYPE_HCCS_SW,      /* 通过交换的HCCS链接 */
     DCMI_TOPO_TYPE_UB,           /* 通过UB总线连接 */
     DCMI_TOPO_TYPE_BUTT,         /* 未知关系 */
-    DCMI_TOPO_TYOE_MAX,
+    DCMI_TOPO_TYPE_MAX,
 };
 
 struct dcmi_network_rdma_bandwidth_info {
