@@ -186,20 +186,30 @@ prepare_src()
   cp -rf ./src/custom/dev_prod/kernel/drv_devmng/* ./src/sdk_driver/dms/devmng/drv_devmng/drv_devmng_host/ascend910/
   cp -rf ./src/custom/dev_prod/kernel/dms/product/* ./src/sdk_driver/dms/devmng/product/
   cp -rf ./src/custom/include/dms_product_ioctl.h ./src/sdk_driver/dms/devmng/product/
+  mv scripts/package/driver/common/conf/itf_ver.conf scripts/package/driver/common/conf/itf_ver.conf.org
+  cp scripts/package/custom/driver/common/conf/itf_ver.conf scripts/package/driver/common/conf/itf_ver.conf
 
   if [ "${ASCEND910_93_EX}" = "TRUE" ]; then
     cp scripts/package/driver/ascend910_93/driver.xml scripts/package/driver/ascend910_93/driver.xml.org
     cp scripts/package/custom/driver/ascend910_93/scripts/specific_func.inc scripts/package/driver/ascend910_93/scripts/specific_func.inc
     python3 ./scripts/package/custom/copy_xml.py scripts/package/driver/ascend910_93/driver.xml scripts/package/custom/driver/ascend910_93/driver.xml
     python3 ./scripts/package/custom/copy_xml.py scripts/package/driver/ascend910_93/driver.xml scripts/package/custom/driver/ascend910B/driver_atlas.xml
+    COMPATIBLE_VERSION=$(grep -rn "ascend910_93" scripts/package/custom/driver/common/compatible_version.conf | cut -d":" -f3)
   else
     cp scripts/package/driver/ascend910B/driver.xml scripts/package/driver/ascend910B/driver.xml.org
     cp scripts/package/custom/driver/ascend910B/scripts/specific_func.inc scripts/package/driver/ascend910B/scripts/specific_func.inc
     python3 ./scripts/package/custom/copy_xml.py scripts/package/driver/ascend910B/driver.xml scripts/package/custom/driver/ascend910B/driver.xml
     python3 ./scripts/package/custom/copy_xml.py scripts/package/driver/ascend910B/driver.xml scripts/package/custom/driver/ascend910B/driver_atlas.xml
+    COMPATIBLE_VERSION=$(grep -rn "ascend910B" scripts/package/custom/driver/common/compatible_version.conf | cut -d":" -f3)
   fi
-  RUN_TOOLS_VERSION=$(cat scripts/package/driver/ascend910B/scripts/sys_version/sys_version.conf)
-  echo "version=${RUN_TOOLS_VERSION}" >./scripts/package/custom/version.info
+
+  mv scripts/package/driver/ascend910B/scripts/sys_version/sys_version.conf scripts/package/driver/ascend910B/scripts/sys_version/sys_version.conf.org
+  cp scripts/package/custom/driver/ascend910B/scripts/sys_version/sys_version.conf scripts/package/driver/ascend910B/scripts/sys_version/sys_version.conf
+
+  PACKAGE_VERSION=$(cat scripts/package/driver/ascend910B/scripts/sys_version/sys_version.conf)
+  echo "version=${PACKAGE_VERSION}" >./scripts/package/custom/version.info
+  sed -i "s/compatible_version=/compatible_version=${COMPATIBLE_VERSION}/g" scripts/package/driver/common/conf/itf_ver.conf
+  sed -i "s/package_version=/package_version=${PACKAGE_VERSION}/g" scripts/package/driver/common/conf/itf_ver.conf
   popd
 }
 
@@ -227,6 +237,9 @@ clean_src()
   else
     mv scripts/package/driver/ascend910B/driver.xml.org scripts/package/driver/ascend910B/driver.xml
   fi
+
+  mv scripts/package/driver/ascend910B/scripts/sys_version/sys_version.conf.org scripts/package/driver/ascend910B/scripts/sys_version/sys_version.conf
+  mv scripts/package/driver/common/conf/itf_ver.conf.org scripts/package/driver/common/conf/itf_ver.conf
   rm -f scripts/package/custom/version.info
   popd
 }
