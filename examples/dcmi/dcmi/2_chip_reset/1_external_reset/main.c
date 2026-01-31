@@ -45,7 +45,7 @@ int main()
                 printf("dcmi_get_device_outband_channel_state fail! card_id is %d , device_id is %d, ret: %d\n",
                        card_id_list[card_id], device_id, ret);
                 if (ret == -8255) {
-                    printf("该设备不支持\n")
+                    printf("该设备不支持\n");
                 }
                 return ret;
             } else {
