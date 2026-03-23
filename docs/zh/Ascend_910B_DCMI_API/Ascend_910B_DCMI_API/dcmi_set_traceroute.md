@@ -122,10 +122,10 @@
 
 **异常处理<a name="section498311885817"></a>**
 
--   为防止由于ICMP报文被丢弃出现traceroute指令卡死的情况，建议IPv4的两条指令间隔3s执行。
--   若强制中断host侧指令或执行指令时返回值显示为-8020，则需配置param\_info.reset\_flag=1，调用dcmi\_set\_traceroute接口结束device侧进程。
--   traceroute指令结束后，建议配置param\_info.reset\_flag=1，调用dcmi\_set\_traceroute接口结束device侧进程，防止进程持续运行影响NPU性能。
--   若param\_info.reset\_flag=1，则其他参数不生效。
+- 为防止由于ICMP报文被丢弃出现traceroute指令卡死的情况，建议IPv4的两条指令间隔3s执行。
+- 若强制中断host侧指令或执行指令时返回值显示为-8020，则需配置param\_info.reset\_flag=1，调用dcmi\_set\_traceroute接口结束device侧进程。
+- traceroute指令结束后，建议配置param\_info.reset\_flag=1，调用dcmi\_set\_traceroute接口结束device侧进程，防止进程持续运行影响NPU性能。
+- 若param\_info.reset\_flag=1，则其他参数不生效。
 
 **约束说明<a name="section1298518810584"></a>**
 
@@ -213,7 +213,7 @@
 
 **调用示例<a name="section1598913835819"></a>**
 
-```
+```c
 … 
 int ret = 0;
 int card_id = 0;
@@ -233,6 +233,5 @@ if (ret != 0){
 …
 ```
 
->![](public_sys-resources/icon-note.gif) **说明：** 
+>**说明：** 
 >_x.x.x.x_表示目的IP地址。
-

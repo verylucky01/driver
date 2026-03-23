@@ -179,7 +179,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001206307222_zh-cn_topic_0000001189111912_zh-cn_topic_0000001167913765_toc533412083"></a>**
 
-```
+```c
 …
 #define MAX_PROC_NUM_IN_DEVICE 64
 int ret;
@@ -196,4 +196,3 @@ if (ret != DCMI_OK) {
 return ret;
 …
 ```
-

@@ -165,7 +165,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001251307153_zh-cn_topic_0000001178054662_zh-cn_topic_0000001147730881_toc533412083"></a>**
 
-```
+```c
 #define ERROR_CODE_MAX_NUM              (128)
 … 
 int ret = 0;
@@ -176,4 +176,3 @@ unsigned int error_code_list[ERROR_CODE_MAX_NUM] = {0};
 ret = dcmi_get_device_errorcode_v2(card_id, device_id, &errorcount, error_code_list, ERROR_CODE_MAX_NUM);
 …
 ```
-

@@ -154,7 +154,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001251427197_zh-cn_topic_0000001178054660_zh-cn_topic_0000001101443704_toc533412083"></a>**
 
-```
+```c
 …
 struct dcmi_elabel_info elabel_info = {0};
 int ret = 0;
@@ -163,4 +163,3 @@ int device_id = 0;
 ret = dcmi_get_device_elabel_info(card_id, device_id, &elabel_info);
 …
 ```
-

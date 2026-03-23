@@ -115,8 +115,8 @@
 
 **约束说明<a name="section3125938142713"></a>**
 
--   仅Control CPU开放形态使用该接口。
--   调用该接口前，请先调用[dcmi\_get\_capability\_group\_info](dcmi_get_capability_group_info.md)查询已配置的资源信息，结合ts\_id参数的说明和group\_info参数的约束说明进行配置，否则可能出现接口调用失败。如果需要删除已有配置，可以调用[dcmi\_delete\_capability\_group](dcmi_delete_capability_group.md)接口进行删除。
+- 仅Control CPU开放形态使用该接口。
+- 调用该接口前，请先调用[dcmi\_get\_capability\_group\_info](dcmi_get_capability_group_info.md)查询已配置的资源信息，结合ts\_id参数的说明和group\_info参数的约束说明进行配置，否则可能出现接口调用失败。如果需要删除已有配置，可以调用[dcmi\_delete\_capability\_group](dcmi_delete_capability_group.md)接口进行删除。
 
 **表 1** 不同部署场景下的支持情况
 
@@ -202,7 +202,7 @@
 
 **调用示例<a name="section206582034172018"></a>**
 
-```
+```c
 … 
 int ret = 0;
 int card_id = 0;
@@ -223,4 +223,3 @@ if (ret != 0){
 }
 …
 ```
-

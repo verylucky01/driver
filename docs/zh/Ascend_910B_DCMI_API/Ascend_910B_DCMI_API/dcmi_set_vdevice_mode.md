@@ -144,7 +144,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001277289337_zh-cn_topic_0000001178213212_zh-cn_topic_0000001167998163_toc533412083"></a>**
 
-```
+```c
 … 
 int mode = 0; 
 ret= dcmi_set_vdevice_mode(mode);
@@ -154,4 +154,3 @@ if (ret != 0){
 } 
 …
 ```
-

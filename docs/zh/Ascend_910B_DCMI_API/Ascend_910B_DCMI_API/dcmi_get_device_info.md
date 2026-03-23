@@ -228,7 +228,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001206467202_zh-cn_topic_0000001178373156_zh-cn_topic_0000001101204718_toc533412083"></a>**
 
-```
+```c
 … 
 int ret = 0;
 int card_id = 0;
@@ -478,7 +478,7 @@ if (ret != 0){
 
 **调用示例<a name="section2133155511568"></a>**
 
-```
+```c
 …
 int ret = 0;
 int card_id = 0;
@@ -496,7 +496,6 @@ if (ret != 0) {
     return ret;
 …
 ```
-
 
 ## DCMI\_MAIN\_CMD\_LP命令说明<a name="ZH-CN_TOPIC_0000002485295394"></a>
 
@@ -634,8 +633,8 @@ DCMI_LP_SUB_CMD_MAX,
 
 **约束说明<a name="section216210381817"></a>**
 
--   通过本接口获取电压和电流信息为寄存器数值。
--   AI Core降频原因每100ms更新一次，不能查询历史降频原因。
+- 通过本接口获取电压和电流信息为寄存器数值。
+- AI Core降频原因每100ms更新一次，不能查询历史降频原因。
 
 **表 1**  sub\_cmd对应的buf格式
 
@@ -835,7 +834,7 @@ DCMI_LP_SUB_CMD_MAX,
 
 **调用示例<a name="section207091751457"></a>**
 
-```
+```c
 …
 int ret = 0;
 int card_id = 0;
@@ -853,7 +852,6 @@ return ret;
 }
 …
 ```
-
 
 ## DCMI\_MAIN\_CMD\_TS命令说明<a name="ZH-CN_TOPIC_0000002485455392"></a>
 
@@ -1118,7 +1116,7 @@ DCMI_TS_SUB_CMD_MAX,
 
 **调用示例<a name="section49611431655"></a>**
 
-```
+```c
 …
 int ret;
 int card_id = 0;
@@ -1138,7 +1136,6 @@ return -1;
 return 0;
 …
 ```
-
 
 ## DCMI\_MAIN\_CMD\_QOS命令说明<a name="ZH-CN_TOPIC_0000002485295474"></a>
 
@@ -1260,8 +1257,8 @@ DCMI_QOS_SUB_CONFIG_DONE,
 
 **约束说明<a name="section2977135411511"></a>**
 
--   受soc特性约束，需要调用DCMI\_set\_device\_info后再调用相应get接口读取配置是否生效，否则读取值不可信。
--   resctrl获取带宽功能与DCMI接口获取实时带宽功能冲突，如果已经使能其中一种，请勿并行使用另外一种。
+- 受soc特性约束，需要调用DCMI\_set\_device\_info后再调用相应get接口读取配置是否生效，否则读取值不可信。
+- resctrl获取带宽功能与DCMI接口获取实时带宽功能冲突，如果已经使能其中一种，请勿并行使用另外一种。
 
 **表 1**  sub\_cmd对应的buf格式
 
@@ -1453,7 +1450,7 @@ DCMI_QOS_SUB_CONFIG_DONE,
 
 **调用示例<a name="section176618596619"></a>**
 
-```
+```c
 …
 int ret = 0;
 int card_id = 0;
@@ -1473,7 +1470,6 @@ return ret;
 }
 …
 ```
-
 
 ## DCMI\_MAIN\_CMD\_HCCS命令说明<a name="ZH-CN_TOPIC_0000002517615317"></a>
 
@@ -1770,7 +1766,7 @@ return ret;
 
 **调用示例<a name="section1782016178717"></a>**
 
-```
+```c
 …
 int ret = 0;
 int card_id = 0;
@@ -1788,7 +1784,6 @@ return ret;
 }
 …
 ```
-
 
 ## DCMI\_MAIN\_CMD\_EX\_COMPUTING命令说明<a name="ZH-CN_TOPIC_0000002485455476"></a>
 
@@ -2019,7 +2014,7 @@ return ret;
 
 **调用示例<a name="section172981043978"></a>**
 
-```
+```c
 …
 int ret = 0;
 int card_id =0;int device_id = 0;
@@ -2036,7 +2031,6 @@ return ret;
 }
 …
 ```
-
 
 ## DCMI\_MAIN\_CMD\_EX\_CERT命令说明<a name="ZH-CN_TOPIC_0000002485295470"></a>
 
@@ -2296,7 +2290,7 @@ return ret;
 
 **调用示例<a name="section5271151515373"></a>**
 
-```
+```c
 …
 int ret;
 int card_id = 0;
@@ -2312,7 +2306,6 @@ if (ret) {
 // todo
 …
 ```
-
 
 ## DCMI\_MAIN\_CMD\_PCIE命令说明<a name="ZH-CN_TOPIC_0000002517535363"></a>
 
@@ -2539,7 +2532,7 @@ host与device采用HCCS互联的设备另采用HCCS命令查询链路信息。
 
 **调用示例<a name="section8297125115718"></a>**
 
-```
+```c
 … 
 int ret = 0;
 int card_id = 0;
@@ -2553,7 +2546,6 @@ if (ret != 0){
 }
 …
 ```
-
 
 ## DCMI\_MAIN\_CMD\_DEVICE\_SHARE命令说明<a name="ZH-CN_TOPIC_0000002485295380"></a>
 
@@ -2672,8 +2664,8 @@ if (ret != 0){
 
 **约束说明<a name="section13645113118442"></a>**
 
--   设置容器共享模式后，重启系统后容器使能状态默认为禁用。
--   该接口支持在物理机+特权容器场景下使用。
+- 设置容器共享模式后，重启系统后容器使能状态默认为禁用。
+- 该接口支持在物理机+特权容器场景下使用。
 
 **表 1**  sub\_cmd对应的buf格式
 
@@ -2780,7 +2772,7 @@ if (ret != 0){
 
 **调用示例<a name="section0362658184619"></a>**
 
-```
+```c
     … 
     int ret = 0;
     int card_id = 0;
@@ -2795,5 +2787,3 @@ if (ret != 0){
     }
     …
 ```
-
-

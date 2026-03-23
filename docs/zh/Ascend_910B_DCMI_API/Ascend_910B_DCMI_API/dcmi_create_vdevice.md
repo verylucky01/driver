@@ -195,7 +195,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001206147238_zh-cn_topic_0000001177894680_zh-cn_topic_0000001121038486_toc533412083"></a>**
 
-```
+```c
 int card_id = 0; 
 int device_id = 0; 
 struct dcmi_create_vdev_out out = {0}; 
@@ -209,4 +209,3 @@ if (ret != 0) {
     return ret; 
 }
 ```
-

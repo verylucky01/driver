@@ -169,7 +169,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001251227173_zh-cn_topic_0000001223292889_zh-cn_topic_0000001147723703_toc533412083"></a>**
 
-```
+```c
 …
 int ret;
 int card_id = 0;
@@ -178,4 +178,3 @@ enum dcmi_unit_type device_type = INVALID_TYPE;
 ret = dcmi_get_device_type(card_id, device_id, &device_type);
 …
 ```
-

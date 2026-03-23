@@ -191,7 +191,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001251427211_zh-cn_topic_0000001178373160_zh-cn_topic_0000001101290912_toc533412083"></a>**
 
-```
+```c
 int ret;
 int card_id = 0;
 int device_id = 0;
@@ -226,4 +226,3 @@ if (ret != 0) {
 free(out_buf);
 free(out_len);
 ```
-

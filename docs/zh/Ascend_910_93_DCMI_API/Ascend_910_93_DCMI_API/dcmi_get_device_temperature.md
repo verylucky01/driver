@@ -147,7 +147,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001251307159_zh-cn_topic_0000001178054670_zh-cn_topic_0000001148124673_toc533412083"></a>**
 
-```
+```c
 … 
 int ret = 0;
 int card_id = 0;
@@ -156,4 +156,3 @@ int temperature = 0;
 ret = dcmi_get_device_temperature(card_id, device_id, &temperature);
 …
 ```
-

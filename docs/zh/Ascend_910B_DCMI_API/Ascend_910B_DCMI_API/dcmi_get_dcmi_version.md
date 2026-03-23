@@ -150,11 +150,10 @@
 
 **调用示例<a name="zh-cn_topic_0000001206627196_zh-cn_topic_0000001178213188_zh-cn_topic_0000001146459833_toc533412083"></a>**
 
-```
+```c
 … 
 int ret;
 char dcmi_ver[16] = {0};
 ret = dcmi_get_dcmi_version(dcmi_ver, sizeof(dcmi_ver));
 …
 ```
-

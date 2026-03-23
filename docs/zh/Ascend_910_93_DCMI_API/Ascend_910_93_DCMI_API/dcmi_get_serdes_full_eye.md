@@ -163,17 +163,16 @@
 
 **调用示例<a name="section1888234213618"></a>**
 
-```
+```c
 …   
 int ret = 0;  
- int card_id = 0;  
- int device_id = 0;  
- struct dcmi_serdes_full_eye serdes_full_eye_info = {
+int card_id = 0;  
+int device_id = 0;  
+struct dcmi_serdes_full_eye serdes_full_eye_info = {
           .macro_id = 9,
           .lane_id = 0,
           .serdes_full_eye = {0} 
  } 
- ret = dcmi_get_serdes_full_eye(card_id, device_id, &serdes_full_eye_info);  
+ret = dcmi_get_serdes_full_eye(card_id, device_id, &serdes_full_eye_info);  
 …
 ```
-

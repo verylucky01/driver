@@ -168,7 +168,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001251227183_zh-cn_topic_0000001177894702_zh-cn_topic_0000001170697495_toc533412083"></a>**
 
-```
+```c
 … 
 int ret;
 int device_id_max = 0;
@@ -178,4 +178,3 @@ int card_id = 0;
 ret = dcmi_get_device_id_in_card(card_id, &device_id_max, &mcu_id, &cpu_id);
 …
 ```
-

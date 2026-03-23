@@ -132,7 +132,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001206467192_zh-cn_topic_0000001223414431_zh-cn_topic_0000001101483708_toc533412083"></a>**
 
-```
+```c
 … 
 int ret;
 int device_num = 0;
@@ -140,4 +140,3 @@ int card_id = 0;
 ret = dcmi_get_device_num_in_card(card_id, &device_num);
 …
 ```
-

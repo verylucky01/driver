@@ -132,11 +132,10 @@
 
 **调用示例<a name="zh-cn_topic_0000001206467214_zh-cn_topic_0000001223292891_zh-cn_topic_0000001147603669_toc533412083"></a>**
 
-```
+```c
 … 
 int ret;
 char driver_ver[64] = {0};
 ret = dcmi_get_driver_version(driver_ver, sizeof(driver_ver));
 …
 ```
-

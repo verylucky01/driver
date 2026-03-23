@@ -139,7 +139,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001206147262_zh-cn_topic_0000001177894706_zh-cn_topic_0000001102110956_toc533412083"></a>**
 
-```
+```c
 … 
 int ret = 0;
 int card_id = 0;
@@ -147,4 +147,3 @@ struct dcmi_board_info board_info = {0};
 ret = dcmi_get_card_board_info(card_id, &board_info);
 …
 ```
-

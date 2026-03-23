@@ -173,7 +173,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001251107211_zh-cn_topic_0000001223414443_zh-cn_topic_0000001100138010_toc533412083"></a>**
 
-```
+```c
 …
 int ret;
 int card_id = 0;
@@ -182,4 +182,3 @@ struct dcmi_board_info board_info = {0};
 ret = dcmi_get_device_board_info(card_id, device_id, &board_info);
 …
 ```
-

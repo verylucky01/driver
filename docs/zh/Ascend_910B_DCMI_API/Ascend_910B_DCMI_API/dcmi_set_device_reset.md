@@ -86,11 +86,11 @@
 
 **约束说明<a name="zh-cn_topic_0000001206467196_zh-cn_topic_0000001177894694_zh-cn_topic_0000001099300038_toc533412082"></a>**
 
--   带外标卡复位功能依赖ipmitool软件，需要提前下载并加载驱动。详细操作请参见\[faq\]\(faq.md\)章节的“准备ipmitool软件”。
+- 带外标卡复位功能依赖ipmitool软件，需要提前下载并加载驱动。详细操作请参见\[faq\]\(faq.md\)章节的“准备ipmitool软件”。
 
--   Atlas 300I A2 推理卡、Atlas 300T A2 训练卡需要调用[dcmi\_set\_device\_pre\_reset](dcmi_set_device_pre_reset.md)预复位芯片并返回成功后，才能调用该接口进行带外复位。
--   对于Atlas 900 A2 PoD 集群基础单元和Atlas 200T A2 Box16 异构子框，正常启动的NPU不支持单NPU复位。若同一设备上的多个NPU中部分降P启动，部分正常启动，则降P启动的NPU支持单NPU复位；正常启动的NPU不支持单NPU复位，即执行单NPU复位命令时所有NPU都将被复位，包括被降P启动的NPU。查询指定NPU是否为降P启动的方法请参见《Atlas A2 中心推理和训练硬件 25.5.0 npu-smi 命令参考》中的“查询指定NPU是否为降P启动”章节，对指定NPU进行降P启动的方法请参见《Atlas A2 中心推理和训练硬件 25.5.0 npu-smi 命令参考》中的“对指定NPU进行降P启动”章节。
--   该接口支持在物理机+特权容器场景下使用。
+- Atlas 300I A2 推理卡、Atlas 300T A2 训练卡需要调用[dcmi\_set\_device\_pre\_reset](dcmi_set_device_pre_reset.md)预复位芯片并返回成功后，才能调用该接口进行带外复位。
+- 对于Atlas 900 A2 PoD 集群基础单元和Atlas 200T A2 Box16 异构子框，正常启动的NPU不支持单NPU复位。若同一设备上的多个NPU中部分降P启动，部分正常启动，则降P启动的NPU支持单NPU复位；正常启动的NPU不支持单NPU复位，即执行单NPU复位命令时所有NPU都将被复位，包括被降P启动的NPU。查询指定NPU是否为降P启动的方法请参见《Atlas A2 中心推理和训练硬件 25.5.0 npu-smi 命令参考》中的“查询指定NPU是否为降P启动”章节，对指定NPU进行降P启动的方法请参见《Atlas A2 中心推理和训练硬件 25.5.0 npu-smi 命令参考》中的“对指定NPU进行降P启动”章节。
+- 该接口支持在物理机+特权容器场景下使用。
 
 **表 1** 不同部署场景下的支持情况
 
@@ -176,7 +176,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001206467196_zh-cn_topic_0000001177894694_zh-cn_topic_0000001099300038_toc533412083"></a>**
 
-```
+```c
 … 
 int ret = 0;
 int card_id = 0;
@@ -189,4 +189,3 @@ if (ret != 0) {
 }
 …  
 ```
-

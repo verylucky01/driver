@@ -102,10 +102,9 @@
 
 **调用示例<a name="zh-cn_topic_0000001206307254_zh-cn_topic_0000001178054644_zh-cn_topic_0000001148017111_toc533412083"></a>**
 
-```
+```c
 ...
 int ret = 0;
 ret = dcmi_set_container_service_enable();
 ...
 ```
-

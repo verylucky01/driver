@@ -154,7 +154,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001251307163_zh-cn_topic_0000001223494389_zh-cn_topic_0000001146696617_toc533412083"></a>**
 
-```
+```c
 …
 int ret;
 int card_id = 0;
@@ -163,4 +163,3 @@ struct dcmi_chip_info chip_info = {0};
 ret = dcmi_get_device_chip_info(card_id, device_id, &chip_info);
 …
 ```
-

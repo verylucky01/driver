@@ -179,7 +179,7 @@
 
 **调用示例<a name="section1888234213618"></a>**
 
-```
+```c
 …   
 int ret = 0;  
  int card_id = 0;  
@@ -192,4 +192,3 @@ int ret = 0;
  ret = dcmi_get_serdes_full_eye(card_id, device_id, &serdes_full_eye_info);  
 …
 ```
-

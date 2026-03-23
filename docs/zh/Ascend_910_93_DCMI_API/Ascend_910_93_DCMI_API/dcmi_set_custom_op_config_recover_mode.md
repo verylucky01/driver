@@ -124,7 +124,7 @@
 
 **调用示例<a name="section184903171142"></a>**
 
-```
+```c
 … 
 unsigned int mode = 0;
 int ret = dcmi_set_custom_op_config_recover_mode(mode);
@@ -134,4 +134,3 @@ if (ret != 0) {
 }
 …
 ```
-

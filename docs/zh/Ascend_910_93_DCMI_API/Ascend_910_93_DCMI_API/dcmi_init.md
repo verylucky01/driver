@@ -104,10 +104,9 @@
 
 **调用示例<a name="zh-cn_topic_0000001251227149_zh-cn_topic_0000001178213202_zh-cn_topic_0000001097675636_toc533412083"></a>**
 
-```
+```c
 … 
 int ret;
 ret = dcmi_init();
 …
 ```
-

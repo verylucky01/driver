@@ -161,7 +161,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001206307238_zh-cn_topic_0000001223494379_zh-cn_topic_0000001148051589_toc533412083"></a>**
 
-```
+```c
 … 
 int ret;
 int device_count = 0;
@@ -169,4 +169,3 @@ int card_id_list[16];
 ret = dcmi_get_card_num_list(&device_count, card_id_list, 16);
 …
 ```
-

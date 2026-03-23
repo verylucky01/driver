@@ -80,8 +80,8 @@
 
 **约束说明<a name="zh-cn_topic_0000001251107203_zh-cn_topic_0000001177894684_zh-cn_topic_0000001115026454_toc533412082"></a>**
 
--   带外通道状态查询功能依赖ipmitool软件，需要提前下载并加载驱动。详细操作请参见[准备ipmitool软件](准备ipmitool软件.md)章节。
--   对于Atlas 9000 A3 SuperPoD 集群算力系统、Atlas 900 A3 SuperPoD 超节点、Atlas 800T A3 超节点和Atlas 800I A3 超节点，该接口支持在物理机+特权容器场景下使用。
+- 带外通道状态查询功能依赖ipmitool软件，需要提前下载并加载驱动。详细操作请参见[准备ipmitool软件](faq.md#准备ipmitool软件)章节。
+- 对于Atlas 9000 A3 SuperPoD 集群算力系统、Atlas 900 A3 SuperPoD 超节点、Atlas 800T A3 超节点和Atlas 800I A3 超节点，该接口支持在物理机+特权容器场景下使用。
 
 **表 1** 不同部署场景下的支持情况
 
@@ -149,7 +149,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001251107203_zh-cn_topic_0000001177894684_zh-cn_topic_0000001115026454_toc533412083"></a>**
 
-```
+```c
 … 
 int ret; 
 int card_id = 0;
@@ -158,4 +158,3 @@ int channel_state = 0;
 ret = dcmi_get_device_outband_channel_state(card_id, device_id, &channel_state);
 …
 ```
-

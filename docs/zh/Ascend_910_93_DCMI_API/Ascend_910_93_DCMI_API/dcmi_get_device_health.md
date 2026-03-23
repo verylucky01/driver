@@ -149,7 +149,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001206147250_zh-cn_topic_0000001178373152_zh-cn_topic_0000001147843629_toc533412083"></a>**
 
-```
+```c
 … 
 int ret = 0;
 int card_id = 0;
@@ -158,4 +158,3 @@ unsigned int health = 0;
 ret = dcmi_get_device_health(card_id, device_id, &health);
 …
 ```
-

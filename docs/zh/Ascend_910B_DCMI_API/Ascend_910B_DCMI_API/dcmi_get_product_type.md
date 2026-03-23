@@ -172,7 +172,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001251427207_zh-cn_topic_0000001223494381_zh-cn_topic_0000001115023430_toc533412083"></a>**
 
-```
+```c
 … 
 int ret;
 char driver_ver[16] = {0};
@@ -183,4 +183,3 @@ int buf_size = 64;
 ret = dcmi_get_product_type(card_id, device_id, product_type_str, buf_size);
 …
 ```
-

@@ -161,7 +161,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001206627172_zh-cn_topic_0000001178054658_zh-cn_topic_0000001101324724_toc533412083"></a>**
 
-```
+```c
 … 
 int ret = 0;
 int card_id = 0;
@@ -170,4 +170,3 @@ unsigned int frequency = 0;
 ret = dcmi_get_device_frequency(card_id, device_id, DCMI_FREQ_DDR, &frequency);
 …
 ```
-

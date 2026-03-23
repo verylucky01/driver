@@ -159,7 +159,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001251427199_zh-cn_topic_0000001223494363_zh-cn_topic_0000001146576691_toc533412083"></a>**
 
-```
+```c
 … 
 int ret;
 int card_num = 0;
@@ -167,4 +167,3 @@ int card_list[16] = {0};
 ret = dcmi_get_card_list(&card_num, card_list, 16);
 …
 ```
-

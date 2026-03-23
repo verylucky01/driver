@@ -148,7 +148,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001251107221_zh-cn_topic_0000001223292883_zh-cn_topic_0000001170855219_toc533412083"></a>**
 
-```
+```c
 … 
 int ret = 0;
 int card_id = 0;
@@ -157,4 +157,3 @@ int board_id = 0;
 ret = dcmi_get_board_id(card_id, device_id, &board_id);
 …
 ```
-

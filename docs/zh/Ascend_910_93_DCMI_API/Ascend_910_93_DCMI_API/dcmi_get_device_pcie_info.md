@@ -154,7 +154,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001251427217_zh-cn_topic_0000001223292899_zh-cn_topic_0000001100298000_toc533412083"></a>**
 
-```
+```c
 …
 int ret;
 int card_id = 0;
@@ -163,4 +163,3 @@ struct dcmi_pcie_info pcie_info = {0};
 ret = dcmi_get_device_pcie_info(card_id, device_id, &pcie_info);
 …
 ```
-

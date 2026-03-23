@@ -172,7 +172,7 @@
 
 **调用示例<a name="section13653173113509"></a>**
 
-```
+```c
 …
 int ret;
 int card_id = 0;
@@ -182,4 +182,3 @@ int length;
 ret = dcmi_get_affinity_cpu_info_by_device_id(card_id, device_id, affinity_cpu, &length);
 …
 ```
-

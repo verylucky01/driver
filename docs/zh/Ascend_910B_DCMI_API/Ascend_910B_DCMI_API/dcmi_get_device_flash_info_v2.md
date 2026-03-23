@@ -182,7 +182,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001251427215_zh-cn_topic_0000001223172955_zh-cn_topic_0000001101490894_toc533412083"></a>**
 
-```
+```c
 int i;
 int ret = 0;
 int card_id = 0x3;
@@ -203,4 +203,3 @@ for (int i = 0; i < flash_count; i++){
 }
 … 
 ```
-
