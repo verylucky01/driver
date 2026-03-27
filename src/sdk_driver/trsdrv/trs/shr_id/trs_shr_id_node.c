@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -30,7 +30,7 @@
 #define SHR_ID_HASH_TABLE_BIT           4
 #define SHR_ID_HASH_BUCKET              16
 
-#define TRS_SHR_ID_NODE_MAX_OPEN_NUM    ((S32_MAX - SHR_ID_PID_MAX_NUM) / SHR_ID_PID_MAX_NUM)
+#define TRS_SHR_ID_NODE_MAX_OPEN_NUM    ((KA_S32_MAX - SHR_ID_PID_MAX_NUM) / SHR_ID_PID_MAX_NUM)
 
 struct shr_id_node_htable {
     KA_DECLARE_HASHTABLE(htable, SHR_ID_HASH_TABLE_BIT);
@@ -60,7 +60,7 @@ static struct shr_id_node_ops *shr_id_get_node_ops(void)
     return &g_shrid_node_ops;
 }
 struct shr_id_node_wlist {
-    pid_t pid;
+    ka_pid_t pid;
     u64 set_time;
     u32 open_num;
 };
@@ -137,7 +137,7 @@ static struct shr_id_node *_shr_id_node_find(const char *name, int type)
     struct shr_id_node *node = NULL;
 
     ka_hash_for_each_possible(htable[type].htable, node, link, key) {
-        if (strcmp(name, node->attr.name) == 0) {
+        if (ka_base_strcmp(name, node->attr.name) == 0) {
             return node;
         }
     }
@@ -202,7 +202,7 @@ int shr_id_get_type_by_name(const char *name, int *id_type)
     size_t name_len;
     int ret;
 
-    name_len = strnlen(name, SHR_ID_NSM_NAME_SIZE);
+    name_len = ka_base_strnlen(name, SHR_ID_NSM_NAME_SIZE);
     if ((name_len == 0) || (name_len >= SHR_ID_NSM_NAME_SIZE)) {
         trs_err("Length out of range. (name_len=%lu)\n", name_len);
         return -EINVAL;
@@ -256,7 +256,7 @@ static struct shr_id_node *_shr_id_node_get(const char *name, int type)
     struct shr_id_node *node = NULL;
     size_t name_len;
 
-    name_len = strnlen(name, SHR_ID_NSM_NAME_SIZE);
+    name_len = ka_base_strnlen(name, SHR_ID_NSM_NAME_SIZE);
     if ((name_len == 0) || (name_len >= SHR_ID_NSM_NAME_SIZE)) {
         trs_err("Length out of range. (name_len=%lu; type=%d)\n", name_len, type);
         return NULL;
@@ -358,7 +358,7 @@ void shr_id_node_put(void *node)
     kref_safe_put(&tmp_node->ref, shr_id_node_release);
 }
 
-static int _shr_id_node_find_wlist_index(struct shr_id_node *node, pid_t pid)
+static int _shr_id_node_find_wlist_index(struct shr_id_node *node, ka_pid_t pid)
 {
     int i;
 
@@ -383,7 +383,7 @@ static int _shr_id_node_get_idle_wlist_index(struct shr_id_node *node)
     return SHR_ID_PID_MAX_NUM;
 }
 
-static int _shr_id_node_set_pid(struct shr_id_node *node, pid_t pid)
+static int _shr_id_node_set_pid(struct shr_id_node *node, ka_pid_t pid)
 {
     int idx = _shr_id_node_find_wlist_index(node, pid);
     if (idx == SHR_ID_PID_MAX_NUM) {
@@ -408,7 +408,7 @@ static int _shr_id_node_set_attr(struct shr_id_node *node, int pid)
     return 0;
 }
 
-static int _shr_id_node_set_pids(struct shr_id_node *node, pid_t create_pid, pid_t pid[], u32 pid_num)
+static int _shr_id_node_set_pids(struct shr_id_node *node, ka_pid_t create_pid, ka_pid_t pid[], u32 pid_num)
 {
     u32 i;
 
@@ -435,7 +435,7 @@ static int _shr_id_node_set_pids(struct shr_id_node *node, pid_t create_pid, pid
     return 0;
 }
 
-int shr_id_node_set_pids(const char *name, int type, pid_t create_pid, pid_t pid[], u32 pid_num)
+int shr_id_node_set_pids(const char *name, int type, ka_pid_t create_pid, ka_pid_t pid[], u32 pid_num)
 {
     struct shr_id_node *node = _shr_id_node_get(name, type);
     int ret;
@@ -457,7 +457,7 @@ int shr_id_node_set_pids(const char *name, int type, pid_t create_pid, pid_t pid
     return ret;
 }
 
-static int shr_id_node_record_check(struct shr_id_node *node, pid_t pid)
+static int shr_id_node_record_check(struct shr_id_node *node, ka_pid_t pid)
 {
     int idx;
 
@@ -479,7 +479,7 @@ static inline int _shr_id_node_record(struct shr_id_node *node)
     return trs_res_id_ctrl(&node->attr.inst, node->attr.res_type, node->attr.id, TRS_RES_OP_RECORD);
 }
 
-int shr_id_node_record(const char *name, int type, pid_t pid)
+int shr_id_node_record(const char *name, int type, ka_pid_t pid)
 {
     struct shr_id_node *node = _shr_id_node_get(name, type);
     int ret = -ENODEV;
@@ -498,7 +498,7 @@ int shr_id_node_record(const char *name, int type, pid_t pid)
     return ret;
 }
 
-static int _shr_id_node_uninit(struct shr_id_node *node, pid_t pid)
+static int _shr_id_node_uninit(struct shr_id_node *node, ka_pid_t pid)
 {
     /* Only creator process have permission to destroy */
     if (node->attr.pid != pid) {
@@ -520,7 +520,7 @@ static int shr_id_destroy_node_handle(struct shr_id_node *node, u32 mode)
     return 0;
 }
 
-int shr_id_node_set_attr(const char *name, int type, pid_t pid)
+int shr_id_node_set_attr(const char *name, int type, ka_pid_t pid)
 {
     struct shr_id_node *node = NULL;
     int ret;
@@ -574,7 +574,7 @@ int shr_id_node_get_attribute(const char *name, int type, struct shr_id_ioctl_in
     return 0;
 }
 
-int shr_id_node_destroy(const char *name, int type, pid_t pid, u32 mode)
+int shr_id_node_destroy(const char *name, int type, ka_pid_t pid, u32 mode)
 {
     struct shr_id_node *node = NULL;
     int ret;
@@ -608,7 +608,7 @@ int shr_id_node_destroy(const char *name, int type, pid_t pid, u32 mode)
     return ret;
 }
 
-static int _shr_id_node_open(struct shr_id_node *node, pid_t pid, unsigned long start_time,
+static int _shr_id_node_open(struct shr_id_node *node, ka_pid_t pid, unsigned long start_time,
     struct shr_id_node_op_attr *attr)
 {
     int idx;
@@ -646,7 +646,7 @@ static int _shr_id_node_open(struct shr_id_node *node, pid_t pid, unsigned long 
     return 0;
 }
 
-int shr_id_node_open(const char *name, pid_t pid, unsigned long start_time, struct shr_id_node_op_attr *attr)
+int shr_id_node_open(const char *name, ka_pid_t pid, unsigned long start_time, struct shr_id_node_op_attr *attr)
 {
     struct shr_id_node *node = NULL;
     int ret;
@@ -670,7 +670,7 @@ int shr_id_node_open(const char *name, pid_t pid, unsigned long start_time, stru
     return ret;
 }
 
-static int _shr_id_node_close(struct shr_id_node *node, pid_t pid)
+static int _shr_id_node_close(struct shr_id_node *node, ka_pid_t pid)
 {
     int idx;
 
@@ -688,7 +688,7 @@ static int _shr_id_node_close(struct shr_id_node *node, pid_t pid)
     return 0;
 }
 
-int shr_id_node_close(const char *name, int type, pid_t pid)
+int shr_id_node_close(const char *name, int type, ka_pid_t pid)
 {
     struct shr_id_node *node = NULL;
     int ret = -ENODEV;

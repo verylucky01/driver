@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,11 +14,11 @@
 #ifndef _DEVDRV_DEVICE_LOAD_H_
 #define _DEVDRV_DEVICE_LOAD_H_
 
-#include "comm_kernel_interface.h"
 #include "ka_common_pub.h"
 #include "ka_task_pub.h"
 #include "ka_base_pub.h"
 #include "ka_memory_pub.h"
+#include "comm_kernel_interface.h"
 
 extern struct devdrv_black_callback g_black_box;
 #define DEVDRV_HOST_FILE_PATH "/home/bios"
@@ -138,7 +138,7 @@ struct devdrv_load_work {
 struct devdrv_agent_load {
     ka_device_t *dev;
     u32 dev_id;
-    void __iomem *mem_sram_base;
+    void __ka_mm_iomem *mem_sram_base;
     struct devdrv_load_blocks *blocks;
 
     ka_timer_list_t load_timer; /* device os load time out timer */

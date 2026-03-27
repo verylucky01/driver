@@ -127,11 +127,17 @@ int dms_feature_get_pcie_bandwidth_info(void *feature, char *in, u32 in_len, cha
 #define CHIP_BASE_ADDR                  0x0
 #define CHIP_OFFSET                     0x200000000000
 #define DIE_OFFSET                      0x0
-#define DEVDRV_LOAD_SRAM_ADDR           0x402000000ULL
 #define DEVDRV_LOAD_SRAM_SIZE           0x4ULL
-#define DEVDRV_MANUFACTURER_ID_OFFSET   0x39980ULL
 
 #define MANUFACTURER_ID_ERROR           0xFFFFFFFFU
+
+#if defined(CFG_SOC_PLATFORM_CLOUD_V4)
+#define DEVDRV_LOAD_SRAM_ADDR           0xE8000000ULL
+#define DEVDRV_MANUFACTURER_ID_OFFSET   0x6BC8CULL
+#else
+#define DEVDRV_LOAD_SRAM_ADDR           0x402000000ULL
+#define DEVDRV_MANUFACTURER_ID_OFFSET   0x39980ULL
+#endif
 
 int dms_feature_get_hbm_manufacturer_id(void *feature, char *in, u32 in_len, char *out, u32 out_len);
 #endif

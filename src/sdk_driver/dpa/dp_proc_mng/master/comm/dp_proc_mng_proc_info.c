@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -89,7 +89,7 @@ static int dp_proc_mng_ioctl_get_mem_stats(ka_file_t *file, struct dp_proc_mng_i
     struct dp_proc_mng_chan_mem_stats mem_stats_msg = {{{0}}};
     int ret;
 
-    mem_stats_msg.head.process_id.hostpid = current->tgid;
+    mem_stats_msg.head.process_id.hostpid = ka_task_get_current_tgid();
     mem_stats_msg.head.process_id.devid = arg->head.devid;
     mem_stats_msg.head.process_id.vfid = arg->head.vfid;
     mem_stats_msg.head.msg_id = DP_PROC_MNG_CHAN_QUERY_MEM_STATS_H2D_ID;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -12,8 +12,6 @@
  */
 
 #define pr_fmt(fmt) "XSMEM_CACHE_VMA: <%s:%d> " fmt, __func__, __LINE__
-
-#include <linux/slab.h>
 
 #include "xsmem_framework_log.h"
 #include "xsmem_framework.h"
@@ -32,7 +30,7 @@ static int cache_vma_algo_pool_init(struct xsm_pool *xp, struct xsm_reg_arg *arg
     struct cache_vma_ctrl *cache_ctrl = NULL;
     void *vma_ctrl = NULL;
 
-    cache_ctrl = xsmem_drv_kmalloc(sizeof(struct cache_vma_ctrl), GFP_KERNEL | __GFP_ACCOUNT | __GFP_ZERO);
+    cache_ctrl = xsmem_drv_kmalloc(sizeof(struct cache_vma_ctrl), KA_GFP_KERNEL | __KA_GFP_ACCOUNT | __KA_GFP_ZERO);
     if (cache_ctrl == NULL) {
         xsmem_err("Alloc memory for cache_vma_ctrl failed.\n");
         return -ENOMEM;
@@ -83,7 +81,7 @@ static int cache_vma_algo_cache_query(struct xsm_pool *xp, unsigned int dev_id,
     return 0;
 }
 
-static void cache_vma_algo_pool_show(struct xsm_pool *xp, struct seq_file *seq)
+static void cache_vma_algo_pool_show(struct xsm_pool *xp, ka_seq_file_t *seq)
 {
     struct cache_vma_ctrl *cache_ctrl = (struct cache_vma_ctrl *)xp->private;
     vma_algo_show(cache_ctrl->vma_ctrl, seq);

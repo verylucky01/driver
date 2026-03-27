@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -265,7 +265,7 @@ static int devmm_shm_try_query_hpagesize(struct devmm_svm_process *svm_proc,
     struct devmm_shm_node *node, u64 va, u64 dst_va, u32 *page_size)
 {
     u64 queried_num = (va - node->src_va) / KA_MM_PAGE_SIZE;
-    int cycle_num = DEVMM_PAGENUM_PER_HPAGE;
+    int cycle_num = devmm_svm->device_hpage_size / KA_MM_PAGE_SIZE;
     u64 total_num = node->page_num;
     u64 pre_pa = 0;
     u64 pa;
@@ -284,8 +284,8 @@ static int devmm_shm_try_query_hpagesize(struct devmm_svm_process *svm_proc,
 
 #ifndef EMU_ST
     /* try to merge normal page to hpage */
-    if ((*page_size == KA_MM_PAGE_SIZE) &&
-        ((dst_va == 0) || ((dst_va & (KA_HPAGE_SIZE - 1)) == 0))) {
+    if ((*page_size == KA_MM_PAGE_SIZE) && (cycle_num > 0) &&
+        ((dst_va == 0) || ((dst_va & (devmm_svm->device_hpage_size - 1)) == 0))) {
         int i;
         for (i = 0; (i < cycle_num) && (queried_num + i < total_num); i++) {
             if (!node->src_pa_is_ram) {
@@ -293,7 +293,7 @@ static int devmm_shm_try_query_hpagesize(struct devmm_svm_process *svm_proc,
             } else {
                 pa = (u64)ka_mm_page_to_phys(node->pages[queried_num + i]);
             }
-            if ((i == 0) && ((pa & (KA_HPAGE_SIZE - 1)) != 0)) {
+            if ((i == 0) && ((pa & (devmm_svm->device_hpage_size - 1)) != 0)) {
                 break;
             } 
             if ((i != 0) && (pre_pa + KA_MM_PAGE_SIZE != pa)) {
@@ -302,7 +302,7 @@ static int devmm_shm_try_query_hpagesize(struct devmm_svm_process *svm_proc,
             pre_pa = pa;
         }
 
-        *page_size = (i == DEVMM_PAGENUM_PER_HPAGE) ? KA_HPAGE_SIZE : KA_MM_PAGE_SIZE;
+        *page_size = (i == cycle_num) ? devmm_svm->device_hpage_size : KA_MM_PAGE_SIZE;
     }
 #endif
     return 0;
@@ -353,6 +353,7 @@ static int devmm_shm_send_info_to_dev(struct devmm_svm_process *svm_proc,
     u64 remained_num = node->page_num;
     u64 start_va = node->src_va;
     u64 total_size = node->size;
+    u64 pagenum_pre_dev_hpage = devmm_svm->device_hpage_size / KA_MM_PAGE_SIZE;
     u32 pre_page_size = 0;
     u32 page_size = KA_MM_PAGE_SIZE;
     u32 host_flag;
@@ -374,7 +375,7 @@ static int devmm_shm_send_info_to_dev(struct devmm_svm_process *svm_proc,
             }
         }
 
-        if (remained_num < DEVMM_PAGENUM_PER_HPAGE) {
+        if ((remained_num < pagenum_pre_dev_hpage) || (pagenum_pre_dev_hpage == 0)) {
             page_size = KA_MM_PAGE_SIZE;
         }
 
@@ -385,8 +386,8 @@ static int devmm_shm_send_info_to_dev(struct devmm_svm_process *svm_proc,
                     perpared_num, queried_num, page_size);
                 return ret;
             }
-            queried_num += (page_size == KA_HPAGE_SIZE) ? DEVMM_PAGENUM_PER_HPAGE : 1;
-            remained_num -= (page_size == KA_HPAGE_SIZE) ? DEVMM_PAGENUM_PER_HPAGE : 1;
+            queried_num += page_size / KA_MM_PAGE_SIZE;
+            remained_num -= page_size / KA_MM_PAGE_SIZE;
             queried_size += page_size;
             pre_page_size = page_size;
             perpared_num++;
@@ -1113,6 +1114,7 @@ STATIC int devmm_merge_palist_to_hpalist(u64 *pa, u32 pa_num, u32 *hpa_num, u32 
 
 static int devmm_try_get_hpalist(const ka_vm_area_struct_t *vma, u64 va, u64 sz, u32 devid, struct devmm_palist_info *palist)
 {
+    u64 dev_hpage_size = devmm_svm->device_hpage_size;
     u32 blk_num = palist->blk_num;
     u32 host_flag;
     int ret;
@@ -1139,19 +1141,20 @@ static int devmm_try_get_hpalist(const ka_vm_area_struct_t *vma, u64 va, u64 sz,
     }
 #endif
 
-    if ((palist->pa_blk[0] & (KA_HPAGE_SIZE - 1)) != 0) {
-        palist->got_num = blk_num;
+    palist->got_num = blk_num;
+    if ((palist->pa_blk[0] & (dev_hpage_size - 1)) != 0 || (dev_hpage_size % KA_MM_PAGE_SIZE) != 0) {
         return 0;
     }
 
+#ifndef EMU_ST
     ret = devmm_merge_palist_to_hpalist(palist->pa_blk, blk_num, &palist->got_num,
-        DEVMM_PAGENUM_PER_HPAGE, KA_MM_PAGE_SIZE);
+        dev_hpage_size / KA_MM_PAGE_SIZE, KA_MM_PAGE_SIZE);
     if (ret == 0) {
-        palist->page_size = KA_HPAGE_SIZE;
+        palist->page_size = dev_hpage_size;
     } else {
         palist->got_num = blk_num;
     }
-
+#endif
     return 0;
 }
 
@@ -1294,7 +1297,7 @@ STATIC int devmm_user_va_to_pa_list(struct devmm_svm_process *svm_proc, u64 va, 
  
     ka_task_down_read(ka_mm_get_mmap_sem(svm_proc->mm));
     vma = ka_mm_find_vma(svm_proc->mm, va);
-    if ((vma == NULL) || (vma->vm_start > va)) {
+    if ((vma == NULL) || (ka_mm_get_vm_start(vma) > va)) {
 #ifndef EMU_ST
         ka_task_up_read(ka_mm_get_mmap_sem(svm_proc->mm));
         devmm_drv_err("Can not find vma.(va=[0x%llx];hostpid=[%d]).\n", va, svm_proc->process_id.hostpid);
@@ -1358,7 +1361,7 @@ static bool devmm_pfn_is_io_mem(struct devmm_svm_process *svm_proc, u64 va, u64 
  
     ka_task_down_read(ka_mm_get_mmap_sem(svm_proc->mm));
     vma = ka_mm_find_vma(svm_proc->mm, va);
-    if ((vma == NULL) || (vma->vm_start > va)) {
+    if ((vma == NULL) || (ka_mm_get_vm_start(vma) > va)) {
 #ifndef EMU_ST
         ka_task_up_read(ka_mm_get_mmap_sem(svm_proc->mm));
         devmm_drv_err("Can not find vma.(va=[0x%llx];hostpid=[%d]).\n", va, svm_proc->process_id.hostpid);
@@ -1366,13 +1369,13 @@ static bool devmm_pfn_is_io_mem(struct devmm_svm_process *svm_proc, u64 va, u64 
 #endif
     }
  
-    for (vaddr = va, pg_num = 0; pg_num < total_num; vaddr += PAGE_SIZE, pg_num++) {
-        aligned_va = ka_base_round_down(va, PAGE_SIZE);
+    for (vaddr = va, pg_num = 0; pg_num < total_num; vaddr += KA_MM_PAGE_SIZE, pg_num++) {
+        aligned_va = ka_base_round_down(va, KA_MM_PAGE_SIZE);
         if (devmm_va_to_pfn(vma, aligned_va, &pfn, &kpg_size) != 0) {
             ka_task_up_read(ka_mm_get_mmap_sem(svm_proc->mm));
             return -ENOENT;
         }
-        if (page_is_ram(pfn)) {
+        if (ka_mm_page_is_ram(pfn)) {
             ka_task_up_read(ka_mm_get_mmap_sem(svm_proc->mm));
 #ifndef EMU_ST  
             return 0;
@@ -1442,11 +1445,11 @@ static int devmm_io_va_to_pages_list(struct devmm_svm_process *svm_proc, struct 
 {
     ka_vm_area_struct_t *vma = NULL;
     bool is_ram_mem = true;
-    int ret;
+    int ret = 0;
  
     ka_task_down_read(get_mmap_sem(svm_proc->mm));
     vma = ka_mm_find_vma(svm_proc->mm, node->src_va);
-    if ((vma == NULL) || (vma->vm_start > node->src_va)) {
+    if ((vma == NULL) || (ka_mm_get_vm_start(vma) > node->src_va)) {
 #ifndef EMU_ST
         ka_task_up_read(get_mmap_sem(svm_proc->mm));
         devmm_drv_err("Can not find vma.(va=[0x%llx];hostpid=[%d]).\n", node->src_va, svm_proc->process_id.hostpid);
@@ -1843,12 +1846,12 @@ static int devmm_local_dev_map_para_check(struct devmm_devid *devids,
         return -EOPNOTSUPP;
     }
 
-    if ((src_va == 0) || (PAGE_ALIGNED(src_va) == false)) {
+    if ((src_va == 0) || (KA_MM_PAGE_ALIGNED(src_va) == false)) {
         devmm_drv_err("Src_va is zero or not page alignment. (src_va=0x%llx)\n", src_va);
         return -EINVAL;
     }
 
-    if ((size == 0) || (PAGE_ALIGNED(size) == false)) {
+    if ((size == 0) || (KA_MM_PAGE_ALIGNED(size) == false)) {
         devmm_drv_err("Size is zero or not page alignment. (size=0x%llx; page_size=%lu)\n",
             size, KA_MM_PAGE_SIZE);
         return -EINVAL;
@@ -1887,7 +1890,7 @@ static int devmm_local_host_map_para_check(struct devmm_devid *devids,
         return -EOPNOTSUPP;
     }
 
-    if ((src_va == 0) || (PAGE_ALIGNED(src_va) == false) || (size == 0)) {
+    if ((src_va == 0) || (KA_MM_PAGE_ALIGNED(src_va) == false) || (size == 0)) {
         devmm_drv_err("Src_va is zero or not page alignment, or map size is zero. (src_va=0x%llx; "
             "page_size=%lu; size=%llu)\n", src_va, KA_MM_PAGE_SIZE, size);
         return -EINVAL;

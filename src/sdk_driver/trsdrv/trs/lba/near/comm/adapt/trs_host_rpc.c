@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -41,7 +41,7 @@ static int trs_urd_rpc_msg_ctrl(void *feature, char *in, u32 in_len, char *out, 
         return -EINVAL;
     }
 
-    if (in_cfg->buff_size > TRS_RPC_MAX_DATA_LEN) {
+    if (in_cfg->buff_size != TRS_RPC_MAX_DATA_LEN) {
         trs_err("Invalid size. (buff_size=%u)\n", in_cfg->buff_size);
         return -EINVAL;
     }

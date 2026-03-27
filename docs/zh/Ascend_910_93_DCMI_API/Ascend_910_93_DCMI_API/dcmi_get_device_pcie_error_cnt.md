@@ -160,7 +160,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001251227155_zh-cn_topic_0000001178213210_zh-cn_topic_0000001147728951_toc533412083"></a>**
 
-```c
+```
 int ret = 0;
 int card_id = 0;
 int device_id = 0;
@@ -168,3 +168,4 @@ struct dcmi_chip_pcie_err_rate pcie_err_code_info = {0};
 ret = dcmi_get_device_pcie_error_cnt(card_id, device_id, &pcie_err_code_info);
 …
 ```
+

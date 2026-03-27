@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,7 +13,8 @@
 
 #ifndef __DMS_EVENT_H__
 #define __DMS_EVENT_H__
-#include <linux/hashtable.h>
+#include "ka_hashtable_pub.h"
+#include "ka_task_pub.h"
 #include "fms/fms_dtm.h"
 #include "fms/fms_smf.h"
 
@@ -26,8 +27,8 @@
 #define EVENT_ID_HASH_TABLE_MASK (EVENT_ID_HASH_TABLE_SIZE - 1)
 
 struct dms_converge_htable {
-    DECLARE_HASHTABLE(htable, EVENT_ID_HASH_TABLE_BIT);
-    struct mutex lock;
+    KA_DECLARE_HASHTABLE(htable, EVENT_ID_HASH_TABLE_BIT);
+    ka_mutex_t lock;
 
     bool converge_switch;
     bool converge_validity;

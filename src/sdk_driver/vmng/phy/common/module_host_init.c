@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,10 +11,11 @@
  * GNU General Public License for more details.
  */
 
-#include "module_host_init.h"
 #include "ka_kernel_def_pub.h"
+#include "ka_compiler_pub.h"
+#include "module_host_init.h"
 
-STATIC int __init asdrv_vmngh_init_module(void)
+STATIC int __ka_init asdrv_vmngh_init_module(void)
 {
     int ret = 0;
 
@@ -26,7 +27,7 @@ STATIC int __init asdrv_vmngh_init_module(void)
     return 0;
 }
 
-STATIC void __exit asdrv_vmngh_exit_module(void)
+STATIC void __ka_exit asdrv_vmngh_exit_module(void)
 {
     vmngh_exit_module();
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,6 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
+#include "ka_memory_pub.h"
 #include "soc_adapt.h"
 #include "pbl/pbl_soc_res.h"
 #include "trs_msg.h"
@@ -20,17 +21,17 @@
 
 static inline u32 _trs_chan_ops_stars_cqint_get_mid_status(struct trs_stars_cqint *cqint)
 {
-    return readl(cqint->base + TRS_STARS_HOST_CQINT_MID_STATUS_OFFSET(cqint->group));
+    return ka_mm_readl(cqint->base + TRS_STARS_HOST_CQINT_MID_STATUS_OFFSET(cqint->group));
 }
 
 static inline u32 _trs_chan_ops_stars_cqint_get_l2_status(struct trs_stars_cqint *cqint, u32 mid_bit)
 {
-    return readl(cqint->base + TRS_STARS_HOST_CQINT_L2_STATUS_OFFSET(cqint->group, mid_bit));
+    return ka_mm_readl(cqint->base + TRS_STARS_HOST_CQINT_L2_STATUS_OFFSET(cqint->group, mid_bit));
 }
 
 static void _trs_chan_ops_stars_cqint_set_l2_ctrl(struct trs_stars_cqint *cqint, u32 mid_bit, u32 l2_status)
 {
-    writel(l2_status, cqint->base + TRS_STARS_HOST_CQINT_L2_CTRL_OFFSET(cqint->group, mid_bit));
+    ka_mm_writel(l2_status, cqint->base + TRS_STARS_HOST_CQINT_L2_CTRL_OFFSET(cqint->group, mid_bit));
 }
 
 static int trs_chan_ops_stars_ops_get_valid_cq_list(struct trs_stars_cqint *cqint, u32 cqid[], u32 num, u32 *valid_num)
@@ -66,7 +67,7 @@ static int trs_chan_ops_stars_ops_get_valid_cq_list(struct trs_stars_cqint *cqin
 static void trs_chan_ops_stars_ops_set_cq_l1_mask(struct trs_stars_cqint *cqint, int val)
 {
     if ((val & 0x1) == 0) {
-        writel(1, cqint->base + TRS_STARS_HOST_CQINT_L1_CTRL_OFFSET(cqint->group));
+        ka_mm_writel(1, cqint->base + TRS_STARS_HOST_CQINT_L1_CTRL_OFFSET(cqint->group));
     }
 }
 

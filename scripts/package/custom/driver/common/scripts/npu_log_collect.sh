@@ -28,6 +28,7 @@ CHIP_NUM_310P=$(lspci | grep -E "d500" | wc -l)
 CHIP_NUM_910=$(lspci | grep -E "d801" | wc -l)
 CHIP_NUM_910B=$(lspci | grep -E "d802" | wc -l)
 CHIP_NUM_910_93=$(lspci | grep -E "d803" | wc -l)
+CHIP_NUM_910_95=$(lspci | grep -E "d806" | wc -l)
 
 usage() {
     echo "Usage: $(basename $0)"
@@ -35,9 +36,11 @@ usage() {
     echo "Example:"
     echo "$(basename $0)                    Collect the default content."
     echo "$(basename $0) -p /home/tmp       Specify a path to store the generated content."
-    echo "$(basename $0) -off host_info     Disable host os info."
+    echo "$(basename $0) --off host_info     Disable host os info."
+if [[ "$CHIP_NUM_910_95" -eq 0]]; then
     echo "$(basename $0) -m                 Collect the mcu logs."
     echo "$(basename $0) -l                 Collect the link_down logs."
+fi
     echo "$(basename $0) -f                 Collect the full logs."
     echo "Options:"
     echo "    -h, --help        Help."
@@ -49,6 +52,7 @@ usage() {
     echo "                      <driver_info>: disable collecting driver info."
     echo "                      <install_info>: disable collecting ascend driver install info."
     echo "                      <network_info>: disable collecting ascend driver network configuration."
+    echo "                      <mcu_log>: disable collecting mcu log"
 }
 
 function parse_args()
@@ -75,12 +79,35 @@ function parse_args()
                 shift
                 ;;
             --off )
+                # 定义包含目标元素的数组（可直接扩展/修改元素）
+                VALID_ARGS=("mcu_log" "host_info" "host_log" "device_log" "device_info" "install_info" "network_info")
+
+                # 检查第二个参数是否为空
                 if [ -z "$2" ]; then
                     usage
                     exit 1
                 elif [ "$2" = "mcu_log" ]; then
                     MCU_LOG_MODE=0
                 fi
+
+                # 标记是否匹配到合法参数（0=未匹配，1=匹配）
+                MATCH_FLAG=0
+
+                # 遍历数组，对比第二个入参和数组元素
+                for arg in "${VALID_ARGS[@]}"; do
+                    if [ "$2" = "$arg" ]; then
+                        MATCH_FLAG=1    # 匹配到合法参数，置为1
+                        break           # 匹配成功后退出循环，提升效率
+                    fi
+                done
+
+                # 非法参数处理
+                if [ $MATCH_FLAG -eq 0 ]; then
+                    echo "The second argument is illegal."
+                    usage
+                    exit 1
+                fi
+
                 main_flag=1
                 shift
                 ;;
@@ -89,6 +116,7 @@ function parse_args()
                 exit
                 ;;
             -m | --mcu )
+                if [ $CHIP_NUM_910_95 -ne 0 ]; then exit; fi
                 echo "You are now collecting mcu logs."
                 get_install_variable
                 create_log_collect_dir
@@ -97,6 +125,7 @@ function parse_args()
                 exit
                 ;;
             -l | --linkdown )
+                if [ $CHIP_NUM_910_95 -ne 0 ]; then exit; fi
                 echo "You are now collecting link_down logs."
                 network_info_collect
                 exit
@@ -138,8 +167,11 @@ function show_info()
 {
     echo
     echo "You are now running "$(basename $0)". This is a tool which will collect necessery information"
+if [[ "$CHIP_NUM_910_95" -eq 0 ]]; then
     echo "about your system, Linux kernel, ascend kernel module, nputools and MCU. This will help our support"
+else
     echo "team diagnose the issue you are facing while using the product. The infomation collection process may"
+fi
     echo "take several minutes and it will generate the tar file named with timestamp under the assigned directory."
     echo "Please download and send the file to the support team, thanks."
     echo
@@ -235,10 +267,11 @@ function collect_npu_info_log()
                 echo "########### collect npu id $dev_id chip id $i ecc info #############" >> $LOG_COLLECT_DIR/npu_info_log/card_info.log
                 echo "npu-smi info -t ecc -i $dev_id -c $i" >> $LOG_COLLECT_DIR/npu_info_log/card_info.log
                 timeout 10s npu-smi info -t ecc -i $dev_id -c $i 1>> $LOG_COLLECT_DIR/npu_info_log/card_info.log 2>> $LOG_COLLECT_RUNING_INFO
-
-                echo "########### collect npu id $dev_id chip id $i hccs info #############" >> $LOG_COLLECT_DIR/npu_info_log/card_info.log
-                echo "npu-smi info -t hccs -i $dev_id -c $i" >> $LOG_COLLECT_DIR/npu_info_log/card_info.log
-                timeout 10s npu-smi info -t hccs -i $dev_id -c $i 1>> $LOG_COLLECT_DIR/npu_info_log/card_info.log 2>> $LOG_COLLECT_RUNING_INFO
+                if [ $CHIP_NUM_910_95 -eq 0 ]; then
+                    echo "########### collect npu id $dev_id chip id $i hccs info #############" >> $LOG_COLLECT_DIR/npu_info_log/card_info.log
+                    echo "npu-smi info -t hccs -i $dev_id -c $i" >> $LOG_COLLECT_DIR/npu_info_log/card_info.log
+                    timeout 10s npu-smi info -t hccs -i $dev_id -c $i 1>> $LOG_COLLECT_DIR/npu_info_log/card_info.log 2>> $LOG_COLLECT_RUNING_INFO
+                fi
             else
                 break
             fi
@@ -250,6 +283,10 @@ function collect_npu_info_log()
 
 function collect_mcu_log()
 {
+    if [ $CHIP_NUM_910_95 -ne 0 ]; then
+        return 0
+    fi
+
     if [ $MCU_LOG_MODE -eq 0 ]; then
         return 0
     fi
@@ -388,7 +425,7 @@ function collect_full()
 
 function check_run_in_vm()
 {
-    dmidecode | grep -E "Manufacturer: QEMU|Manufacturer: qemu|xen|Xen|VMware|OpenStack|KVM Virtual Machine"
+    dmidecode | grep -E "Manufacturer: QEMU|Manufacturer: qemu|xen|Xen|VMware|OpenStack|KVM Virtual Machine" > /dev/null 2>$1
     if [ $? -eq 0 ]; then
         return 1
     else
@@ -403,7 +440,7 @@ function check_run_in_vm()
 
 function check_run_in_docker()
 {
-    cat /proc/self/cgroup | grep "docker"
+    cat /proc/self/cgroup | grep "docker" > /dev/null 2>$1
     if [ $? -eq 0 ]; then
         return 1
     else
@@ -413,7 +450,7 @@ function check_run_in_docker()
 
 function network_info_collect()
 {
-    if [ $CHIP_NUM_910 -eq 0 ]; then
+    if [ $CHIP_NUM_910 -eq 0 -o $CHIP_NUM_910_95 -ne 0 ]; then
         return 0
     fi
     product=$CHIP_NUM_910B
@@ -620,14 +657,16 @@ function get_version_info() {
 	timeout 20s ${INSTALL_PATH}/driver/tools/upgrade-tool --device_index -1 --system_version >> ${FILE_VERSION_LOG}
 	echo "--------------- firmware version ---------------"
 	timeout 20s ${INSTALL_PATH}/driver/tools/upgrade-tool --device_index -1 --component -1 --version >> ${FILE_VERSION_LOG}
-	bdf_list=$(lspci | egrep "d100|d500|d801|d802|d803" | awk '{print $1}') 
+	bdf_list=$(lspci | egrep "d100|d500|d801|d802|d803|d806" | awk '{print $1}') 
 	for bdf in $bdf_list ;do lspci -vvvs $bdf -xxx | grep 4e0 >> ${FILE_VERSION_LOG};done
 	for bdf in $bdf_list ;do lspci -vvvs $bdf -xxxx | grep 300  >> ${FILE_VERSION_LOG}; lspci -vvvs $bdf -xxxx | grep 320 >> ${FILE_VERSION_LOG}; lspci -vvvs $bdf -xxxx | grep 450 >> ${FILE_VERSION_LOG};done
-	lspci | egrep "d100|d500|d801|d802|d803"  | awk '{print $1}' | xargs -i lspci -xxxx -s {} | grep 300 >> ${FILE_VERSION_LOG}
-	lspci | egrep "d100|d500|d801|d802|d803"  | awk '{print $1}' | xargs -i lspci -xxxx -s {} | grep 320 >> ${FILE_VERSION_LOG}
-	lspci | egrep "d100|d500|d801|d802|d803"  | awk '{print $1}' | xargs -i lspci -xxxx -s {} | grep 450 >> ${FILE_VERSION_LOG}
-	echo "--------------- cat mcu version ---------------"
-	for id in $(seq 0 7) ;do echo "====$id===="; npu-smi upgrade -b mcu -i $id >> ${FILE_VERSION_LOG}; done
+	lspci | egrep "d100|d500|d801|d802|d803|d806"  | awk '{print $1}' | xargs -i lspci -xxxx -s {} | grep 300 >> ${FILE_VERSION_LOG}
+	lspci | egrep "d100|d500|d801|d802|d803|d806"  | awk '{print $1}' | xargs -i lspci -xxxx -s {} | grep 320 >> ${FILE_VERSION_LOG}
+	lspci | egrep "d100|d500|d801|d802|d803|d806"  | awk '{print $1}' | xargs -i lspci -xxxx -s {} | grep 450 >> ${FILE_VERSION_LOG}
+	if [ "$CHIP_NUM_910_95" -eq 0 ]; then
+        echo "--------------- cat mcu version ---------------"
+        for id in $(seq 0 7) ;do echo "====$id===="; npu-smi upgrade -b mcu -i $id >> ${FILE_VERSION_LOG}; done
+    fi
 	echo "--------------- cat vrd version ---------------"
 	for id in $(seq 0 7) ;do echo "====$id===="; npu-smi upgrade -b vrd -i $id >> ${FILE_VERSION_LOG}; done
     green_echo "$(date) End collect driver version info" | tee -a $LOG_COLLECT_RUNING_INFO
@@ -638,22 +677,22 @@ function get_pcie_log() {
 	date >> ${FILE_PCIE_LOG}
 	
     echo "--------------- lspci ---------------" 		>> ${FILE_PCIE_LOG}
-	lspci | egrep "d100|d500|d801|d802|d803" 				>> ${FILE_PCIE_LOG}
+	lspci | egrep "d100|d500|d801|d802|d803|d806" 				>> ${FILE_PCIE_LOG}
 
 	echo "--------------- bdf_to_devid ---------------" 					>> ${FILE_PCIE_LOG}
-	bdf_list=($(lspci | egrep "d100|d500|d801|d802|d803" | awk '{print $1}'))
+	bdf_list=($(lspci | egrep "d100|d500|d801|d802|d803|d806" | awk '{print $1}'))
 	cat /sys/bus/pci/devices/0000:${bdf_list[0]}/devdrv_sysfs_bdf_to_devid 	>> ${FILE_PCIE_LOG}
-	bdf_list=$(lspci | egrep "d100|d500|d801|d802|d803" | awk '{print $1}') 
+	bdf_list=$(lspci | egrep "d100|d500|d801|d802|d803|d806" | awk '{print $1}') 
 	
     echo "--------------- firmware version ---------------" 				>> ${FILE_PCIE_LOG}
 	for bdf in $bdf_list ;do lspci -vvvs $bdf -xxx | grep 4e0;done			>> ${FILE_PCIE_LOG}
 	for bdf in $bdf_list ;do lspci -vvvs $bdf -xxxx | grep 300 >> ${FILE_VERSION_LOG}; lspci -vvvs $bdf -xxxx | grep 320 >> ${FILE_VERSION_LOG}; lspci -vvvs $bdf -xxxx | grep 450 >> ${FILE_PCIE_LOG};done
-	lspci | egrep "d100|d500|d801|d802|d803"  | awk '{print $1}' | xargs -i lspci -xxxx -s {} | grep 300 >> ${FILE_PCIE_LOG}
-	lspci | egrep "d100|d500|d801|d802|d803"  | awk '{print $1}' | xargs -i lspci -xxxx -s {} | grep 320 >> ${FILE_PCIE_LOG}
-	lspci | egrep "d100|d500|d801|d802|d803"  | awk '{print $1}' | xargs -i lspci -xxxx -s {} | grep 450 >> ${FILE_PCIE_LOG}
+	lspci | egrep "d100|d500|d801|d802|d803|d806"  | awk '{print $1}' | xargs -i lspci -xxxx -s {} | grep 300 >> ${FILE_PCIE_LOG}
+	lspci | egrep "d100|d500|d801|d802|d803|d806"  | awk '{print $1}' | xargs -i lspci -xxxx -s {} | grep 320 >> ${FILE_PCIE_LOG}
+	lspci | egrep "d100|d500|d801|d802|d803|d806"  | awk '{print $1}' | xargs -i lspci -xxxx -s {} | grep 450 >> ${FILE_PCIE_LOG}
 
 	echo "--------------- LnkSta ---------------" >> ${FILE_PCIE_LOG}
-	date;lspci | egrep "d100|d500|d801|d802|d803" | awk '{print $1}'|xargs -i lspci -vvvvs {}|grep -E 'LnkSta:'  >> ${FILE_PCIE_LOG}
+	date;lspci | egrep "d100|d500|d801|d802|d803|d806" | awk '{print $1}'|xargs -i lspci -vvvvs {}|grep -E 'LnkSta:'  >> ${FILE_PCIE_LOG}
 	
 	echo "--------------- NUMA ---------------" >> ${FILE_PCIE_LOG}
 	for bdf in $bdf_list ;do echo ====$bdf====;lspci -vvvs $bdf | egrep "Lnk|NUMA";done >> ${FILE_PCIE_LOG}
@@ -662,7 +701,7 @@ function get_pcie_log() {
 	echo "--------------- lspci -tv ---------------" >> ${FILE_PCIE_LOG}
 	lspci -tv >> ${FILE_PCIE_LOG}
 	echo "--------------- lspci -d 19e5:xxx -k ---------------" >> ${FILE_PCIE_LOG}
-	lspci -d 19e5:d802|d803 -k >> ${FILE_PCIE_LOG}
+	lspci -d 19e5:d802|d803|d806 -k >> ${FILE_PCIE_LOG}
 	lspci -d 19e5:d801 -k >> ${FILE_PCIE_LOG}
 	lspci -d 19e5:d500 -k >> ${FILE_PCIE_LOG}
 	lspci -d 19e5:d100 -k >> ${FILE_PCIE_LOG}

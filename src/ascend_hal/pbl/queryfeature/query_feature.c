@@ -80,6 +80,23 @@ static bool featureSupportDmsGetQosMasterConfig(uint32_t devId)
 #endif
 }
 
+static bool featureSupportDmsQueryChipDieIdByPhyId(uint32_t devId)
+{
+    (void)devId;
+
+#ifdef CFG_FEATURE_QUERY_CHIP_DIE_ID
+    return true;
+#else
+    return false;
+#endif
+}
+
+static bool featureSupportApmResMapRemote(uint32_t devId)
+{
+    (void)devId;
+    return true;
+}
+
 static const feature_support_handle g_feature_support[FEATURE_MAX] = {
     [FEATURE_TRSDRV_SQ_DEVICE_MEM_PRIORITY] = featureSupportTsDrvSqDevmemPrio,
     [FEATURE_PROF_AICPU_CHAN] = featureSupportProfAicpuChan,
@@ -89,6 +106,8 @@ static const feature_support_handle g_feature_support[FEATURE_MAX] = {
     [FEATURE_TRSDRV_IS_SQ_SUPPORT_DYNAMIC_BIND_VERSION] = featureTsDrvIsSupportSqDanamicBindVersion,
     [FEATURE_SVM_MEM_HOST_UVA] = svm_support_mem_host_uva,
     [FEATURE_DMS_GET_QOS_MASTER_CONFIG] = featureSupportDmsGetQosMasterConfig,
+    [FEATURE_DMS_QUERY_CHIP_DIE_ID] = featureSupportDmsQueryChipDieIdByPhyId,
+    [FEATURE_APM_RES_MAP_REMOTE] = featureSupportApmResMapRemote,
 };
 
 bool halSupportFeature(uint32_t devId, drvFeature_t type)

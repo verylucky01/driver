@@ -123,9 +123,9 @@ static int que_clt_get_con_type(void)
     int64_t val;
     int ret;
 
-    ret = halGetDeviceInfo(0, MODULE_TYPE_SYSTEM, INFO_TYPE_HD_CONNECT_TYPE, &val);
+    ret = dms_get_connect_type(&val);
     if (ret != DRV_ERROR_NONE) {
-        QUEUE_LOG_ERR("halGetDeviceInfo failed. (ret=%d)\n", ret);
+        QUEUE_LOG_ERR("dms_get_connect_type failed. (ret=%d)\n", ret);
         return QUE_CON_UNKNOWN;
     }
     switch (val) {

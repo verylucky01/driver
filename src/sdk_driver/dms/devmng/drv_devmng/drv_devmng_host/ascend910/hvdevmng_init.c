@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -19,24 +19,6 @@
 #endif
 #ifdef CONFIG_DEBUG_BUGVERBOSE
 #undef CONFIG_DEBUG_BUGVERBOSE
-#endif
-
-#include <linux/delay.h>
-#include <linux/irq.h>
-#include <linux/module.h>
-#include <linux/of_address.h>
-#include <linux/platform_device.h>
-#include <linux/uaccess.h>
-#include <linux/idr.h>
-#include <linux/errno.h>
-#include <linux/fs.h>
-#include <linux/sched.h>
-#include <linux/stat.h>
-#include <linux/io.h>
-#include <linux/pci.h>
-#include <linux/vmalloc.h>
-#ifndef DEVDRV_MANAGER_HOST_UT_TEST
-#include <linux/bitmap.h>
 #endif
 
 #include "pbl/pbl_uda.h"

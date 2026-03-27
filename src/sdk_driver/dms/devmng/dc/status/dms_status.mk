@@ -24,7 +24,7 @@ ifneq ($(filter $(PRODUCT), ascend910B),)
 	asdrv_dms-y += devmng/dc/status/dms_chip_info_adapt.o
 endif
 
-ifneq ($(filter $(PRODUCT), ascend910_95),)
+ifneq ($(filter $(PRODUCT), ascend950),)
 	asdrv_dms-y += devmng/status/dms_osc_freq.o
 	asdrv_dms-y += devmng/dc/status/dms_host_notify_ready.o
 	asdrv_dms-y += devmng/dc/status/dms_vdev.o

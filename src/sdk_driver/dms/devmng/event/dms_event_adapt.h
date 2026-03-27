@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -17,10 +17,11 @@
 #include "kernel_version_adapt.h"
 #include "dms/dms_shm_info.h"
 #include "dms/dms_cmd_def.h"
+#include "ka_system_pub.h"
 int devdrv_manager_container_logical_id_to_physical_id(u32 logical_dev_id, u32 *physical_dev_id, u32 *vfid);
 
 int devdrv_host_black_box_add_exception(u32 devid, u32 code,
-    struct timespec stamp, const void *data);
+    ka_timespec_t stamp, const void *data);
 int dms_event_subscribe_from_device(u32 phyid);
 int dms_event_clean_to_device(u32 phyid);
 int dms_event_mask_event_code(u32 phyid, u32 event_code, u8 mask);
@@ -30,7 +31,7 @@ int dms_get_event_code_from_bar(u32 devid, u32 *health_code, u32 health_len,
 int dms_get_health_code_from_bar(u32 devid, u32 *health_code, u32 health_len);
 int dms_event_distribute_to_bar(u32 phyid);
 int dms_event_disable_event_code(u32 phyid, u32 event_code);
-int dms_event_box_add_exception(u32 devid, u32 code, struct timespec stamp);
+int dms_event_box_add_exception(u32 devid, u32 code, ka_timespec_t stamp);
 int dms_get_event_para(int dev_id, struct dms_event_para *dms_event, u32 in_cnt, u32 *event_num);
 int dms_get_event_code_from_local(u32 devid, u32 *health_code, struct shm_event_code *event_code, u32 event_len);
 int dms_get_health_code_from_local(u32 devid, u32 *health_code);

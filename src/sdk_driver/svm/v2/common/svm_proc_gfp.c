@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -51,7 +51,7 @@ void devmm_proc_free_pages(struct devmm_svm_process *svm_proc,
     if (svm_proc != NULL) {
         u32 pg_type;
 
-        pg_type = devmm_is_giant_page(pages) ? DEVMM_GIANT_PAGE_TYPE : attr->pg_type;
+        pg_type = devmm_is_giant_page(pages, pg_num) ? DEVMM_GIANT_PAGE_TYPE : attr->pg_type;
         devmm_used_page_cnt_sub(&svm_proc->pg_cnt_stats, pg_type, pages, pg_num);
     }
     devmm_free_pages(attr, pages, pg_num);

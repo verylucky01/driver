@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,8 +13,10 @@
 
 #ifndef __ASCEND_ADPATER_DEF_H__
 #define __ASCEND_ADPATER_DEF_H__
-#include <linux/module.h>
-#include <linux/rwsem.h>
+
+#include "ka_common_pub.h"
+#include "ka_memory_pub.h"
+#include "ka_base_pub.h"
 #include "comm_kernel_interface.h"
 #ifdef __cplusplus
 extern "C" {
@@ -29,15 +31,15 @@ struct symbol_list {
 };
 
 struct dma_ops_stu {
-    void* (*alloc_coherent)(struct device *dev, size_t size, dma_addr_t *dma_addr, gfp_t gfp);
-    void (*free_coherent)(struct device *dev, size_t size, void *addr, dma_addr_t dma_addr);
+    void* (*alloc_coherent)(ka_device_t *dev, size_t size, ka_dma_addr_t *dma_addr, ka_gfp_t gfp);
+    void (*free_coherent)(ka_device_t *dev, size_t size, void *addr, ka_dma_addr_t dma_addr);
     int (*link_free)(struct devdrv_dma_prepare *dma_prepare);
     struct devdrv_dma_prepare* (*link_prepare)(u32 devid, enum devdrv_dma_data_type type,
                 struct devdrv_dma_node *dma_node, u32 node_cnt, u32 fill_status);
-    dma_addr_t (*map_single)(struct device *dev, void *ptr, size_t size, enum dma_data_direction dir);
+    ka_dma_addr_t (*map_single)(ka_device_t *dev, void *ptr, size_t size, ka_dma_data_direction_t dir);
     int (*sync_copy)(u32 dev_id, enum devdrv_dma_data_type type, u64 src, u64 dst, u32 size,
                 enum devdrv_dma_direction direction);
-    void (*unmap_single)(struct device *dev, dma_addr_t addr, size_t size, enum dma_data_direction dir);
+    void (*unmap_single)(ka_device_t *dev, ka_dma_addr_t addr, size_t size, ka_dma_data_direction_t dir);
 };
 
 struct p2p_ops_stu {
@@ -61,7 +63,7 @@ struct pcie_ops_stu {
     int (*read_proc)(u32 dev_id, enum devdrv_addr_type type, u32 offset, unsigned char *value, u32 len);
     int (*get_addr_info)(u32 devid, enum devdrv_addr_type type, u32 index, u64 *addr, size_t *size);
     int (*get_bbox_reservd_mem)(unsigned int devid, unsigned long long *dma_addr,
-        struct page **dma_pages, unsigned int *len);
+        ka_page_t **dma_pages, unsigned int *len);
     int (*register_black_callback)(struct devdrv_black_callback *black_callback);
     void (*unregister_black_callback)(const struct devdrv_black_callback *black_callback);
     void (*notifier_unregister)(void);
@@ -74,7 +76,7 @@ struct pcie_ops_stu {
     int (* get_pci_enabled_vf_num)(u32 dev_id, u32 *vf_num);
 };
 struct bus_adpater_stu {
-    struct rw_semaphore rw_lock;
+    ka_rw_semaphore_t rw_lock;
     struct dma_ops_stu dma;
     struct hccs_ops_stu hccs;
     struct p2p_ops_stu p2p;
@@ -92,7 +94,7 @@ struct bus_adpater_stu *get_adapter_by_dev_id(unsigned int dev_id);
 struct bus_adpater_stu *get_adapter_by_module(unsigned int index);
 void put_adapter(struct bus_adpater_stu *adap);
 
-void init_module_func(const struct module *mod, const struct symbol_list *fun_name_list,
+void init_module_func(const ka_module_t *mod, const struct symbol_list *fun_name_list,
     unsigned int count, struct bus_adpater_stu *adapt);
 void uninit_module_func(const struct symbol_list *fun_name_list, unsigned int count, struct bus_adpater_stu *adapt);
 

@@ -15,6 +15,7 @@ EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/dms/devmng/include
 EXTRA_CFLAGS += -I$(DRIVER_HAL_INC_DIR)
 EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/inc/pbl
 EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/kernel_adapt/include
+EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/dms/command/ioctl
 EXTRA_CFLAGS += -isystem $(shell $(CC) -print-file-name=include)
 EXTRA_CFLAGS += -Iinclude/linux
 
@@ -28,7 +29,7 @@ ifeq ($(ENABLE_UBE), true)
 	EXTRA_CFLAGS += -DCFG_FEATURE_UB
 endif
 
-ifneq ($(filter $(PRODUCT), ascend910_95),)
+ifneq ($(filter $(PRODUCT), ascend950),)
 	EXTRA_CFLAGS += -DCFG_FEATURE_USE_ADPATER_FUNC
 endif
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,12 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-#include <linux/version.h>
-#include <linux/slab.h>
-#include <linux/time.h>
-#include <linux/rtc.h>
-#include <linux/ktime.h>
-#include <linux/uaccess.h>
+
 #include "securec.h"
 #include "dmc_kernel_interface.h"
 #include "ka_base_pub.h"
@@ -74,8 +69,8 @@ STATIC struct log_drv_fault_mng *log_get_drv_fault_mng_info(void)
 void log_drv_get_date(char *date, unsigned int len)
 {
 #ifndef DRVFAULT_UT
-    struct timespec64 sys_time = { 0 };
-    struct tm tm = { 0 };
+    ka_timespec64_t sys_time = { 0 };
+    ka_tm_t tm = { 0 };
     int ret;
 
     ka_system_ktime_get_real_ts64(&sys_time);
@@ -176,9 +171,9 @@ void log_user_write_fault_mng(const char *module, int pid, const char *comm, con
         return;
 #endif
     }
-    va_start(args, fmt);
+    ka_va_start(args, fmt);
     ret = vsnprintf_s(fault_mng->printk_buf, LOG_PRINT_LEN, LOG_PRINT_LEN - 1, new_fmt, args);
-    va_end(args);
+    ka_va_end(args);
     if (ret <= 0) {
 #ifndef DRVFAULT_UT
         ka_task_spin_unlock_irqrestore(&fault_mng->spinlock, flags);

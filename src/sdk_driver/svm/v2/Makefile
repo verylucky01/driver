@@ -19,7 +19,7 @@
     asdrv_svm-objs += common/svm_dma.o common/svm_mem_query.o common/devmm_page_cache.o common/svm_proc_mng.o common/devmm_dev.o common/devmm_common.o common/svm_heap_mng.o common/svm_mmu_notifier.o common/svm_dynamic_addr.o
     asdrv_svm-objs += common/svm_pci_dev_tbl.o common/svm_module_ops.o common/svm_mem_mng.o common/svm_res_idr.o common/svm_version_adapt.o common/svm_proc_fs.o common/devmm_register_dma.o
     asdrv_svm-objs += common/svm_rbtree.o common/svm_srcu_work.o common/svm_page_cnt_stats.o common/svm_gfp.o  common/svm_dma_map.o common/svm_mem_split.o common/svm_log.o
-    asdrv_svm-objs += common/svm_proc_gfp.o common/svm_phy_addr_blk_mng.o common/svm_mem_create.o common/svm_mem_share.o common/svm_mem_map.o common/svm_vmma_mng.o
+    asdrv_svm-objs += common/svm_proc_gfp.o common/svm_phy_addr_blk_mng.o common/svm_mem_create.o common/svm_mem_share.o common/svm_mem_map.o common/svm_vmma_mng.o common/devmm_addr_mng.o
     asdrv_svm-objs += master/pmaster/svm_master_query.o
     asdrv_svm-objs += master/pmaster/svm_master_register_ops.o master/pmaster/svm_hot_reset.o master/pmaster/svm_master_process_status_mng.o master/pmaster/svm_pmaster_mem_map.o master/pmaster/svm_shmem_node.o master/pmaster/svm_shmem_procfs.o
     obj-m := asdrv_svm.o

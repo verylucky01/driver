@@ -164,7 +164,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001251107225_zh-cn_topic_0000001177894708_zh-cn_topic_0000001101283718_toc533412083"></a>**
 
-```c
+```
 int ret = 0;
 int card_id = 0;
 int device_id = 0;
@@ -172,3 +172,4 @@ int power = 0;
 ret = dcmi_get_device_power_info(card_id, device_id, &power);
 …
 ```
+

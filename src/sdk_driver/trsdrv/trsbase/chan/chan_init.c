@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -46,7 +46,7 @@ u32 trs_chan_get_max_cq_depth(struct trs_chan_type *type)
     return TRS_SQCQ_DEPTH_MAX;
 }
 #else
-#define TRS_HW_SQ_DEPTH_MAX 2048
+#define TRS_HW_SQ_DEPTH_MAX 4096
 #define TRS_HW_CQ_DEPTH_MAX 1024
 u32 trs_chan_get_max_sq_depth(struct trs_chan_type *type)
 {
@@ -59,7 +59,6 @@ u32 trs_chan_get_max_cq_depth(struct trs_chan_type *type)
 }
 #endif
 
-static KA_TASK_DEFINE_MUTEX(chan_mutex);
 static KA_BASE_DEFINE_IDR(chan_idr);
 static KA_TASK_DEFINE_RWLOCK(chan_idr_lock);
 
@@ -127,7 +126,7 @@ static void trs_chan_irq_init(struct trs_chan *chan)
 #endif
     }
     if ((chan->types.type == CHAN_TYPE_HW) && (chan->ts_inst->ops.get_cq_affinity_irq != NULL)) {
-        if (chan->ts_inst->hw_cq_ctx[chan->cq.cqid].irq_index == U32_MAX) {
+        if (chan->ts_inst->hw_cq_ctx[chan->cq.cqid].irq_index == KA_U32_MAX) {
             (void)chan->ts_inst->ops.get_cq_affinity_irq(&chan->inst, chan->cq.cqid,
                 &chan->ts_inst->hw_cq_ctx[chan->cq.cqid].irq_index);
         }
@@ -460,6 +459,7 @@ static int trs_chan_cq_init(struct trs_chan_ts_inst *ts_inst, struct trs_chan *c
 
     if (chan->types.type == CHAN_TYPE_HW) {
         ts_inst->hw_cq_ctx[chan->cq.cqid].chan_id = chan->id;
+        ts_inst->hw_cq_ctx[chan->cq.cqid].valid = true;
     }
 
     if (chan->types.type == CHAN_TYPE_MAINT) {
@@ -490,6 +490,7 @@ static void trs_chan_cq_uninit(struct trs_chan_ts_inst *ts_inst, struct trs_chan
 
     if (chan->types.type == CHAN_TYPE_HW) {
         ts_inst->hw_cq_ctx[chan->cq.cqid].chan_id = -1;
+        ts_inst->hw_cq_ctx[chan->cq.cqid].valid = false;
     }
 
     if (chan->types.type == CHAN_TYPE_MAINT) {
@@ -812,7 +813,7 @@ struct trs_chan *trs_chan_get(struct trs_id_inst *inst, u32 chan_id)
     }
 
     ka_task_read_lock_bh(&chan_idr_lock);
-    chan = (struct trs_chan *)idr_find(&chan_idr, chan_id);
+    chan = (struct trs_chan *)ka_base_idr_find(&chan_idr, chan_id);
     if (chan != NULL) {
         if ((chan->inst.devid == inst->devid) && (chan->inst.tsid == inst->tsid) && (chan->id == chan_id)) {
             kref_safe_get(&chan->ref);
@@ -894,9 +895,9 @@ int hal_kernel_trs_chan_create(struct trs_id_inst *inst, struct trs_chan_para *p
         return -EINVAL;
     }
 
-    ka_task_mutex_lock(&chan_mutex);
+    ka_task_mutex_lock(&ts_inst->mutex);
     ret = trs_chan_inst_create(ts_inst, para, chan_id);
-    ka_task_mutex_unlock(&chan_mutex);
+    ka_task_mutex_unlock(&ts_inst->mutex);
     if (ret != 0) { /* if success, put 'ts inst' in destroy */
         trs_chan_ts_inst_put(ts_inst);
     }
@@ -930,15 +931,20 @@ void hal_kernel_trs_chan_destroy_ex(struct trs_id_inst *inst, u32 flag, int chan
         return;
     }
 
-    ka_task_mutex_lock(&chan_mutex);
+    ts_inst = trs_chan_ts_inst_get(inst);
+    if (ts_inst == NULL) {
+        return;
+    }
+
+    ka_task_mutex_lock(&ts_inst->mutex);
     chan = trs_chan_get(inst, (u32)chan_id);
     if (chan == NULL) {
-        ka_task_mutex_unlock(&chan_mutex);
+        ka_task_mutex_unlock(&ts_inst->mutex);
+        trs_chan_ts_inst_put(ts_inst);
         trs_warn("Not create. (chan_id=%d)\n", chan_id);
         return;
     }
 
-    ts_inst = chan->ts_inst;
     if (trs_chan_is_need_show(chan)) {
         trs_chan_detail_show(inst, chan);
     }
@@ -948,7 +954,8 @@ void hal_kernel_trs_chan_destroy_ex(struct trs_id_inst *inst, u32 flag, int chan
     trs_chan_id_free(chan);
     trs_chan_put(chan);
 
-    ka_task_mutex_unlock(&chan_mutex);
+    ka_task_mutex_unlock(&ts_inst->mutex);
+    trs_chan_ts_inst_put(ts_inst);
 
     trs_chan_inst_destroy(chan);
 }

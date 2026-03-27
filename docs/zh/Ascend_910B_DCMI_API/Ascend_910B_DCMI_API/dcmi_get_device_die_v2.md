@@ -179,7 +179,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001206627176_zh-cn_topic_0000001178213218_zh-cn_topic_0000001101123898_toc533412083"></a>**
 
-```c
+```
 …
 int ret = 0;
 int card_id = 0;
@@ -189,3 +189,4 @@ struct dcmi_die_id die_id = {0};
 ret = dcmi_get_device_die_v2(card_id, device_id, input_type, &die_id);
 …
 ```
+

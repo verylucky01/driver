@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -22,6 +22,7 @@
 #include "svm_dma_prepare_pool.h"
 #include "svm_master_dma_desc_mng.h"
 #include "ka_kernel_def_pub.h"
+#include "ka_base_pub.h"
 
 struct devmm_dma_desc_node_info {
     struct svm_id_inst id_inst;
@@ -129,7 +130,7 @@ static void devmm_dma_desc_res_destroy(struct devmm_svm_process *svm_proc, struc
         devmm_dma_prepare_put_to_pool(res->dev_id, res->dma_prepare_pool_fd);
         res->dma_prepare_pool_fd = NULL;
     } else {
-        if (in_softirq()) {
+        if (ka_base_in_softirq()) {
             devmm_srcu_subwork_add(&svm_proc->srcu_work, DEVMM_SRCU_SUBWORK_ENSURE_EXEC_TYPE,
                     devmm_dma_prepare_destroy_srcu_work, (u64 *)&res->dma_prepare, sizeof(struct devdrv_dma_prepare));
         } else {
@@ -244,7 +245,7 @@ static struct devmm_dma_desc_node *devmm_dma_desc_node_erase_one_by_key(
     struct devmm_dma_desc_node *tmp = NULL;
 
     ka_task_spin_lock_bh(&rb_info->spinlock);
-    rbtree_postorder_for_each_entry_safe(pos, tmp, &rb_info->root, task_node) {
+    ka_base_rbtree_postorder_for_each_entry_safe(pos, tmp, &rb_info->root, task_node) {
         if (pos->info.key == key) {
             devmm_dma_desc_node_erase(rb_info, pos);
             ka_task_spin_unlock_bh(&rb_info->spinlock);

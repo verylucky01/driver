@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,6 +11,11 @@
  * GNU General Public License for more details.
  */
 
+#include "ka_list_pub.h"
+#include "ka_task_pub.h"
+#include "ka_kernel_def_pub.h"
+#include "ka_compiler_pub.h"
+#include "ka_memory_pub.h"
 #include "hw_vdavinci.h"
 #include "vpc_soc_adapt.h"
 #include "virtmng_msg_pub.h"
@@ -20,23 +25,19 @@
 #include "virtmng_msg_admin.h"
 #include "vmng_mem_alloc_interface.h"
 #include "virtmnghost_msg.h"
-#include "ka_list_pub.h"
-#include "ka_task_pub.h"
-#include "ka_kernel_def_pub.h"
-#include "ka_memory_pub.h"
 
 struct vmng_msg_dev_head {
     ka_list_head_t msg_dev_head;
     ka_mutex_t mutex;
 };
 
-struct vmng_msg_dev_head g_msg_dev_head;
+struct vmng_msg_dev_head g_vmngh_msg_dev_head;
 
 struct vmng_msg_dev *vmngh_get_msg_dev_by_id(u32 dev_id, u32 fid)
 {
     struct vmng_msg_dev *pos;
 
-    ka_list_for_each_entry(pos, &g_msg_dev_head.msg_dev_head, list) {
+    ka_list_for_each_entry(pos, &g_vmngh_msg_dev_head.msg_dev_head, list) {
         if (pos->dev_id == dev_id && pos->fid == fid) {
             return pos;
         }
@@ -49,7 +50,7 @@ STATIC void vmngh_msg_dev_list_free(void)
     struct vmng_msg_dev *pos;
     struct vmng_msg_dev *n;
 
-    ka_list_for_each_entry_safe(pos, n, &g_msg_dev_head.msg_dev_head, list) {
+    ka_list_for_each_entry_safe(pos, n, &g_vmngh_msg_dev_head.msg_dev_head, list) {
         ka_list_del(&pos->list);
         vmng_kfree(pos);
         pos = NULL;
@@ -453,9 +454,9 @@ STATIC struct vmng_msg_dev *vmngh_alloc_msg_dev(struct vmngh_vpc_unit *unit)
         msg_dev = NULL;
         return NULL;
     }
-    ka_task_mutex_lock(&g_msg_dev_head.mutex);
-    ka_list_add(&msg_dev->list, &g_msg_dev_head.msg_dev_head);
-    ka_task_mutex_unlock(&g_msg_dev_head.mutex);
+    ka_task_mutex_lock(&g_vmngh_msg_dev_head.mutex);
+    ka_list_add(&msg_dev->list, &g_vmngh_msg_dev_head.msg_dev_head);
+    ka_task_mutex_unlock(&g_vmngh_msg_dev_head.mutex);
 
     return msg_dev;
 }
@@ -496,16 +497,16 @@ void vmngh_uninit_vpc_msg(void *unit_in)
 }
 KA_EXPORT_SYMBOL(vmngh_uninit_vpc_msg);
 
-STATIC int __init vmngh_vpc_init_module(void)
+STATIC int __ka_init vmngh_vpc_init_module(void)
 {
     vmng_info("Init vmngh vpc module finish.\n");
-    KA_INIT_LIST_HEAD(&g_msg_dev_head.msg_dev_head);
-    ka_task_mutex_init(&g_msg_dev_head.mutex);
+    KA_INIT_LIST_HEAD(&g_vmngh_msg_dev_head.msg_dev_head);
+    ka_task_mutex_init(&g_vmngh_msg_dev_head.mutex);
     return 0;
 }
 ka_module_init(vmngh_vpc_init_module);
 
-STATIC void __exit vmngh_vpc_exit_module(void)
+STATIC void __ka_exit vmngh_vpc_exit_module(void)
 {
     vmngh_msg_dev_list_free();
     vmng_info("Exit vmngh vpc module finish.\n");

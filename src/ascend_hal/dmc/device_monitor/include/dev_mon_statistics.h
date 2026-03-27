@@ -13,8 +13,18 @@
 
 #include "device_monitor_type.h"
 
+#define MAX_DMP_THREADS         1024
+#define MAX_DMP_THREADS_PRINT   768
+#define MAX_OPCODE              256
+#define MONITOR_SCAN_PERIOD     5
+#define MONITOR_TIME_OUT_PERIOD 10
+
 void dm_update_dmp_invoked_count(void);
 void dm_update_cmd_invoked_count(DEV_MON_CMD_TAG_VALUE_ST* value);
 void dm_printf_dmp_historical_invoke_data(SYSTEM_CB_T *cb);
+void *monitor_worker(void *arg);
+int dmp_monitor_start(unsigned int opcode, unsigned int opfun);
+void dmp_monitor_end(int index);
+void dmp_print_timeout_msg(hash_table *cmd_hash_table);
 
 #endif

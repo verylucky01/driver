@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,7 +11,6 @@
  * GNU General Public License for more details.
  */
 
-#include "linux/uaccess.h"
 #include "pbl/pbl_spod_info.h"
 #include "pbl/pbl_uda.h"
 #include "pbl/pbl_feature_loader.h"
@@ -25,6 +24,9 @@
 #include "ka_task_pub.h"
 #include "ka_memory_pub.h"
 #include "dms/dms_notifier.h"
+#include "ascend_dev_num.h"
+#include "ka_dfx_pub.h"
+#include "ka_common_pub.h"
 
 #ifdef CFG_HOST_ENV
 #include "devdrv_manager_container.h"
@@ -58,37 +60,12 @@ ADD_FEATURE_COMMAND(DMS_MODULE_SPOD_INFO, DMS_GET_GET_DEVICE_INFO_CMD, ZERO_CMD,
 END_FEATURE_COMMAND()
 END_MODULE_DECLARATION();
 
-#define DMS_SPOD_MAX_SERVER_NUM (48)
-#define DMS_SPOD_MAX_CHIP_NUM (8)
-#define DMS_SPOD_MAX_DIE_NUM (2)
-#define DMS_SPOD_MAX_UDEVID_NUM (DMS_SPOD_MAX_CHIP_NUM * DMS_SPOD_MAX_DIE_NUM)
-#define DMS_SPOD_MAX_NUM (DMS_SPOD_MAX_SERVER_NUM * DMS_SPOD_MAX_UDEVID_NUM)
-
-#define DMS_SPOD_CHECK_SDID(sdid_parse_info, ret)                                                                    \
-    do {                                                                                                             \
-        if (((sdid_parse_info).server_id >= DMS_SPOD_MAX_SERVER_NUM) ||                                              \
-            ((sdid_parse_info).chip_id >= DMS_SPOD_MAX_CHIP_NUM) ||                                                  \
-            ((sdid_parse_info).die_id >= DMS_SPOD_MAX_DIE_NUM) ||                                                    \
-            ((sdid_parse_info).udevid >= DMS_SPOD_MAX_UDEVID_NUM) ||                                                 \
-            ((sdid_parse_info).chip_id * DMS_SPOD_MAX_DIE_NUM + (sdid_parse_info).die_id != (sdid_parse_info).udevid)) { \
-            (ret) = -EINVAL;                                                                                         \
-        }                                                                                                            \
-    }while(0)
-
-struct spod_node_status {
-    u8 status[DMS_SPOD_MAX_NUM];
-};
-
 struct sdid_status {
     unsigned int sdid;
     HAL_KERNEL_SPOD_NODE_STATUS status;
 };
 
 typedef int (*dms_spod_notifier)(unsigned int udevid, unsigned int soc_type);
-#ifdef CFG_HOST_ENV
-STATIC struct spod_node_status *g_spod_node_status[DEVDRV_PF_DEV_MAX_NUM] = {NULL};
-STATIC struct rw_semaphore g_spod_node_status_lock[DEVDRV_PF_DEV_MAX_NUM];
-#endif
 
 STATIC int dms_dev_info_args_check(const struct dms_get_device_info_in *input, const u32 in_len,
     const struct dms_get_device_info_out *output, const u32 out_len, const u32 min_buff)
@@ -123,7 +100,7 @@ static int dms_root_physical_check(u32 udevid)
 
 #ifndef DEVDRV_MANAGER_HOST_UT_TEST
     /* user check and keep errno same with the dms. */
-    if ((u32)(current->cred->euid.val) != 0) {
+    if ((u32)(ka_task_get_current_cred_euid()) != 0) {
         dms_err("Operation not permitted. (udevid=%u)\n", udevid);
         return -EPERM;
     }
@@ -250,71 +227,14 @@ STATIC int dms_spod_node_status_check_soc_type(unsigned int udevid)
 }
 #endif
 
-int hal_kernel_get_spod_node_status(unsigned int local_udevid, unsigned int remote_sdid, unsigned int *status)
-{
-#ifdef CFG_HOST_ENV
-    int ret = 0;
-    struct sdid_parse_info sdid_info = {0};
-    struct spod_node_status *nodes_status = NULL;
-    int index = 0;
-
-    if (!devdrv_manager_is_pf_device(local_udevid)) {
-        return -EOPNOTSUPP;
-    }
-
-    if (local_udevid >= DEVDRV_PF_DEV_MAX_NUM) {
-        return -EINVAL;
-    }
-
-    if (status == NULL) {
-        return -EFAULT;
-    }
-
-    ret = dbl_parse_sdid(remote_sdid, &sdid_info);
-    if (ret != 0) {
-        return ret;
-    }
-
-    DMS_SPOD_CHECK_SDID(sdid_info, ret);
-    if (ret != 0) {
-        return -ERANGE;
-    }
-
-    ret = dms_spod_node_status_check_soc_type(local_udevid);
-    if (ret != 0) {
-        return (ret == -EOPNOTSUPP ? ret : -ENODEV);
-    }
-
-    index = sdid_info.server_id * DMS_SPOD_MAX_UDEVID_NUM + sdid_info.udevid;
-
-    ka_task_down_read(&g_spod_node_status_lock[local_udevid]);
-
-    nodes_status = g_spod_node_status[local_udevid];
-    if (nodes_status == NULL) {
-        ka_task_up_read(&g_spod_node_status_lock[local_udevid]);
-        return -ENODATA;
-    }
-
-    *status = nodes_status->status[index];
-    ka_task_up_read(&g_spod_node_status_lock[local_udevid]);
-    return 0;
-#else
-    (void)local_udevid;
-    (void)remote_sdid;
-    (void)status;
-    return -EOPNOTSUPP;
-#endif
-}
-
 STATIC int dms_spod_set_node_status(unsigned int local_udevid, unsigned int remote_sdid, unsigned int status)
 {
 #ifdef CFG_HOST_ENV
     int ret;
     struct sdid_parse_info sdid_info = {0};
-    struct spod_node_status *nodes_status = NULL;
     unsigned int index = 0;
 
-    if ((local_udevid >= DEVDRV_PF_DEV_MAX_NUM) || (status >= DMS_SPOD_NODE_STATUS_MAX)) {
+    if ((local_udevid >= ASCEND_PDEV_MAX_NUM) || (status >= DMS_SPOD_NODE_STATUS_MAX)) {
         dms_err("Invalid parameter. (local_udevid=%u; status=%d)\n", local_udevid, status);
         return -EINVAL;
     }
@@ -325,7 +245,7 @@ STATIC int dms_spod_set_node_status(unsigned int local_udevid, unsigned int remo
         return ret;
     }
 
-    DMS_SPOD_CHECK_SDID(sdid_info, ret);
+    DBL_SPOD_CHECK_SDID(sdid_info, ret);
     if (ret != 0) {
         dms_err("Invalid sdid. (sdid_server_id=%u; sdid_chip_id=%u; sdid_die_id=%u; sdid_udevid=%u)\n",
                     sdid_info.server_id, sdid_info.chip_id, sdid_info.die_id, sdid_info.udevid);
@@ -338,22 +258,8 @@ STATIC int dms_spod_set_node_status(unsigned int local_udevid, unsigned int remo
         return ret;
     }
 
-    index = sdid_info.server_id * DMS_SPOD_MAX_UDEVID_NUM + sdid_info.udevid;
-
-    ka_task_down_write(&g_spod_node_status_lock[local_udevid]);
-
-    nodes_status = g_spod_node_status[local_udevid];
-    if (nodes_status == NULL) {
-        ka_task_up_write(&g_spod_node_status_lock[local_udevid]);
-        dms_err("Spod node status has not been inited. (local_udevid=%u)\n", local_udevid);
-        return -ENODATA;
-    }
-
-    nodes_status->status[index] = status;
-
-    ka_task_up_write(&g_spod_node_status_lock[local_udevid]);
-
-    return 0;
+    index = sdid_info.server_id * DBL_SPOD_MAX_UDEVID_NUM + sdid_info.udevid;
+    return dbl_set_spod_node_status(local_udevid, index, status);
 #else
     (void)local_udevid;
     (void)remote_sdid;
@@ -453,29 +359,11 @@ int dms_set_spod_node_status(void *feature, char *in, u32 in_len, char *out, u32
 STATIC int dms_spod_node_status_init(unsigned int udevid, unsigned int soc_type)
 {
 #ifdef CFG_HOST_ENV
-    struct spod_node_status *nodes_status = NULL;
-
     if ((soc_type != SOC_TYPE_CLOUD_V3) || (!devdrv_manager_is_pf_device(udevid))) {
         return 0;
     }
 
-    ka_task_down_write(&g_spod_node_status_lock[udevid]);
-
-    if (g_spod_node_status[udevid] != NULL) {
-        ka_task_up_write(&g_spod_node_status_lock[udevid]);
-        dms_info("Spod node status has been inited. (udevid=%u)", udevid);
-        return 0;
-    }
-
-    nodes_status = (struct spod_node_status *)dbl_kzalloc(sizeof(struct spod_node_status), KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
-    if (nodes_status == NULL) {
-        ka_task_up_write(&g_spod_node_status_lock[udevid]);
-        dms_err("malloc spod node status failed. (udevid=%u)", udevid);
-        return -ENOMEM;
-    }
-
-    g_spod_node_status[udevid] = nodes_status;
-    ka_task_up_write(&g_spod_node_status_lock[udevid]);
+    return dbl_spod_node_status_init(udevid);
 #endif
     return 0;
 }
@@ -487,17 +375,7 @@ STATIC void dms_spod_node_status_uninit(unsigned int udevid, unsigned int soc_ty
         return;
     }
 
-    ka_task_down_write(&g_spod_node_status_lock[udevid]);
-
-    if (g_spod_node_status[udevid] == NULL) {
-        ka_task_up_write(&g_spod_node_status_lock[udevid]);
-        return;
-    }
-
-    dbl_kfree(g_spod_node_status[udevid]);
-    g_spod_node_status[udevid] = NULL;
-
-    ka_task_up_write(&g_spod_node_status_lock[udevid]);
+    dbl_spod_node_status_uninit(udevid);
 #endif
     return;
 }
@@ -506,7 +384,7 @@ STATIC int dms_spod_device_up_notify(unsigned int udevid, unsigned int soc_type)
 {
     int ret = 0;
 
-    if (udevid >= DEVDRV_MAX_DAVINCI_NUM) {
+    if (udevid >= ASCEND_DEV_MAX_NUM) {
         dms_err("Invalid udevid. (udevid=%u)\n", udevid);
         return -EINVAL;
     }
@@ -524,7 +402,7 @@ STATIC int dms_spod_device_down_notify(unsigned int udevid, unsigned int soc_typ
 {
     int ret = 0;
 
-    if (udevid >= DEVDRV_MAX_DAVINCI_NUM) {
+    if (udevid >= ASCEND_DEV_MAX_NUM) {
         dms_err("Invalid udevid. (udevid=%u)\n", udevid);
         return -EINVAL;
     }
@@ -538,7 +416,7 @@ STATIC dms_spod_notifier dms_spod_notifier_handle_func[DMS_DEVICE_NOTIFIER_MAX] 
     [DMS_DEVICE_DOWN3] = dms_spod_device_down_notify,
 };
 
-STATIC int dms_spod_notifier_handle(struct notifier_block *nb, unsigned long mode, void *data)
+STATIC int dms_spod_notifier_handle(ka_notifier_block_t *nb, unsigned long mode, void *data)
 {
     int ret;
     unsigned int soc_type = SOC_TYPE_MAX;
@@ -567,20 +445,13 @@ STATIC int dms_spod_notifier_handle(struct notifier_block *nb, unsigned long mod
     return 0;
 }
 
-STATIC struct notifier_block g_dms_spod_notifier = {
+STATIC ka_notifier_block_t g_dms_spod_notifier = {
     .notifier_call = dms_spod_notifier_handle,
 };
 
 STATIC int dms_spod_status_module_init(void)
 {
     int ret = 0;
-
-#ifdef CFG_HOST_ENV
-    int i;
-    for (i = 0; i < DEVDRV_PF_DEV_MAX_NUM; ++i) {
-        ka_task_init_rwsem(&g_spod_node_status_lock[i]);
-    }
-#endif
 
     ret = dms_register_notifier(&g_dms_spod_notifier);
     if (ret != 0) {
@@ -616,4 +487,3 @@ void dms_spod_exit(void)
     CALL_EXIT_MODULE(DMS_MODULE_SPOD_INFO);
 }
 DECLAER_FEATURE_AUTO_UNINIT(dms_spod_exit, FEATURE_LOADER_STAGE_5);
-

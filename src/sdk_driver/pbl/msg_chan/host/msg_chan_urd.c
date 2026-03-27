@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -17,12 +17,12 @@
 #include "pbl/pbl_urd_sub_cmd_def.h"
 
 #include "urd_acc_ctrl.h"
-#include "devdrv_user_common.h"
+#include "ascend_dev_num.h"
 
 #include "msg_chan_main.h"
 
-int ascend_msg_chan_register_urd(void);
-void ascend_msg_chan_unregister_urd(void);
+int ascend_msg_chan_init_urd(void);
+void ascend_msg_chan_uninit_urd(void);
 STATIC int devdrv_get_device_boot_status_urd(void *feature, char *in, u32 in_len, char *out, u32 out_len)
 {
     u32 phys_id, boot_status;
@@ -38,14 +38,14 @@ STATIC int devdrv_get_device_boot_status_urd(void *feature, char *in, u32 in_len
     }
     phys_id = *(u32 *)in;
 
-    if (phys_id >= DEVDRV_MAX_DAVINCI_NUM) {
+    if (phys_id >= ASCEND_DEV_MAX_NUM) {
         devdrv_err("phys_id %d is invalid\n", phys_id);
         return -EINVAL;
     }
 
     /* only judge the physical id is available in container */
     if (run_in_normal_docker()) {
-        if (!uda_task_can_access_udevid_inherit(current, phys_id)) {
+        if (!uda_task_can_access_udevid_inherit(ka_task_get_current(), phys_id)) {
             devdrv_err("device phyid %u is not belong to current docker\n", phys_id);
             return -EFAULT;
         }
@@ -100,6 +100,7 @@ STATIC int devdrv_get_p2p_attr_urd(void *feature, char *in, u32 in_len, char *ou
     base_attr.status =  &p2p_attr->status;
     base_attr.capability = &p2p_attr->capability;
     base_attr.op = p2p_attr->op;
+    base_attr.type = p2p_attr->type;
 
     ret = devdrv_p2p_attr_op(&base_attr);
     if (ret == -EOPNOTSUPP) {
@@ -244,18 +245,18 @@ BEGIN_FEATURE_COMMAND()
 END_FEATURE_COMMAND()
 END_MODULE_DECLARATION()
 
-int ascend_msg_chan_register_urd(void)
+int ascend_msg_chan_init_urd(void)
 {
     CALL_INIT_MODULE(ASCEND_MSG_CHAN_CMD_NAME);
     devdrv_info("Register urd feature finish.\n");
     return 0;
 }
 
-void ascend_msg_chan_unregister_urd(void)
+void ascend_msg_chan_uninit_urd(void)
 {
     CALL_EXIT_MODULE(ASCEND_MSG_CHAN_CMD_NAME);
     devdrv_info("Unregister urd feature finish.\n");
     return;
 }
-DECLAER_FEATURE_AUTO_INIT(ascend_msg_chan_register_urd, FEATURE_LOADER_STAGE_5);
-DECLAER_FEATURE_AUTO_UNINIT(ascend_msg_chan_unregister_urd, FEATURE_LOADER_STAGE_5);
+DECLAER_FEATURE_AUTO_INIT(ascend_msg_chan_init_urd, FEATURE_LOADER_STAGE_5);
+DECLAER_FEATURE_AUTO_UNINIT(ascend_msg_chan_uninit_urd, FEATURE_LOADER_STAGE_5);

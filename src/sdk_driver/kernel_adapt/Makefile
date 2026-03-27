@@ -34,6 +34,7 @@ EXTRA_CFLAGS += -I$(TARGET_SRC_DIR)/kernel_adapt/net
 EXTRA_CFLAGS += -I$(TARGET_SRC_DIR)/kernel_adapt/pci
 EXTRA_CFLAGS += -I$(TARGET_SRC_DIR)/kernel_adapt/system
 EXTRA_CFLAGS += -I$(TARGET_SRC_DIR)/kernel_adapt/task
+EXTRA_CFLAGS += -I$(TARGET_SRC_DIR)/kernel_adapt/sched
 
 EXTRA_CFLAGS += -isystem $(shell $(CC) -print-file-name=include)
 EXTRA_CFLAGS += -Wno-type-limits # for kernel 5.15
@@ -87,6 +88,8 @@ ascend_kernel_open_adapt-objs := ka_module_init.o  \
                                  base/ka_base.o \
                                  driver/ka_driver.o \
                                  memory/ka_mem.o \
+                                 memory/ka_pgwalk.o \
                                  pci/ka_pci.o \
                                  net/ka_net.o \
-                                 dfx/ka_dfx.o
+                                 dfx/ka_dfx.o \
+                                 sched/ka_sched.o

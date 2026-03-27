@@ -179,7 +179,7 @@ function config_recover()
                     continue
                 fi
                 if [[ ! "$op_card_id" =~ ^[0-9]+$ ]] || [[ ! "$op_chip_id" =~ ^[0-9]+$ ]] ||[[ ! "$enable_value" =~ ^[0-9]+$ ]]; then
-                    log "Warning: error op-timeout-cfg command not int, This configuration will not be restored."
+                    log "Warning: error op-timeout-cfg command, This configuration will not be restored."
                     continue
                 fi
                 if [ "${op_card_id}" -lt 0 ] || [ "${op_card_id}" -gt 7 ] || [[ "${op_chip_id}" -ne 0 && "${op_chip_id}" -ne 1 ]] || [[ "${enable_value}" -lt 20 ]] || [[ "${enable_value}" -gt 32 ]]; then
@@ -187,7 +187,6 @@ function config_recover()
                     continue
                 fi
                 if [ "$op_card_id" -ne "$card_id_cur" ] || [ "$op_chip_id" -ne "$chip_id_cur" ]; then
-                    log "Warning: error op-timeout-cfg op_card_id!=card_id_cur, This configuration will not be restored."
                     continue
                 fi
                 cmd_info="npu-smi set -t op-timeout-cfg -i ${op_card_id} -c ${op_chip_id} -d ${enable_value}"
@@ -218,7 +217,7 @@ function config_recover()
 }
 
 if [ ! -f "$OP_TIMEOUT_CONF" ]; then
-    log "OP_TIMEOUT_CONF path is not exist, do not need to recover, exit."
+    log "OP_TIMEOUT_CONF path is not exist, restore to default, exit."
     exit 0
 fi
 

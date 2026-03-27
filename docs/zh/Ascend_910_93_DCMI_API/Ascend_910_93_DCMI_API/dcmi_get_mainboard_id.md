@@ -147,7 +147,7 @@
 
 **调用示例<a name="section91062141991"></a>**
 
-```c
+```
 …  
 int ret = 0; 
 int mainboard_id; 
@@ -156,3 +156,4 @@ int device_id = 0;
 ret = dcmi_get_mainboard_id (card_id, device_id, &mainboard_id); 
 …
 ```
+

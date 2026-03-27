@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -12,9 +12,9 @@
  */
 
 #include "ka_base_pub.h"
+#include "ka_system_pub.h"
 #include "virtmng_public_def.h"
 #include "virtmng_msg_common.h"
-#include "ka_system_pub.h"
 
 enum vmng_data_offset {
     DATA_SHIFT_OFFSET = 1,

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,20 +11,18 @@
  * GNU General Public License for more details.
  */
 
+#include "ka_kernel_def_pub.h"
+#include "ka_dfx_pub.h"
+#include "ka_barrier_pub.h"
+#include "ka_system_pub.h"
+#include "ka_pci_pub.h"
+#include "ka_memory_pub.h"
 #include "virtmngagent_vpc_unit.h"
 #include "virtmngagent_msg.h"
 #include "virtmng_public_def.h"
 #include "virtmngagent_msg_common.h"
 #include "vmng_mem_alloc_interface.h"
 #include "vpc_kernel_interface.h"
-#include "ka_kernel_def_pub.h"
-#include "ka_dfx_pub.h"
-#include "ka_base_pub.h"
-#include "ka_task_pub.h"
-#include "ka_barrier_pub.h"
-#include "ka_system_pub.h"
-#include "ka_pci_pub.h"
-#include "ka_memory_pub.h"
 
 int vpc_register_client(u32 dev_id, u32 fid, const struct vmng_vpc_client *vpc_client)
 {
@@ -139,7 +137,7 @@ STATIC ka_irqreturn_t vmnga_vpc_start_irq(int irq, void *data)
 STATIC int vpc_top_half_init_finish(struct vmnga_vpc_unit *vpc_unit)
 {
     struct vmnga_vpc_start_dev *start_dev = &vpc_unit->start_dev;
-    struct sysinfo mem_info;
+    ka_sysinfo_t mem_info;
     u64 mem_size;
     u32 time;
     int ret;
@@ -164,7 +162,7 @@ STATIC int vpc_top_half_init_finish(struct vmnga_vpc_unit *vpc_unit)
 
     vmnga_register_extended_common_msg_client(vpc_unit->msg_dev);
 
-    si_meminfo(&mem_info);
+    ka_si_meminfo(&mem_info);
     mem_size = mem_info.totalram * KA_MM_PAGE_SIZE / GB_UNIT + 1;
     if (mem_size < MIN_MEM_SIZE) {
         mem_size = MIN_MEM_SIZE;

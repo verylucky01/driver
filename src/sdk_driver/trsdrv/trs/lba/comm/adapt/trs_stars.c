@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,6 +13,7 @@
 #include "ka_memory_pub.h"
 #include "ka_task_pub.h"
 #include "ka_kernel_def_pub.h"
+#include "ka_compiler_pub.h"
 #include "soc_adapt.h"
 #include "pbl_kref_safe.h"
 
@@ -21,7 +22,7 @@
 struct trs_stars {
     struct trs_id_inst inst;
 
-    void __iomem *base;
+    void __ka_mm_iomem *base;
     phys_addr_t paddr;
     size_t size;
 
@@ -141,7 +142,7 @@ static void trs_stars_put(struct trs_stars *stars)
 
 static int trs_stars_range_check(struct trs_stars *stars, unsigned long offset, size_t size)
 {
-    if (unlikely((offset > (unsigned long)stars->size) || (offset + (unsigned long)size) > stars->size)) {
+    if (ka_unlikely((offset > (unsigned long)stars->size) || (offset + (unsigned long)size) > stars->size)) {
         return -ENOMEM;
     }
     return 0;
@@ -158,7 +159,7 @@ static u32 trs_stars_addr_adjust(struct trs_stars *stars, u32 val)
 int trs_stars_get_sq_tail(struct trs_id_inst *inst, u32 sqid, u32 *tail)
 {
     struct trs_stars *stars = NULL;
-    void __iomem *vaddr = NULL;
+    void __ka_mm_iomem *vaddr = NULL;
     unsigned long offset;
     int ret, reg_offset;
 
@@ -177,7 +178,7 @@ int trs_stars_get_sq_tail(struct trs_id_inst *inst, u32 sqid, u32 *tail)
     ret = trs_stars_range_check(stars, offset, sizeof(u32));
     if (ret == 0) {
         vaddr = stars->base + offset + trs_stars_addr_adjust(stars, sqid);
-        *tail = readl(vaddr);
+        *tail = ka_mm_readl(vaddr);
     }
     trs_stars_put(stars);
     return ret;
@@ -186,7 +187,7 @@ int trs_stars_get_sq_tail(struct trs_id_inst *inst, u32 sqid, u32 *tail)
 int trs_stars_set_sq_tail(struct trs_id_inst *inst, u32 sqid, u32 tail)
 {
     struct trs_stars *stars = NULL;
-    void __iomem *vaddr = NULL;
+    void __ka_mm_iomem *vaddr = NULL;
     unsigned long offset;
     int ret, reg_offset;
 
@@ -205,7 +206,7 @@ int trs_stars_set_sq_tail(struct trs_id_inst *inst, u32 sqid, u32 tail)
     ret = trs_stars_range_check(stars, offset, sizeof(u32));
     if (ret == 0) {
         vaddr = stars->base + offset + trs_stars_addr_adjust(stars, sqid);
-        writel(tail, vaddr);
+        ka_mm_writel(tail, vaddr);
     }
     trs_stars_put(stars);
     return ret;
@@ -214,7 +215,7 @@ int trs_stars_set_sq_tail(struct trs_id_inst *inst, u32 sqid, u32 tail)
 int trs_stars_get_cq_head(struct trs_id_inst *inst, u32 cqid, u32 *head)
 {
     struct trs_stars *stars = NULL;
-    void __iomem *vaddr = NULL;
+    void __ka_mm_iomem *vaddr = NULL;
     unsigned long offset;
     int ret, reg_offset;
 
@@ -233,7 +234,7 @@ int trs_stars_get_cq_head(struct trs_id_inst *inst, u32 cqid, u32 *head)
     ret = trs_stars_range_check(stars, offset, sizeof(u32));
     if (ret == 0) {
         vaddr = stars->base + offset + trs_stars_addr_adjust(stars, cqid);
-        *head = readl(vaddr);
+        *head = ka_mm_readl(vaddr);
     }
     trs_stars_put(stars);
     return ret;
@@ -242,7 +243,7 @@ int trs_stars_get_cq_head(struct trs_id_inst *inst, u32 cqid, u32 *head)
 int trs_stars_set_cq_head(struct trs_id_inst *inst, u32 cqid, u32 head)
 {
     struct trs_stars *stars = NULL;
-    void __iomem *vaddr = NULL;
+    void __ka_mm_iomem *vaddr = NULL;
     unsigned long offset;
     int ret, reg_offset;
 
@@ -261,7 +262,7 @@ int trs_stars_set_cq_head(struct trs_id_inst *inst, u32 cqid, u32 head)
     ret = trs_stars_range_check(stars, offset, sizeof(u32));
     if (ret == 0) {
         vaddr = stars->base + offset + trs_stars_addr_adjust(stars, cqid);
-        writel(head, vaddr);
+        ka_mm_writel(head, vaddr);
     }
     trs_stars_put(stars);
     return ret;
@@ -270,7 +271,7 @@ int trs_stars_set_cq_head(struct trs_id_inst *inst, u32 cqid, u32 head)
 int trs_stars_get_cq_tail(struct trs_id_inst *inst, u32 cqid, u32 *tail)
 {
     struct trs_stars *stars = NULL;
-    void __iomem *vaddr = NULL;
+    void __ka_mm_iomem *vaddr = NULL;
     unsigned long offset;
     int ret, reg_offset;
 
@@ -289,7 +290,7 @@ int trs_stars_get_cq_tail(struct trs_id_inst *inst, u32 cqid, u32 *tail)
     ret = trs_stars_range_check(stars, offset, sizeof(u32));
     if (ret == 0) {
         vaddr = stars->base + offset + trs_stars_addr_adjust(stars, cqid);
-        *tail = readl(vaddr);
+        *tail = ka_mm_readl(vaddr);
     }
     trs_stars_put(stars);
     return ret;
@@ -297,7 +298,7 @@ int trs_stars_get_cq_tail(struct trs_id_inst *inst, u32 cqid, u32 *tail)
 
 static bool _trs_stars_sq_is_enabled(struct trs_stars *stars, u32 sqid)
 {
-    void __iomem *vaddr = NULL;
+    void __ka_mm_iomem *vaddr = NULL;
     unsigned long offset;
     u32 val, reg_offset;
     int ret;
@@ -311,7 +312,7 @@ static bool _trs_stars_sq_is_enabled(struct trs_stars *stars, u32 sqid)
     ret = trs_stars_range_check(stars, offset, sizeof(u32));
     if (ret == 0) {
         vaddr = stars->base + offset + trs_stars_addr_adjust(stars, sqid);
-        val = readl(vaddr);
+        val = ka_mm_readl(vaddr);
         if ((val & 0x1) == 1) {
             return true;
         }
@@ -321,7 +322,7 @@ static bool _trs_stars_sq_is_enabled(struct trs_stars *stars, u32 sqid)
 
 static int _trs_stars_set_sq_status(struct trs_stars *stars, u32 sqid, int val)
 {
-    void __iomem *vaddr = NULL;
+    void __ka_mm_iomem *vaddr = NULL;
     unsigned long offset;
     u32 reg_offset;
     int ret;
@@ -335,14 +336,14 @@ static int _trs_stars_set_sq_status(struct trs_stars *stars, u32 sqid, int val)
     ret = trs_stars_range_check(stars, offset, sizeof(u32));
     if (ret == 0) {
         vaddr = stars->base + offset + trs_stars_addr_adjust(stars, sqid);
-        writel((val & 0x1U), vaddr);
+        ka_mm_writel((val & 0x1U), vaddr);
     }
     return ret;
 }
 
 static int _trs_stars_get_sq_status(struct trs_stars *stars, u32 sqid, u32 *val)
 {
-    void __iomem *vaddr = NULL;
+    void __ka_mm_iomem *vaddr = NULL;
     unsigned long offset;
     u32 reg_offset;
     int ret;
@@ -356,14 +357,14 @@ static int _trs_stars_get_sq_status(struct trs_stars *stars, u32 sqid, u32 *val)
     ret = trs_stars_range_check(stars, offset, sizeof(u32));
     if (ret == 0) {
         vaddr = stars->base + offset + trs_stars_addr_adjust(stars, sqid);
-        *val = readl(vaddr);
+        *val = ka_mm_readl(vaddr);
     }
     return ret;
 }
 
 static int _trs_stars_set_sq_head(struct trs_stars *stars, u32 sqid, u32 head)
 {
-    void __iomem *vaddr = NULL;
+    void __ka_mm_iomem *vaddr = NULL;
     unsigned long offset;
     u32 reg_offset;
     int ret;
@@ -377,14 +378,14 @@ static int _trs_stars_set_sq_head(struct trs_stars *stars, u32 sqid, u32 head)
     ret = trs_stars_range_check(stars, offset, sizeof(u32));
     if (ret == 0) {
         vaddr = stars->base + offset + trs_stars_addr_adjust(stars, sqid);
-        writel(head, vaddr);
+        ka_mm_writel(head, vaddr);
     }
     return ret;
 }
 
 static int _trs_stars_get_sq_head(struct trs_stars *stars, u32 sqid, u32 *head)
 {
-    void __iomem *vaddr = NULL;
+    void __ka_mm_iomem *vaddr = NULL;
     unsigned long offset;
     u32 reg_offset;
     int ret;
@@ -398,7 +399,7 @@ static int _trs_stars_get_sq_head(struct trs_stars *stars, u32 sqid, u32 *head)
     ret = trs_stars_range_check(stars, offset, sizeof(u32));
     if (ret == 0) {
         vaddr = stars->base + offset + trs_stars_addr_adjust(stars, sqid);
-        *head = readl(vaddr);
+        *head = ka_mm_readl(vaddr);
     }
     return ret;
 }

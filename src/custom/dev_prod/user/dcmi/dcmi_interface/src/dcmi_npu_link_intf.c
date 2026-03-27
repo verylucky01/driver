@@ -161,7 +161,7 @@ int dcmi_get_pcie_link_bandwidth_info(int card_id, int device_id,
         }
     }
 
-    if (!dcmi_board_chip_type_is_ascend_910b()) {
+    if (!dcmi_board_chip_type_is_ascend_910b() && !dcmi_board_chip_type_is_ascend_910_95_card()) {
         gplog(LOG_OP, "This device does not support get pcie link bandwidth info.");
         return DCMI_ERR_CODE_NOT_SUPPORT;
     }
@@ -659,11 +659,101 @@ STATIC int dcmi_get_npu_serdes_quality_info(int card_id, int device_id, unsigned
     return dcmi_convert_error_code(ret);
 }
 
+STATIC int dcmi_get_910_95_max_macro_id(int card_id, int device_id, int *max_id)
+{
+    int ret;
+    unsigned int main_board_id;
+
+    ret = dcmi_get_mainboard_id(card_id, device_id, &main_board_id);
+    if (ret != DCMI_OK) {
+        gplog(LOG_ERR, "Failed to query 910_95 main board id of card. err is %d", ret);
+        return ret;
+    }
+
+    if (dcmi_mainboard_is_a900_a5_ub(main_board_id)) {
+        *max_id = MAX_910_95_POD_MACRO_ID;
+        return DCMI_OK;
+    }
+
+    switch (main_board_id) {
+        case DCMI_910_95_1P_MAINBOARD_ID:
+            *max_id = MAX_910_95_1P_MACRO_ID;
+            break;
+        case DCMI_910_95_2P_MAINBOARD_ID:
+            *max_id = MAX_910_95_2P_MACRO_ID;
+            break;
+        case DCMI_910_95_4P_MAINBOARD_ID:
+            *max_id = MAX_910_95_4P_MACRO_ID;
+            break;
+        default:
+            gplog(LOG_OP, "This device does not support get max macro id.");
+            return DCMI_ERR_CODE_NOT_SUPPORT;
+    }
+    return DCMI_OK;
+}
+
+STATIC int dcmi_get_max_macro_id(int card_id, int device_id, int chip_type, int *max_id)
+{
+    int ret;
+    unsigned int main_board_id;
+
+    switch (chip_type) {
+        case DCMI_CHIP_TYPE_D910B:
+            *max_id = MAX_MACRO_ID;
+            ret = DCMI_OK;
+            break;
+        case DCMI_CHIP_TYPE_D310P:
+            *max_id = MAX_310P_MACRO_ID;
+            ret = DCMI_OK;
+            break;
+        case DCMI_CHIP_TYPE_D910_93:
+            ret = dcmi_get_mainboard_id(card_id, device_id, &main_board_id);
+            if (ret != DCMI_OK) {
+                gplog(LOG_ERR, "Failed to query main board id of card. err is %d", ret);
+                return ret;
+            }
+            *max_id = (main_board_id == DCMI_A_X_910_93_MAIN_BOARD_ID) ? MAX_A_X_MACRO_ID : MAX_H60_ID;
+            break;
+        case DCMI_CHIP_TYPE_D910_95:
+            ret = dcmi_get_910_95_max_macro_id(card_id, device_id, max_id);
+            if (ret != DCMI_OK && ret != DCMI_ERR_CODE_NOT_SUPPORT) {
+                gplog(LOG_ERR, "dcmi_get_max_macro_id failed. card_id[%d], device_id[%d], err is %d", 
+                    card_id, device_id, ret);
+                return ret;
+            }
+            break;
+        default:
+            gplog(LOG_OP, "This device does not support get eye info.");
+            return DCMI_ERR_CODE_NOT_SUPPORT;
+    }
+    return ret;
+}
+
+STATIC int check_macro_id_valid(int chip_type, int macro_id, int max_id)
+{
+    if (macro_id < MIN_MACRO_ID) {
+        gplog(LOG_ERR, "macro_id is invalid. macro_id is %d", macro_id);
+        return DCMI_ERR_CODE_INVALID_PARAMETER;
+    }
+
+    if (macro_id > max_id || (macro_id == RES_MACRO_ID && chip_type != DCMI_CHIP_TYPE_D910_95)) {
+        gplog(LOG_ERR, "macro_id is invalid. macro_id is %d", macro_id);
+        return DCMI_ERR_CODE_INVALID_PARAMETER;
+    }
+
+    if (chip_type == DCMI_CHIP_TYPE_D910_95 && max_id == MAX_910_95_2P_MACRO_ID && 
+            macro_id == RES_910_95_2P_MACRO_ID) {
+        gplog(LOG_ERR, "macro_id is invalid. macro_id is %d", macro_id);
+        return DCMI_ERR_CODE_INVALID_PARAMETER;
+    }
+
+    return DCMI_OK;
+}
+
 int check_serdes_environment_is_invalid(int card_id, int device_id, int macro_id)
 {
     int ret;
     int max_id;
-    unsigned int main_board_id;
     int chip_type = DCMI_CHIP_TYPE_INVALID;
 
     if (dcmi_check_chip_is_in_split_mode(card_id, device_id) == DCMI_ERR_CODE_OPER_NOT_PERMITTED) {
@@ -672,32 +762,11 @@ int check_serdes_environment_is_invalid(int card_id, int device_id, int macro_id
     }
 
     chip_type = dcmi_get_board_chip_type();
-    switch (chip_type) {
-        case DCMI_CHIP_TYPE_D910B:
-            max_id = MAX_MACRO_ID;
-            break;
-        case DCMI_CHIP_TYPE_D310P:
-            max_id = MAX_310P_MACRO_ID;
-            break;
-        case DCMI_CHIP_TYPE_D910_93:
-            ret = dcmi_get_mainboard_id(card_id, device_id, &main_board_id);
-            if (ret != DCMI_OK) {
-                gplog(LOG_ERR, "Failed to query main board id of card. err is %d", ret);
-                return ret;
-            }
-            max_id = (main_board_id == DCMI_A_X_910_93_MAIN_BOARD_ID) ? MAX_A_X_MACRO_ID : MAX_H60_ID;
-            break;
-        default:
-            gplog(LOG_OP, "This device does not support get eye info.");
-            return DCMI_ERR_CODE_NOT_SUPPORT;
+    ret = dcmi_get_max_macro_id(card_id, device_id, chip_type, &max_id);
+    if (ret != DCMI_OK) {
+        return ret;
     }
-
-    if (macro_id > max_id || macro_id == RES_MACRO_ID || macro_id < MIN_310P_MACRO_ID) {
-        gplog(LOG_ERR, "macro_id is invalid. macro_id is %d", macro_id);
-        return DCMI_ERR_CODE_INVALID_PARAMETER;
-    }
-
-    return DCMI_OK;
+    return check_macro_id_valid(chip_type, macro_id, max_id);
 }
 
 int dcmi_get_serdes_quality_info(int card_id, int device_id, unsigned int macro_id,

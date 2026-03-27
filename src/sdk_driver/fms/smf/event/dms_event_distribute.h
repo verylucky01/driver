@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,11 +13,11 @@
 
 #ifndef __DMS_EVENT_DISTRIBUTE_H__
 #define __DMS_EVENT_DISTRIBUTE_H__
-#include <linux/kfifo.h>
-
+#include "ka_system_pub.h"
+#include "ka_task_pub.h"
+#include "ka_base_pub.h"
 #include "dms/dms_cmd_def.h"
 #include "fms/fms_smf.h"
-#include "ka_task_pub.h"
 
 #define DMS_EVENT_DISTRIBUTE_FUNC_MAX 64
 #define DISTRIBUTE_FUNC_HEAD_INDEX(priority) (DMS_EVENT_DISTRIBUTE_FUNC_MAX /               \
@@ -46,16 +46,10 @@
 #define DMS_EVENT_WAIT_TIME 1000 /* 1000ms */
 #define DMS_EVENT_WAIT_TIME_MAX 30000 /* 30000ms(30s) */
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0)
-typedef u64 TASK_TIME_TYPE;
-#else
-typedef struct timespec TASK_TIME_TYPE;
-#endif
-
 typedef struct {
-    struct kfifo event_fifo;
+    ka_kfifo_t event_fifo;
     ka_wait_queue_head_t event_wait;
-    struct mutex process_mutex;
+    ka_mutex_t process_mutex;
 
     u32 exception_num;
     ka_pid_t process_pid;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,8 +11,6 @@
  * GNU General Public License for more details.
  */
 #ifndef EVENT_SCHED_UT
-
-#include <linux/kallsyms.h>
 
 #include "pbl/pbl_uda.h"
 #include "pbl/pbl_feature_loader.h"
@@ -53,17 +51,14 @@ STATIC int esched_host_msg_send(u32 dev_id, struct esched_ctrl_msg *msg, u32 msg
     return 0;
 }
 
-int sched_query_remote_trace_msg_send(u32 chip_id,
-    u32 pid, u32 gid, u32 tid, struct sched_sync_event_trace *sched_trace)
+int sched_query_remote_trace_msg_send(u32 chip_id, struct sched_trace_input *para, struct sched_sync_event_trace *sched_trace)
 {
-    struct esched_ctrl_msg msg;
+    struct esched_ctrl_msg msg = {0};
     int ret;
 
     sched_remote_msg_head_init(&msg.head, ESCHED_MSG_TYPE_REMOTE_QUERY_TRACE);
 
-    msg.trace_msg.pid = pid;
-    msg.trace_msg.gid = gid;
-    msg.trace_msg.tid = tid;
+    msg.trace_msg.para = *para;
 
     ret = esched_host_msg_send(chip_id, (void *)&msg, sizeof(msg));
     if (ret == 0) {
@@ -103,7 +98,7 @@ int sched_publish_event_to_remote(u32 chip_id, u32 event_src,
     return esched_host_msg_send(real_devid, (void *)&msg, total_len);
 }
 
-STATIC int sched_publish_event_proxy(u32 devid, struct esched_publish_msg *msg)
+STATIC int sched_publish_event_proxy(u32 devid, struct sched_numa_node *node, struct esched_publish_msg *msg)
 {
     struct esched_remote_submit_msg *submit_msg = &msg->submit_msg;
     struct sched_published_event_func event_func;
@@ -118,6 +113,9 @@ STATIC int sched_publish_event_proxy(u32 devid, struct esched_publish_msg *msg)
     } else {
         submit_msg->event_info.msg = NULL;
     }
+    node->curr_msg.dst_pid = submit_msg->event_info.pid;
+    node->curr_msg.dst_event_id = submit_msg->event_info.event_id;
+    node->curr_msg.dst_subevent_id = submit_msg->event_info.subevent_id;
     submit_msg->event_info.publish_timestamp = sched_get_cur_timestamp();
 
     ret = sched_publish_event_para_check(&submit_msg->event_info);
@@ -405,10 +403,10 @@ STATIC int esched_ctrl_msg_recv(u32 devid, void *data, u32 in_data_len, u32 out_
         sched_err("Invalid device. (chip_id=%u)\n", devid);
         return DRV_ERROR_INVALID_DEVICE;
     }
-
+    node->curr_msg.msg_type = msg->type;
     switch (msg->type) {
         case ESCHED_MSG_TYPE_REMOTE_SUBMIT:
-            ret = sched_publish_event_proxy(devid, (struct esched_publish_msg *)data);
+            ret = sched_publish_event_proxy(devid, node, (struct esched_publish_msg *)data);
             *real_out_len = sizeof(struct esched_msg_head);
             break;
         case ESCHED_MSG_TYPE_REMOTE_QUERY_GID:
@@ -428,7 +426,7 @@ STATIC int esched_ctrl_msg_recv(u32 devid, void *data, u32 in_data_len, u32 out_
         sched_warn("invoke the sched_publish_event_proxy not success. (devid=%u; type=%d; ret=%d)\n",
             devid, msg->type, ret);
     }
-
+    node->curr_msg.msg_type = ESCHED_MSG_TYPE_MAX_NUM;
     msg->error_code = ret;
     esched_dev_put(node);
     return 0;

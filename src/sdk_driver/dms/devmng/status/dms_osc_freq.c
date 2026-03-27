@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,19 +10,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
-#include <linux/time64.h>
-#include <linux/ktime.h>
-#include <linux/timekeeping.h>
-#include <linux/delay.h>
-#include <linux/types.h>
-#include <linux/version.h>
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
-#include <linux/sched/clock.h>
-#else
-#include <linux/sched.h>
-#endif
 
 #include "drv_type.h"
 #include "pbl/pbl_uda.h"
@@ -47,6 +34,8 @@
 #include "ka_task_pub.h"
 #include "ka_errno_pub.h"
 #include "ka_kernel_def_pub.h"
+#include "ka_common_pub.h"
+#include "ka_dfx_pub.h"
 #include "dms_osc_freq.h"
 
 #ifndef CFG_DMS_TEST
@@ -58,7 +47,7 @@
 static u64 g_host_osc_freq[ASCEND_PDEV_MAX_NUM] = {0};
 static u64 g_device_osc_freq[ASCEND_PDEV_MAX_NUM] = {0};
 
-static struct task_struct *calculate_osc_freq_task[ASCEND_PDEV_MAX_NUM] = {NULL};
+static ka_task_struct_t *calculate_osc_freq_task[ASCEND_PDEV_MAX_NUM] = {NULL};
 
 #if defined(__aarch64__)
 STATIC u64 get_local_system_freq(void)
@@ -195,9 +184,9 @@ STATIC int dms_osc_freq_calculate_task(void *arg)
 
 #if defined(__x86_64__)
     host_tick_start1 = get_host_osc_cycles();
-    current_time = local_clock();
+    current_time = ka_system_local_clock();
     host_tick_start2 = get_host_osc_cycles();
-    host_start_time = current_time / NSEC_PER_USEC;
+    host_start_time = current_time / KA_NSEC_PER_USEC;
 #endif
 
     /* the first h2d dropped */
@@ -218,9 +207,9 @@ STATIC int dms_osc_freq_calculate_task(void *arg)
 
 #if defined(__x86_64__)
     host_tick_end1 = get_host_osc_cycles();
-    current_time = local_clock();
+    current_time = ka_system_local_clock();
     host_tick_end2 = get_host_osc_cycles();
-    host_end_time = current_time / NSEC_PER_USEC;
+    host_end_time = current_time / KA_NSEC_PER_USEC;
 #endif
 
 #if defined(__aarch64__)
@@ -247,7 +236,7 @@ STATIC int dms_osc_freq_calculate_task(void *arg)
     return 0;
 }
 
-STATIC int osc_freq_notifier(struct notifier_block *nb, unsigned long mode, void *data)
+STATIC int osc_freq_notifier(ka_notifier_block_t *nb, unsigned long mode, void *data)
 {
     struct devdrv_info *dev = NULL;
 
@@ -285,7 +274,7 @@ STATIC int osc_freq_notifier(struct notifier_block *nb, unsigned long mode, void
     return 0;
 }
 
-STATIC struct notifier_block g_osc_freq_notifier = {
+STATIC ka_notifier_block_t g_osc_freq_notifier = {
     .notifier_call = osc_freq_notifier,
 };
 

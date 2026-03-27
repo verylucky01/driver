@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -155,4 +155,10 @@ extern int devdrv_s2s_non_trans_msg_recv(void *msg_chan, void *data, u32 in_data
 void devdrv_s2s_rwsem_init(void);
 void *devdrv_get_s2s_non_trans_chan(struct devdrv_msg_dev *msg_dev);
 void devdrv_set_s2s_chan_pre_reset(u32 dev_id);
+int devdrv_pci_register_s2s_msg_proc_func(enum devdrv_s2s_msg_type msg_type, s2s_msg_recv func);
+int devdrv_pci_unregister_s2s_msg_proc_func(enum devdrv_s2s_msg_type msg_type);
+int devdrv_pci_s2s_msg_send(u32 devid, u32 sdid, enum devdrv_s2s_msg_type msg_type, u32 direction,
+    struct data_input_info *data_info);
+int devdrv_pci_s2s_async_msg_recv(u32 devid, u32 sdid, enum devdrv_s2s_msg_type msg_type,
+    struct data_recv_info *data_info);
 #endif

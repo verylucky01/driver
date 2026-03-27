@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -19,37 +19,6 @@
 #endif
 #ifdef CONFIG_DEBUG_BUGVERBOSE
 #undef CONFIG_DEBUG_BUGVERBOSE
-#endif
-
-#include <linux/delay.h>
-#include <linux/irq.h>
-#include <linux/module.h>
-#include <linux/of_address.h>
-#include <linux/platform_device.h>
-#include <linux/uaccess.h>
-#include <linux/idr.h>
-#include <linux/errno.h>
-#include <linux/fs.h>
-#include <linux/sched.h>
-#include <linux/stat.h>
-#include <linux/io.h>
-#include <linux/pci.h>
-#include <linux/vmalloc.h>
-#include <linux/kmod.h>
-#include <linux/reboot.h>
-#include <linux/version.h>
-#include <linux/kallsyms.h>
-#include <linux/kthread.h>
-#ifndef DEVMNG_UT
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)
-#include "pbl/pbl_kernel_adapt.h"
-#else
-#include <linux/profile.h>
-#endif
-#endif
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
-#include <linux/sched/signal.h>
-#include <linux/sched/task.h>
 #endif
 
 #include "pbl/pbl_uda.h"
@@ -78,11 +47,13 @@
 #include "davinci_interface.h"
 #include "devdrv_user_common.h"
 #include "pbl/pbl_davinci_api.h"
+#include "devdrv_manager_container.h"
 #include "dms/dms_devdrv_manager_comm.h"
 #include "svm_kernel_interface.h"
 #include "dms_hotreset.h"
 #include "ascend_kernel_hal.h"
 #include "pbl/pbl_soc_res_attr.h"
+#include "pbl/pbl_chip_config.h"
 
 #ifdef CFG_FEATURE_DEVICE_SHARE
 #include "devdrv_manager_dev_share.h"
@@ -113,37 +84,42 @@
 #include "ka_dfx_pub.h"
 #include "ka_barrier_pub.h"
 #include "ka_hashtable_pub.h"
+#include "ka_common_pub.h"
+#include "ka_pci_pub.h"
+
+#ifndef DEVMNG_UT
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)
+#include "pbl/pbl_kernel_adapt.h"
+#endif
+#endif
 #include "devdrv_manager.h"
+#include "devdrv_manager_ioctl.h"
+#include "devdrv_chan_msg_process.h"
+#include "devdrv_black_box_dump.h"
+#include "devdrv_device_status.h"
+#include "devdrv_pci_info.h"
+#include "devdrv_ipc_notify.h"
+#include "devdrv_core_info.h"
+#include "devdrv_resource_info.h"
+#include "devdrv_shm_info.h"
+#include "devdrv_vdev_info.h"
 
-#define DEVMNG_DEV_BOOT_ARG_NUM 2
-#define DEVMNG_PHY_ID_LEN 16
+
+#define DEVMNG_DEV_BOOT_ARG_NUM 3
+#define DEVMNG_DEV_ID_LEN 16
 #define DEVMNG_DEV_BOOT_INIT_SH "/usr/bin/device_boot_init.sh"
-#define DEVMNG_SET_ALL_DEV 0xFFFFFFFFU
-#define DEVMNG_TSLOG_MAX_SIZE (1024 * 1024) /* 1M bytes */
-#define BBOX_AP_BIAS 0x202000ul
-#define BBOX_VMCORE_MASK_OFFSET 24
 
-void *dev_manager_no_trasn_chan[ASCEND_DEV_MAX_NUM];
 struct devdrv_manager_info *dev_manager_info;
-STATIC struct devdrv_common_msg_client devdrv_manager_common_chan;
 STATIC struct tsdrv_drv_ops devdrv_host_drv_ops;
-STATIC struct rw_semaphore devdrv_ops_sem;
+STATIC ka_rw_semaphore_t devdrv_ops_sem;
 STATIC struct devdrv_info *devdrv_info_array[ASCEND_DEV_MAX_NUM];
-STATIC struct devdrv_ts_log *g_devdrv_ts_log_array[ASCEND_DEV_MAX_NUM] = {NULL};
 STATIC struct devdrv_board_info_cache *g_devdrv_board_info[ASCEND_DEV_MAX_NUM] = {NULL};
-STATIC struct devdrv_dev_log *g_devdrv_dev_log_array[DEVDRV_LOG_DUMP_TYPE_MAX][DEVDRV_PF_DEV_MAX_NUM] = {{NULL}};
 STATIC int module_init_finish = 0;
-static u32 g_device_process_status[ASCEND_DEV_MAX_NUM] = {0};
 
 STATIC void devdrv_set_devdrv_info_array(u32 dev_id, struct devdrv_info *dev_info);
-STATIC void devdrv_manager_set_no_trans_chan(u32 dev_id, void *no_trans_chan);
-#ifndef CFG_FEATURE_REFACTOR
-STATIC int devdrv_manager_ipc_notify_ioctl(struct file *filep, unsigned int cmd, unsigned long arg);
-#endif
 STATIC void devdrv_manager_uninit_one_device_info(unsigned int dev_id);
 
 static KA_TASK_DEFINE_SPINLOCK(devdrv_spinlock);
-static KA_TASK_DEFINE_SPINLOCK(g_device_process_status_spinlock);
 
 #define U32_MAX_BIT_NUM 32
 #define U64_MAX_BIT_NUM 64
@@ -163,11 +139,11 @@ u32 devdrv_manager_get_ts_num(struct devdrv_info *dev_info);
 
 static u32 sysfs_devid = 0;
 
-#define DEVDRV_ATTR_RO(_name) static struct kobj_attribute _name##_attr = __ATTR_RO(_name)
+#define DEVDRV_ATTR_RO(_name) static ka_base_kobj_attribute_t _name##_attr = __KA_FS_ATTR_RO(_name)
 
-#define DEVDRV_ATTR(_name) static struct kobj_attribute _name##_attr = __ATTR(_name, 0600, _name##_show, _name##_store)
+#define DEVDRV_ATTR(_name) static ka_base_kobj_attribute_t _name##_attr = __KA_FS_ATTR(_name, 0600, _name##_show, _name##_store)
 
-STATIC ssize_t devdrv_resources_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+STATIC ssize_t devdrv_resources_store(ka_kobject_t *kobj, ka_base_kobj_attribute_t *attr, const char *buf, size_t count)
 {
     u32 result;
     int ret;
@@ -195,31 +171,23 @@ STATIC ssize_t devdrv_resources_store(struct kobject *kobj, struct kobj_attribut
     return count;
 }
 
-STATIC ssize_t devdrv_resources_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+STATIC ssize_t devdrv_resources_show(ka_kobject_t *kobj, ka_base_kobj_attribute_t *attr, char *buf)
 {
     return 0;
 }
 DEVDRV_ATTR(devdrv_resources);
 
-static struct attribute *devdrv_manager_attrs[] = {
-    &devdrv_resources_attr.attr,
+static ka_attribute_t *devdrv_manager_attrs[] = {
+    ka_fs_get_dev_attr(devdrv_resources_attr)
     NULL,
 };
 
-static struct attribute_group devdrv_manager_attr_group = {
-    .attrs = devdrv_manager_attrs,
-    .name = "devdrv_manager",
+static ka_attribute_group_t devdrv_manager_attr_group = {
+    ka_fs_init_ag_attrs(devdrv_manager_attrs)
+    ka_fs_init_ag_name("devdrv_manager")
 };
 
 #endif /* CONFIG_SYSFS */
-
-STATIC int align_to_4k(u32 size_in, u64 *aligned_size)
-{
-    u64 temp = (u64)size_in + KA_MM_PAGE_SIZE - 1;
-
-    *aligned_size = (temp / KA_MM_PAGE_SIZE) * KA_MM_PAGE_SIZE;
-    return 0;
-}
 
 int copy_from_user_safe(void *to, const void __ka_user *from, unsigned long n)
 {
@@ -250,36 +218,6 @@ int copy_to_user_safe(void __ka_user *to, const void *from, unsigned long n)
     return 0;
 }
 KA_EXPORT_SYMBOL(copy_to_user_safe);
-
-STATIC int devdrv_manager_trans_and_check_id(u32 logical_dev_id, u32 *physical_dev_id, u32 *vfid)
-{
-    int ret;
-
-    if (logical_dev_id >= ASCEND_DEV_MAX_NUM) {
-        devdrv_drv_err("Wrong device id. (dev_id=%u)\n", logical_dev_id);
-        return -EINVAL;
-    }
-
-    ret = devdrv_manager_container_logical_id_to_physical_id(logical_dev_id, physical_dev_id, vfid);
-    if (ret != 0) {
-        devdrv_drv_err("Can not transfer device id. (logical_dev_id=%u; ret = %d)\n", logical_dev_id, ret);
-        return ret;
-    }
-    if (*physical_dev_id >= ASCEND_DEV_MAX_NUM) {
-        devdrv_drv_err("Wrong device id. (physical_dev_id = %u\n", *physical_dev_id);
-        return -EINVAL;
-    }
-    if ((dev_manager_info == NULL) || devdrv_info_array[*physical_dev_id] == NULL) {
-        devdrv_drv_err("Device manager is not initialized. (dev_id=%u; device_manager_info=%d)\n",
-            *physical_dev_id, (dev_manager_info == NULL));
-        return -EINVAL;
-    }
-    if (devdrv_info_array[*physical_dev_id]->status == 1) {
-        devdrv_drv_warn("The device status is 1. (dev_id=%u)\n", *physical_dev_id);
-        return -EBUSY;
-    }
-    return 0;
-}
 
 STATIC void devdrv_set_devdrv_info_array(u32 dev_id, struct devdrv_info *dev_info)
 {
@@ -563,158 +501,13 @@ KA_EXPORT_SYMBOL_GPL(devdrv_get_devinfo);
 
 int devdrv_manager_devid_to_nid(u32 devid, u32 mem_type)
 {
-    return NUMA_NO_NODE;
+    return KA_NUMA_NO_NODE;
 }
 KA_EXPORT_SYMBOL(devdrv_manager_devid_to_nid);
-
-#ifdef CFG_FEATURE_INUSE_NUM_DYNAMIC
-int devdrv_get_core_inuse(u32 devid, u32 vfid, struct devdrv_hardware_inuse *inuse)
-{
-    struct devdrv_info *dev_info = NULL;
-    u32 vf_aicore_num_inused = 0;
-    u32 vf_aicpu_num_inused = 0;
-    u32 aicpu_bitmap = 0;
-
-    if (devid >= ASCEND_DEV_MAX_NUM || vfid > VDAVINCI_MAX_VFID_NUM) {
-        devdrv_drv_err("Invalid para,(devid=%u,vfid=%u).\n", devid, vfid);
-        return -EINVAL;
-    }
-
-    if ((inuse == NULL) || (dev_manager_info == NULL) || (dev_manager_info->dev_info[devid] == NULL)) {
-        devdrv_drv_err("inuse(%pK) or dev_manager_info(%pK) or dev_manager_info->dev_info[devid(%u)] is NULL.\n", inuse,
-                       dev_manager_info, devid);
-        return -EINVAL;
-    }
-
-    dev_info = dev_manager_info->dev_info[devid];
-#ifndef DEVDRV_MANAGER_HOST_UT_TEST
-    if (dev_info == NULL) {
-        devdrv_drv_err("dev_info is NULL. (dev_id=%u).\n", devid);
-        return -EINVAL;
-    }
-#endif
-
-    if (tsdrv_is_ts_work(devid, 0) == false) {
-        devdrv_drv_err("device(%u) is not working.\n", devid);
-        return -ENXIO;
-    }
-
-    (void)hvdevmng_get_aicore_num(devid, vfid, &vf_aicore_num_inused);
-    (void)hvdevmng_get_aicpu_num(devid, vfid, &vf_aicpu_num_inused, &aicpu_bitmap);
-
-    inuse->ai_core_num = ((vfid == 0) ? (dev_info->inuse.ai_core_num) : (vf_aicore_num_inused));
-    inuse->ai_core_error_bitmap = ((vfid == 0) ? (dev_info->inuse.ai_core_error_bitmap) : (0x0));
-    inuse->ai_cpu_num = ((vfid == 0) ? (dev_info->inuse.ai_cpu_num) : (vf_aicpu_num_inused));
-    inuse->ai_cpu_error_bitmap = ((vfid == 0) ? (dev_info->inuse.ai_cpu_error_bitmap) : (0x0));
-
-    return 0;
-}
-#else
-int devdrv_get_core_inuse(u32 devid, u32 vfid, struct devdrv_hardware_inuse *inuse)
-{
-    struct devdrv_info *dev_info = NULL;
-    (void)vfid;
-
-    if ((inuse == NULL) || (devid >= ASCEND_DEV_MAX_NUM)) {
-        devdrv_drv_err("Invalid parameter, (inuse_is_null=%d, devid=%u)\n", (inuse == NULL), devid);
-        return -EINVAL;
-    }
-
-    dev_info = devdrv_manager_get_devdrv_info(devid);
-    if (dev_info == NULL) {
-        devdrv_drv_err("Device manager is not initialized. (devid=%u)\n", devid);
-        return -EINVAL;
-    }
-
-    inuse->ai_core_num = dev_info->ai_core_num;
-    inuse->ai_core_error_bitmap = 0;
-    inuse->ai_cpu_num = dev_info->ai_cpu_core_num;
-    inuse->ai_cpu_error_bitmap = 0;
-
-    return 0;
-}
-#endif
-KA_EXPORT_SYMBOL(devdrv_get_core_inuse);
-
-int devdrv_get_core_spec(u32 devid, u32 vfid, struct devdrv_hardware_spec *spec)
-{
-    struct devdrv_info *dev_info = NULL;
-    u32 aicpu_bitmap = 0;
-
-    if ((devid >= ASCEND_DEV_MAX_NUM) || (vfid > VDAVINCI_MAX_VFID_NUM)) {
-        devdrv_drv_err("invalid dev_id(%u) vfid(%u).\n", devid, vfid);
-        return -EINVAL;
-    }
-
-    if ((spec == NULL) || (dev_manager_info == NULL) || (dev_manager_info->dev_info[devid] == NULL)) {
-        devdrv_drv_err("spec(%pK) or dev_manager_info(%pK) or dev_manager_info->dev_info[devid(%u)] is NULL.\n", spec,
-                       dev_manager_info, devid);
-        return -EINVAL;
-    }
-
-    dev_info = dev_manager_info->dev_info[devid];
-#ifndef DEVDRV_MANAGER_HOST_UT_TEST
-    if (dev_info == NULL) {
-        devdrv_drv_err("dev_info is NULL. (dev_id=%u).\n", devid);
-        return -EINVAL;
-    }
-#endif
-
-    (void)hvdevmng_get_aicore_num(dev_info->dev_id, vfid, &spec->ai_core_num);
-    (void)hvdevmng_get_aicpu_num(dev_info->dev_id, vfid, &spec->ai_cpu_num, &aicpu_bitmap);
-    spec->first_ai_core_id = dev_info->ai_core_id;
-    spec->first_ai_cpu_id = dev_info->ai_cpu_core_id;
-#ifndef CFG_FEATURE_REFACTOR
-    spec->ai_core_num_level = dev_info->pdata->ai_core_num_level;
-    spec->ai_core_freq_level = dev_info->pdata->ai_core_freq_level;
-#else
-    spec->ai_core_num_level = 0;
-    spec->ai_core_freq_level = 0;
-#endif
-    return 0;
-}
-KA_EXPORT_SYMBOL(devdrv_get_core_spec);
 
 STATIC inline void *devdrv_manager_vzalloc(size_t alloc_size)
 {
     return dbl_vmalloc(alloc_size, KA_GFP_KERNEL | __KA_GFP_ZERO | __KA_GFP_ACCOUNT, KA_PAGE_KERNEL);
-}
-
-STATIC int devdrv_manager_ipc_notify_init(struct devdrv_manager_context *dev_manager_context)
-{
-    struct ipc_notify_info *ipc_notify_info = NULL;
-    size_t ipc_size = sizeof(struct ipc_notify_info);
-
-    ipc_notify_info = (struct ipc_notify_info *)dbl_kzalloc(ipc_size, KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
-    if (ipc_notify_info == NULL) {
-        devdrv_drv_err("vmalloc ipc_notify_info is NULL.\n");
-        return -ENOMEM;
-    }
-
-    ipc_notify_info->create_fd_num = 0;
-    ipc_notify_info->open_fd_num = 0;
-    KA_INIT_LIST_HEAD(&ipc_notify_info->create_list_head);
-    KA_INIT_LIST_HEAD(&ipc_notify_info->open_list_head);
-    ka_task_mutex_init(&ipc_notify_info->info_mutex);
-
-    dev_manager_context->ipc_notify_info = ipc_notify_info;
-
-    return 0;
-}
-
-STATIC void devdrv_manager_ipc_notify_uninit(struct devdrv_manager_context *dev_manager_context)
-{
-    struct ipc_notify_info *ipc_notify_info = NULL;
-
-    ipc_notify_info = dev_manager_context->ipc_notify_info;
-    if (ipc_notify_info == NULL) {
-        return;
-    }
-
-    ka_task_mutex_destroy(&ipc_notify_info->info_mutex);
-    dbl_kfree(ipc_notify_info);
-    ipc_notify_info = NULL;
-    dev_manager_context->ipc_notify_info = NULL;
 }
 
 STATIC struct devdrv_manager_context *devdrv_manager_context_init(void)
@@ -728,12 +521,12 @@ STATIC struct devdrv_manager_context *devdrv_manager_context_init(void)
         return NULL;
     }
 
-    dev_manager_context->pid = current->pid;
-    dev_manager_context->tgid = current->tgid;
+    dev_manager_context->pid = ka_task_get_current_pid();
+    dev_manager_context->tgid = ka_task_get_current_tgid();
     dev_manager_context->task = current;
-    dev_manager_context->start_time = current->start_time;
+    dev_manager_context->start_time = ka_task_get_current_starttime();
     dev_manager_context->real_start_time = get_start_time(current);
-    dev_manager_context->mnt_ns = current->nsproxy->mnt_ns;
+    dev_manager_context->mnt_ns = ka_task_get_current_mnt_ns();
     dev_manager_context->pid_ns = ka_task_get_current_pid_ns();
 
     if (devdrv_manager_ipc_notify_init(dev_manager_context)) {
@@ -746,7 +539,7 @@ STATIC struct devdrv_manager_context *devdrv_manager_context_init(void)
     return dev_manager_context;
 }
 
-STATIC void devdrv_manager_context_uninit(struct devdrv_manager_context *dev_manager_context)
+void devdrv_manager_context_uninit(struct devdrv_manager_context *dev_manager_context)
 {
     if (dev_manager_context == NULL) {
         return;
@@ -756,7 +549,7 @@ STATIC void devdrv_manager_context_uninit(struct devdrv_manager_context *dev_man
     dev_manager_context = NULL;
 }
 
-STATIC int devdrv_manager_open(struct inode *inode, struct file *filep)
+STATIC int devdrv_manager_open(ka_inode_t *inode, ka_file_t *filep)
 {
     struct devdrv_manager_context *dev_manager_context = NULL;
 
@@ -775,37 +568,7 @@ STATIC int devdrv_manager_open(struct inode *inode, struct file *filep)
     return 0;
 }
 
-STATIC void devdrv_manager_resource_recycle(struct devdrv_manager_context *dev_manager_context)
-{
-    struct ipc_notify_info *ipc_notify_info = NULL;
-    u32 ipc_notify_create_num = 0;
-    u32 ipc_notify_open_num = 0;
-
-    ipc_notify_info = dev_manager_context->ipc_notify_info;
-    if (ipc_notify_info != NULL) {
-        ipc_notify_open_num = ipc_notify_info->open_fd_num;
-        ipc_notify_create_num = ipc_notify_info->create_fd_num;
-    }
-
-    if ((ipc_notify_open_num > 0) || (ipc_notify_create_num > 0)) {
-        devdrv_drv_info("ipc resource leak, "
-                        "ipc_notify_create_num = %u, "
-                        "ipc_notify_open_num = %u\n",
-                        ipc_notify_create_num, ipc_notify_open_num);
-#ifndef CFG_FEATURE_REFACTOR
-        devdrv_manager_ops_sem_down_read();
-        if (devdrv_host_drv_ops.ipc_notify_release_recycle != NULL) {
-            devdrv_host_drv_ops.ipc_notify_release_recycle(dev_manager_context);
-        }
-        devdrv_manager_ops_sem_up_read();
-#endif
-    }
-
-    adap_flush_p2p(dev_manager_context->pid);
-    devdrv_manager_context_uninit(dev_manager_context);
-}
-
-STATIC int devdrv_manager_release(struct inode *inode, struct file *filep)
+STATIC int devdrv_manager_release(ka_inode_t *inode, ka_file_t *filep)
 {
     struct devdrv_manager_context *dev_manager_context = NULL;
 
@@ -831,793 +594,6 @@ struct devdrv_manager_info *devdrv_get_manager_info(void)
     return dev_manager_info;
 }
 KA_EXPORT_SYMBOL(devdrv_get_manager_info);
-
-STATIC int devdrv_manager_get_pci_info(struct file *filep, unsigned int cmd, unsigned long arg)
-{
-#ifndef CFG_FEATURE_REFACTOR
-    struct devdrv_platform_data *pdata = NULL;
-#endif
-    u32 dev_id = ASCEND_DEV_MAX_NUM + 1;
-    struct devdrv_info *dev_info = NULL;
-    struct devdrv_pci_info pci_info;
-    u32 virt_id;
-    u32 vfid = 0;
-    int ret;
-    unsigned long flags;
-
-    if (copy_from_user_safe(&pci_info, (void *)(uintptr_t)arg, sizeof(struct devdrv_pci_info))) {
-        return -EFAULT;
-    }
-    virt_id = pci_info.dev_id;
-    ret = devdrv_manager_trans_and_check_id(virt_id, &dev_id, &vfid);
-    if (ret != 0) {
-        devdrv_drv_err("can't transform virt id %u,ret=%d\n", virt_id, ret);
-        return ret;
-    }
-
-    if (dev_id >= ASCEND_DEV_MAX_NUM) {
-        devdrv_drv_err("invalid dev_id(%u)\n", dev_id);
-        return -ENODEV;
-    }
-
-    ka_task_spin_lock_irqsave(&dev_manager_info->spinlock, flags);
-    dev_info = dev_manager_info->dev_info[dev_id];
-    if (dev_info == NULL) {
-        ka_task_spin_unlock_irqrestore(&dev_manager_info->spinlock, flags);
-        devdrv_drv_err("dev_info[%u] is NULL\n", dev_id);
-        return -EFAULT;
-    }
-#ifdef CFG_FEATURE_REFACTOR
-    pci_info.bus_number = dev_info->pci_info.bus_number;
-    pci_info.dev_number = dev_info->pci_info.dev_number;
-    pci_info.function_number = dev_info->pci_info.function_number;
-#else
-    if (dev_info->pdata == NULL) {
-        ka_task_spin_unlock_irqrestore(&dev_manager_info->spinlock, flags);
-        devdrv_drv_err("dev_info[%u] pdata is NULL\n", dev_id);
-        return -EFAULT;
-    }
-    pdata = dev_info->pdata;
-    pci_info.bus_number = pdata->pci_info.bus_number;
-    pci_info.dev_number = pdata->pci_info.dev_number;
-    pci_info.function_number = pdata->pci_info.function_number;
-#endif
-    ka_task_spin_unlock_irqrestore(&dev_manager_info->spinlock, flags);
-
-    if (copy_to_user_safe((void *)(uintptr_t)arg, &pci_info, sizeof(struct devdrv_pci_info))) {
-        return -EFAULT;
-    }
-
-    return 0;
-}
-
-STATIC int devdrv_manager_get_device_status(struct file *filep, unsigned int cmd, unsigned long arg)
-{
-    enum devdrv_ts_status ts_status;
-    u32 loc_id;
-    u32 vfid = 0;
-    u32 status;
-    int ret;
-
-    u32 phys_id = ASCEND_DEV_MAX_NUM + 1;
-    ret = copy_from_user_safe(&loc_id, (void *)(uintptr_t)arg, sizeof(u32));
-    if (ret) {
-        devdrv_drv_err("copy from user failed, ret(%d).\n", ret);
-        return -EINVAL;
-    }
-    if (loc_id >= ASCEND_DEV_MAX_NUM) {
-        devdrv_drv_err("invalid dev_id(%u).\n", loc_id);
-        return -EINVAL;
-    }
-
-    if (devdrv_manager_container_logical_id_to_physical_id(loc_id, &phys_id, &vfid) != 0) {
-        devdrv_drv_err("can't transform virt id %u.\n", loc_id);
-        return -EFAULT;
-    }
-
-    ts_status = tsdrv_get_ts_status(phys_id, 0);
-
-    if ((dev_manager_info == NULL) || (dev_manager_info->dev_info[phys_id] == NULL)) {
-        status = DRV_STATUS_INITING;
-    } else if (dev_manager_info->device_status[phys_id] == DRV_STATUS_COMMUNICATION_LOST) {
-        status = DRV_STATUS_COMMUNICATION_LOST;
-    } else if (ts_status == TS_DOWN) {
-        status = DRV_STATUS_EXCEPTION;
-    } else if (ts_status == TS_WORK) {
-        status = DRV_STATUS_WORK;
-    } else {
-        status = DRV_STATUS_INITING;
-    }
-
-    ret = copy_to_user_safe((void *)(uintptr_t)arg, &status, sizeof(u32));
-    if (ret) {
-        devdrv_drv_err("copy to user failed, ret(%d). dev_id(%u)\n", ret, phys_id);
-        return -EINVAL;
-    }
-
-    return 0;
-}
-
-STATIC int devdrv_manager_get_core(struct file *filep, unsigned int cmd, unsigned long arg)
-{
-    struct devdrv_hardware_inuse inuse;
-    struct devdrv_hardware_spec spec;
-    u32 phys_id = ASCEND_DEV_MAX_NUM + 1;
-    u32 vfid = 0;
-    int ret;
-
-    switch (cmd) {
-        case DEVDRV_MANAGER_GET_CORE_SPEC:
-            ret = copy_from_user_safe(&spec, (void *)((uintptr_t)arg), sizeof(struct devdrv_hardware_spec));
-            if (ret) {
-                devdrv_drv_err("copy_from_user_safe failed, ret(%d).\n", ret);
-                return ret;
-            }
-            if (devdrv_manager_container_logical_id_to_physical_id(spec.devid, &phys_id, &vfid) != 0) {
-                devdrv_drv_err("can't transform virt id %u \n", spec.devid);
-                return -EFAULT;
-            }
-
-            ret = devdrv_get_core_spec(phys_id, vfid, &spec);
-            if (ret) {
-                devdrv_drv_err("devdrv_get_core_spec failed, ret(%d), dev_id(%u).\n", ret, phys_id);
-                return ret;
-            }
-            ret = copy_to_user_safe((void *)((uintptr_t)arg), &spec, sizeof(struct devdrv_hardware_spec));
-            if (ret) {
-                devdrv_drv_err("copy_to_user_safe failed, ret(%d). dev_id(%u)\n", ret, phys_id);
-                return ret;
-            }
-            break;
-        case DEVDRV_MANAGER_GET_CORE_INUSE:
-            ret = copy_from_user_safe(&inuse, (void *)((uintptr_t)arg), sizeof(struct devdrv_hardware_inuse));
-            if (ret) {
-                devdrv_drv_err("copy_from_user_safe failed, ret(%d).\n", ret);
-                return ret;
-            }
-
-            if (devdrv_manager_container_logical_id_to_physical_id(inuse.devid, &phys_id, &vfid) != 0) {
-                devdrv_drv_err("can't transform virt id %u \n", inuse.devid);
-                return -EFAULT;
-            }
-
-            ret = devdrv_get_core_inuse(phys_id, vfid, &inuse);
-            if (ret) {
-                devdrv_drv_err("devdrv_get_core_inuse failed, ret(%d), dev_id(%u).\n", ret, phys_id);
-                return ret;
-            }
-            ret = copy_to_user_safe((void *)(uintptr_t)arg, &inuse, sizeof(struct devdrv_hardware_inuse));
-            if (ret) {
-                devdrv_drv_err("copy_to_user_safe failed, ret(%d). dev_id(%u)\n", ret, phys_id);
-                return ret;
-            }
-            break;
-        default:
-            devdrv_drv_err("invalid cmd.\n");
-            return -EINVAL;
-    }
-    return 0;
-}
-
-STATIC int devdrv_manager_get_container_devids(unsigned long arg)
-{
-    struct devdrv_manager_devids *hccl_devinfo = NULL;
-    int ret;
-
-    if ((current->nsproxy == NULL) || (!devdrv_manager_container_is_host_system(current->nsproxy->mnt_ns))) {
-        devdrv_drv_err("Do not have permission in container or virtual machine.\n");
-        return -EPERM;
-    }
-
-    hccl_devinfo =
-        (struct devdrv_manager_devids *)dbl_kzalloc(sizeof(struct devdrv_manager_devids),
-            KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
-    if (hccl_devinfo == NULL) {
-        devdrv_drv_err("Alloc memory for hccl device info failed.\n");
-        return -ENOMEM;
-    }
-
-    ret = devdrv_get_devids(hccl_devinfo->devids, ASCEND_DEV_MAX_NUM);
-    if (ret) {
-        devdrv_drv_err("get container devlist failed, ret(%d)\n", ret);
-        dbl_kfree(hccl_devinfo);
-        hccl_devinfo = NULL;
-        return -ENODEV;
-    }
-
-    if (copy_to_user_safe((void *)(uintptr_t)arg, hccl_devinfo, sizeof(struct devdrv_manager_devids))) {
-        devdrv_drv_err("copy from user failed, ret(%d).\n", ret);
-        dbl_kfree(hccl_devinfo);
-        hccl_devinfo = NULL;
-        return -EINVAL;
-    }
-
-    dbl_kfree(hccl_devinfo);
-    hccl_devinfo = NULL;
-    return 0;
-}
-
-STATIC int devdrv_manager_get_devinfo(unsigned long arg)
-{
-    struct devdrv_manager_hccl_devinfo *hccl_devinfo = NULL;
-#ifndef CFG_FEATURE_REFACTOR
-    struct devdrv_platform_data *pdata = NULL;
-#endif
-    struct devdrv_info *dev_info = NULL;
-    u32 phys_id = ASCEND_DEV_MAX_NUM + 1;
-    u32 aicpu_occupy_bitmap = 0;
-    u32 vfid = 0;
-    u32 dev_id;
-    int ret, connect_type;
-
-    hccl_devinfo = (struct devdrv_manager_hccl_devinfo *)dbl_kzalloc(sizeof(struct devdrv_manager_hccl_devinfo),
-        KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
-    if (hccl_devinfo == NULL) {
-        devdrv_drv_err("Alloc memory for hccl device info failed.\n");
-        return -ENOMEM;
-    }
-
-    if (copy_from_user_safe(hccl_devinfo, (void *)(uintptr_t)arg, sizeof(struct devdrv_manager_hccl_devinfo))) {
-        devdrv_drv_err("Copy from user failed.\n");
-        ret = -EINVAL;
-        goto FREE_DEV_INFO_EXIT;
-    }
-
-    dev_id = hccl_devinfo->dev_id;
-    if (dev_id >= ASCEND_DEV_MAX_NUM) {
-        devdrv_drv_err("invalid dev_id(%u)\n", hccl_devinfo->dev_id);
-        ret = -ENODEV;
-        goto FREE_DEV_INFO_EXIT;
-    }
-    ret = devdrv_manager_trans_and_check_id(dev_id, &phys_id, &vfid);
-    if (ret != 0) {
-        devdrv_drv_err_extend(ret, -EBUSY, "Can not convert device id. (devid=%u; ret=%d)\n", dev_id, ret);
-        goto FREE_DEV_INFO_EXIT;
-    }
-
-    if ((phys_id >= ASCEND_DEV_MAX_NUM) || (vfid > VDAVINCI_MAX_VFID_NUM)) {
-        devdrv_drv_err("get invalid output phys_id(%u) vfid(%u)\n", phys_id, vfid);
-        ret = -EINVAL;
-        goto FREE_DEV_INFO_EXIT;
-    }
-
-    dev_info = devdrv_manager_get_devdrv_info(phys_id);
-    if (dev_info == NULL) {
-        devdrv_drv_err("device(%u) is not initialized\n", phys_id);
-        ret = -ENODEV;
-        goto FREE_DEV_INFO_EXIT;
-    }
-
-    ret = dms_hotreset_task_cnt_increase(phys_id);
-    if (ret != 0) {
-        devdrv_drv_err("Hotreset task cnt increase failed. (dev_id=%u; ret=%d)\n", phys_id, ret);
-        goto FREE_DEV_INFO_EXIT;
-    }
-
-    ka_base_atomic_inc(&dev_info->occupy_ref);
-    if (dev_info->status == DEVINFO_STATUS_REMOVED) {
-        devdrv_drv_warn("dev %d has been reset\n", dev_info->dev_id);
-        ret = -EINVAL;
-        goto HOT_RESET_CNT_EXIT;
-    }
-
-    (void)hvdevmng_get_aicore_num(dev_info->dev_id, vfid, &hccl_devinfo->ai_core_num);
-    (void)hvdevmng_get_aicpu_num(dev_info->dev_id, vfid, &hccl_devinfo->ai_cpu_core_num, &aicpu_occupy_bitmap);
-
-    hccl_devinfo->aicore_freq = dev_info->aicore_freq;
-    hccl_devinfo->ctrl_cpu_core_num = dev_info->ctrl_cpu_core_num;
-    hccl_devinfo->ctrl_cpu_occupy_bitmap = dev_info->ctrl_cpu_occupy_bitmap;
-    hccl_devinfo->ctrl_cpu_id = dev_info->ctrl_cpu_id;
-    hccl_devinfo->ctrl_cpu_ip = dev_info->ctrl_cpu_ip;
-
-    /* 1:little endian 0:big endian */
-    hccl_devinfo->ctrl_cpu_endian_little = dev_info->ctrl_cpu_endian_little;
-    hccl_devinfo->env_type = dev_info->env_type;
-    hccl_devinfo->ai_core_id = dev_info->ai_core_id;
-    hccl_devinfo->ai_cpu_core_id = dev_info->ai_cpu_core_id;
-    hccl_devinfo->ai_cpu_bitmap = (vfid == 0) ? dev_info->aicpu_occupy_bitmap : aicpu_occupy_bitmap;
-    hccl_devinfo->aicore_bitmap[0] = dev_info->aicore_bitmap;
-    hccl_devinfo->hardware_version = dev_info->hardware_version;
-#ifndef CFG_FEATURE_REFACTOR
-    pdata = dev_info->pdata;
-    hccl_devinfo->ts_cpu_core_num = pdata->ts_pdata[0].ts_cpu_core_num;
-    hccl_devinfo->ts_num = devdrv_manager_get_ts_num(dev_info);
-#else
-    hccl_devinfo->ts_num = dev_info->ts_num;
-#endif
-    hccl_devinfo->ffts_type = dev_info->ffts_type;
-    hccl_devinfo->chip_id = dev_info->chip_id;
-    hccl_devinfo->die_id = dev_info->die_id;
-#ifdef CFG_SOC_PLATFORM_MINIV2
-    hccl_devinfo->vector_core_num = (vfid == 0) ? dev_info->vector_core_num : hccl_devinfo->ai_cpu_core_num;
-#else
-    hccl_devinfo->vector_core_num = dev_info->vector_core_num;
-#endif
-    hccl_devinfo->vector_core_freq = dev_info->vector_core_freq;
-    devdrv_drv_debug("ctrl_cpu_ip(0x%x), ts_cpu_core_num(%d), dev_id(%u)\n", dev_info->ctrl_cpu_ip,
-                     hccl_devinfo->ts_cpu_core_num, phys_id);
-    hccl_devinfo->addr_mode = dev_info->addr_mode;
-    hccl_devinfo->mainboard_id = dev_info->mainboard_id;
-    hccl_devinfo->product_type = dev_info->product_type;
-#if ((defined CFG_FEATURE_PCIE_HOST_DEVICE_COMM) || (defined CFG_FEATURE_UB_HOST_DEVICE_COMM))
-    connect_type = devdrv_get_connect_protocol(phys_id);
-    if (connect_type < 0) {
-        devdrv_drv_err("Get host device connect type failed. (dev_id=%u; type=%d)\n",
-            phys_id, connect_type);
-        ret = -EINVAL;
-        goto HOT_RESET_CNT_EXIT;
-    }
-#else
-    connect_type = CONNECT_PROTOCOL_UNKNOWN;
-#endif
-    hccl_devinfo->host_device_connect_type = connect_type;
-#ifdef CFG_FEATURE_PG
-#ifndef CFG_FEATURE_REFACTOR
-    ret = strncpy_s(hccl_devinfo->soc_version, SOC_VERSION_LENGTH,
-                    dev_info->pg_info.spePgInfo.socVersion, SOC_VERSION_LEN - 1);
-#else
-    ret = strncpy_s(hccl_devinfo->soc_version, SOC_VERSION_LENGTH,
-                    dev_info->soc_version, SOC_VERSION_LEN - 1);
-#endif
-    if (ret != 0) {
-        devdrv_drv_err("Strncpy_s soc_version failed. (ret=%d)\n", ret);
-        ret = -EINVAL;
-        goto HOT_RESET_CNT_EXIT;
-    }
-#endif
-
-    if (copy_to_user_safe((void *)(uintptr_t)arg, hccl_devinfo, sizeof(struct devdrv_manager_hccl_devinfo))) {
-        devdrv_drv_err("copy to user failed. dev_id(%u)\n", phys_id);
-        ret = -EFAULT;
-    }
-
-HOT_RESET_CNT_EXIT:
-    ka_base_atomic_dec(&dev_info->occupy_ref);
-    dms_hotreset_task_cnt_decrease(phys_id);
-FREE_DEV_INFO_EXIT:
-    dbl_kfree(hccl_devinfo);
-    hccl_devinfo = NULL;
-    return ret;
-}
-
-#ifdef CFG_FEATURE_DEVMNG_IOCTL
-STATIC void devdrv_manager_set_computing_value(struct devdrv_manager_hccl_devinfo *hccl_devinfo,
-    struct devdrv_info *dev_info, bool valid)
-{
-    int i;
-
-    if (valid) {
-        for (i = 0; i < DEVDRV_MAX_COMPUTING_POWER_TYPE; i++) {
-            hccl_devinfo->computing_power[i] = dev_info->computing_power[i];
-        }
-    } else {
-        for (i = 0; i < DEVDRV_MAX_COMPUTING_POWER_TYPE; i++) {
-            hccl_devinfo->computing_power[i] = DEVDRV_COMPUTING_VALUE_ERROR;
-        }
-    }
-}
-
-STATIC int devdrv_manager_get_h2d_devinfo(unsigned long arg)
-{
-    struct devdrv_manager_hccl_devinfo *hccl_devinfo = NULL;
-    struct devdrv_platform_data *pdata = NULL;
-    struct devdrv_info *dev_info = NULL;
-    u32 phys_id = ASCEND_DEV_MAX_NUM + 1;
-    u32 vfid = 0;
-    u32 dev_id;
-    int ret;
-
-    hccl_devinfo = (struct devdrv_manager_hccl_devinfo *)dbl_kzalloc(sizeof(struct devdrv_manager_hccl_devinfo),
-        KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
-    if (hccl_devinfo == NULL) {
-        devdrv_drv_err("Alloc memory for hccl device info failed.\n");
-        return -ENOMEM;
-    }
-
-    if (copy_from_user_safe(hccl_devinfo, (void *)(uintptr_t)arg, sizeof(struct devdrv_manager_hccl_devinfo))) {
-        devdrv_drv_err("copy from user failed.\n");
-        ret = -EINVAL;
-        goto FREE_DEV_INFO_EXIT;
-    }
-
-    dev_id = hccl_devinfo->dev_id;
-    if (dev_id >= ASCEND_DEV_MAX_NUM) {
-        devdrv_drv_err("invalid dev_id(%u)\n", hccl_devinfo->dev_id);
-        ret = -ENODEV;
-        goto FREE_DEV_INFO_EXIT;
-    }
-    if (devdrv_manager_container_logical_id_to_physical_id(dev_id, &phys_id, &vfid) != 0) {
-        devdrv_drv_err("can't transform virt id %u \n", dev_id);
-        ret = -EFAULT;
-        goto FREE_DEV_INFO_EXIT;
-    }
-
-    dev_info = devdrv_manager_get_devdrv_info(phys_id);
-    if (dev_info == NULL) {
-        devdrv_drv_err("device(%u) is not initialized\n", phys_id);
-        ret = -ENODEV;
-        goto FREE_DEV_INFO_EXIT;
-    }
-
-    ret = dms_hotreset_task_cnt_increase(phys_id);
-    if (ret != 0) {
-        devdrv_drv_err("Hotreset task cnt increase failed. (dev_id=%u; ret=%d)\n", phys_id, ret);
-        goto FREE_DEV_INFO_EXIT;
-    }
-
-    ka_base_atomic_inc(&dev_info->occupy_ref);
-    if (dev_info->status == DEVINFO_STATUS_REMOVED) {
-        ka_base_atomic_dec(&dev_info->occupy_ref);
-        devdrv_drv_warn("dev %d has been reset\n", dev_info->dev_id);
-        dms_hotreset_task_cnt_decrease(phys_id);
-        ret = -EINVAL;
-        goto FREE_DEV_INFO_EXIT;
-    }
-
-    pdata = dev_info->pdata;
-    hccl_devinfo->ai_core_num = dev_info->ai_core_num;
-    hccl_devinfo->aicore_freq = dev_info->aicore_freq;
-    hccl_devinfo->ai_cpu_core_num = dev_info->ai_cpu_core_num;
-    hccl_devinfo->ctrl_cpu_core_num = dev_info->ctrl_cpu_core_num;
-    hccl_devinfo->ctrl_cpu_occupy_bitmap = dev_info->ctrl_cpu_occupy_bitmap;
-
-    /* 1:little endian 0:big endian */
-    hccl_devinfo->ctrl_cpu_endian_little = dev_info->ctrl_cpu_endian_little;
-    hccl_devinfo->ctrl_cpu_id = dev_info->ctrl_cpu_id;
-    hccl_devinfo->ctrl_cpu_ip = dev_info->ctrl_cpu_ip;
-    hccl_devinfo->ts_cpu_core_num = pdata->ts_pdata[0].ts_cpu_core_num;
-    hccl_devinfo->env_type = dev_info->env_type;
-    hccl_devinfo->ai_core_id = dev_info->ai_core_id;
-    hccl_devinfo->ai_cpu_core_id = dev_info->ai_cpu_core_id;
-    hccl_devinfo->ai_cpu_bitmap = dev_info->aicpu_occupy_bitmap;
-    hccl_devinfo->hardware_version = dev_info->hardware_version;
-    hccl_devinfo->ts_num = devdrv_manager_get_ts_num(dev_info);
-
-    if (devdrv_manager_h2d_sync_get_devinfo(dev_info)) {
-        devdrv_drv_err("device info get failed. dev_id(%u)\n", phys_id);
-        devdrv_manager_set_computing_value(hccl_devinfo, dev_info, false);
-    } else {
-        devdrv_manager_set_computing_value(hccl_devinfo, dev_info, true);
-    }
-    hccl_devinfo->cpu_system_count = dev_info->cpu_system_count;
-    hccl_devinfo->monotonic_raw_time_ns = dev_info->monotonic_raw_time_ns;
-    hccl_devinfo->ffts_type = dev_info->ffts_type;
-    hccl_devinfo->vector_core_num = dev_info->vector_core_num;
-    hccl_devinfo->vector_core_freq = dev_info->vector_core_freq;
-    devdrv_drv_debug("ctrl_cpu_ip(0x%x), ts_cpu_core_num(%d), dev_id(%u)\n", dev_info->ctrl_cpu_ip,
-                     hccl_devinfo->ts_cpu_core_num, phys_id);
-
-    ka_base_atomic_dec(&dev_info->occupy_ref);
-
-    if (copy_to_user_safe((void *)(uintptr_t)arg, hccl_devinfo, sizeof(struct devdrv_manager_hccl_devinfo))) {
-        devdrv_drv_err("copy to user failed. dev_id(%u)\n", phys_id);
-        dms_hotreset_task_cnt_decrease(phys_id);
-        ret = -EFAULT;
-        goto FREE_DEV_INFO_EXIT;
-    }
-
-    dms_hotreset_task_cnt_decrease(phys_id);
-
-FREE_DEV_INFO_EXIT:
-    dbl_kfree(hccl_devinfo);
-    hccl_devinfo = NULL;
-    return ret;
-}
-#endif
-
-STATIC int devdrv_get_pcie_id(unsigned long arg)
-{
-    struct dmanage_pcie_id_info pcie_id_info = {0};
-    struct devdrv_pcie_id_info id_info = {0};
-    unsigned int dev_id, virt_id, vfid;
-    int ret;
-
-    ret = copy_from_user_safe(&pcie_id_info, (void *)((uintptr_t)arg), sizeof(struct dmanage_pcie_id_info));
-    if (ret) {
-        devdrv_drv_err("copy_from_user_safe failed.\n");
-        return ret;
-    }
-
-    virt_id = pcie_id_info.davinci_id;
-    ret = devdrv_manager_trans_and_check_id(virt_id, &dev_id, &vfid);
-    if (ret != 0) {
-        devdrv_drv_err("can't transform virt id %u, ret=%d\n", virt_id, ret);
-        return ret;
-    }
-
-    ret = dms_hotreset_task_cnt_increase(dev_id);
-    if (ret != 0) {
-        devdrv_drv_err("Hotreset task cnt increase failed. (dev_id=%u; ret=%d)\n", dev_id, ret);
-        return ret;
-    }
-
-    ret = adap_get_pcie_id_info(dev_id, &id_info);
-    if (ret) {
-        devdrv_drv_err("devdrv_get_pcie_id failed.\n");
-        dms_hotreset_task_cnt_decrease(dev_id);
-        return ret;
-    }
-
-    pcie_id_info.venderid = id_info.venderid;
-    pcie_id_info.subvenderid = id_info.subvenderid;
-    pcie_id_info.deviceid = id_info.deviceid;
-    pcie_id_info.subdeviceid = id_info.subdeviceid;
-    pcie_id_info.bus = id_info.bus;
-    pcie_id_info.device = id_info.device;
-    pcie_id_info.fn = id_info.fn;
-
-    ret = copy_to_user_safe((void *)(uintptr_t)arg, &pcie_id_info, sizeof(struct dmanage_pcie_id_info));
-    if (ret) {
-        devdrv_drv_err("copy_to_user_safe failed.\n");
-        dms_hotreset_task_cnt_decrease(dev_id);
-        return ret;
-    }
-    dms_hotreset_task_cnt_decrease(dev_id);
-    return 0;
-}
-
-STATIC int devdrv_manager_get_core_utilization(unsigned long arg)
-{
-    u32 phys_id = ASCEND_DEV_MAX_NUM + 1;
-    u32 vfid = 0;
-    u32 dev_id;
-    int ret;
-    struct devdrv_core_utilization util_info = {0};
-    struct devdrv_info *dev_info = NULL;
-
-    ret = copy_from_user_safe(&util_info, (void*)(uintptr_t)arg, sizeof(struct devdrv_core_utilization));
-    if (ret != 0) {
-        devdrv_drv_err("Copy from user failed. (ret=%d)\n", ret);
-        return ret;
-    }
-
-    dev_id = util_info.dev_id;
-    if (dev_id >= ASCEND_DEV_MAX_NUM) {
-        devdrv_drv_err("Invalid device id. (dev_id=%u)\n", util_info.dev_id);
-        return -ENODEV;
-    }
-
-    if (util_info.core_type >= DEV_DRV_TYPE_MAX) {
-        devdrv_drv_err("Core_type is wrong. (dev_id=%u)\n", dev_id);
-        return -EINVAL;
-    }
-
-    ret = devdrv_manager_container_logical_id_to_physical_id(dev_id, &phys_id, &vfid);
-    if (ret != 0) {
-        devdrv_drv_err("Transform virtual id failed. (dev_id=%u; ret=%d)\n", dev_id, ret);
-        return -EFAULT;
-    }
-    if (!devdrv_manager_is_pf_device(phys_id) || (vfid > 0)) {
-        return -EOPNOTSUPP;
-    }
-
-    dev_info = devdrv_manager_get_devdrv_info(phys_id);
-    if (dev_info == NULL) {
-        devdrv_drv_err("The device is not initialized. (phys_id=%u)\n", phys_id);
-        return -ENODEV;
-    }
-
-    ret = dms_hotreset_task_cnt_increase(phys_id);
-    if (ret != 0) {
-        devdrv_drv_err("Hotreset task count increase failed. (phys_id=%u; ret=%d)\n", phys_id, ret);
-        return ret;
-    }
-
-    ka_base_atomic_inc(&dev_info->occupy_ref);
-    if (dev_info->status == DEVINFO_STATUS_REMOVED) {
-        ka_base_atomic_dec(&dev_info->occupy_ref);
-        devdrv_drv_warn("The device has been reset. (dev_id=%u)\n", dev_info->dev_id);
-        dms_hotreset_task_cnt_decrease(phys_id);
-        return -EINVAL;
-    }
-
-    util_info.dev_id = phys_id;
-    ret = devdrv_manager_h2d_sync_get_core_utilization(&util_info);
-    if (ret != 0) {
-        ka_base_atomic_dec(&dev_info->occupy_ref);
-        devdrv_drv_err("The core utilization get failed. (dev_id=%u; ret=%d)\n", dev_id, ret);
-        dms_hotreset_task_cnt_decrease(phys_id);
-        return ret;
-    }
-
-    ka_base_atomic_dec(&dev_info->occupy_ref);
-
-    ret = copy_to_user_safe((void *)(uintptr_t)arg, &util_info, sizeof(struct devdrv_core_utilization));
-    if (ret != 0) {
-        devdrv_drv_err("Copy to user failed. (phys_id=%u; ret=%d)\n", phys_id, ret);
-        dms_hotreset_task_cnt_decrease(phys_id);
-        return -EFAULT;
-    }
-
-    dms_hotreset_task_cnt_decrease(phys_id);
-
-    return ret;
-}
-
-STATIC int devdrv_manager_devinfo_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
-{
-    int ret;
-
-    switch (cmd) {
-        case DEVDRV_MANAGER_GET_CORE_UTILIZATION:
-            ret = devdrv_manager_get_core_utilization(arg);
-            break;
-        case DEVDRV_MANAGER_GET_CONTAINER_DEVIDS:
-            ret = devdrv_manager_get_container_devids(arg);
-            break;
-        case DEVDRV_MANAGER_GET_DEVINFO:
-            ret = devdrv_manager_get_devinfo(arg);
-            break;
-#ifdef CFG_FEATURE_DEVMNG_IOCTL
-        case DEVDRV_MANAGER_GET_H2D_DEVINFO:
-            ret = devdrv_manager_get_h2d_devinfo(arg);
-            break;
-#endif
-        case DEVDRV_MANAGER_GET_PCIE_ID_INFO:
-            ret = devdrv_get_pcie_id(arg);
-            break;
-        default:
-            ret = -EINVAL;
-            break;
-    }
-
-    return ret;
-}
-
-STATIC int devdrv_manager_get_tsdrv_dev_com_info(struct file *filep,
-    unsigned int cmd, unsigned long arg)
-{
-    struct tsdrv_dev_com_info dev_com_info;
-
-    dev_com_info.mach_type = PHY_MACHINE_TYPE;
-    dev_com_info.ts_num = 1;
-
-    if (copy_to_user_safe((void *)(uintptr_t)arg, &dev_com_info, sizeof(struct tsdrv_dev_com_info))) {
-        devdrv_drv_err("copy to user failed.\n");
-        return -EFAULT;
-    }
-
-    return 0;
-}
-
-int devdrv_manager_shm_info_check(struct devdrv_info *dev_info)
-{
-    if ((dev_info == NULL) || (dev_info->shm_status == NULL) ||
-        (dev_info->shm_head == NULL)) {
-        devdrv_drv_err("dev_info is NULL or dev_info->shm_status/shm_head is NULL.\n");
-        return -EFAULT;
-    }
-
-    if ((dev_info->shm_head->head_info.version != DEVMNG_SHM_INFO_HEAD_VERSION) ||
-        (dev_info->shm_head->head_info.magic != DEVMNG_SHM_INFO_HEAD_MAGIC)) {
-        devdrv_drv_warn("dev(%u) version of share memory in host is 0x%llx, "
-                        "the version in device is 0x%llx, magic is 0x%x.\n",
-                        dev_info->dev_id, DEVMNG_SHM_INFO_HEAD_VERSION,
-                        dev_info->shm_head->head_info.version,
-                        dev_info->shm_head->head_info.magic);
-        return -EFAULT;
-    }
-
-    return 0;
-}
-
-STATIC int dms_get_device_startup_status_form_bar(struct devdrv_info *dev_info,
-    unsigned int *dmp_started, unsigned int *device_process_status)
-{
-    if ((dev_info->shm_head == NULL) || (dev_info->shm_status == NULL) ||
-        (dev_info->shm_head->head_info.magic != DEVMNG_SHM_INFO_HEAD_MAGIC)) {
-        *dmp_started = false;
-        *device_process_status = DSMI_BOOT_STATUS_UNINIT;
-    } else if (dev_info->shm_head->head_info.version != DEVMNG_SHM_INFO_HEAD_VERSION) {
-        devdrv_drv_err("dev(%u) version of share memory in host is 0x%llx, "
-                       "the version in device is 0x%llx, magic is 0x%x.\n",
-                       dev_info->dev_id, DEVMNG_SHM_INFO_HEAD_VERSION,
-                       dev_info->shm_head->head_info.version,
-                       dev_info->shm_head->head_info.magic);
-        return -EINVAL;
-    } else {
-        if (dev_info->dmp_started == false) {
-            dev_info->dmp_started = devdrv_manager_h2d_query_dmp_started(dev_info->dev_id);
-        }
-
-        *dmp_started = dev_info->dmp_started;
-        *device_process_status = (unsigned int)dev_info->shm_status->os_status;
-    }
-
-    return 0;
-}
-
-#define DEVDRV_SYSTEM_START_FINISH 16
-STATIC int dms_get_device_startup_status_form_device(struct devdrv_info *dev_info,
-    unsigned int *dmp_started, unsigned int *device_process_status)
-{
-    int ret = 0;
-
-    if (dev_info->dmp_started == false) {
-        dev_info->dmp_started = devdrv_manager_h2d_query_dmp_started(dev_info->dev_id);
-    }
-    *dmp_started = dev_info->dmp_started;
-
-    ka_task_spin_lock(&g_device_process_status_spinlock);
-    if (g_device_process_status[dev_info->dev_id] == DEVDRV_SYSTEM_START_FINISH) {
-        *device_process_status = DEVDRV_SYSTEM_START_FINISH;
-        ka_task_spin_unlock(&g_device_process_status_spinlock);
-        return 0;
-    }
-    ret = devdrv_manager_h2d_get_device_process_status(dev_info->dev_id, &g_device_process_status[dev_info->dev_id]);
-    if (ret != 0) {
-        devdrv_drv_err("Failed to obtain the device process status through H2D. (dev_id=%u; ret=%d)",
-            dev_info->dev_id, ret);
-        ka_task_spin_unlock(&g_device_process_status_spinlock);
-        return ret;
-    }
-    *device_process_status = g_device_process_status[dev_info->dev_id];
-    ka_task_spin_unlock(&g_device_process_status_spinlock);
-    return 0;
-}
-
-STATIC int devdrv_manager_get_device_startup_status(struct file *filep, unsigned int cmd, unsigned long arg)
-{
-    int ret;
-    unsigned int phys_id;
-    unsigned int vfid = 0;
-    struct devdrv_info *dev_info = NULL;
-    struct devdrv_device_work_status para = {0};
-    int connect_type = CONNECT_PROTOCOL_UNKNOWN;
-
-    ret = copy_from_user_safe(&para, (void *)(uintptr_t)arg, sizeof(struct devdrv_device_work_status));
-    if (ret != 0) {
-        devdrv_drv_err("copy from user failed, ret(%d).\n", ret);
-        return -EINVAL;
-    }
-
-    ret = devdrv_manager_container_logical_id_to_physical_id(para.device_id, &phys_id, &vfid);
-    if (ret != 0) {
-        devdrv_drv_err("can't transform virt id %u \n", para.device_id);
-        return -EFAULT;
-    }
-
-    dev_info = devdrv_manager_get_devdrv_info(phys_id);
-    if (dev_info == NULL) {
-        para.dmp_started = false;
-        para.device_process_status = DSMI_BOOT_STATUS_UNINIT;
-        goto startup_status_out;
-    }
-
-    ka_base_atomic_inc(&dev_info->occupy_ref);
-    if (dev_info->status == DEVINFO_STATUS_REMOVED) {
-        ka_base_atomic_dec(&dev_info->occupy_ref);
-        para.dmp_started = false;
-        para.device_process_status = DSMI_BOOT_STATUS_UNINIT;
-        goto startup_status_out;
-    }
-
-    connect_type = devdrv_get_connect_protocol(phys_id);
-    if (connect_type < 0) {
-        devdrv_drv_err("Get host device connect type failed. (dev_id=%u; ret=%d)\n", phys_id, connect_type);
-        ka_base_atomic_dec(&dev_info->occupy_ref);
-        return -EINVAL;
-    } else if (connect_type == CONNECT_PROTOCOL_UB) {
-        ret = dms_get_device_startup_status_form_device(dev_info, &para.dmp_started, &para.device_process_status);
-    } else {
-        ret = dms_get_device_startup_status_form_bar(dev_info, &para.dmp_started, &para.device_process_status);
-    }
-    if (ret != 0) {
-        devdrv_drv_err("Failed to obtain the device process status. (dev_id=%u; ret=%d)\n", phys_id, ret);
-        ka_base_atomic_dec(&dev_info->occupy_ref);
-        return ret;
-    }
-    ka_base_atomic_dec(&dev_info->occupy_ref);
-
-startup_status_out:
-    ret = copy_to_user_safe((void *)(uintptr_t)arg, &para, sizeof(struct devdrv_device_work_status));
-    if (ret != 0) {
-        devdrv_drv_err("copy to user failed, ret(%d)\n", ret);
-        return -EINVAL;
-    }
-
-    return 0;
-}
 
 int devdrv_try_get_dev_info_occupy(struct devdrv_info *dev_info)
 {
@@ -1647,1325 +623,6 @@ void devdrv_put_dev_info_occupy(struct devdrv_info *dev_info)
     ka_base_atomic_dec(&dev_info->occupy_ref);
 }
 KA_EXPORT_SYMBOL(devdrv_put_dev_info_occupy);
-
-STATIC int devdrv_manager_get_device_health_status(struct file *filep, unsigned int cmd, unsigned long arg)
-{
-    int ret;
-    unsigned int phys_id;
-    unsigned int vfid = 0;
-    struct devdrv_info *dev_info = NULL;
-    struct devdrv_device_health_status para;
-
-    ret = copy_from_user_safe(&para, (void *)(uintptr_t)arg, sizeof(struct devdrv_device_health_status));
-    if (ret != 0) {
-        devdrv_drv_err("copy from user failed, ret(%d).\n", ret);
-        return -EINVAL;
-    }
-
-    ret = devdrv_manager_container_logical_id_to_physical_id(para.device_id, &phys_id, &vfid);
-    if (ret != 0) {
-        devdrv_drv_err("can't transform virt id %u \n", para.device_id);
-        return -EFAULT;
-    }
-
-    dev_info = devdrv_manager_get_devdrv_info(phys_id);
-    ret = devdrv_try_get_dev_info_occupy(dev_info);
-    if (ret != 0) {
-        devdrv_drv_err("Get dev_info occupy failed. (ret=%d; devid=%u)\n", ret, phys_id);
-        return ret;
-    }
-
-    if (devdrv_manager_shm_info_check(dev_info)) {
-        devdrv_drv_err("devid(%u) shm info check fail.\n", phys_id);
-        devdrv_put_dev_info_occupy(dev_info);
-        return -EFAULT;
-    }
-
-    para.device_health_status = (unsigned int)dev_info->shm_status->health_status;
-    devdrv_put_dev_info_occupy(dev_info);
-
-    ret = copy_to_user_safe((void *)(uintptr_t)arg, &para, sizeof(struct devdrv_device_health_status));
-    if (ret != 0) {
-        devdrv_drv_err("copy to user failed, ret(%d)\n", ret);
-        return -EINVAL;
-    }
-
-    return 0;
-}
-
-STATIC int devdrv_manager_get_black_box_exception_index(void)
-{
-    int i;
-
-    /* find the same pid */
-    for (i = 0; i < MAX_EXCEPTION_THREAD; i++) {
-        if (dev_manager_info->black_box.black_box_pid[i] == current->tgid) {
-            return i;
-        }
-    }
-
-    /* no same pid and inset new pid */
-    for (i = 0; i < MAX_EXCEPTION_THREAD; i++) {
-        if (dev_manager_info->black_box.black_box_pid[i] == 0) {
-            dev_manager_info->black_box.black_box_pid[i] = current->tgid;
-            return i;
-        }
-    }
-
-    /* thread num exceed the MAX_EXCEPTION_THREAD */
-    return MAX_EXCEPTION_THREAD;
-}
-
-STATIC int devdrv_manager_get_group_para(struct devdrv_ioctl_info *ioctl_buf, struct get_ts_group_para *group_para,
-                                         unsigned long arg)
-{
-    int ret;
-
-    ret = copy_from_user_safe((void *)ioctl_buf, (void *)((uintptr_t)arg), sizeof(struct devdrv_ioctl_info));
-    if (ret != 0) {
-        devdrv_drv_err("copy from user failed %d\n", ret);
-        return ret;
-    }
-    if ((ioctl_buf->input_len != sizeof(struct get_ts_group_para)) ||
-        (ioctl_buf->input_len > DEVDRV_MANAGER_INFO_PAYLOAD_LEN)) {
-        devdrv_drv_err("input_len %d is invalid should equal %ld, and less than %ld\n", ioctl_buf->input_len,
-                       sizeof(struct get_ts_group_para), DEVDRV_MANAGER_INFO_PAYLOAD_LEN);
-        return -EINVAL;
-    }
-    ret = copy_from_user_safe((void *)group_para, (void *)(ioctl_buf->input_buf), ioctl_buf->input_len);
-    if (ret != 0) {
-        devdrv_drv_err("copy from user failed %d\n", ret);
-        return ret;
-    }
-    return 0;
-}
-
-STATIC int devdrv_manager_host_get_group_info(struct devdrv_manager_msg_info *dev_manager_msg_info,
-    struct get_ts_group_para *group_para, struct devdrv_info *info)
-{
-    int ret;
-    int out_len = 0;
-
-    dev_manager_msg_info->header.msg_id = DEVDRV_MANAGER_CHAN_H2D_GET_TS_GROUP_INFO;
-    dev_manager_msg_info->header.valid = DEVDRV_MANAGER_MSG_VALID;
-    /* give a random value for checking result later */
-    dev_manager_msg_info->header.result = (u16)DEVDRV_MANAGER_MSG_INVALID_RESULT;
-    /* inform corresponding devid to device side */
-    dev_manager_msg_info->header.dev_id = info->dev_id;
-
-    ret = memcpy_s(dev_manager_msg_info->payload, DEVDRV_MANAGER_INFO_PAYLOAD_LEN,
-                   group_para, sizeof(struct get_ts_group_para));
-    if (ret != 0) {
-        devdrv_drv_err("memcpy failed ret = %d\n", ret);
-        return -EFAULT;
-    }
-
-    ret = devdrv_manager_send_msg(info, dev_manager_msg_info, &out_len);
-    if (ret != 0) {
-        devdrv_drv_err("send msg to device fail ret = %d\n", ret);
-        return ret;
-    }
-    if (out_len != (DEVDRV_TS_GROUP_NUM * sizeof(struct ts_group_info) + sizeof(struct devdrv_manager_msg_head))) {
-        devdrv_drv_err("receive response len %d is not equal = %ld\n", out_len,
-                       DEVDRV_TS_GROUP_NUM * sizeof(struct ts_group_info));
-        return -EINVAL;
-    }
-    if (dev_manager_msg_info->header.result != 0) {
-        devdrv_drv_err("get response from host error ret = %d\n", dev_manager_msg_info->header.result);
-        return dev_manager_msg_info->header.result;
-    }
-    return 0;
-}
-
-STATIC int devdrv_manager_get_ts_group_info(struct file *filep,
-    unsigned int cmd, unsigned long arg)
-{
-    struct devdrv_ioctl_info ioctl_buf = { 0, NULL, 0, NULL, 0, {0}};
-    struct get_ts_group_para group_para = {0};
-    int ret;
-    struct devdrv_manager_msg_info dev_manager_msg_info = {{0}, {0}};
-    struct devdrv_info *info = NULL;
-    struct devdrv_manager_info *d_info = NULL;
-    unsigned int phy_id = 0;
-    unsigned int vfid = 0;
-
-    ret = devdrv_manager_get_group_para(&ioctl_buf, &group_para, arg);
-    if (ret != 0) {
-        devdrv_drv_err("get group para fail ret = %d\n", ret);
-        return ret;
-    }
-    ret = devdrv_manager_container_logical_id_to_physical_id(group_para.device_id, &phy_id, &vfid);
-    if (ret != 0) {
-        devdrv_drv_err("can't get phys device id. virt id is %u, ret = %d\n", group_para.device_id, ret);
-        return -EINVAL;
-    }
-
-    d_info = devdrv_get_manager_info();
-    if (d_info == NULL) {
-        devdrv_drv_err("info is NULL! the wrong dev_id is null\n");
-        return -EINVAL;
-    }
-    if (phy_id >= ASCEND_DEV_MAX_NUM) {
-        devdrv_drv_err("group_para phy device_id %d must less than %d\n", phy_id, ASCEND_DEV_MAX_NUM);
-        return -EINVAL;
-    }
-    info = d_info->dev_info[phy_id];
-    if (info == NULL) {
-        devdrv_drv_err("info is NULL! the wrong vir device id = %d, phy dev_id is %u\n",
-                       group_para.device_id, phy_id);
-        return -EINVAL;
-    }
-    ret = devdrv_manager_host_get_group_info(&dev_manager_msg_info, &group_para, info);
-    if (ret != 0) {
-        devdrv_drv_err("host get ts group info fail %u\n", ret);
-        return ret;
-    }
-    if (ioctl_buf.out_len > DEVDRV_MANAGER_INFO_PAYLOAD_LEN) {
-        devdrv_drv_err("out len %d is invalid should less than %ld\n", ioctl_buf.out_len,
-                       DEVDRV_MANAGER_INFO_PAYLOAD_LEN);
-        return -EINVAL;
-    }
-    if (copy_to_user_safe((void *)(ioctl_buf.out_buf), (void *)dev_manager_msg_info.payload, ioctl_buf.out_len)) {
-        devdrv_drv_err("copy to user failed.\n");
-        return -EFAULT;
-    }
-    return 0;
-}
-
-/* This interface does not support using in containers */
-STATIC int devdrv_manager_black_box_get_exception(struct file *filep, unsigned int cmd, unsigned long arg)
-{
-    struct devdrv_black_box_user *black_box_user = NULL;
-    unsigned long flags;
-    int ret, index;
-
-    ret = devdrv_manager_container_is_in_container();
-    if (ret) {
-        devdrv_drv_err("not support using in container, ret(%d).\n", ret);
-        return -EINVAL;
-    }
-
-    if (dev_manager_info == NULL) {
-        devdrv_drv_err("device does not exist.\n");
-        return -EINVAL;
-    }
-
-    ka_task_spin_lock_irqsave(&dev_manager_info->black_box.spinlock, flags);
-    index = devdrv_manager_get_black_box_exception_index();
-    if (index >= MAX_EXCEPTION_THREAD) {
-        ka_task_spin_unlock_irqrestore(&dev_manager_info->black_box.spinlock, flags);
-        devdrv_drv_err("thread num exceed the support MAX_EXCEPTION_THREAD.\n");
-        return -EINVAL;
-    }
-
-    if (dev_manager_info->black_box.exception_num[index] > 0) {
-        ka_task_spin_unlock_irqrestore(&dev_manager_info->black_box.spinlock, flags);
-        devdrv_drv_info("black box exception_num[%d] :%d\n", index, dev_manager_info->black_box.exception_num[index]);
-        goto no_wait_black_box_sema;
-    }
-    ka_task_spin_unlock_irqrestore(&dev_manager_info->black_box.spinlock, flags);
-
-    ret = ka_task_down_interruptible(&dev_manager_info->black_box.black_box_sema[index]);
-    if (ret == -EINTR) {
-        devdrv_drv_info("interrupted. ret(%d)\n", ret);
-        return 0;
-    }
-    if (ret) {
-        devdrv_drv_err("ka_task_down_interruptible fail. ret(%d)\n", ret);
-        return ret;
-    }
-
-no_wait_black_box_sema:
-    black_box_user = (struct devdrv_black_box_user *)dbl_kzalloc(sizeof(struct devdrv_black_box_user),
-        KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
-    if (black_box_user == NULL) {
-        devdrv_drv_err("Allocate memory for black box failed.\n");
-        return -ENOMEM;
-    }
-
-    devdrv_host_black_box_get_exception(black_box_user, index);
-    ret = copy_to_user_safe((void *)((uintptr_t)arg), black_box_user, sizeof(struct devdrv_black_box_user));
-    if (ret) {
-        devdrv_drv_err("copy_to_user_safe fail.\n");
-        dbl_kfree(black_box_user);
-        black_box_user = NULL;
-        return ret;
-    }
-
-    dbl_kfree(black_box_user);
-    black_box_user = NULL;
-    return 0;
-}
-
-STATIC int devdrv_manager_check_black_box_info(struct devdrv_black_box_user *black_box_user, unsigned int check_size)
-{
-    if (black_box_user->devid >= ASCEND_DEV_MAX_NUM) {
-        devdrv_drv_err("Invalid device id. (dev_id=%u)\n", black_box_user->devid);
-        return -EINVAL;
-    }
-
-    if (!devdrv_manager_is_pf_device(black_box_user->devid)) {
-        return -EOPNOTSUPP;
-    }
-
-    if (black_box_user->dst_buffer == NULL) {
-        devdrv_drv_err("Invalid buffer. (dev_id=%u)\n", black_box_user->devid);
-        return -EFAULT;
-    }
-
-    if ((black_box_user->size <= 0) || (black_box_user->size > check_size)) {
-        devdrv_drv_err("Invalid size. (dev_id=%u)\n", black_box_user->devid);
-        return -EINVAL;
-    }
-
-    return 0;
-}
-
-STATIC int devdrv_manager_device_memory_dump(struct file *filep, unsigned int cmd, unsigned long arg)
-{
-    struct devdrv_black_box_user *black_box_user = NULL;
-    struct devdrv_info *dev_info = NULL;
-    ka_dma_addr_t host_addr_dma = 0;
-    u64 align_size = 0;
-    void *buffer = NULL;
-    int dev_id;
-    int ret;
-
-    if (devdrv_manager_container_is_in_container()) {
-        devdrv_drv_err("not support using in container.\n");
-        return -EINVAL;
-    }
-
-    black_box_user = (struct devdrv_black_box_user *)dbl_kzalloc(sizeof(struct devdrv_black_box_user),
-        KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
-    if (black_box_user == NULL) {
-        devdrv_drv_err("Allocate memory for black box failed.\n");
-        return -ENOMEM;
-    }
-
-    ret = copy_from_user_safe(black_box_user, (void *)((uintptr_t)arg), sizeof(struct devdrv_black_box_user));
-    if (ret) {
-        devdrv_drv_err("copy_from_user_safe fail, ret(%d).\n", ret);
-        goto free_black_box_exit;
-    }
-
-    ret = devdrv_manager_check_black_box_info(black_box_user, DEVDRV_MAX_MEMORY_DUMP_SIZE);
-    if (ret != 0) {
-        devdrv_drv_ex_notsupport_err(ret, "Check black box parameter fail. (dev_id=%u)\n", black_box_user->devid);
-        goto free_black_box_exit;
-    }
-
-    dev_info = devdrv_get_devdrv_info_array(black_box_user->devid);
-    if (dev_info == NULL) {
-        devdrv_drv_err("no device(%u).\n", black_box_user->devid);
-        ret = -ENODEV;
-        goto free_black_box_exit;
-    }
-
-    if ((black_box_user->addr_offset >= dev_info->dump_ddr_size) ||
-        (black_box_user->addr_offset + black_box_user->size > dev_info->dump_ddr_size)) {
-        devdrv_drv_err("invalid phy offset addr. dev_id(%u), size(%u), info size(%u)\n",
-                       black_box_user->devid, black_box_user->size, dev_info->dump_ddr_size);
-        ret = -EFAULT;
-        goto free_black_box_exit;
-    }
-
-    ret = uda_dev_get_remote_udevid(black_box_user->devid, &dev_id);
-    if (ret != 0 || dev_id < 0 || dev_id >= ASCEND_DEV_MAX_NUM) {
-        devdrv_drv_err("get device(%u) index(%d) fail, (ret=%d).\n", black_box_user->devid, dev_id, ret);
-        ret = -EINVAL;
-        goto free_black_box_exit;
-    }
-
-    black_box_user->addr_offset += dev_info->dump_ddr_dma_addr;
-
-    ka_base_atomic_inc(&dev_info->occupy_ref);
-    if (dev_info->status == DEVINFO_STATUS_REMOVED) {
-        ka_base_atomic_dec(&dev_info->occupy_ref);
-        devdrv_drv_warn("dev %d has been reset\n", dev_info->dev_id);
-        ret = -EINVAL;
-        goto free_black_box_exit;
-    }
-
-    ret = align_to_4k(black_box_user->size, &align_size);
-    if (ret != 0) {
-        ka_base_atomic_dec(&dev_info->occupy_ref);
-        devdrv_drv_err("Align size to 4k failed. (dev_id=%u)\n", dev_info->dev_id);
-        ret = -EINVAL;
-        goto free_black_box_exit;
-    }
-
-    buffer = adap_dma_alloc_coherent(dev_info->dev, align_size, &host_addr_dma, KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
-    if (buffer == NULL) {
-        ka_base_atomic_dec(&dev_info->occupy_ref);
-        devdrv_drv_err("dma_alloc_coherent fail devid(%u), size(%d).\n", black_box_user->devid, black_box_user->size);
-        ret = -ENOMEM;
-        goto free_black_box_exit;
-    }
-    devdrv_drv_debug("devid: %u, len: %d.\n", black_box_user->devid, black_box_user->size);
-
-    ret = adap_dma_sync_copy(dev_info->pci_dev_id, DEVDRV_DMA_DATA_COMMON, (u64)black_box_user->addr_offset,
-                               (u64)host_addr_dma, black_box_user->size, DEVDRV_DMA_DEVICE_TO_HOST);
-    if (ret) {
-        devdrv_drv_err("hal_kernel_devdrv_dma_sync_copy fail, ret(%d). dev_id(%u)\n", ret, black_box_user->devid);
-        ret = -1;
-        goto free_alloc;
-    }
-
-    ret = copy_to_user_safe(black_box_user->dst_buffer, buffer, black_box_user->size);
-    if (ret) {
-        devdrv_drv_err("copy_to_user_safe fail, ret(%d). dev_id(%u)\n", ret, black_box_user->devid);
-        ret = -1;
-        goto free_alloc;
-    }
-
-free_alloc:
-    ka_base_atomic_dec(&dev_info->occupy_ref);
-    adap_dma_free_coherent(dev_info->dev, align_size, buffer, host_addr_dma);
-    buffer = NULL;
-free_black_box_exit:
-    dbl_kfree(black_box_user);
-    black_box_user = NULL;
-    return ret;
-}
-
-STATIC int devdrv_manager_device_vmcore_dump(struct file *filep, unsigned int cmd, unsigned long arg)
-{
-#ifdef CFG_FEATURE_BBOX_KDUMP
-    struct devdrv_black_box_user *black_box_user = NULL;
-    struct devdrv_info *dev_info = NULL;
-    ka_dma_addr_t host_addr_dma = 0;
-    void *buff = NULL;
-    int ret;
-    u64 align_size = 0;
-    struct devdrv_dma_node dma_info = {0};
-    u64 vmcore_bar_addr;
-    u64 *vmcore_addr = NULL;
-    size_t vmcore_bar_size;
-
-    ret = devdrv_manager_check_permission();
-    if (ret != 0) {
-        return ret;
-    }
-
-    black_box_user = (struct devdrv_black_box_user *)dbl_kzalloc(sizeof(struct devdrv_black_box_user),
-        KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
-    if (black_box_user == NULL) {
-        devdrv_drv_err("Allocate memory for black box failed.\n");
-        return -ENOMEM;
-    }
-
-    ret = copy_from_user_safe(black_box_user, (void *)((uintptr_t)arg), sizeof(struct devdrv_black_box_user));
-    if (ret != 0) {
-        devdrv_drv_err("copy_from_user_safe failed. (ret=%d)\n", ret);
-        goto free_black_box_exit;
-    }
-
-    if (!devdrv_manager_is_pf_device(black_box_user->devid)) {
-        ret = -EOPNOTSUPP;
-        goto free_black_box_exit;
-    }
-
-    if ((black_box_user->size == 0) || (black_box_user->size > DEVDRV_VMCORE_MAX_SIZE)) {
-        devdrv_drv_err("Invalid size. (dev_id=%u; size=%u)\n", black_box_user->devid, black_box_user->size);
-        ret = -EINVAL;
-        goto free_black_box_exit;
-    }
-
-    dev_info = devdrv_get_devdrv_info_array(black_box_user->devid);
-    if (dev_info == NULL) {
-        devdrv_drv_err("Device is not initialize. (dev_id=%u)\n", black_box_user->devid);
-        ret = -ENODEV;
-        goto free_black_box_exit;
-    }
-
-    ret = align_to_4k(black_box_user->size, &align_size);
-    if (ret != 0) {
-        devdrv_drv_err("Align size to 4k failed. (dev_id=%u)\n", dev_info->dev_id);
-        ret = -EINVAL;
-        goto free_black_box_exit;
-    }
-
-    buff = hal_kernel_devdrv_dma_alloc_coherent(dev_info->dev, align_size, &host_addr_dma, KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
-    if (buff == NULL) {
-        devdrv_drv_err("dma_alloc_coherent failed. (devid=%u; size=%u).\n", black_box_user->devid, black_box_user->size);
-        ret = -ENOMEM;
-        goto free_black_box_exit;
-    }
-
-    devdrv_drv_debug("Black box info. (devid=%u; len=%d)\n", black_box_user->devid, black_box_user->size);
-
-    ret = devdrv_get_addr_info(black_box_user->devid, DEVDRV_ADDR_BBOX_BASE, 0, &vmcore_bar_addr, &vmcore_bar_size);
-    if (ret) {
-        devdrv_drv_err("get bar_addr failed (devid=%u; ret=%d)\n", black_box_user->devid, ret);
-        goto free_alloc;
-    }
-    vmcore_bar_addr += BBOX_AP_BIAS; /* Add the size of (PCIe loop + RDR CONTROL AREA) offset */
-    vmcore_addr = ka_mm_ioremap(vmcore_bar_addr, sizeof(u64));
-    if (vmcore_addr == NULL) {
-        devdrv_drv_err("ka_mm_ioremap failed (dev_id=%u)\n", black_box_user->devid);
-        goto free_alloc;
-    }
-
-    /* Shifting 24 bits is used for encryption to avoid direct exposure of kernel-addr information. */
-    dma_info.src_addr = ((u64)(*vmcore_addr) << BBOX_VMCORE_MASK_OFFSET) + black_box_user->addr_offset;
-    if (KA_U64_MAX - black_box_user->addr_offset <= ((u64)(*vmcore_addr) << BBOX_VMCORE_MASK_OFFSET)) {
-        devdrv_drv_err("Source address is out of range. (dev_id=%u; offset=%llu)\n",
-            black_box_user->devid, black_box_user->addr_offset);
-        ka_mm_iounmap(vmcore_addr);
-        ret = -EINVAL;
-        goto free_alloc;
-    }
-    ka_mm_iounmap(vmcore_addr);
-    dma_info.dst_addr = (u64)host_addr_dma;
-    dma_info.size = black_box_user->size;
-    dma_info.direction = DEVDRV_DMA_DEVICE_TO_HOST;
-    dma_info.loc_passid = 0;
-
-    ret = hal_kernel_devdrv_dma_sync_link_copy_extend(black_box_user->devid,
-        DEVDRV_DMA_DATA_TRAFFIC, DEVDRV_DMA_WAIT_INTR, &dma_info, 1);
-    if (ret != 0) {
-        devdrv_drv_err("hal_kernel_devdrv_dma_sync_link_copy_extend fail. (ret=%d; devid=%u)\n", ret, black_box_user->devid);
-        ret = -ENOMEM;
-        goto free_alloc;
-    }
-
-    ret = copy_to_user_safe(black_box_user->dst_buffer, buff, black_box_user->size);
-    if (ret) {
-        devdrv_drv_err("copy_to_user_safe fail. (ret=%d; devid=%u)\n", ret, black_box_user->devid);
-        ret = -ENOMEM;
-        goto free_alloc;
-    }
-
-free_alloc:
-    hal_kernel_devdrv_dma_free_coherent(dev_info->dev, align_size, buff, host_addr_dma);
-    buff = NULL;
-free_black_box_exit:
-    dbl_kfree(black_box_user);
-    black_box_user = NULL;
-    return ret;
-#else
-    (void)filep;
-    (void)cmd;
-    (void)arg;
-    return DRV_ERROR_NOT_SUPPORT;
-#endif
-}
-
-STATIC struct devdrv_ts_log *devdrv_get_tslog_info(u32 dev_id)
-{
-    if (dev_id >= ASCEND_DEV_MAX_NUM) {
-        devdrv_drv_err("Invalid parameter. (device id=%u)\n", dev_id);
-        return NULL;
-    }
-
-    return g_devdrv_ts_log_array[dev_id];
-}
-
-STATIC struct devdrv_dev_log *devdrv_get_devlog_info(u32 dev_id, u32 log_type)
-{
-    if (dev_id >= DEVDRV_PF_DEV_MAX_NUM || log_type >= DEVDRV_LOG_DUMP_TYPE_MAX) {
-        devdrv_drv_err("Invalid parameter. (dev_id=%u; dev_maxnum=%d; log_type=%u; logtype_maxnum=%d)\n",
-            dev_id, DEVDRV_PF_DEV_MAX_NUM, log_type, DEVDRV_LOG_DUMP_TYPE_MAX);
-        return NULL;
-    }
-
-    return g_devdrv_dev_log_array[log_type][dev_id];
-}
-
-STATIC int devdrv_manager_tslog_dump_process(struct devdrv_black_box_user *black_box_user, void **buffer)
-{
-    int ret = 0;
-    u64 align_size = 0;
-    ka_dma_addr_t host_addr_dma = 0;
-    struct devdrv_info *dev_info = NULL;
-
-    dev_info = devdrv_get_devdrv_info_array(black_box_user->devid);
-    if (dev_info == NULL) {
-        devdrv_drv_err("Device is nonexistent. (device id=%u)\n", black_box_user->devid);
-        return -ENODEV;
-    }
-
-    ka_base_atomic_inc(&dev_info->occupy_ref);
-    if (dev_info->status == DEVINFO_STATUS_REMOVED) {
-        devdrv_drv_warn("Device has been reset. (device id=%u)\n", dev_info->dev_id);
-        ret = -ENODEV;
-        goto FLAG_DEC;
-    }
-
-    ret = align_to_4k(black_box_user->size, &align_size);
-    if (ret != 0) {
-        devdrv_drv_err("Align size to 4k failed. (dev_id=%u)\n", dev_info->dev_id);
-        ret = -EINVAL;
-        goto FLAG_DEC;
-    }
-
-    *buffer = adap_dma_alloc_coherent(dev_info->dev, align_size,
-                                        &host_addr_dma, KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
-    if (*buffer == NULL) {
-        devdrv_drv_err("Dma alloc coherent failed. (device id=%u; size=%d)\n",
-            black_box_user->devid, black_box_user->size);
-        ret = -ENOMEM;
-        goto FLAG_DEC;
-    }
-
-    ret = adap_dma_sync_copy(dev_info->pci_dev_id, DEVDRV_DMA_DATA_COMMON, (u64)black_box_user->addr_offset,
-                               (u64)host_addr_dma, black_box_user->size, DEVDRV_DMA_DEVICE_TO_HOST);
-    if (ret) {
-        devdrv_drv_err("Dma sync copy failed. (ret=%d; device id=%u)\n", ret, black_box_user->devid);
-        goto DMA_FREE;
-    }
-
-    ret = copy_to_user_safe(black_box_user->dst_buffer, *buffer, black_box_user->size);
-    if (ret) {
-        devdrv_drv_err("Copy to user failed. (ret=%d; device id=%u)\n", ret, black_box_user->devid);
-    }
-
-DMA_FREE:
-    adap_dma_free_coherent(dev_info->dev, align_size, *buffer, host_addr_dma);
-FLAG_DEC:
-    ka_base_atomic_dec(&dev_info->occupy_ref);
-    return ret;
-}
-
-STATIC int devdrv_manager_tslog_dump(struct file *filep, unsigned int cmd, unsigned long arg)
-{
-    int ret;
-    void *buffer = NULL;
-    struct devdrv_ts_log *ts_log = NULL;
-    struct devdrv_black_box_user *black_box_user = NULL;
-
-    if (devdrv_manager_container_is_in_container()) {
-        return -EOPNOTSUPP;
-    }
-
-    black_box_user = (struct devdrv_black_box_user *)dbl_kzalloc(sizeof(struct devdrv_black_box_user),
-        KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
-    if (black_box_user == NULL) {
-        devdrv_drv_err("Allocate memory for black box failed.\n");
-        return -ENOMEM;
-    }
-
-    ret = copy_from_user_safe(black_box_user, (void *)((uintptr_t)arg), sizeof(struct devdrv_black_box_user));
-    if (ret) {
-        devdrv_drv_err("Copy from user failed. (ret=%d).\n", ret);
-        goto FREE_BBOX_EXIT;
-    }
-
-    if (!devdrv_manager_is_pf_device(black_box_user->devid)) {
-        ret = -EOPNOTSUPP;
-        goto FREE_BBOX_EXIT;
-    }
-
-    ts_log = devdrv_get_tslog_info(black_box_user->devid);
-    if (ts_log == NULL || ts_log->mem_size == 0) {
-        devdrv_drv_err("Ts log dma addr info is not refreshed by device yet. (device id=%u).\n", black_box_user->devid);
-        ret = -ENODEV;
-        goto FREE_BBOX_EXIT;
-    }
-
-    if ((ts_log->mem_size > DEVMNG_TSLOG_MAX_SIZE) || (black_box_user->addr_offset >= ts_log->mem_size) ||
-        (black_box_user->size == 0) || (black_box_user->addr_offset + black_box_user->size > ts_log->mem_size)) {
-        devdrv_drv_err("Invalid user input parameter. (dev_id=%u; addr offset=%llu; size=%u; info size=%u)\n",
-                       black_box_user->devid, black_box_user->addr_offset, black_box_user->size, ts_log->mem_size);
-        ret = -EFAULT;
-        goto FREE_BBOX_EXIT;
-    }
-
-    black_box_user->addr_offset += ts_log->dma_addr;
-
-    ret = devdrv_manager_tslog_dump_process(black_box_user, &buffer);
-    if (ret) {
-        devdrv_drv_ex_notsupport_err(ret, "Ts log dump failed. (ret=%d; device id=%u)\n", ret, black_box_user->devid);
-    }
-
-FREE_BBOX_EXIT:
-    dbl_kfree(black_box_user);
-    black_box_user = NULL;
-    buffer = NULL;
-    return ret;
-}
-
-STATIC int devdrv_manager_devlog_dump_process(struct devdrv_black_box_user *black_box_user)
-{
-    int ret = 0;
-    u64 align_size = 0;
-    void *buffer = NULL;
-    ka_dma_addr_t host_addr_dma = 0;
-    struct devdrv_info *dev_info = NULL;
-
-    dev_info = devdrv_get_devdrv_info_array(black_box_user->devid);
-    if (dev_info == NULL) {
-        devdrv_drv_err("Device is nonexistent. (devid=%u)\n", black_box_user->devid);
-        return -ENODEV;
-    }
-
-    ka_base_atomic_inc(&dev_info->occupy_ref);
-    if (dev_info->status == DEVINFO_STATUS_REMOVED) {
-        devdrv_drv_warn("Device has been reset. (devid=%u)\n", dev_info->dev_id);
-        ret = -ENODEV;
-        goto FLAG_DEC;
-    }
-
-    ret = align_to_4k(black_box_user->size, &align_size);
-    if (ret != 0) {
-        devdrv_drv_err("Align size to 4k failed. (dev_id=%u)\n", dev_info->dev_id);
-        ret = -EINVAL;
-        goto FLAG_DEC;
-    }
-
-    buffer = hal_kernel_devdrv_dma_alloc_coherent(dev_info->dev, align_size,
-                                        &host_addr_dma, KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
-    if (buffer == NULL) {
-        devdrv_drv_err("Dma alloc coherent failed. (devid=%u; size=%u)\n",
-            black_box_user->devid, black_box_user->size);
-        ret = -ENOMEM;
-        goto FLAG_DEC;
-    }
-
-    ret = hal_kernel_devdrv_dma_sync_copy(dev_info->pci_dev_id, DEVDRV_DMA_DATA_COMMON, (u64)black_box_user->addr_offset,
-                               (u64)host_addr_dma, black_box_user->size, DEVDRV_DMA_DEVICE_TO_HOST);
-    if (ret != 0) {
-        devdrv_drv_err("Dma sync copy failed. (ret=%d; devid=%u)\n", ret, black_box_user->devid);
-        goto DMA_FREE;
-    }
-
-    ret = copy_to_user_safe(black_box_user->dst_buffer, buffer, black_box_user->size);
-    if (ret != 0) {
-        devdrv_drv_err("Copy to user failed. (ret=%d; devid=%u)\n", ret, black_box_user->devid);
-    }
-
-DMA_FREE:
-    hal_kernel_devdrv_dma_free_coherent(dev_info->dev, align_size, buffer, host_addr_dma);
-    buffer = NULL;
-FLAG_DEC:
-    ka_base_atomic_dec(&dev_info->occupy_ref);
-    return ret;
-}
-
-int devdrv_manager_devlog_dump(struct devdrv_bbox_logdump *in)
-{
-    int ret;
-    struct devdrv_dev_log *dev_log = NULL;
-    struct devdrv_black_box_user *black_box_user = NULL;
-
-    if (in == NULL) {
-        devdrv_drv_err("Invalid black_box_user parameter.(in=%s)\n", (in == NULL) ? "NULL" : "OK");
-        return -ENOMEM;
-    }
-
-    if (in->bbox_user == NULL) {
-        devdrv_drv_err("Invalid black_box_user parameter.(bbox_user=%s)\n", (in->bbox_user == NULL) ? "NULL" : "OK");
-        return -ENOMEM;
-    }
-
-    black_box_user = (struct devdrv_black_box_user *)ka_mm_kzalloc(sizeof(struct devdrv_black_box_user),
-        KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
-    if (black_box_user == NULL) {
-        devdrv_drv_err("Allocate memory for black box failed.\n");
-        return -ENOMEM;
-    }
-
-    ret = copy_from_user_safe(black_box_user, in->bbox_user, sizeof(struct devdrv_black_box_user));
-    if (ret != 0) {
-        devdrv_drv_err("Copy from user failed. (ret=%d).\n", ret);
-        goto FREE_BBOX_EXIT;
-    }
-
-    if (black_box_user->devid >= DEVDRV_PF_DEV_MAX_NUM || in->log_type >= DEVDRV_LOG_DUMP_TYPE_MAX) {
-        devdrv_drv_err("Invalid black_box_user parameter. (dev_id=%u; dev_maxnum=%d; log_type=%u; logtype_maxnum=%d)\n",
-            black_box_user->devid, DEVDRV_PF_DEV_MAX_NUM, in->log_type, DEVDRV_LOG_DUMP_TYPE_MAX);
-        ret = -EFAULT;
-        goto FREE_BBOX_EXIT;
-    }
-
-    if (black_box_user->size == 0) {
-        devdrv_drv_err("Invalid black_box_user parameter. (size=%u)\n", black_box_user->size);
-        ret = -EFAULT;
-        goto FREE_BBOX_EXIT;
-    }
-
-    dev_log = devdrv_get_devlog_info(black_box_user->devid, in->log_type);
-    if (dev_log == NULL || dev_log->mem_size == 0) {
-        devdrv_drv_err("devlog dma addr info is not refreshed by device yet. (devid=%u; log_type=%u).\n",
-            black_box_user->devid, in->log_type);
-        ret = -ENODEV;
-        goto FREE_BBOX_EXIT;
-    }
-
-    if ((KA_U64_MAX - black_box_user->addr_offset <= black_box_user->size) ||
-        (black_box_user->addr_offset + black_box_user->size > dev_log->mem_size)) {
-        devdrv_drv_err("Invalid user input parameter. (devid=%u; addr_offset=%llu; size=%u; mem_size=%u)\n",
-                       black_box_user->devid, black_box_user->addr_offset, black_box_user->size, dev_log->mem_size);
-        ret = -EFAULT;
-        goto FREE_BBOX_EXIT;
-    }
-
-    black_box_user->addr_offset += dev_log->dma_addr;
-    ret = devdrv_manager_devlog_dump_process(black_box_user);
-    if (ret != 0) {
-        devdrv_drv_ex_notsupport_err(ret, "Dev log dump failed. (ret=%d; devid=%u)\n", ret, black_box_user->devid);
-        goto FREE_BBOX_EXIT;
-    }
-
-FREE_BBOX_EXIT:
-    ka_mm_kfree(black_box_user);
-    black_box_user = NULL;
-    return ret;
-}
-
-#if !defined(DEVDRV_MANAGER_HOST_UT_TEST) && defined(CFG_FEATURE_PCIE_BBOX_DUMP)
-#define DEVDRV_DUMP_SINGLE_LEN 0x200000U
-STATIC int devdrv_dma_bbox_dump_para_check(unsigned int dev_id, void *value)
-{
-    if (dev_id >= ASCEND_DEV_MAX_NUM) {
-        devdrv_drv_err("Invalid device id. (dev_id=%u)\n", dev_id);
-        return -EINVAL;
-    }
-
-    if (!devdrv_manager_is_pf_device(dev_id)) {
-        return -EOPNOTSUPP;
-    }
-
-    if (value == NULL) {
-        devdrv_drv_err("Invalid buffer. (dev_id=%u)\n", dev_id);
-        return -EFAULT;
-    }
-
-    return 0;
-}
-
-int devdrv_dma_bbox_dump(struct bbox_dma_dump *dma_dump)
-{
-    struct devdrv_info *dev_info = NULL;
-    ka_dma_addr_t host_addr_dma = 0;
-    void *buffer = NULL;
-    u64 dump_dma_addr;
-    u32 dump_size, i, count, copy_size;
-    int ret;
-    u32 dev_id = dma_dump->dev_id;
-    void *dst_buf;
-
-    ret = devdrv_dma_bbox_dump_para_check(dev_id, dma_dump->dst_buf);
-    if (ret != 0) {
-        devdrv_drv_ex_notsupport_err(ret, "Check black box parameter fail. (dev_id=%u)\n", dev_id);
-        return ret;
-    }
-
-    dump_size = g_devdrv_dev_log_array[dma_dump->log_type][dev_id]->mem_size;
-    dump_dma_addr = g_devdrv_dev_log_array[dma_dump->log_type][dev_id]->dma_addr;
-
-    if ((dma_dump->len <= 0) || (dma_dump->offset >= dump_size) || (dma_dump->offset + dma_dump->len > dump_size)) {
-        devdrv_drv_err("Invalid size. (dev_id=%u, len=%u, offset=%u, mem_size=%u)\n", dev_id, dma_dump->len, dma_dump->offset, dump_size);
-        return -EINVAL;
-    }
-
-    dev_info = devdrv_get_devdrv_info_array(dev_id);
-    if (dev_info == NULL) {
-        devdrv_drv_err("No device. (dev_id=%u)\n", dev_id);
-        return -ENODEV;
-    }
-
-    dump_dma_addr += dma_dump->offset;
-    ka_base_atomic_inc(&dev_info->occupy_ref);
-    if (dev_info->status == DEVINFO_STATUS_REMOVED) {
-        ka_base_atomic_dec(&dev_info->occupy_ref);
-        devdrv_drv_warn("Device has been reset. (dev_id=%d)\n", dev_info->dev_id);
-        return -EINVAL;
-    }
-
-    buffer = hal_kernel_devdrv_dma_alloc_coherent(dev_info->dev, DEVDRV_DUMP_SINGLE_LEN, &host_addr_dma, KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
-    if (buffer == NULL) {
-        ka_base_atomic_dec(&dev_info->occupy_ref);
-        devdrv_drv_err("dma_alloc_coherent fail. (dev_id=%u; size=%d)\n", dev_id, dma_dump->len);
-        return -ENOMEM;
-    }
-
-    count = KA_BASE_DIV_ROUND_UP(dma_dump->len, DEVDRV_DUMP_SINGLE_LEN);
-    dst_buf = dma_dump->dst_buf;
-    for (i = 0; i < count; i++) {
-        copy_size = DEVDRV_DUMP_SINGLE_LEN;
-        if (i == (count - 1)) {
-            copy_size = dma_dump->len - (count - 1) * DEVDRV_DUMP_SINGLE_LEN;
-        }
-
-        ret = hal_kernel_devdrv_dma_sync_copy(dev_info->pci_dev_id, DEVDRV_DMA_DATA_COMMON, (u64)dump_dma_addr,
-                               (u64)host_addr_dma, copy_size, DEVDRV_DMA_DEVICE_TO_HOST);
-        if (ret != 0) {
-            devdrv_drv_err("Dma sync copy failed. (ret=%d; devid=%u; len=%u; copy_size=%u; idx=%u)\n", ret, dev_id, dma_dump->len, copy_size, i);
-            goto free_alloc;
-        }
-
-        ret = copy_to_user_safe(dst_buf, buffer, copy_size);
-        if (ret != 0) {
-            devdrv_drv_err("copy_to_user_safe fail. (ret=%d; dev_id=%u; len=%u; copy_size=%u; idx=%u))\n", ret, dev_id, dma_dump->len, copy_size, i);
-            goto free_alloc;
-        }
-        dump_dma_addr += copy_size;
-        dst_buf += copy_size;
-    }
-
-free_alloc:
-    ka_base_atomic_dec(&dev_info->occupy_ref);
-    adap_dma_free_coherent(dev_info->dev, DEVDRV_DUMP_SINGLE_LEN, buffer, host_addr_dma);
-    buffer = NULL;
-    return ret;
-}
-#endif
-
-STATIC int devdrv_manager_reg_ddr_read(struct file *filep, unsigned int cmd, unsigned long arg)
-{
-    struct devdrv_black_box_user *black_box_user = NULL;
-    struct devdrv_info *dev_info = NULL;
-    ka_dma_addr_t host_addr_dma = 0;
-    void *buffer = NULL;
-    u64 align_size = 0;
-    int dev_id;
-    int ret;
-
-    if (devdrv_manager_container_is_in_container()) {
-        devdrv_drv_err("Not support using in container.\n");
-        return -EINVAL;
-    }
-
-    black_box_user = (struct devdrv_black_box_user *)dbl_kzalloc(sizeof(struct devdrv_black_box_user),
-        KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
-    if (black_box_user == NULL) {
-        devdrv_drv_err("Allocate memory for black box failed.\n");
-        return -ENOMEM;
-    }
-
-    ret = copy_from_user_safe(black_box_user, (void *)((uintptr_t)arg), sizeof(struct devdrv_black_box_user));
-    if (ret) {
-        devdrv_drv_err("copy_from_user_safe fail. (ret=%d)\n", ret);
-        goto free_black_box_exit;
-    }
-
-    ret = devdrv_manager_check_black_box_info(black_box_user, DEVDRV_MAX_REG_DDR_READ_SIZE);
-    if (ret != 0) {
-        devdrv_drv_ex_notsupport_err(ret, "Check black box parameter fail. (dev_id=%u)\n", black_box_user->devid);
-        goto free_black_box_exit;
-    }
-
-#ifndef CFG_FEATURE_CHIP_REG_FORCED_EXPORT
-    ret = devdrv_manager_check_capability(black_box_user->devid, DEVDRV_CAP_IMU_REG_EXPORT);
-    if (ret) {
-        devdrv_drv_ex_notsupport_err(ret, "Do not support read reg ddr. (dev_id=%u)\n", black_box_user->devid);
-        ret = -EINVAL;
-        goto free_black_box_exit;
-    }
-#endif
-
-    dev_info = devdrv_get_devdrv_info_array(black_box_user->devid);
-    if (dev_info == NULL) {
-        devdrv_drv_err("No device. (dev_id=%u)\n", black_box_user->devid);
-        ret = -ENODEV;
-        goto free_black_box_exit;
-    }
-
-    if ((black_box_user->addr_offset >= dev_info->reg_ddr_size) ||
-        (black_box_user->addr_offset + black_box_user->size > dev_info->reg_ddr_size)) {
-        devdrv_drv_err("Invalid phy offset addr. (dev_id=%u; size=%u; info_size=%u)\n",
-                       black_box_user->devid, black_box_user->size, dev_info->reg_ddr_size);
-        ret = -EFAULT;
-        goto free_black_box_exit;
-    }
-
-    ret = uda_dev_get_remote_udevid(black_box_user->devid, &dev_id);
-    if (ret != 0 || dev_id < 0 || dev_id >= ASCEND_DEV_MAX_NUM) {
-        devdrv_drv_err("Get device index fail. (dev_id=%u; index=%d)\n", black_box_user->devid, dev_id);
-        ret = -EINVAL;
-        goto free_black_box_exit;
-    }
-
-    black_box_user->addr_offset += dev_info->reg_ddr_dma_addr;
-
-    ka_base_atomic_inc(&dev_info->occupy_ref);
-    if (dev_info->status == DEVINFO_STATUS_REMOVED) {
-        ka_base_atomic_dec(&dev_info->occupy_ref);
-        devdrv_drv_warn("Device has been reset. (dev_id=%d)\n", dev_info->dev_id);
-        ret = -EINVAL;
-        goto free_black_box_exit;
-    }
-
-    ret = align_to_4k(black_box_user->size, &align_size);
-    if (ret != 0) {
-        devdrv_drv_err("Align size to 4k failed. (dev_id=%u)\n", dev_info->dev_id);
-        ret = -EINVAL;
-        goto free_black_box_exit;
-    }
-
-    buffer = adap_dma_alloc_coherent(dev_info->dev, align_size, &host_addr_dma, KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
-    if (buffer == NULL) {
-        ka_base_atomic_dec(&dev_info->occupy_ref);
-        devdrv_drv_err("dma_alloc_coherent fail. (dev_id=%u; size=%d)\n", black_box_user->devid, black_box_user->size);
-        ret = -ENOMEM;
-        goto free_black_box_exit;
-    }
-    devdrv_drv_debug("devid: %u, len: %d.\n", black_box_user->devid, black_box_user->size);
-
-    ret = adap_dma_sync_copy(dev_info->pci_dev_id, DEVDRV_DMA_DATA_COMMON, (u64)black_box_user->addr_offset,
-                               (u64)host_addr_dma, black_box_user->size, DEVDRV_DMA_DEVICE_TO_HOST);
-    if (ret != 0) {
-        devdrv_drv_err("hal_kernel_devdrv_dma_sync_copy fail. (ret=%d; dev_id=%u)\n", ret, black_box_user->devid);
-        ret = -1;
-        goto free_alloc;
-    }
-
-    ret = copy_to_user_safe(black_box_user->dst_buffer, buffer, black_box_user->size);
-    if (ret != 0) {
-        devdrv_drv_err("copy_to_user_safe fail. (ret=%d; dev_id=%u)\n", ret, black_box_user->devid);
-        ret = -1;
-        goto free_alloc;
-    }
-
-free_alloc:
-    ka_base_atomic_dec(&dev_info->occupy_ref);
-    adap_dma_free_coherent(dev_info->dev, align_size, buffer, host_addr_dma);
-    buffer = NULL;
-free_black_box_exit:
-    dbl_kfree(black_box_user);
-    black_box_user = NULL;
-    return ret;
-}
-
-static int devdrv_manager_all_is_pf_device(void)
-{
-    int i, ret;
-    unsigned int phy_id = 0;
-    unsigned int vfid = 0;
-    unsigned int dev_num = 0;
-
-    dev_num = devdrv_manager_get_devnum();
-    if ((dev_num > ASCEND_DEV_MAX_NUM) || (dev_num == 0)) {
-        devdrv_drv_err("Can't get device number (dev_num=%u)\n", dev_num);
-        return -EINVAL;
-    }
-
-    for (i = 0; i < dev_num; i++) {
-        ret = devdrv_manager_container_logical_id_to_physical_id(i, &phy_id, &vfid);
-        if (ret != 0) {
-            devdrv_drv_err("Transfer logical id to physical id failed. (ret=%d)\n", ret);
-            return ret;
-        }
-
-        if (!devdrv_manager_is_pf_device(phy_id) || (vfid > 0)) {
-            return -EOPNOTSUPP;
-        }
-    }
-
-    return 0;
-}
-
-static int devdrv_bind_master_para_check(struct devdrv_ioctl_para_bind_host_pid *para_info)
-{
-    if ((para_info->cp_type == DEVDRV_PROCESS_DEV_ONLY) || (para_info->vfid != 0) ||
-        ((para_info->chip_id >= PID_MAP_DEVNUM) && (para_info->chip_id != HAL_BIND_ALL_DEVICE)) ||
-        ((para_info->chip_id == HAL_BIND_ALL_DEVICE) && (para_info->cp_type != DEVDRV_PROCESS_USER))) {
-        return -EOPNOTSUPP;
-    }
-
-    para_info->sign[DEVDRV_SIGN_LEN - 1] = '\0';
-    if ((para_info->len != PROCESS_SIGN_LENGTH) || (para_info->mode >= AICPUFW_MAX_PLAT) ||
-        (para_info->cp_type < 0) || (para_info->cp_type >= DEVDRV_PROCESS_CPTYPE_MAX)) {
-        devdrv_drv_err("Invalid parameter. (len=%u; mode=%d; cp_type=%d; dev_id=%u; vf_id=%u; master_pid=%d).\n",
-            para_info->len, para_info->mode, para_info->cp_type, para_info->chip_id,
-            para_info->vfid, para_info->host_pid);
-        return -EINVAL;
-    }
-
-    return 0;
-}
-
-STATIC int devdrv_fop_bind_host_pid(struct file *filep, unsigned int cmd, unsigned long arg)
-{
-    struct devdrv_ioctl_para_bind_host_pid para_info;
-    struct bind_cost_statistics cost_stat;
-    int node_id = ka_system_numa_node_id();
-    unsigned int phy_id = 0;
-    unsigned int vfid = 0;
-    int ret;
-
-    (void)memset_s(&cost_stat, sizeof(cost_stat), 0, sizeof(cost_stat));
-    cost_stat.bind_start = ka_system_ktime_get();
-    if (copy_from_user_safe(&para_info, (void *)(uintptr_t)arg, sizeof(struct devdrv_ioctl_para_bind_host_pid))) {
-        devdrv_drv_err("ka_base_copy_from_user error. (dev_id=%u)\n", node_id);
-        return -EINVAL;
-    }
-
-    ret = devdrv_bind_master_para_check(&para_info);
-    if (ret != 0) {
-        return ret;
-    }
-
-    if (para_info.chip_id < PID_MAP_DEVNUM) {
-        ret = devdrv_manager_container_logical_id_to_physical_id(para_info.chip_id, &phy_id, &vfid);
-        if (ret != 0) {
-            devdrv_drv_err("Transfer logical id to physical id failed. (ret=%d)\n", ret);
-            return ret;
-        }
-
-        if (!devdrv_manager_is_pf_device(phy_id) || (vfid > 0)) {
-            return -EOPNOTSUPP;
-        }
-        para_info.chip_id = phy_id;
-    }
-
-    if (para_info.chip_id == HAL_BIND_ALL_DEVICE) {
-        ret = devdrv_manager_all_is_pf_device();
-        if (ret != 0) {
-            return ret;
-        }
-    }
-
-    ret = devdrv_bind_hostpid(para_info, cost_stat);
-    if (ret) {
-        devdrv_drv_err("bind_hostpid error. dev_id:%u, ret:%d, host_pid:%d, cp_type:%d, current_pid:%d\n",
-            node_id, ret, para_info.host_pid, para_info.cp_type, current->tgid);
-        return ret;
-    }
-
-    return 0;
-}
-
-STATIC int devdrv_manager_ioctl_get_console_loglevel(struct file *filep, unsigned int cmd, unsigned long arg)
-{
-    int console_loglevle_value;
-    int ret;
-
-    console_loglevle_value = log_level_get();
-    ret = copy_to_user_safe((void *)((uintptr_t)arg), &console_loglevle_value, sizeof(int));
-
-    return ret;
-}
-
-STATIC int devdrv_manager_ioctl_get_plat_info(struct file *filep, unsigned int cmd, unsigned long arg)
-{
-    u32 plat_info;
-
-    plat_info = dev_manager_info->plat_info;
-    return copy_to_user_safe((void *)((uintptr_t)arg), &plat_info, sizeof(u32));
-}
-
-/* This interface does not support using in containers */
-STATIC int devdrv_manager_device_reset_inform(struct file *filep, unsigned int cmd, unsigned long arg)
-{
-    struct timespec stamp;
-    u32 devid;
-    int virt_id;
-    u32 vfid = 0;
-    int ret;
-
-    ret = copy_from_user_safe(&devid, (void *)((uintptr_t)arg), sizeof(u32));
-    if (ret) {
-        devdrv_drv_err("copy_from_user_safe failed. (ret=%d)\n", ret);
-        return ret;
-    }
-
-    virt_id = devid;
-    if (devdrv_manager_container_logical_id_to_physical_id(virt_id, &devid, &vfid)) {
-        devdrv_drv_err("Can't transform logical id. (virtual_id=%u)\n", virt_id);
-        return -EINVAL;
-    }
-
-    if (vfid != 0) {
-        return -EOPNOTSUPP;
-    }
-
-#ifndef CFG_FEATURE_SRIOV
-    ret = devdrv_manager_check_permission();
-    if (ret != 0) {
-        devdrv_drv_err("Failed to invoke devdrv_manager_check_permission. (ret=%d)\n", ret);
-    #ifdef CFG_FEATURE_ERRORCODE_ON_NEW_CHIPS
-        return ret;
-    #else
-        return -EINVAL;
-    #endif
-    }
-#endif
-    stamp = current_kernel_time();
-
-    ret = devdrv_host_black_box_add_exception(devid, DEVDRV_BB_DEVICE_RESET_INFORM, stamp, NULL);
-    if (ret) {
-        devdrv_drv_err("devdrv_host_black_box_add_exception failed, ret(%d). dev_id(%u)\n", ret, devid);
-        return ret;
-    }
-
-    return 0;
-}
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
-ssize_t devdrv_load_file_read(struct file *file, loff_t *pos, char *addr, size_t count)
-{
-    char __ka_user *buf = (char __ka_user *)addr;
-    ka_mm_segment_t old_fs;
-    ssize_t len;
-
-    old_fs = ka_fs_get_fs();
-    ka_fs_set_fs(ka_mm_get_ds()); /*lint !e501 */ /* kernel source */
-    len = ka_fs_vfs_read(file, buf, count, pos);
-    ka_fs_set_fs(old_fs);
-
-    return len;
-}
-#endif
-
-STATIC int devdrv_manager_get_container_flag(struct file *filep, unsigned int cmd, unsigned long arg)
-{
-    unsigned int flag;
-    int ret;
-
-    flag = (unsigned int)devdrv_manager_container_is_in_container();
-
-    ret = copy_to_user_safe((void *)((uintptr_t)arg), &flag, sizeof(unsigned int));
-
-    return ret;
-}
-
-STATIC int devdrv_manager_container_cmd(struct file *filep, unsigned int cmd, unsigned long arg)
-{
-    return devdrv_manager_container_process(filep, arg);
-}
-
-u32 devdrv_manager_get_probe_num_kernel(void)
-{
-    u32 probe_num;
-    int ret;
-    unsigned long flags;
-
-    ret = devdrv_manager_container_is_in_container();
-    if (ret != 0) { // if in container, num is the number of device in container
-        probe_num = devdrv_manager_get_devnum();
-    } else {
-        ka_task_spin_lock_irqsave(&dev_manager_info->spinlock, flags);
-        probe_num = dev_manager_info->prob_num;
-        ka_task_spin_unlock_irqrestore(&dev_manager_info->spinlock, flags);
-    }
-
-    return probe_num;
-}
-
-STATIC int devdrv_get_error_code(struct file *filep, unsigned int cmd, unsigned long arg)
-{
-    struct devdrv_error_code_para user_arg = { 0, { 0 }, 0 };
-    struct devdrv_info *dev_info = NULL;
-    u32 phys_id, vfid;
-    int ret, i;
-
-    ret = copy_from_user_safe(&user_arg, (void *)((uintptr_t)arg), sizeof(struct devdrv_error_code_para));
-    if (ret) {
-        devdrv_drv_err("copy_from_user_safe failed. (ret=%d)\n", ret);
-        return ret;
-    }
-
-    if (devdrv_manager_container_logical_id_to_physical_id(user_arg.dev_id, &phys_id, &vfid)) {
-        devdrv_drv_err("can't transform virt id %u.\n", user_arg.dev_id);
-        return -ENODEV;
-    }
-
-    dev_info = devdrv_manager_get_devdrv_info(phys_id);
-    ret = devdrv_try_get_dev_info_occupy(dev_info);
-    if (ret != 0) {
-        devdrv_drv_err("Get dev_info occupy failed. (ret=%d; devid=%u)\n", ret, phys_id);
-        return ret;
-    }
-
-    if (devdrv_manager_shm_info_check(dev_info)) {
-        devdrv_drv_err("Share memory info check fail. (dev_id=%u)\n", phys_id);
-        devdrv_put_dev_info_occupy(dev_info);
-        return -EFAULT;
-    }
-
-    user_arg.error_code_count = dev_info->shm_status->error_cnt;
-    for (i = 0; i < DEVMNG_SHM_INFO_ERROR_CODE_LEN; i++) {
-        user_arg.error_code[i] = dev_info->shm_status->error_code[i];
-    }
-    devdrv_put_dev_info_occupy(dev_info);
-
-    ret = copy_to_user_safe((void *)((uintptr_t)arg), &user_arg, sizeof(struct devdrv_error_code_para));
-    if (ret != 0) {
-        devdrv_drv_err("copy_to_user_safe failed.\n");
-        return ret;
-    }
-
-    return 0;
-}
-
-int devmng_dms_get_event_code(u32 devid, u32 *health_code, u32 health_len,
-    struct shm_event_code *event_code, u32 event_len)
-{
-    struct devdrv_info *dev_info = NULL;
-    int i, cnt, ret;
-
-    if ((devid >= ASCEND_DEV_MAX_NUM) || (health_code == NULL) ||
-        (health_len != VMNG_VDEV_MAX_PER_PDEV) || (event_code == NULL) ||
-        (event_len != DEVMNG_SHM_INFO_EVENT_CODE_LEN)) {
-        devdrv_drv_err("Invalid parameter. (devid=%u; health_code=\"%s\"; health_len=%u; "
-                       "event_code=\"%s\"; event_len=%u)\n", devid,
-                       (health_code == NULL) ? "NULL" : "OK", health_len,
-                       (event_code == NULL) ? "NULL" : "OK", event_len);
-        return -EINVAL;
-    }
-
-    dev_info = devdrv_manager_get_devdrv_info(devid);
-    ret = devdrv_try_get_dev_info_occupy(dev_info);
-    if (ret != 0) {
-        devdrv_drv_err("Get dev_info occupy failed. (ret=%d; devid=%u)\n", ret, devid);
-        return ret;
-    }
-
-    if (devdrv_manager_shm_info_check(dev_info)) {
-        devdrv_drv_err("The dev_info is invalid. (devid=%u)\n", devid);
-        devdrv_put_dev_info_occupy(dev_info);
-        return -EFAULT;
-    }
-
-    for (i = 0; i < VMNG_VDEV_MAX_PER_PDEV; i++) {
-        health_code[i] = dev_info->shm_status->dms_health_status[i];
-    }
-    cnt = (dev_info->shm_status->event_cnt > DEVMNG_SHM_INFO_EVENT_CODE_LEN) ?
-          DEVMNG_SHM_INFO_EVENT_CODE_LEN : dev_info->shm_status->event_cnt;
-    for (i = 0; i < cnt; i++) {
-        event_code[i].event_code = dev_info->shm_status->event_code[i].event_code;
-        event_code[i].fid = dev_info->shm_status->event_code[i].fid;
-    }
-    devdrv_put_dev_info_occupy(dev_info);
-
-    return 0;
-}
-
-int devmng_dms_get_health_code(u32 devid, u32 *health_code, u32 health_len)
-{
-    struct devdrv_info *dev_info = NULL;
-    int i, ret;
-
-    if ((devid >= ASCEND_DEV_MAX_NUM) || (health_code == NULL) ||
-        (health_len != VMNG_VDEV_MAX_PER_PDEV)) {
-        devdrv_drv_err("Invalid parameter. (devid=%u; health_code=\"%s\"; health_len=%u)\n",
-                       devid, (health_code == NULL) ? "NULL" : "OK", health_len);
-        return -EINVAL;
-    }
-
-    dev_info = devdrv_manager_get_devdrv_info(devid);
-    ret = devdrv_try_get_dev_info_occupy(dev_info);
-    if (ret != 0) {
-        devdrv_drv_err("Get dev_info occupy failed. (ret=%d; devid=%u)\n", ret, devid);
-        return ret;
-    }
-
-    if (devdrv_manager_shm_info_check(dev_info)) {
-        devdrv_drv_err("The dev_info is invalid. (devid=%u)\n", devid);
-        devdrv_put_dev_info_occupy(dev_info);
-        return -EFAULT;
-    }
-
-    for (i = 0; i < VMNG_VDEV_MAX_PER_PDEV; i++) {
-        health_code[i] = dev_info->shm_status->dms_health_status[i];
-    }
-    devdrv_put_dev_info_occupy(dev_info);
-
-    return 0;
-}
 
 #ifdef CFG_FEATURE_CHIP_DIE
 int devdrv_manager_get_random_from_dev_info(u32 devid, char *random_number, u32 random_len)
@@ -3000,247 +657,6 @@ int devdrv_manager_get_random_from_dev_info(u32 devid, char *random_number, u32 
     return 0;
 }
 #endif
-
-STATIC int devdrv_creat_random_sign(char *random_sign, u32 len)
-{
-    char random[RANDOM_SIZE] = {0};
-    int offset = 0;
-    int ret;
-    int i;
-
-    for (i = 0; i < RANDOM_SIZE; i++) {
-        ret = snprintf_s(random_sign + offset, len - offset, len - 1 - offset, "%02x", (u8)random[i]);
-        if (ret < 0) {
-            devdrv_drv_err("snprintf failed, ret(%d).\n", ret);
-            return -EINVAL;
-        }
-        offset += ret;
-    }
-    random_sign[len - 1] = '\0';
-
-    return 0;
-}
-
-STATIC int devdrv_get_process_sign(struct devdrv_manager_info *d_info, char *sign, u32 len, u32 docker_id)
-{
-    struct devdrv_process_sign *d_sign = NULL;
-    struct list_head *pos = NULL;
-    struct list_head *n = NULL;
-    int ret;
-
-    if (!ka_list_empty_careful(&d_info->hostpid_list_header)) {
-        ka_list_for_each_safe(pos, n, &d_info->hostpid_list_header) {
-            d_sign = ka_list_entry(pos, struct devdrv_process_sign, list);
-            if (d_sign->hostpid == current->tgid) {
-                ret = strcpy_s(sign, len, d_sign->sign);
-                if (ret) {
-                    devdrv_drv_err("Copy hostpid sign failed. (docker_id=%u; hostpid=%d; ret=%d)\n",
-                        docker_id, d_sign->hostpid, ret);
-                    return -EINVAL;
-                }
-
-                return 0;
-            }
-        }
-    }
-
-    if (d_info->devdrv_sign_count[docker_id] >= DEVDRV_MAX_SIGN_NUM) {
-        devdrv_drv_err("Master process is full. (max_number=%d; docker_id=%u).\n", DEVDRV_MAX_SIGN_NUM, docker_id);
-        return -EINVAL;
-    }
-
-    d_sign = dbl_vmalloc(sizeof(struct devdrv_process_sign), KA_GFP_KERNEL | __KA_GFP_ZERO | __KA_GFP_ACCOUNT, KA_PAGE_KERNEL);
-    if (d_sign == NULL) {
-        devdrv_drv_err("vzalloc failed. (docker_id=%u)\n", docker_id);
-        return -ENOMEM;
-    }
-    d_sign->hostpid = current->tgid;
-#if (!defined (DEVMNG_UT)) && (!defined (DEVDRV_MANAGER_HOST_UT_TEST))
-    d_sign->hostpid_start_time = ka_task_get_current_group_starttime();
-#endif
-    d_sign->docker_id = docker_id;
-
-    ret = devdrv_creat_random_sign(d_sign->sign, PROCESS_SIGN_LENGTH);
-    if (ret) {
-        devdrv_drv_err("Get sign failed. (ret=%d; docker_id=%u)\n", ret, docker_id);
-        dbl_vfree(d_sign);
-        d_sign = NULL;
-        return ret;
-    }
-    ret = strcpy_s(sign, len, d_sign->sign);
-    if (ret) {
-        devdrv_drv_err("strcpy_s failed. (ret=%d; docker_id=%u)\n", ret, docker_id);
-        dbl_vfree(d_sign);
-        d_sign = NULL;
-        return -EINVAL;
-    }
-
-    ka_list_add(&d_sign->list, &d_info->hostpid_list_header);
-    d_info->devdrv_sign_count[d_sign->docker_id]++;
-    return 0;
-}
-
-STATIC int devdrv_manager_get_process_sign(struct file *filep, unsigned int cmd, unsigned long arg)
-{
-    struct devdrv_manager_info *d_info = devdrv_get_manager_info();
-    u32 docker_id = MAX_DOCKER_NUM;
-    struct process_sign dev_sign = {0};
-    int ret;
-
-    if (d_info == NULL) {
-        devdrv_drv_err("d_info is null.\n");
-        return -EINVAL;
-    }
-
-    /*
-     * check current environment :
-     * non-container : docker_id is set to 64;
-     * container : get docker_id , docker_id is 0 ~ 63.
-     */
-    ret = devdrv_manager_container_is_in_container();
-    if (ret) {
-        ret = devdrv_manager_container_get_docker_id(&docker_id);
-        if (ret) {
-            devdrv_drv_err("container get docker_id failed, ret(%d).\n", ret);
-            return -EINVAL;
-        }
-    }
-
-    ka_task_mutex_lock(&d_info->devdrv_sign_list_lock);
-    ret = devdrv_get_process_sign(d_info, dev_sign.sign, PROCESS_SIGN_LENGTH, docker_id);
-    if (ret) {
-        ka_task_mutex_unlock(&d_info->devdrv_sign_list_lock);
-        devdrv_drv_err("get process_sign failed, ret(%d).\n", ret);
-        return ret;
-    }
-    ka_task_mutex_unlock(&d_info->devdrv_sign_list_lock);
-
-    dev_sign.tgid = current->tgid;
-
-    ret = copy_to_user_safe((void *)((uintptr_t)arg), &dev_sign, sizeof(struct process_sign));
-    if (ret) {
-        devdrv_drv_err("copy to user failed, ret(%d).\n", ret);
-        return ret;
-    }
-    (void)memset_s(dev_sign.sign, PROCESS_SIGN_LENGTH, 0, PROCESS_SIGN_LENGTH);
-
-    return 0;
-}
-
-STATIC int devdrv_host_query_process_by_host_pid(struct devdrv_ioctl_para_query_pid *para_info,
-    struct devdrv_info *info)
-{
-    int ret;
-    int out_len = 0;
-    ka_pid_t host_tgid = -1;
-    struct devdrv_manager_msg_info dev_manager_msg_info = {{0}, {0}};
-    struct devdrv_ioctl_para_query_pid *para_info_tmp;
-
-    if (para_info == NULL || info == NULL) {
-        devdrv_drv_err("para_info or info is NULL!.\n");
-        return -EINVAL;
-    }
-
-    if (devdrv_get_tgid_by_pid(para_info->host_pid, &host_tgid) != 0) {
-        devdrv_drv_err("Failed to get tgid by pid. (pid=%d)\n", para_info->host_pid);
-        return -EINVAL;
-    }
-    para_info->host_pid = host_tgid;
-
-#ifndef DEVDRV_MANAGER_HOST_UT_TEST
-    if ((para_info->cp_type == DEVDRV_PROCESS_CP1) && (para_info->vfid == 0)) { /* not support host cp query */
-        /* host has cp, store device cp in dev_only */
-        ret = devdrv_query_process_by_host_pid(para_info->host_pid, info->dev_id, DEVDRV_PROCESS_DEV_ONLY,
-            para_info->vfid, &para_info->pid);
-        if (ret == 0) {
-            return 0;
-        }
-    }
-#endif
-
-    dev_manager_msg_info.header.dev_id = info->dev_id;
-    dev_manager_msg_info.header.msg_id = DEVDRV_MANAGER_CHAN_H2D_QUERY_DEVICE_PID;
-    dev_manager_msg_info.header.valid = DEVDRV_MANAGER_MSG_VALID;
-    /* give a random value for checking result later */
-    dev_manager_msg_info.header.result = (u16)DEVDRV_MANAGER_MSG_INVALID_RESULT;
-    /* inform corresponding devid to device side */
-
-    para_info_tmp = (struct devdrv_ioctl_para_query_pid *)dev_manager_msg_info.payload;
-    para_info_tmp->cp_type = para_info->cp_type;
-    para_info_tmp->host_pid = para_info->host_pid;
-    para_info_tmp->vfid = para_info->vfid;
-    para_info_tmp->chip_id = para_info->chip_id;
-
-    ret = devdrv_manager_send_msg(info, &dev_manager_msg_info, &out_len);
-    if (ret != 0) {
-        devdrv_drv_warn("send msg to device fail ret = %d.\n", ret);
-        return ret;
-    }
-    if (out_len != (sizeof(struct devdrv_ioctl_para_query_pid) + sizeof(struct devdrv_manager_msg_head))) {
-        devdrv_drv_warn("receive response len %d is not equal = %ld.\n", out_len,
-            (sizeof(struct devdrv_ioctl_para_query_pid) + sizeof(struct devdrv_manager_msg_head)));
-        return -EINVAL;
-    }
-    if (dev_manager_msg_info.header.result != 0) {
-        devdrv_drv_warn("Can not get device pid. (ret=%d).\n", dev_manager_msg_info.header.result);
-        return dev_manager_msg_info.header.result;
-    }
-
-    para_info->pid = para_info_tmp->pid;
-    return 0;
-}
-
-int devdrv_host_query_devpid(struct file *filep, unsigned int cmd, unsigned long arg)
-{
-    int ret;
-    struct devdrv_ioctl_para_query_pid para_info;
-    struct devdrv_info *info = NULL;
-    unsigned int phy_id = 0;
-    unsigned int vfid = 0;
-
-    if (copy_from_user_safe(&para_info, (void *)(uintptr_t)arg, sizeof(struct devdrv_ioctl_para_query_pid))) {
-        devdrv_drv_err("[devdrv_query_devpid] copy_from_user error\n");
-        return -EINVAL;
-    }
-
-    ret = devdrv_manager_container_logical_id_to_physical_id(para_info.chip_id, &phy_id, &vfid);
-    if (ret != 0) {
-        devdrv_drv_err("can't get phys device id. virt id is %u, ret = %d.\n", para_info.chip_id, ret);
-        return -EINVAL;
-    }
-
-    info = devdrv_manager_get_devdrv_info(phy_id);
-    if (info == NULL) {
-        devdrv_drv_err("info is NULL!.\n");
-        return -EINVAL;
-    }
-
-    ret = dms_hotreset_task_cnt_increase(phy_id);
-    if (ret != 0) {
-        devdrv_drv_err("Hotreset task cnt increase failed. (dev_id=%u; ret=%d)\n", phy_id, ret);
-        return ret;
-    }
-
-    ret = devdrv_host_query_process_by_host_pid(&para_info, info);
-    if (ret) {
-#ifndef DEVDRV_MANAGER_HOST_UT_TEST
-        devdrv_drv_warn("Can not query device_pid by host_pid. (ret=%d; host_pid=%u; cp_type=%u)\n",
-            ret, para_info.host_pid, para_info.cp_type);
-#endif
-        goto out;
-    }
-
-    if (copy_to_user_safe((void *)((uintptr_t)arg), &para_info, sizeof(struct devdrv_ioctl_para_query_pid))) {
-        devdrv_drv_err("[devdrv_query_devpid] copy_to_user error\n");
-        ret = -EINVAL;
-        goto out;
-    }
-    dms_hotreset_task_cnt_decrease(phy_id);
-    return 0;
-out:
-    dms_hotreset_task_cnt_decrease(phy_id);
-    return ret;
-}
 
 STATIC int devdrv_host_notice_dev_process_exit(u32 phy_id, int host_pid)
 {
@@ -3319,7 +735,7 @@ STATIC void devdrv_notify_all_dev_reboot(void)
         return;
     }
 
-    for (i = 0; i < DEVDRV_PF_DEV_MAX_NUM; ++i) {
+    for (i = 0; i < ASCEND_PDEV_MAX_NUM; ++i) {
         if (!uda_is_udevid_exist(i)) {
             continue;
         }
@@ -3349,43 +765,6 @@ STATIC void devdrv_host_release_notice_dev(int host_pid)
     }
 }
 
-STATIC int devdrv_manager_get_dev_resource_info(struct devdrv_resource_info *dinfo)
-{
-    struct devdrv_manager_msg_resource_info info;
-    u32 phy_id = 0;
-    u32 vfid = 0;
-    int ret;
-
-    if ((dinfo->resource_type == DEVDRV_DEV_PROCESS_PID) || (dinfo->resource_type == DEVDRV_DEV_PROCESS_MEM)) {
-        return -EOPNOTSUPP;
-    }
-
-#ifndef CFG_FEATURE_DDR
-    if ((dinfo->resource_type == DEVDRV_DEV_DDR_TOTAL) || (dinfo->resource_type == DEVDRV_DEV_DDR_FREE)) {
-        return -EOPNOTSUPP;
-    }
-#endif
-
-    ret = devdrv_manager_container_logical_id_to_physical_id(dinfo->devid, &phy_id, &vfid);
-    if (ret) {
-        devdrv_drv_err("logical_id_to_physical_id fail, devid(%u) ret(%d).\n", dinfo->devid, ret);
-        return ret;
-    }
-
-    info.vfid = vfid;
-    info.info_type = dinfo->resource_type;
-    info.owner_id = dinfo->owner_id;
-    ret = hvdevmng_get_dev_resource(phy_id, dinfo->tsid, &info);
-    if (ret) {
-        devdrv_drv_err("get resource info failed, devid(%u), resource type (%u) ret(%d).\n",
-            dinfo->devid, dinfo->resource_type, ret);
-        return ret;
-    }
-    *((u64 *)dinfo->buf) = info.value;
-
-    return 0;
-}
-
 int devdrv_manager_get_docker_id(u32 *docker_id)
 {
     if (devdrv_manager_container_is_in_container()) {
@@ -3397,953 +776,19 @@ int devdrv_manager_get_docker_id(u32 *docker_id)
 }
 KA_EXPORT_SYMBOL(devdrv_manager_get_docker_id);
 
-STATIC int devdrv_manager_get_container_pid(ka_pid_t hostpid, ka_pid_t *container_pid)
+STATIC ssize_t devdrv_manager_read(ka_file_t *filep, char __ka_user *buf, size_t count, loff_t *ppos)
 {
-    struct pid *pgrp = NULL;
-    struct task_struct *tsk = NULL;
-
-    ka_task_rcu_read_lock();
-    ka_for_each_process(tsk) {
-        if ((tsk != NULL) && (tsk->pid == hostpid)) {
-            pgrp = task_pid(tsk);
-            if (pgrp == NULL) {
-                ka_task_rcu_read_unlock();
-                devdrv_drv_err("The process group parameter is NULL.\n");
-                return -EINVAL;
-            }
-            *container_pid = pgrp->numbers[pgrp->level].nr;
-            break;
-        }
-    }
-    ka_task_rcu_read_unlock();
-
     return 0;
 }
 
-STATIC int devdrv_manager_get_hostpid(ka_pid_t container_pid, ka_pid_t *hostpid)
-{
-    struct pid *pgrp = NULL;
-
-    if (devdrv_manager_container_is_in_container()) {
-        pgrp = ka_task_find_get_pid(container_pid);
-        if (pgrp == NULL) {
-            devdrv_drv_err("The pgrp parameter is NULL.\n");
-            return -EINVAL;
-        }
-        *hostpid = pgrp->numbers[0].nr; /* 0:hostpid */
-        ka_task_put_pid(pgrp);
-    } else {
-        *hostpid = container_pid;
-    }
-
-    return 0;
-}
-
-STATIC int (*dms_set_dev_info_handlers[DMS_DEV_INFO_TYPE_MAX])(u32 devid, const void *buf, u32 buf_size);
-static KA_TASK_DEFINE_MUTEX(dev_info_handler_mutex);
-
-#ifndef DEVDRV_MANAGER_HOST_UT_TEST
-int dms_register_set_dev_info_handler(DMS_DEV_INFO_TYPE type, dms_set_dev_info_ops func)
-{
-    if (func == NULL) {
-        devdrv_drv_err("Register function of setting device information is null.\n");
-        return -EINVAL;
-    }
-
-    if (type >= DMS_DEV_INFO_TYPE_MAX) {
-        devdrv_drv_err("Register type is error. (type=%u)\n", type);
-        return -EINVAL;
-    }
-    ka_task_mutex_lock(&dev_info_handler_mutex);
-    dms_set_dev_info_handlers[type] = func;
-    ka_task_mutex_unlock(&dev_info_handler_mutex);
-    return 0;
-}
-KA_EXPORT_SYMBOL(dms_register_set_dev_info_handler);
-#endif
-
-int dms_unregister_set_dev_info_handler(DMS_DEV_INFO_TYPE type)
-{
-    if (type >= DMS_DEV_INFO_TYPE_MAX) {
-        devdrv_drv_err("Unregister type is error. (type=%u)\n", type);
-        return -EINVAL;
-    }
-    ka_task_mutex_lock(&dev_info_handler_mutex);
-    dms_set_dev_info_handlers[type] = NULL;
-    ka_task_mutex_unlock(&dev_info_handler_mutex);
-    return 0;
-}
-KA_EXPORT_SYMBOL(dms_unregister_set_dev_info_handler);
-
-STATIC int (*dms_get_svm_dev_info_handlers[DMS_DEV_INFO_TYPE_MAX])(u32 devid, void *buf, u32 *buf_size);
-static KA_TASK_DEFINE_MUTEX(svm_get_dev_info_mutex);
-
-int dms_register_get_svm_dev_info_handler(DMS_DEV_INFO_TYPE type, dms_get_dev_info_ops func)
-{
-    if (func == NULL) {
-        devdrv_drv_err("Register function of getting device information is null.\n");
-        return -EINVAL;
-    }
-
-    if (type >= DMS_DEV_INFO_TYPE_MAX) {
-        devdrv_drv_err("Register type is error. (type=%u)\n", type);
-        return -EINVAL;
-    }
-    ka_task_mutex_lock(&svm_get_dev_info_mutex);
-    dms_get_svm_dev_info_handlers[type] = func;
-    ka_task_mutex_unlock(&svm_get_dev_info_mutex);
-    return 0;
-}
-KA_EXPORT_SYMBOL(dms_register_get_svm_dev_info_handler);
-
-int dms_unregister_get_svm_dev_info_handler(DMS_DEV_INFO_TYPE type)
-{
-    if (type >= DMS_DEV_INFO_TYPE_MAX) {
-        devdrv_drv_err("Unregister type is error. (type=%u)\n", type);
-        return -EINVAL;
-    }
-    ka_task_mutex_lock(&svm_get_dev_info_mutex);
-    dms_get_svm_dev_info_handlers[type] = NULL;
-    ka_task_mutex_unlock(&svm_get_dev_info_mutex);
-    return 0;
-}
-KA_EXPORT_SYMBOL(dms_unregister_get_svm_dev_info_handler);
-
-devmm_get_device_accounting_pids_ops get_device_pids_from_devmm = NULL;
-static KA_TASK_DEFINE_MUTEX(devmm_get_pids_mutex);
-int devdrv_manager_get_process_pids_register(devmm_get_device_accounting_pids_ops func)
-{
-    if (func == NULL) {
-        devdrv_drv_err("Register pids operation function null.\n");
-        return -EINVAL;
-    }
-
-    ka_task_mutex_lock(&devmm_get_pids_mutex);
-    get_device_pids_from_devmm = func;
-    ka_task_mutex_unlock(&devmm_get_pids_mutex);
-    return 0;
-}
-KA_EXPORT_SYMBOL(devdrv_manager_get_process_pids_register);
-
-void devdrv_manager_get_process_pids_unregister(void)
-{
-    ka_task_mutex_lock(&devmm_get_pids_mutex);
-    get_device_pids_from_devmm = NULL;
-    ka_task_mutex_unlock(&devmm_get_pids_mutex);
-}
-KA_EXPORT_SYMBOL(devdrv_manager_get_process_pids_unregister);
-
-STATIC int devdrv_manager_get_accounting_pid(u32 phyid, u32 vfid, struct devdrv_resource_info *dinfo)
-{
-    int ret;
-    ka_pid_t pid = -1;
-    u32 i;
-    u32 docker_id = 0;
-    int out_cnt = 0;
-
-    if (dinfo->buf_len > DEVDRV_MAX_PAYLOAD_LEN) {
-        dinfo->buf_len = DEVDRV_MAX_PAYLOAD_LEN;
-    }
-
-    ret = devdrv_manager_get_docker_id(&docker_id);
-    if (ret) {
-        devdrv_drv_err("The devdrv_manager_container_get_docker_id failed. (devid=%u; docker_id=%d; ret=%d)\n",
-            dinfo->devid, docker_id, ret);
-        return ret;
-    }
-
-    ka_task_mutex_lock(&devmm_get_pids_mutex);
-    if (get_device_pids_from_devmm == NULL) {
-        ka_task_mutex_unlock(&devmm_get_pids_mutex);
-        devdrv_drv_err("The devmm_get_device_accounting_pids is NULL.\n");
-        return -EINVAL;
-    }
-
-    out_cnt = get_device_pids_from_devmm(docker_id, phyid, vfid,
-        (ka_pid_t *)dinfo->buf, (dinfo->buf_len / sizeof(ka_pid_t)));
-    if (out_cnt < 0) {
-        ka_task_mutex_unlock(&devmm_get_pids_mutex);
-        devdrv_drv_err("Failed to obtain the PID list of the process from SVM. (devid=%u; docker_id=%d; count=%d)\n",
-            dinfo->devid, docker_id, out_cnt);
-        return -EINVAL;
-    }
-    ka_task_mutex_unlock(&devmm_get_pids_mutex);
-
-    if (out_cnt > DEVDRV_MAX_PAYLOAD_LEN / sizeof(ka_pid_t)) {
-        out_cnt = DEVDRV_MAX_PAYLOAD_LEN / sizeof(ka_pid_t);
-    }
-
-    if (docker_id < MAX_DOCKER_NUM) {
-        for (i = 0; i < out_cnt; i++) {
-            ret = devdrv_manager_get_container_pid(((ka_pid_t *)dinfo->buf)[i], &pid);
-            if (ret) {
-                devdrv_drv_err("devdrv_manager_get_container_pid failed. (devid=%u; hostpid=%d; ret=%d)\n",
-                    dinfo->devid, ((u32 *)dinfo->buf)[i], ret);
-                return ret;
-            }
-            ((ka_pid_t *)dinfo->buf)[i] = pid;
-        }
-    }
-    dinfo->buf_len = out_cnt * sizeof(ka_pid_t);
-
-    return 0;
-}
-
-STATIC int devdrv_manager_get_process_memory(u32 fid, u32 phyid, struct devdrv_resource_info *dinfo)
-{
-    int ret;
-    ka_pid_t hostpid = -1;
-    struct devdrv_manager_msg_resource_info resource_info;
-
-    if (fid >= VMNG_VDEV_MAX_PER_PDEV || dinfo->buf_len > DEVDRV_MAX_PAYLOAD_LEN) {
-        devdrv_drv_err("Invalid parameter. (fid=%d; buf_len=%d)\n", fid, dinfo->buf_len);
-        return -EINVAL;
-    }
-
-    ret = devdrv_manager_get_hostpid(dinfo->owner_id, &hostpid);
-    if (ret != 0) {
-        devdrv_drv_err("devdrv_manager_get_hostpid failed. (owner_id=%d; hostpid=%d; ret=%d;)\n",
-            dinfo->owner_id, hostpid, ret);
-        return -EINVAL;
-    }
-
-    resource_info.vfid = fid;
-    resource_info.info_type = dinfo->resource_type;
-    resource_info.owner_id = hostpid;
-    ret = devdrv_manager_h2d_query_resource_info(phyid, &resource_info);
-    if (ret) {
-        devdrv_drv_ex_notsupport_err(ret, "h2d_query_resource_info failed. (devid=%u; info_type=%d; ret=%d)\n",
-            dinfo->devid, dinfo->resource_type, ret);
-        return ret;
-    }
-    *((u64 *)dinfo->buf) = resource_info.value;
-    if (dinfo->buf_len > sizeof(u64)) {
-        dinfo->buf_len = sizeof(u64);
-    }
-
-    return 0;
-}
-
-STATIC int devdrv_manager_get_process_resource_info(struct devdrv_resource_info *dinfo)
-{
-    int ret;
-    u32 phy_id = 0;
-    u32 vfid = 0;
-
-    if (dinfo->devid >= ASCEND_DEV_MAX_NUM) {
-        devdrv_drv_err("Invalid parameter. (devid=%u)\n", dinfo->devid);
-        return -EINVAL;
-    }
-    ret = devdrv_manager_container_logical_id_to_physical_id(dinfo->devid, &phy_id, &vfid);
-    if (ret) {
-        devdrv_drv_err("Logical id to physical id failed. (devid=%u; phy_id=%d; ret=%d)\n", dinfo->devid, phy_id, ret);
-        return ret;
-    }
-
-    switch (dinfo->resource_type) {
-        case DEVDRV_DEV_PROCESS_PID:
-            ret = devdrv_manager_get_accounting_pid(phy_id, vfid, dinfo);
-            break;
-        case DEVDRV_DEV_PROCESS_MEM:
-            ret = devdrv_manager_get_process_memory(vfid, phy_id, dinfo);
-            break;
-        default:
-            devdrv_drv_err("Invalid device process resource type. (type=%d)", dinfo->resource_type);
-            return -EINVAL;
-    }
-
-    if (ret) {
-        devdrv_drv_ex_notsupport_err(ret, "devdrv_manager_get_process_resource_info failed. (ret=%d; type=%d)\n",
-            ret, dinfo->resource_type);
-    }
-    return ret;
-}
-
-STATIC int (*const dmanage_get_resource_handler[DEVDRV_MAX_OWNER_TYPE])(struct devdrv_resource_info *dinfo) = {
-    [DEVDRV_DEV_RESOURCE] = devdrv_manager_get_dev_resource_info,
-    [DEVDRV_VDEV_RESOURCE] = devdrv_manager_get_vdev_resource_info,
-    [DEVDRV_PROCESS_RESOURCE] = devdrv_manager_get_process_resource_info,
+const ka_file_operations_t devdrv_manager_file_operations = {
+    ka_fs_init_f_owner(KA_THIS_MODULE)
+    ka_fs_init_f_read(devdrv_manager_read)
+    ka_fs_init_f_open(devdrv_manager_open)
+    ka_fs_init_f_release(devdrv_manager_release)
+    ka_fs_init_f_unlocked_ioctl(devdrv_manager_ioctl)
+    ka_fs_init_f_poll(devdrv_manager_poll)
 };
-
-int devdrv_manager_ioctl_get_dev_resource_info(struct file *filep, unsigned int cmd, unsigned long arg)
-{
-    struct devdrv_resource_info dinfo = {0};
-    int ret;
-
-    if (copy_from_user_safe(&dinfo, (void *)(uintptr_t)arg, sizeof(dinfo))) {
-        return -EFAULT;
-    }
-
-    if (dinfo.owner_type >= DEVDRV_MAX_OWNER_TYPE) {
-        devdrv_drv_err("devid(%u) invalid owner_type(%u).\n", dinfo.devid, dinfo.owner_type);
-        return -EINVAL;
-    }
-
-    if (dmanage_get_resource_handler[dinfo.owner_type] == NULL) {
-        return -EOPNOTSUPP;
-    }
-
-    ret = dmanage_get_resource_handler[dinfo.owner_type](&dinfo);
-    if (ret) {
-        devdrv_drv_ex_notsupport_err(ret, "get dev resource info failed devid(%u) owner_type(%u), ret = %d.\n",
-            dinfo.devid, dinfo.owner_type, ret);
-        return ret;
-    }
-
-    if (copy_to_user_safe((void *)(uintptr_t)arg, &dinfo, sizeof(dinfo))) {
-        devdrv_drv_err("copy to user failed.\n");
-        return -EFAULT;
-    }
-
-    return 0;
-}
-
-#ifdef CFG_FEATURE_CHIP_DIE
-int devdrv_manager_ioctl_get_chip_count(struct file *filep, unsigned int cmd, unsigned long arg)
-{
-    int ret;
-    int count = 0;
-    unsigned int phy_id = 0;
-    unsigned int vfid = 0;
-
-    ret = devdrv_manager_container_logical_id_to_physical_id(0, &phy_id, &vfid);
-    if (ret != 0) {
-        devdrv_drv_err("Transfer logical id to physical id failed.\n");
-        return -EPERM;
-    }
-
-    if (!devdrv_manager_is_pf_device(phy_id) || (vfid > 0) || devdrv_manager_container_is_in_container()) {
-        count = devdrv_manager_get_devnum();
-    } else {
-        ret = devdrv_manager_get_chip_count(&count);
-        if (ret != 0) {
-            devdrv_drv_err("Get chip count fail. (ret=%d).\n", ret);
-            return ret;
-        }
-    }
-
-    ret = copy_to_user_safe((void *)(uintptr_t)arg, &count, sizeof(int));
-    if (ret != 0) {
-        devdrv_drv_err("copy to user failed, ret=%d.\n", ret);
-        return -EFAULT;
-    }
-
-    return 0;
-}
-
-int devdrv_manager_ioctl_get_chip_list(struct file *filep, unsigned int cmd, unsigned long arg)
-{
-    int ret;
-    unsigned int i;
-    unsigned int phy_id = 0;
-    unsigned int vfid = 0;
-    struct devdrv_chip_list chip_list = {0};
-
-    ret = copy_from_user_safe(&chip_list, (void *)((uintptr_t)arg), sizeof(struct devdrv_chip_list));
-    if (ret != 0) {
-        devdrv_drv_err("copy_from_user_safe fail, ret(%d).\n", ret);
-        return ret;
-    }
-
-    ret = devdrv_manager_container_logical_id_to_physical_id(0, &phy_id, &vfid);
-    if (ret != 0) {
-        devdrv_drv_err("Transfer logical id to physical id failed. (ret=%d)\n", ret);
-        return -EPERM;
-    }
-
-    if (!devdrv_manager_is_pf_device(phy_id) || (vfid > 0) || devdrv_manager_container_is_in_container()) {
-        chip_list.count = devdrv_manager_get_devnum();
-        /*
-         * devdrv_manager_get_devnum's max return is UDA_DEV_MAX_NUM here.
-         * host: UDA_DEV_MAX_NUM = 100; VDAVINCI_VDEV_OFFSET = 100;
-         * the VDAVINCI_VDEV_OFFSET must be equal to UDA_DEV_MAX_NUM
-         **/
-        if (chip_list.count > VDAVINCI_VDEV_OFFSET) {
-            devdrv_drv_err("Invalid device number. (devnum=%u; max=%u)\n", chip_list.count, VDAVINCI_VDEV_OFFSET);
-            return -EINVAL;
-        }
-        for (i = 0; i < chip_list.count; i++) {
-            chip_list.chip_list[i] = i;
-        }
-    } else {
-        ret = devdrv_manager_get_chip_list(&chip_list);
-        if (ret != 0) {
-            devdrv_drv_err("Get chip list failed. (ret=%d)\n", ret);
-            return ret;
-        }
-    }
-
-    ret = copy_to_user_safe((void *)(uintptr_t)arg, &chip_list, sizeof(struct devdrv_chip_list));
-    if (ret != 0) {
-        devdrv_drv_err("copy to user failed, ret=%d.\n", ret);
-        return -EFAULT;
-    }
-
-    return 0;
-}
-
-int devdrv_manager_ioctl_get_device_from_chip(struct file *filep, unsigned int cmd, unsigned long arg)
-{
-    int ret;
-    unsigned int phy_id = 0;
-    unsigned int vfid = 0;
-    struct devdrv_chip_dev_list *chip_dev_list = NULL;
-
-    chip_dev_list = (struct devdrv_chip_dev_list *)dbl_kzalloc(sizeof(struct devdrv_chip_dev_list),
-        KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
-    if (chip_dev_list == NULL) {
-        devdrv_drv_err("Allocate memory for chip device list failed.\n");
-        return -ENOMEM;
-    }
-
-    ret = copy_from_user_safe(chip_dev_list, (void *)((uintptr_t)arg), sizeof(struct devdrv_chip_dev_list));
-    if (ret != 0) {
-        devdrv_drv_err("copy_from_user_safe fail, ret(%d).\n", ret);
-        goto FREE_CHIP_DEV_LIST;
-    }
-
-    ret = devdrv_manager_container_logical_id_to_physical_id(0, &phy_id, &vfid);
-    if (ret != 0) {
-        devdrv_drv_err("Transfer logical id to physical id failed. (ret=%d)\n", ret);
-        goto FREE_CHIP_DEV_LIST;
-    }
-
-    if (!devdrv_manager_is_pf_device(phy_id) || (vfid > 0) || devdrv_manager_container_is_in_container()) {
-        if ((chip_dev_list->chip_id < devdrv_manager_get_devnum()) && (chip_dev_list->chip_id < DEVDRV_MAX_CHIP_NUM)) {
-            chip_dev_list->count = 1;
-            chip_dev_list->dev_list[0] = chip_dev_list->chip_id;
-        } else {
-            devdrv_drv_err("Chip id is invalid. (chip_id=%u)\n", chip_dev_list->chip_id);
-            ret = -EINVAL;
-            goto FREE_CHIP_DEV_LIST;
-        }
-    } else {
-        ret = devdrv_manager_get_device_from_chip(chip_dev_list);
-        if (ret != 0) {
-            devdrv_drv_err("Get device list from chip id failed. (ret=%d)\n", ret);
-            goto FREE_CHIP_DEV_LIST;
-        }
-    }
-
-    ret = copy_to_user_safe((void *)(uintptr_t)arg, chip_dev_list, sizeof(struct devdrv_chip_dev_list));
-    if (ret != 0) {
-        devdrv_drv_err("copy to user failed, ret=%d.\n", ret);
-        goto FREE_CHIP_DEV_LIST;
-    }
-
-FREE_CHIP_DEV_LIST:
-    dbl_kfree(chip_dev_list);
-    chip_dev_list = NULL;
-    return ret;
-}
-
-int devdrv_manager_ioctl_get_chip_from_device(struct file *filep, unsigned int cmd, unsigned long arg)
-{
-    int ret;
-    unsigned int phy_id = 0;
-    unsigned int vfid = 0;
-    struct devdrv_get_dev_chip_id chip_from_dev = {0};
-
-    ret = copy_from_user_safe(&chip_from_dev, (void *)((uintptr_t)arg), sizeof(struct devdrv_get_dev_chip_id));
-    if (ret != 0) {
-        devdrv_drv_err("copy_from_user_safe fail, ret(%d).\n", ret);
-        return ret;
-    }
-
-    ret = devdrv_manager_container_logical_id_to_physical_id(0, &phy_id, &vfid);
-    if (ret != 0) {
-        devdrv_drv_err("Transfer logical id to physical id failed.\n");
-        return -EPERM;
-    }
-
-    if (!devdrv_manager_is_pf_device(phy_id) || (vfid > 0) || devdrv_manager_container_is_in_container()) {
-        if ((chip_from_dev.dev_id < devdrv_manager_get_devnum()) && (chip_from_dev.dev_id < DEVDRV_MAX_CHIP_NUM)) {
-            chip_from_dev.chip_id = chip_from_dev.dev_id;
-        } else {
-            devdrv_drv_err("Device id is invalid. (dev_id=%u)\n", chip_from_dev.dev_id);
-            return -EINVAL;
-        }
-    } else {
-        ret = devdrv_manager_get_chip_from_device(&chip_from_dev);
-        if (ret != 0) {
-            devdrv_drv_err("devdrv_manager_get_chip_from_device failed. (ret=%d)\n", ret);
-            return ret;
-        }
-    }
-
-    ret = copy_to_user_safe((void *)(uintptr_t)arg, &chip_from_dev, sizeof(struct devdrv_get_dev_chip_id));
-    if (ret != 0) {
-        devdrv_drv_err("copy to user failed, ret=%d.\n", ret);
-        return -EFAULT;
-    }
-
-    return 0;
-}
-#endif
-
-STATIC int devdrv_manager_ioctl_set_vdevinfo(struct file *filep, unsigned int cmd, unsigned long arg)
-{
-#ifdef CFG_FEATURE_DMS_SVM_DEV
-    int ret;
-    u32 vfid = 0;
-    u32 phy_id = 0;
-    struct devdrv_svm_vdev_info vinfo = {0};
-    struct devmm_set_convert_len_para len_para = {0};
-
-    if (devdrv_manager_check_permission()) {
-        return -EOPNOTSUPP;
-    }
-
-    ret = copy_from_user_safe(&vinfo, (void *)((uintptr_t)arg), sizeof(struct devdrv_svm_vdev_info));
-    if (ret != 0) {
-        devdrv_drv_err("Copy from user failed. (ret=%d)\n", ret);
-        return -EFAULT;
-    }
-
-    if (vinfo.type >= DMS_DEV_INFO_TYPE_MAX) {
-        devdrv_drv_err("Invalid type. (dev_id=%u; type=%u)\n", vinfo.devid, vinfo.type);
-        return -EINVAL;
-    }
-
-    if (vinfo.devid != DEVMNG_SET_ALL_DEV) {
-        ret = devdrv_manager_container_logical_id_to_physical_id(vinfo.devid, &phy_id, &vfid);
-        if (ret != 0) {
-            devdrv_drv_err("logical_id_to_physical_id fail, devid(%u) ret(%d).\n", vinfo.devid, ret);
-            return ret;
-        }
-        vinfo.devid = phy_id;
-    }
-
-    if (vinfo.buf_size != sizeof(len_para)) {
-        devdrv_drv_err("Buffer size is error. (dev_id=%u; buf_size=%u;)\n",  vinfo.devid, vinfo.buf_size);
-        return -EINVAL;
-    }
-
-    ret = memcpy_s(&len_para, sizeof(len_para), vinfo.buf, vinfo.buf_size);
-    if (ret != 0) {
-        devdrv_drv_err("Memcpy failed. (ret=%d)\n", ret);
-        return -EFAULT;
-    }
-
-    ka_task_mutex_lock(&dev_info_handler_mutex);
-    if (dms_set_dev_info_handlers[vinfo.type] == NULL) {
-        ka_task_mutex_unlock(&dev_info_handler_mutex);
-        return -EOPNOTSUPP;
-    }
-
-    ret = dms_set_dev_info_handlers[vinfo.type](vinfo.devid, (void *)&len_para, sizeof(len_para));
-    if (ret != 0) {
-        ka_task_mutex_unlock(&dev_info_handler_mutex);
-        devdrv_drv_err("Set vdevice information failed. (dev_id=%u; type=%u)\n", vinfo.devid, vinfo.type);
-        return ret;
-    }
-    ka_task_mutex_unlock(&dev_info_handler_mutex);
-
-    return 0;
-#else
-    return -EOPNOTSUPP;
-#endif
-}
-
-STATIC int devdrv_manager_ioctl_get_svm_vdevinfo(struct file *filep, unsigned int cmd, unsigned long arg)
-{
-#ifdef CFG_FEATURE_DMS_SVM_DEV
-    int ret;
-    u32 vfid = 0;
-    u32 phy_id = 0;
-    struct devdrv_svm_vdev_info vinfo = {0};
-
-    if (devdrv_manager_check_permission()) {
-        return -EOPNOTSUPP;
-    }
-
-    ret = copy_from_user_safe(&vinfo, (void *)((uintptr_t)arg), sizeof(struct devdrv_svm_vdev_info));
-    if (ret != 0) {
-        devdrv_drv_err("Copy from user failed. (ret=%d)\n", ret);
-        return -EFAULT;
-    }
-
-    if (vinfo.type >= DMS_DEV_INFO_TYPE_MAX) {
-        devdrv_drv_err("Invalid type. (dev_id=%u; type=%u)\n", vinfo.devid, vinfo.type);
-        return -EINVAL;
-    }
-
-    ret = devdrv_manager_container_logical_id_to_physical_id(vinfo.devid, &phy_id, &vfid);
-    if (ret != 0) {
-        devdrv_drv_err("logical_id_to_physical_id fail, devid(%u) ret(%d).\n", vinfo.devid, ret);
-        return ret;
-    }
-    vinfo.devid = phy_id;
-
-    if (vinfo.buf_size != DEVDRV_SVM_VDEV_LEN) {
-        devdrv_drv_err("Buffer size is error. (dev_id=%u; buf_size=%u;)\n",  vinfo.devid, vinfo.buf_size);
-        return -EINVAL;
-    }
-
-    ka_task_mutex_lock(&svm_get_dev_info_mutex);
-    if (dms_get_svm_dev_info_handlers[vinfo.type] == NULL) {
-        ka_task_mutex_unlock(&svm_get_dev_info_mutex);
-        return -EOPNOTSUPP;
-    }
-
-    ret = dms_get_svm_dev_info_handlers[vinfo.type](vinfo.devid, (void *)vinfo.buf, &vinfo.buf_size);
-    if (ret != 0) {
-        ka_task_mutex_unlock(&svm_get_dev_info_mutex);
-        devdrv_drv_err("Get vdevice information failed. (dev_id=%u; type=%u)\n", vinfo.devid, vinfo.type);
-        return ret;
-    }
-    ka_task_mutex_unlock(&svm_get_dev_info_mutex);
-
-    ret = copy_to_user_safe((void *)((uintptr_t)arg), &vinfo, sizeof(struct devdrv_svm_vdev_info));
-    if (ret != 0) {
-        devdrv_drv_err("devid=%d copy to user failed.,ret = %d\n", vinfo.devid, ret);
-        return ret;
-    }
-
-    return 0;
-#else
-    return -EOPNOTSUPP;
-#endif
-}
-
-#ifdef CFG_FEATURE_VASCEND
-STATIC int devdrv_manager_ioctl_set_vdevmode(struct file *filep, unsigned int cmd, unsigned long arg)
-{
-    int ret;
-    int mode;
-
-    if (devdrv_manager_check_permission()) {
-        return -EOPNOTSUPP;
-    }
-
-    ret = copy_from_user_safe(&mode, (void *)((uintptr_t)arg), sizeof(int));
-    if (ret != 0) {
-        devdrv_drv_err("Copy from user failed. (ret=%d)\n", ret);
-        return -EFAULT;
-    }
-
-    ret = hw_dvt_set_mode(mode);
-    if (ret != 0) {
-        devdrv_drv_err("Set vdevice mode failed. (mode=%d)\n", mode);
-        return ret;
-    }
-
-    return 0;
-}
-
-STATIC int devdrv_manager_ioctl_get_vdevmode(struct file *filep, unsigned int cmd, unsigned long arg)
-{
-    int ret;
-    int mode;
-
-    if (devdrv_manager_check_permission()) {
-        return -EOPNOTSUPP;
-    }
-
-    ret = hw_dvt_get_mode(&mode);
-    if (ret != 0) {
-        devdrv_drv_err("hw_dvt_get_mode fail, ret=%d.\n", ret);
-        return ret;
-    }
-
-    ret = copy_to_user_safe((void *)(uintptr_t)arg, &mode, sizeof(int));
-    if (ret != 0) {
-        devdrv_drv_err("copy to user failed, ret=%d.\n", ret);
-        return -EFAULT;
-    }
-
-    return 0;
-}
-#endif
-
-STATIC int (*const devdrv_manager_ioctl_handlers[DEVDRV_MANAGER_CMD_MAX_NR])(struct file *filep, unsigned int cmd,
-    unsigned long arg) = {
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_PCIINFO)] = devdrv_manager_get_pci_info,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_PLATINFO)] = devdrv_manager_ioctl_get_plat_info,
-        [_KA_IOC_NR(DEVDRV_MANAGER_DEVICE_STATUS)] = devdrv_manager_get_device_status,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_CORE_SPEC)] = devdrv_manager_get_core,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_CORE_INUSE)] = devdrv_manager_get_core,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_CONTAINER_DEVIDS)] = devdrv_manager_devinfo_ioctl,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_DEVINFO)] = devdrv_manager_devinfo_ioctl,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_DEVID_BY_LOCALDEVID)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_DEV_INFO_BY_PHYID)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_PCIE_ID_INFO)] = devdrv_manager_devinfo_ioctl,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_CORE_UTILIZATION)] = devdrv_manager_devinfo_ioctl,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_VOLTAGE)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_TEMPERATURE)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_TSENSOR)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_AI_USE_RATE)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_FREQUENCY)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_POWER)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_HEALTH_CODE)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_ERROR_CODE)] = devdrv_get_error_code,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_DDR_CAPACITY)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_LPM3_SMOKE)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_BLACK_BOX_GET_EXCEPTION)] = devdrv_manager_black_box_get_exception,
-        [_KA_IOC_NR(DEVDRV_MANAGER_DEVICE_MEMORY_DUMP)] = devdrv_manager_device_memory_dump,
-        [_KA_IOC_NR(DEVDRV_MANAGER_DEVICE_VMCORE_DUMP)] = devdrv_manager_device_vmcore_dump,
-        [_KA_IOC_NR(DEVDRV_MANAGER_DEVICE_RESET_INFORM)] = devdrv_manager_device_reset_inform,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_MODULE_STATUS)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_REG_DDR_READ)] = devdrv_manager_reg_ddr_read,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_MINI_BOARD_ID)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_PCIE_PRE_RESET)] = devdrv_manager_pcie_pre_reset,
-        [_KA_IOC_NR(DEVDRV_MANAGER_PCIE_RESCAN)] = devdrv_manager_pcie_rescan,
-        [_KA_IOC_NR(DEVDRV_MANAGER_PCIE_HOT_RESET)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_P2P_ATTR)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_ALLOC_HOST_DMA_ADDR)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_PCIE_READ)] = drv_pcie_read,
-        [_KA_IOC_NR(DEVDRV_MANAGER_PCIE_SRAM_WRITE)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_PCIE_WRITE)] = drv_pcie_write,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_EMMC_VOLTAGE)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_DEVICE_BOOT_STATUS)] = drv_get_device_boot_status,
-        [_KA_IOC_NR(DEVDRV_MANAGER_ENABLE_EFUSE_LDO)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_DISABLE_EFUSE_LDO)] = NULL,
-
-        [_KA_IOC_NR(DEVDRV_MANAGER_CONTAINER_CMD)] = devdrv_manager_container_cmd,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_HOST_PHY_MACH_FLAG)] = devdrv_manager_get_host_phy_mach_flag,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_LOCAL_DEVICEIDS)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_IMU_SMOKE)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_SET_NEW_TIME)] = NULL,
-#ifndef CFG_FEATURE_REFACTOR
-        [_KA_IOC_NR(DEVDRV_MANAGER_IPC_NOTIFY_CREATE)] = devdrv_manager_ipc_notify_ioctl,
-        [_KA_IOC_NR(DEVDRV_MANAGER_IPC_NOTIFY_OPEN)] = devdrv_manager_ipc_notify_ioctl,
-        [_KA_IOC_NR(DEVDRV_MANAGER_IPC_NOTIFY_CLOSE)] = devdrv_manager_ipc_notify_ioctl,
-        [_KA_IOC_NR(DEVDRV_MANAGER_IPC_NOTIFY_DESTROY)] = devdrv_manager_ipc_notify_ioctl,
-        [_KA_IOC_NR(DEVDRV_MANAGER_IPC_NOTIFY_SET_PID)] = devdrv_manager_ipc_notify_ioctl,
-        [_KA_IOC_NR(DEVDRV_MANAGER_IPC_NOTIFY_RECORD)] = devdrv_manager_ipc_notify_ioctl,
-        [_KA_IOC_NR(DEVDRV_MANAGER_IPC_NOTIFY_SET_ATTR)] = devdrv_manager_ipc_notify_ioctl,
-        [_KA_IOC_NR(DEVDRV_MANAGER_IPC_NOTIFY_GET_INFO)] = devdrv_manager_ipc_notify_ioctl,
-        [_KA_IOC_NR(DEVDRV_MANAGER_IPC_NOTIFY_GET_ATTR)] = devdrv_manager_ipc_notify_ioctl,
-#else
-        [_KA_IOC_NR(DEVDRV_MANAGER_IPC_NOTIFY_CREATE)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_IPC_NOTIFY_OPEN)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_IPC_NOTIFY_CLOSE)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_IPC_NOTIFY_DESTROY)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_IPC_NOTIFY_SET_PID)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_IPC_NOTIFY_RECORD)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_IPC_NOTIFY_GET_INFO)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_IPC_NOTIFY_SET_ATTR)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_IPC_NOTIFY_GET_ATTR)] = NULL,
-#endif
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_CPU_INFO)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_SEND_TO_IMU)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_RECV_FROM_IMU)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_IMU_INFO)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_CONFIG_ECC_ENABLE)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_PROBE_NUM)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_PROBE_LIST)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_DEBUG_INFORM)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_COMPUTE_POWER)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_SYNC_MATRIX_DAEMON_READY)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_BBOX_ERRSTR)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_PCIE_IMU_DDR_READ)] = drv_pcie_bbox_imu_ddr_read,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_SLOT_ID)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_APPMON_BBOX_EXCEPTION_CMD)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_CONTAINER_FLAG)] = devdrv_manager_get_container_flag,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_PROCESS_SIGN)] = devdrv_manager_get_process_sign,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_MASTER_DEV_IN_THE_SAME_OS)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_LOCAL_DEV_ID_BY_HOST_DEV_ID)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_BOOT_DEV_ID)] = devdrv_manager_online_get_devids,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_TSDRV_DEV_COM_INFO)] = devdrv_manager_get_tsdrv_dev_com_info,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_CAPABILITY_GROUP_INFO)] = devdrv_manager_get_ts_group_info,
-        [_KA_IOC_NR(DEVDRV_MANAGER_PASSTHRU_MCU)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_P2P_CAPABILITY)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_ETH_ID)] = NULL,
-        [_KA_IOC_NR(DEVDRV_MANAGER_BIND_PID_ID)] = devdrv_fop_bind_host_pid,
-        [_KA_IOC_NR(DEVDRV_MANAGER_QUERY_HOST_PID)] = devdrv_fop_query_host_pid,
-        [_KA_IOC_NR(DEVDRV_MANAGER_QUERY_DEV_PID)] = devdrv_host_query_devpid,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_H2D_DEVINFO)] = devdrv_manager_devinfo_ioctl,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_CONSOLE_LOG_LEVEL)] = devdrv_manager_ioctl_get_console_loglevel,
-        [_KA_IOC_NR(DEVDRV_MANAGER_CREATE_VDEV)] = devdrv_manager_ioctl_create_vdev,
-        [_KA_IOC_NR(DEVDRV_MANAGER_DESTROY_VDEV)] = devdrv_manager_ioctl_destroy_vdev,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_VDEVINFO)] = devdrv_manager_ioctl_get_vdevinfo,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_STARTUP_STATUS)] = devdrv_manager_get_device_startup_status,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_DEVICE_HEALTH_STATUS)] = devdrv_manager_get_device_health_status,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_DEV_RESOURCE_INFO)] = devdrv_manager_ioctl_get_dev_resource_info,
-#ifdef CFG_FEATURE_CHIP_DIE
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_CHIP_COUNT)] = devdrv_manager_ioctl_get_chip_count,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_CHIP_LIST)] = devdrv_manager_ioctl_get_chip_list,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_DEVICE_FROM_CHIP)] = devdrv_manager_ioctl_get_device_from_chip,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_CHIP_FROM_DEVICE)] = devdrv_manager_ioctl_get_chip_from_device,
-#endif
-        [_KA_IOC_NR(DEVDRV_MANAGER_SET_SVM_VDEVINFO)] = devdrv_manager_ioctl_set_vdevinfo,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_SVM_VDEVINFO)] = devdrv_manager_ioctl_get_svm_vdevinfo,
-#ifdef CFG_FEATURE_VASCEND
-        [_KA_IOC_NR(DEVDRV_MANAGER_SET_VDEVMODE)] = devdrv_manager_ioctl_set_vdevmode,
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_VDEVMODE)] = devdrv_manager_ioctl_get_vdevmode,
-#endif
-        [_KA_IOC_NR(DEVDRV_MANAGER_GET_VDEVIDS)] = devdrv_manager_devinfo_ioctl,
-        [_KA_IOC_NR(DEVDRV_MANAGER_TS_LOG_DUMP)] = devdrv_manager_tslog_dump,
-#ifdef CFG_FEATURE_DEVICE_SHARE
-        [_KA_IOC_NR(DEVDRV_MANAGER_CONFIG_DEVICE_SHARE)] = devdrv_manager_config_device_share,
-#endif
-};
-
-STATIC long devdrv_manager_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
-{
-    if (dev_manager_info == NULL) {
-        devdrv_drv_err("invalid parameter, "
-                       "dev_manager_info = %pK, "
-                       "arg = 0x%lx\n",
-                       dev_manager_info, arg);
-        return -EINVAL;
-    }
-
-    if (_KA_IOC_NR(cmd) >= DEVDRV_MANAGER_CMD_MAX_NR) {
-        devdrv_drv_err("cmd out of range, cmd = %u, max value = %u\n", _KA_IOC_NR(cmd), DEVDRV_MANAGER_CMD_MAX_NR);
-        return -EINVAL;
-    }
-
-    if (devdrv_manager_ioctl_handlers[_KA_IOC_NR(cmd)] == NULL) {
-        devdrv_drv_err("invalid cmd, cmd = %u\n", _KA_IOC_NR(cmd));
-        return -EINVAL;
-    }
-
-    return devdrv_manager_ioctl_handlers[_KA_IOC_NR(cmd)](filep, cmd, arg);
-}
-
-#ifndef CFG_FEATURE_REFACTOR
-STATIC inline int devdrv_manager_drv_ops_check(void)
-{
-#ifndef DEVDRV_MANAGER_HOST_UT_TEST
-    if (devdrv_host_drv_ops.ipc_notify_create == NULL || devdrv_host_drv_ops.ipc_notify_open == NULL ||
-        devdrv_host_drv_ops.ipc_notify_close == NULL || devdrv_host_drv_ops.ipc_notify_destroy == NULL ||
-        devdrv_host_drv_ops.ipc_notify_set_pid == NULL || devdrv_host_drv_ops.ipc_notify_get_info == NULL ||
-        devdrv_host_drv_ops.ipc_notify_set_attr == NULL || devdrv_host_drv_ops.ipc_notify_get_attr == NULL) {
-        return -EINVAL;
-    }
-#endif
-    return 0;
-}
-
-STATIC int devdrv_manager_ipc_notify_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
-{
-    struct devdrv_notify_ioctl_info notify_ioctl_info;
-    struct devdrv_manager_context *context = NULL;
-    int ret;
-
-    if (filep == NULL) {
-        devdrv_drv_err("filep is NULL.\n");
-        return -EINVAL;
-    }
-
-    if (filep->private_data == NULL) {
-        devdrv_drv_err("filep private_data is NULL.\n");
-        return -EINVAL;
-    }
-
-    context = filep->private_data;
-    if (context->ipc_notify_info == NULL) {
-        devdrv_drv_err("context->ipc_notify_info is NULL.\n");
-        return -ENODEV;
-    }
-
-    ret = copy_from_user_safe(&notify_ioctl_info, (void *)((uintptr_t)arg),
-        sizeof(struct devdrv_notify_ioctl_info));
-    if (ret) {
-        devdrv_drv_err("copy from user failed, ret(%d).\n", ret);
-        return -EFAULT;
-    }
-    notify_ioctl_info.name[DEVDRV_IPC_NAME_SIZE - 1] = '\0';
-
-    devdrv_manager_ops_sem_down_read();
-    if (devdrv_manager_drv_ops_check()) {
-        devdrv_manager_ops_sem_up_read();
-        devdrv_drv_err("ipc notify function not init\n");
-        return -EINVAL;
-    }
-
-    switch (cmd) {
-        case DEVDRV_MANAGER_IPC_NOTIFY_CREATE:
-            ret = devdrv_host_drv_ops.ipc_notify_create((void*)context, arg, (void*)(uintptr_t)&notify_ioctl_info);
-            break;
-        case DEVDRV_MANAGER_IPC_NOTIFY_OPEN:
-            ret = devdrv_host_drv_ops.ipc_notify_open((void*)context, arg, (void*)(uintptr_t)&notify_ioctl_info);
-            break;
-        case DEVDRV_MANAGER_IPC_NOTIFY_CLOSE:
-            ret = devdrv_host_drv_ops.ipc_notify_close((void*)context, (void*)(uintptr_t)&notify_ioctl_info);
-            break;
-        case DEVDRV_MANAGER_IPC_NOTIFY_DESTROY:
-            ret = devdrv_host_drv_ops.ipc_notify_destroy((void*)context, (void*)(uintptr_t)&notify_ioctl_info);
-            break;
-        case DEVDRV_MANAGER_IPC_NOTIFY_SET_PID:
-            ret = devdrv_host_drv_ops.ipc_notify_set_pid((void*)context, (void*)(uintptr_t)&notify_ioctl_info);
-            break;
-#ifndef DEVDRV_MANAGER_HOST_UT_TEST
-        case DEVDRV_MANAGER_IPC_NOTIFY_RECORD:
-            ret = devdrv_host_drv_ops.ipc_notify_record((void*)context, (void*)(uintptr_t)&notify_ioctl_info);
-            break;
-        case DEVDRV_MANAGER_IPC_NOTIFY_SET_ATTR:
-            ret = devdrv_host_drv_ops.ipc_notify_set_attr((void*)context, (void*)(uintptr_t)&notify_ioctl_info);
-            break;
-        case DEVDRV_MANAGER_IPC_NOTIFY_GET_INFO:
-            ret = devdrv_host_drv_ops.ipc_notify_get_info((void*)context, arg, (void*)(uintptr_t)&notify_ioctl_info);
-            break;
-        case DEVDRV_MANAGER_IPC_NOTIFY_GET_ATTR:
-            ret = devdrv_host_drv_ops.ipc_notify_get_attr((void*)context, arg, (void*)(uintptr_t)&notify_ioctl_info);
-            break;
-#endif
-        default:
-            devdrv_drv_err("invalid cmd, cmd = %d\n", _KA_IOC_NR(cmd));
-            ret = -EFAULT;
-            break;
-    };
-
-#ifndef DEVDRV_MANAGER_HOST_UT_TEST
-    if ((ret == 0) && ((cmd == DEVDRV_MANAGER_IPC_NOTIFY_CLOSE) || (cmd == DEVDRV_MANAGER_IPC_NOTIFY_DESTROY))) {
-        ret = copy_to_user_safe((void *)((uintptr_t)arg), (void *)&notify_ioctl_info,
-            sizeof(struct devdrv_notify_ioctl_info));
-        if (ret != 0) {
-            devdrv_drv_err("copy to user failed. (cmd=%u; ret=%d).\n", cmd, ret);
-        }
-    }
-#endif
-    devdrv_manager_ops_sem_up_read();
-    (void)memset_s(notify_ioctl_info.name, DEVDRV_IPC_NAME_SIZE, 0, DEVDRV_IPC_NAME_SIZE);
-
-    return ret;
-}
-#endif
-
-STATIC ssize_t devdrv_manager_read(struct file *filep, char __ka_user *buf, size_t count, loff_t *ppos)
-{
-    return 0;
-}
-
-const struct file_operations devdrv_manager_file_operations = {
-    .owner = KA_THIS_MODULE,
-    .read = devdrv_manager_read,
-    .open = devdrv_manager_open,
-    .release = devdrv_manager_release,
-    .unlocked_ioctl = devdrv_manager_ioctl,
-    .poll = devdrv_manager_poll,
-};
-
-STATIC int devdrv_manager_get_dev_resource(struct devdrv_info *dev_info)
-{
-#ifndef CFG_FEATURE_REFACTOR
-    struct devdrv_platform_data *pdata = NULL;
-#endif
-    struct devdrv_pci_dev_info dev_pci_info = {0};
-    u32 dev_id = dev_info->pci_dev_id;
-
-    if (adap_get_pci_dev_info(dev_id, &dev_pci_info)) {
-        devdrv_drv_err("devdrv_get_pci_dev_info failed. dev_id(%u)\n", dev_id);
-        return -EBUSY;
-    }
-#ifdef CFG_FEATURE_REFACTOR
-    dev_info->pci_info.bus_number = dev_pci_info.bus_no;
-    dev_info->pci_info.dev_number = dev_pci_info.device_no;
-    dev_info->pci_info.function_number = dev_pci_info.function_no;
-#else
-    pdata = dev_info->pdata;
-    pdata->pci_info.bus_number = dev_pci_info.bus_no;
-    pdata->pci_info.dev_number = dev_pci_info.device_no;
-    pdata->pci_info.function_number = dev_pci_info.function_no;
-#endif
-    devdrv_drv_debug("device(%u) ts doorbell addr.\n", dev_id);
-    return 0;
-}
 
 int devdrv_manager_send_msg(struct devdrv_info *dev_info, struct devdrv_manager_msg_info *dev_manager_msg_info,
                             int *out_len)
@@ -4387,28 +832,6 @@ STATIC int devdrv_manager_send_devid(struct devdrv_info *dev_info)
     return 0;
 }
 
-#ifndef CFG_FEATURE_REFACTOR
-u32 devdrv_manager_get_ts_num(struct devdrv_info *dev_info)
-{
-    if (dev_info == NULL) {
-        devdrv_drv_err("invalid input handler.\n");
-        return (u32)-1;
-    }
-    if (dev_info->pdata == NULL) {
-        devdrv_drv_err("invalid input handler.\n");
-        return (u32)-1;
-    }
-
-    if (dev_info->pdata->ts_num > DEVDRV_MAX_TS_NUM) {
-        devdrv_drv_err("ts_num(%u).\n", dev_info->pdata->ts_num);
-        return (u32)-1;
-    }
-    dev_info->pdata->ts_num = 1;
-
-    return dev_info->pdata->ts_num;
-}
-KA_EXPORT_SYMBOL(devdrv_manager_get_ts_num);
-#endif
 STATIC int devdrv_get_board_info_from_dev(unsigned int dev_id, struct devdrv_board_info_cache *board_info)
 {
     int ret;
@@ -4655,12 +1078,7 @@ STATIC int devdrv_manager_device_ready_info(struct devdrv_info *dev_info, struct
     dev_info->reg_ddr_dma_addr = drv_info->reg_ddr_dma_addr;
     dev_info->reg_ddr_size = drv_info->reg_ddr_size;
 #ifdef CFG_FEATURE_PCIE_BBOX_DUMP
-    g_devdrv_dev_log_array[LOG_SLOG_BBOX_DDR][dev_info->dev_id]->dma_addr = drv_info->dump_ddr_dma_addr;
-    g_devdrv_dev_log_array[LOG_SLOG_BBOX_DDR][dev_info->dev_id]->mem_size = drv_info->dump_ddr_size;
-    g_devdrv_dev_log_array[LOG_SLOG_REG_DDR][dev_info->dev_id]->dma_addr = drv_info->reg_ddr_dma_addr;
-    g_devdrv_dev_log_array[LOG_SLOG_REG_DDR][dev_info->dev_id]->mem_size = drv_info->reg_ddr_size;
-    g_devdrv_dev_log_array[LOG_VMCORE_FILE_DDR][dev_info->dev_id]->dma_addr = drv_info->vmcore_ddr_dma_addr;
-    g_devdrv_dev_log_array[LOG_VMCORE_FILE_DDR][dev_info->dev_id]->mem_size = drv_info->vmcore_ddr_size;
+    devdrv_devlog_init(dev_info, drv_info);
 #endif
 
     dev_info->chip_name = drv_info->chip_name;
@@ -4711,21 +1129,20 @@ STATIC int devdrv_manager_device_ready_info(struct devdrv_info *dev_info, struct
     return 0;
 }
 
-#ifndef CFG_FEATURE_REFACTOR
-STATIC u32 devdrv_get_ts_num(void)
+STATIC void devdrv_manager_set_base_dev_info(u32 dev_id, struct devdrv_info *dev_info)
 {
-    u32 tsid;
+    struct dbl_dev_base_info dev_base_info = {0};
 
-#ifndef CFG_SOC_PLATFORM_MINIV2
-    tsid = DEVDRV_MAX_TS_NUM;
-#else
-    tsid = 1;  // tsid should be transferred from dev side later
-#endif /* CFG_SOC_PLATFORM_MINIV2 */
-    return tsid;
+    dev_base_info.chip_id = dev_info->chip_id;
+    dev_base_info.die_id = dev_info->die_id;
+    dev_base_info.addr_mode = dev_info->addr_mode;
+    dev_base_info.multi_die = dev_info->multi_die;
+    dev_base_info.dev_ready = DEVDRV_DEV_READY_WORK;
+    
+    dbl_set_dev_base_info(dev_id, dev_base_info);
 }
-#endif
 
-STATIC int devdrv_manager_device_ready(void *msg, u32 *ack_len)
+int devdrv_manager_device_ready(void *msg, u32 *ack_len)
 {
     struct devdrv_manager_msg_info *dev_manager_msg_info = NULL;
     struct devdrv_device_info *drv_info = NULL;
@@ -4802,6 +1219,8 @@ STATIC int devdrv_manager_device_ready(void *msg, u32 *ack_len)
         ka_task_queue_work(dev_manager_info->dev_rdy_work, &dev_info->work);
     }
 
+    devdrv_manager_set_base_dev_info(dev_id, dev_info);
+
     devdrv_drv_info("Receive device ready notify. (dev_id=%u; dev_manager_info%s)\n",
         dev_id, dev_manager_info != NULL ? "!=NULL": "==NULL");
 
@@ -4810,493 +1229,58 @@ READY_EXIT:
     return 0;
 }
 
-STATIC int devdrv_manager_device_inform_handler(void *msg, u32 *ack_len, enum devdrv_ts_status status)
+#if !defined(CFG_FEATURE_NOT_BOOT_INIT)
+STATIC int devmng_alloc_dev_boot_argv(char **argv)
 {
-    struct devdrv_manager_msg_info *dev_manager_msg_info = NULL;
-    struct devdrv_info *dev_info = NULL;
-    u32 dev_id;
-    int ret;
+    int ret = 0;
 
-    dev_manager_msg_info = (struct devdrv_manager_msg_info *)msg;
-    if (dev_manager_msg_info->header.valid != DEVDRV_MANAGER_MSG_VALID) {
-        devdrv_drv_err("invalid message from host\n");
-        return -EINVAL;
+    argv[0] = (char *)dbl_kzalloc((ka_base_strlen(DEVMNG_DEV_BOOT_INIT_SH) + 1), KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
+    if (argv[0] == NULL) {
+        devdrv_drv_err("kzalloc argv[0] fail !\n");
+        return -ENOMEM;
     }
 
-    dev_id = dev_manager_msg_info->header.dev_id;
-    if (dev_id >= ASCEND_DEV_MAX_NUM) {
-        devdrv_drv_err("invalid dev_id(%u)\n", dev_id);
-        return -ENODEV;
+    argv[1] = (char *)dbl_kzalloc(DEVMNG_DEV_ID_LEN, KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
+    if (argv[1] == NULL) {
+        devdrv_drv_err("kzalloc argv[1] fail !\n");
+        ret = -ENOMEM;
+        goto kzalloc_argv1_fail;
     }
 
-    dev_info = devdrv_get_devdrv_info_array(dev_id);
-    if (dev_info == NULL) {
-        devdrv_drv_err("device(%u) is not ready.\n", dev_id);
-        return -EINVAL;
+    argv[DEVMNG_DEV_BOOT_ARG_NUM - 1] = (char *)dbl_kzalloc(DEVMNG_DEV_ID_LEN, KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
+    if (argv[DEVMNG_DEV_BOOT_ARG_NUM - 1] == NULL) {
+        devdrv_drv_err("kzalloc last argv fail !\n");
+        ret = -ENOMEM;
+        goto kzalloc_argv2_fail;
     }
 
-    switch (status) {
-        case TS_DOWN:
-            devdrv_drv_err("receive ts exception message from device(%u).\n", dev_id);
-            devdrv_host_manager_device_exception(dev_info);
-            ret = 0;
-            break;
-        case TS_WORK:
-            devdrv_drv_err("receive ts resume message from device(%u).\n", dev_id);
-            ret = devdrv_host_manager_device_resume(dev_info);
-            break;
-        case TS_FAIL_TO_SUSPEND:
-            devdrv_drv_err("receive ts fail to suspend message from device(%u).\n", dev_id);
-            ret = devdrv_host_manager_device_resume(dev_info);
-            break;
-        case TS_SUSPEND:
-            devdrv_drv_err("receive ts suspend message from device(%u).\n", dev_id);
-            ret = devdrv_host_manager_device_suspend(dev_info);
-            break;
-        default:
-            devdrv_drv_err("invalid input ts status. dev_id(%u)\n", dev_id);
-            return -EINVAL;
-    }
-
-    *ack_len = sizeof(*dev_manager_msg_info);
-    /* return result */
-    dev_manager_msg_info->header.result = ret;
     return 0;
+
+kzalloc_argv2_fail:
+    dbl_kfree(argv[1]);
+kzalloc_argv1_fail:
+    dbl_kfree(argv[0]);
+    return ret;
 }
 
-STATIC int devdrv_manager_device_suspend(void *msg, u32 *ack_len)
+STATIC void devmng_free_dev_boot_argv(char **argv)
 {
-    return devdrv_manager_device_inform_handler(msg, ack_len, TS_SUSPEND);
-}
+    int i;
 
-STATIC int devdrv_manager_device_down(void *msg, u32 *ack_len)
-{
-    return devdrv_manager_device_inform_handler(msg, ack_len, TS_DOWN);
-}
-
-STATIC int devdrv_manager_device_resume(void *msg, u32 *ack_len)
-{
-    return devdrv_manager_device_inform_handler(msg, ack_len, TS_WORK);
-}
-
-STATIC int devdrv_manager_device_fail_to_suspend(void *msg, u32 *ack_len)
-{
-    return devdrv_manager_device_inform_handler(msg, ack_len, TS_FAIL_TO_SUSPEND);
-}
-STATIC int devdrv_manager_check_process_sign(void *msg, u32 *ack_len)
-{
-    struct devdrv_manager_msg_info *dev_manager_msg_info = NULL;
-    int ret = DEVDRV_MANAGER_MSG_INVALID_RESULT;
-    struct list_head *pos = NULL;
-    struct list_head *n = NULL;
-    struct devdrv_manager_info *d_info = NULL;
-    struct devdrv_process_sign *d_sign = NULL;
-    struct process_sign *process_sign = NULL;
-    u32 dev_id;
-    u16 result = ESRCH;
-
-    dev_manager_msg_info = (struct devdrv_manager_msg_info *)msg;
-    if (dev_manager_msg_info->header.valid != DEVDRV_MANAGER_MSG_VALID) {
-        devdrv_drv_err("invalid message from host\n");
-        return -EINVAL;
-    }
-
-    dev_id = dev_manager_msg_info->header.dev_id;
-    if ((dev_id >= ASCEND_DEV_MAX_NUM)) {
-        devdrv_drv_err("Invalid device id. (dev_id=%u)\n", dev_id);
-        return -EINVAL;
-    }
-    d_info = devdrv_get_manager_info();
-    if (d_info == NULL) {
-        devdrv_drv_err("d_info is null. (dev_id=%u)\n", dev_id);
-        return -EINVAL;
-    }
-    process_sign = (struct process_sign *)dev_manager_msg_info->payload;
-    ka_task_mutex_lock(&d_info->devdrv_sign_list_lock);
-    if (ka_list_empty_careful(&d_info->hostpid_list_header)) {
-        devdrv_drv_err("Hostpid sign list is empty. (dev_id=%u; hostpid=%d)\n", dev_id, process_sign->tgid);
-        goto out;
-    }
-    ka_list_for_each_safe(pos, n, &d_info->hostpid_list_header) {
-        d_sign = ka_list_entry(pos, struct devdrv_process_sign, list);
-        if (d_sign->hostpid == process_sign->tgid) {
-            ret = devdrv_manager_container_check_devid_in_container(dev_id, d_sign->hostpid);
-            if (ret != 0) {
-                result = EINVAL;
-                devdrv_drv_err("Device id and hostpid mismatch in container. (dev_id=%u; hostpid=%d; ret=%d)\n",
-                    dev_id, d_sign->hostpid, ret);
-            } else {
-                result = 0;
-                devdrv_drv_info("Process sign check success. (dev_id=%u; hostpid=%d)\n", dev_id, process_sign->tgid);
-            }
-            goto out;
+    for (i = 0; i < DEVMNG_DEV_BOOT_ARG_NUM; i++) {
+        if (argv[i] != NULL) {
+            dbl_kfree(argv[i]);
+            argv[i] = NULL;
         }
     }
 
-    devdrv_drv_err("Host pid is not in process sign list. (dev_id=%u; hostpid=%d)\n", dev_id, process_sign->tgid);
-
-out:
-    ka_task_mutex_unlock(&d_info->devdrv_sign_list_lock);
-    *ack_len = sizeof(*dev_manager_msg_info);
-    dev_manager_msg_info->header.result = result;
-    return 0;
+    return;
 }
 
-STATIC int devdrv_manager_get_pcie_id(void *msg, u32 *ack_len)
-{
-    struct devdrv_manager_msg_info *dev_manager_msg_info = NULL;
-    struct devdrv_pcie_id_info pcie_id_info = {0};
-    struct devdrv_pcie_id_info *host_pcie_id_info = NULL;
-    struct devdrv_info *dev_info = NULL;
-    u32 dev_id;
-    int ret;
-
-    dev_manager_msg_info = (struct devdrv_manager_msg_info *)msg;
-    if (dev_manager_msg_info->header.valid != DEVDRV_MANAGER_MSG_VALID) {
-        devdrv_drv_err("invalid message from host\n");
-        return -EINVAL;
-    }
-
-    dev_id = dev_manager_msg_info->header.dev_id;
-    if ((dev_id >= ASCEND_DEV_MAX_NUM) || (devdrv_info_array[dev_id] == NULL)) {
-        devdrv_drv_err("invalid dev_id(%u), or devdrv_info_array[dev_id] is NULL\n", dev_id);
-        return -EINVAL;
-    }
-
-    dev_info = devdrv_info_array[dev_id];
-
-    ret = adap_get_pcie_id_info(dev_info->pci_dev_id, &pcie_id_info);
-    if (ret) {
-        devdrv_drv_err("devdrv_manager_get_pcie_id_info failed. dev_id(%u)\n", dev_id);
-        goto out;
-    }
-
-    host_pcie_id_info = (struct devdrv_pcie_id_info *)dev_manager_msg_info->payload;
-
-    host_pcie_id_info->venderid = pcie_id_info.venderid;
-    host_pcie_id_info->subvenderid = pcie_id_info.subvenderid;
-    host_pcie_id_info->deviceid = pcie_id_info.deviceid;
-    host_pcie_id_info->subdeviceid = pcie_id_info.subdeviceid;
-    host_pcie_id_info->bus = pcie_id_info.bus;
-    host_pcie_id_info->fn = pcie_id_info.fn;
-    host_pcie_id_info->device = pcie_id_info.device;
-
-out:
-    *ack_len = sizeof(*dev_manager_msg_info);
-    /* return result */
-    dev_manager_msg_info->header.result = ret;
-    return 0;
-}
-
-STATIC int devdrv_manager_d2h_sync_matrix_ready(void *msg, u32 *ack_len)
-{
-    struct devdrv_manager_msg_info *dev_manager_msg_info = NULL;
-    int ret = 0;
-    u32 dev_id;
-
-    dev_manager_msg_info = (struct devdrv_manager_msg_info *)msg;
-    if (dev_manager_msg_info->header.valid != DEVDRV_MANAGER_MSG_VALID) {
-        devdrv_drv_err("invalid message from host\n");
-        return -EINVAL;
-    }
-
-    dev_id = dev_manager_msg_info->header.dev_id;
-    if ((dev_id >= ASCEND_DEV_MAX_NUM) || (devdrv_info_array[dev_id] == NULL)) {
-        devdrv_drv_err("invalid dev_id(%u), or devdrv_info_array[dev_id] is NULL\n", dev_id);
-        return -EINVAL;
-    }
-
-    *ack_len = sizeof(*dev_manager_msg_info);
-    dev_manager_msg_info->header.result = ret;
-    return 0;
-}
-
-STATIC int devdrv_manager_d2h_get_device_index(void *msg, u32 *ack_len)
-{
-    struct devdrv_manager_msg_info *dev_manager_msg_info = NULL;
-    u32 *host_devid_buf = NULL;
-    int device_index, ret;
-
-    dev_manager_msg_info = (struct devdrv_manager_msg_info *)msg;
-    if (dev_manager_msg_info->header.valid != DEVDRV_MANAGER_MSG_VALID) {
-        devdrv_drv_err("invalid message from host\n");
-        return -EINVAL;
-    }
-    *ack_len = sizeof(*dev_manager_msg_info);
-
-    host_devid_buf = (u32 *)dev_manager_msg_info->payload;
-    ret = uda_dev_get_remote_udevid(*host_devid_buf, &device_index);
-    if (ret != 0 || device_index >= ASCEND_DEV_MAX_NUM) {
-        devdrv_drv_err("invalid host devid(%u), (ret=%d).\n", *host_devid_buf, ret);
-        dev_manager_msg_info->header.result = DEVDRV_MANAGER_MSG_INVALID_RESULT;
-    } else {
-        *host_devid_buf = (u32)device_index;
-        dev_manager_msg_info->header.result = 0;
-    }
-
-    return 0;
-}
-
-STATIC int devdrv_manager_receive_tslog_addr(void *msg, u32 *ack_len)
-{
-    u32 dev_id;
-    struct devdrv_ts_log *ts_log = NULL;
-    struct devdrv_manager_msg_info *dev_manager_msg_info = NULL;
-
-    dev_manager_msg_info = (struct devdrv_manager_msg_info *)msg;
-    dev_id = dev_manager_msg_info->header.dev_id;
-
-    if (dev_manager_msg_info->header.valid != DEVDRV_MANAGER_MSG_VALID) {
-        devdrv_drv_err("Invalid message from device. (device id=%u)\n", dev_id);
-        return -EINVAL;
-    }
-
-    if (dev_id >= ASCEND_DEV_MAX_NUM) {
-        devdrv_drv_err("Invalid device id. (device id=%u)\n", dev_id);
-        return -ENODEV;
-    }
-
-    ts_log = (struct devdrv_ts_log *)dev_manager_msg_info->payload;
-    g_devdrv_ts_log_array[dev_id]->devid = ts_log->devid;
-    g_devdrv_ts_log_array[dev_id]->dma_addr = ts_log->dma_addr;
-    g_devdrv_ts_log_array[dev_id]->mem_size = ts_log->mem_size;
-
-    *ack_len = sizeof(*dev_manager_msg_info);
-    dev_manager_msg_info->header.result = 0;
-
-    return 0;
-}
-
-STATIC int devdrv_manager_receive_devlog_addr(void *msg, u32 *ack_len)
-{
-    u32 dev_id;
-    u32 log_type;
-    struct devdrv_dev_log *dev_log = NULL;
-    struct devdrv_manager_msg_info *dev_manager_msg_info = NULL;
-
-    dev_manager_msg_info = (struct devdrv_manager_msg_info *)msg;
-    dev_id = dev_manager_msg_info->header.dev_id;
-
-    if (dev_manager_msg_info->header.valid != DEVDRV_MANAGER_MSG_VALID) {
-        devdrv_drv_err("Invalid message from device. (device id=%u)\n", dev_id);
-        return -EINVAL;
-    }
-
-    dev_log = (struct devdrv_dev_log *)dev_manager_msg_info->payload;
-    log_type = dev_log->log_type;
-
-    if (dev_id >= DEVDRV_PF_DEV_MAX_NUM || log_type >= DEVDRV_LOG_DUMP_TYPE_MAX) {
-        devdrv_drv_err("Invalid log info. (dev_id=%u; dev_maxnum=%d; logtype=%u; logtype_maxnum=%d)\n",
-            dev_id, DEVDRV_PF_DEV_MAX_NUM, log_type, DEVDRV_LOG_DUMP_TYPE_MAX);
-        return -ENODEV;
-    }
-
-    g_devdrv_dev_log_array[log_type][dev_id]->devid = dev_log->devid;
-    g_devdrv_dev_log_array[log_type][dev_id]->dma_addr = dev_log->dma_addr;
-    g_devdrv_dev_log_array[log_type][dev_id]->mem_size = dev_log->mem_size;
-    g_devdrv_dev_log_array[log_type][dev_id]->log_type = dev_log->log_type;
-
-    *ack_len = sizeof(*dev_manager_msg_info);
-    dev_manager_msg_info->header.result = 0;
-
-    return 0;
-}
-
-static int devdrv_set_device_info_aicpu(u32 dev_id, u32 aicpu_num)
-{
-    struct devdrv_info *dev_info = NULL;
-    u32 ai_cpu_core_id;
-    u32 aicpu_occupy_bitmap;
-
-    /* aicpu_num set to 7 when SRIOV enable */
-    if (aicpu_num == 7) {
-        ai_cpu_core_id = 1;
-        aicpu_occupy_bitmap = 0xFE;
-    } else {
-        /* when SRIOV disable, aicpu_num set to 6, aicpu ID begin from 2 */
-        ai_cpu_core_id = 2;
-        aicpu_occupy_bitmap = 0xFC;
-    }
-
-    dev_info = devdrv_manager_get_devdrv_info(dev_id);
-    if (dev_info == NULL) {
-        return -EINVAL;
-    }
-
-    dev_info->ai_cpu_core_num = aicpu_num;
-    dev_info->ai_cpu_core_id = ai_cpu_core_id;
-    dev_info->aicpu_occupy_bitmap = aicpu_occupy_bitmap;
-    dev_info->inuse.ai_cpu_num = aicpu_num;
-    return 0;
-}
-
-STATIC int devdrv_set_host_aicpu_num_from_device(void *msg, u32 *ack_len)
-{
-    u32 dev_id;
-    u32 *aicpu_num = NULL;
-    struct devdrv_manager_msg_info *dev_manager_msg_info = NULL;
-    int ret;
-
-    if (msg == NULL || ack_len == NULL) {
-        devdrv_drv_err("Invalid para. (msg is NULL=%d; ack_len is NULL=%d)\n", msg == NULL, ack_len == NULL);
-        return -EINVAL;
-    }
-
-    dev_manager_msg_info = (struct devdrv_manager_msg_info *)msg;
-    dev_id = dev_manager_msg_info->header.dev_id;
-
-    if (dev_manager_msg_info->header.valid != DEVDRV_MANAGER_MSG_D2H_MAGIC) {
-        devdrv_drv_err("Invalid message from device. (device id=%u)\n", dev_id);
-        return -EINVAL;
-    }
-
-    if (dev_id >= DEVDRV_PF_DEV_MAX_NUM) {
-        devdrv_drv_err("Invalid device id. (device id=%u)\n", dev_id);
-        return -ENODEV;
-    }
-
-    aicpu_num = (int *)dev_manager_msg_info->payload;
-
-    /* aicpu_num must only be 6 or 7 */
-    if (*aicpu_num > 7 || *aicpu_num < 6) {
-        devdrv_drv_err("Invalid aicpu number. (dev_id=%u, aicpu_num=%u)\n", dev_id, *aicpu_num);
-        return -EINVAL;
-    }
-
-    ret = devdrv_set_device_info_aicpu(dev_id, *aicpu_num);
-    if (ret != 0) {
-        devdrv_drv_err("Set aicpu_num failed. (dev_id=%u, aicpu_num=%u)\n", dev_id, *aicpu_num);
-        return ret;
-    }
-
-    ret = hvdevmng_set_core_num(dev_id, 0, 0);
-    if (ret != 0) {
-        devdrv_drv_err("hvdevmng_set_core_num failed. (dev_id=%u, aicpu_num=%u)\n", dev_id, *aicpu_num);
-        return ret;
-    }
-
-    *ack_len = sizeof(u32) + sizeof(struct devdrv_manager_msg_head);
-    dev_manager_msg_info->header.result = 0;
-
-    return 0;
-}
-
-
-STATIC int (*devdrv_manager_chan_msg_processes[])(void *msg, u32 *ack_len) = {
-    [DEVDRV_MANAGER_CHAN_D2H_DEVICE_READY] = devdrv_manager_device_ready,
-    [DEVDRV_MANAGER_CHAN_D2H_DOWN] = devdrv_manager_device_down,
-    [DEVDRV_MANAGER_CHAN_D2H_SUSNPEND] = devdrv_manager_device_suspend,
-    [DEVDRV_MANAGER_CHAN_D2H_RESUME] = devdrv_manager_device_resume,
-    [DEVDRV_MANAGER_CHAN_D2H_FAIL_TO_SUSPEND] = devdrv_manager_device_fail_to_suspend,
-    [DEVDRV_MANAGER_CHAN_D2H_CORE_INFO] = NULL,
-    [DEVDRV_MANAGER_CHAN_D2H_GET_PCIE_ID_INFO] = devdrv_manager_get_pcie_id,
-    [DEVDRV_MANAGER_CHAN_D2H_SYNC_MATRIX_READY] = devdrv_manager_d2h_sync_matrix_ready,
-    [DEVDRV_MANAGER_CHAN_D2H_CHECK_PROCESS_SIGN] = devdrv_manager_check_process_sign,
-    [DEVDRV_MANAGER_CHAN_D2H_GET_DEVICE_INDEX] = devdrv_manager_d2h_get_device_index,
-    [DEVDRV_MANAGER_CHAN_D2H_DMS_EVENT_DISTRIBUTE] = dms_event_get_exception_from_device,
-    [DEVDRV_MANAGER_CHAN_D2H_SEND_TSLOG_ADDR] = devdrv_manager_receive_tslog_addr,
-    [DEVDRV_MANAGER_CHAN_D2H_SEND_DEVLOG_ADDR] = devdrv_manager_receive_devlog_addr,
-#if (!defined (DEVMNG_UT)) && (!defined (DEVDRV_MANAGER_HOST_UT_TEST))
-    [DEVDRV_MANAGER_CHAN_PID_MAP_SYNC] = devdrv_pid_map_sync_proc,
-#endif
-    [DEVDRV_MANAGER_CHAN_D2H_SET_HOST_AICPU_NUM] = devdrv_set_host_aicpu_num_from_device,
-    [DEVDRV_MANAGER_CHAN_MAX_ID] = NULL,
-};
-
-STATIC int devdrv_chan_msg_dispatch(void *data, u32 *real_out_len)
-{
-    u32 msg_id = ((struct devdrv_manager_msg_head *)data)->msg_id;
-
-    return devdrv_manager_chan_msg_processes[msg_id](data, real_out_len);
-}
-
-int devdrv_manager_rx_common_msg_process(u32 dev_id, void *data, u32 in_data_len, u32 out_data_len,
-    u32 *real_out_len)
-{
-    struct devdrv_manager_msg_info *dev_manager_msg_info = NULL;
-    u32 msg_id;
-
-    if ((dev_id >= ASCEND_DEV_MAX_NUM) || (data == NULL) || (real_out_len == NULL) ||
-        (in_data_len < sizeof(struct devdrv_manager_msg_info))) {
-        devdrv_drv_err("date(%pK) or real_out_len(%pK) is NULL, devid(%u), in_data_len(%u)\n",
-            data, real_out_len, dev_id, in_data_len);
-        return -EINVAL;
-    }
-    msg_id = ((struct devdrv_manager_msg_head *)data)->msg_id;
-
-    if (msg_id >= DEVDRV_MANAGER_CHAN_MAX_ID) {
-        devdrv_drv_err("invalid msg_id(%u)\n", msg_id);
-        return -EINVAL;
-    }
-    if (devdrv_manager_chan_msg_processes[msg_id] == NULL) {
-        devdrv_drv_err("devdrv_manager_chan_msg_processes[%u] is NULL\n", msg_id);
-        return -EINVAL;
-    }
-
-    dev_manager_msg_info = (struct devdrv_manager_msg_info *)data;
-    dev_manager_msg_info->header.dev_id = dev_id;
-    return devdrv_chan_msg_dispatch(data, real_out_len);
-}
-EXPORT_SYMBOL_UNRELEASE(devdrv_manager_rx_common_msg_process);
-
-int devdrv_manager_rx_msg_process(void *msg_chan, void *data, u32 in_data_len, u32 out_data_len,
-    u32 *real_out_len)
-{
-    struct devdrv_manager_msg_info *dev_manager_msg_info = NULL;
-    struct devdrv_info *dev_info = NULL;
-    u32 msg_id;
-    int dev_id;
-
-    if ((msg_chan == NULL) || (data == NULL) || (real_out_len == NULL) ||
-        (in_data_len < sizeof(struct devdrv_manager_msg_info))) {
-        devdrv_drv_err("msg_chan(%pK) or data(%pK) or real_out_len(%pK) is NULL, in_date_len(%u)\n",
-            msg_chan, data, real_out_len, in_data_len);
-        return -EINVAL;
-    }
-    msg_id = ((struct devdrv_manager_msg_head *)data)->msg_id;
-
-    if ((msg_id >= DEVDRV_MANAGER_CHAN_MAX_ID) || (devdrv_manager_chan_msg_processes[msg_id] == NULL)) {
-        devdrv_drv_err("invalid msg_id(%u) or devdrv_manager_chan_msg_processes[msg_id] is NULL\n", msg_id);
-        return -EINVAL;
-    }
-
-    dev_info = (struct devdrv_info *)devdrv_get_msg_chan_priv(msg_chan);
-    dev_manager_msg_info = (struct devdrv_manager_msg_info *)data;
-
-    /* get dev_id by msg_chan */
-    if ((dev_id = devdrv_get_msg_chan_devid(msg_chan)) < 0) {
-        devdrv_drv_err("msg_chan to devid failed\n");
-        return -EINVAL;
-    }
-
-    if (dev_id >= ASCEND_DEV_MAX_NUM) {
-        devdrv_drv_err("invalid dev_id(%d).\r\n", dev_id);
-        return -EINVAL;
-    }
-    dev_manager_msg_info->header.dev_id = dev_id;
-
-    return devdrv_chan_msg_dispatch(data, real_out_len);
-}
-EXPORT_SYMBOL_UNRELEASE(devdrv_manager_rx_msg_process);
-
-#define DEV_MNG_NON_TRANS_MSG_DESC_SIZE 1024
-struct devdrv_non_trans_msg_chan_info dev_manager_msg_chan_info = {
-    .msg_type = devdrv_msg_client_devmanager,
-    .flag = 0,
-    .level = DEVDRV_MSG_CHAN_LEVEL_LOW,
-    .s_desc_size = DEV_MNG_NON_TRANS_MSG_DESC_SIZE,
-    .c_desc_size = DEV_MNG_NON_TRANS_MSG_DESC_SIZE,
-    .rx_msg_process = devdrv_manager_rx_msg_process,
-};
-
-STATIC void devdrv_manager_msg_chan_notify(u32 dev_id, int status)
-{
-}
-
-#if !defined(CFG_FEATURE_NOT_BOOT_INIT)
 STATIC int devmng_call_dev_boot_init(u32 phy_id)
 {
     int ret;
+    u32 logic_id = UDA_INVALID_UDEVID;
     char *argv[DEVMNG_DEV_BOOT_ARG_NUM + 1] = {NULL};
     char *envp[] = {
         "HOME=/",
@@ -5304,88 +1288,54 @@ STATIC int devmng_call_dev_boot_init(u32 phy_id)
         NULL
     };
 
-    argv[0] = (char *)dbl_kzalloc((ka_base_strlen(DEVMNG_DEV_BOOT_INIT_SH) + 1), KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
-    if (argv[0] == NULL) {
-        devdrv_drv_err("kzalloc argv[0] fail !\n");
-        ret = -ENOMEM;
-        goto kzalloc_argv0_fail;
-    }
-    argv[1] = (char *)dbl_kzalloc(DEVMNG_PHY_ID_LEN, KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
-    if (argv[1] == NULL) {
-        devdrv_drv_err("kzalloc argv[1] fail !\n");
-        ret = -ENOMEM;
-        goto kzalloc_argv1_fail;
+    ret = devmng_alloc_dev_boot_argv(argv);
+    if (ret != 0) {
+        devdrv_drv_err("Allocate memory for argument failed. (phy_id=%u; ret=%d)\n", phy_id, ret);
+        return ret;
     }
 
     /* argument 0, for script path */
     ret = snprintf_s(argv[0], (ka_base_strlen(DEVMNG_DEV_BOOT_INIT_SH) + 1),
         ka_base_strlen(DEVMNG_DEV_BOOT_INIT_SH), "%s", DEVMNG_DEV_BOOT_INIT_SH);
     if (ret < 0) {
-        devdrv_drv_err("sscanf_s argv[0] fail. (ret=%d)\n", ret);
-        goto snprintf_s_fail;
+        devdrv_drv_err("snprintf_s argv[0] fail. (ret=%d)\n", ret);
+        ret = -EINVAL;
+        goto free_argv;
     }
 
-    /* argument 1, for device id */
-    ret = snprintf_s(argv[1], DEVMNG_PHY_ID_LEN, DEVMNG_PHY_ID_LEN - 1, "%u", phy_id);
+    /* argument 1, for udevice id */
+    ret = snprintf_s(argv[1], DEVMNG_DEV_ID_LEN, DEVMNG_DEV_ID_LEN - 1, "%u", phy_id);
     if (ret < 0) {
-        devdrv_drv_err("sscanf_s argv[1] fail. (ret=%d)\n", ret);
-        goto snprintf_s_fail;
+        devdrv_drv_err("snprintf_s argv[1] fail. (ret=%d)\n", ret);
+        ret = -EINVAL;
+        goto free_argv;
     }
 
+    /* argument 2, for logical id */
+    ret = uda_udevid_to_logic_id(phy_id, &logic_id);
+    if (ret != 0) {
+        devdrv_drv_err("Udevice id to logical id failed. (ret=%d)\n", ret);
+        goto free_argv;
+    }
+
+    ret = snprintf_s(argv[DEVMNG_DEV_BOOT_ARG_NUM - 1], DEVMNG_DEV_ID_LEN, DEVMNG_DEV_ID_LEN - 1, "%u", logic_id);
+    if (ret < 0) {
+        devdrv_drv_err("snprintf_s last argument fail. (ret=%d)\n", ret);
+        ret = -EINVAL;
+        goto free_argv;
+    }
+
+    devdrv_drv_info("Call boot init script. (phy_id=%u; logic_id=%u)\n", phy_id, logic_id);
     ret = ka_system_call_usermodehelper(DEVMNG_DEV_BOOT_INIT_SH, argv, envp, UMH_WAIT_EXEC);
-    if (ret) {
+    if (ret != 0) {
         devdrv_drv_err("ka_system_call_usermodehelper fail. (ret=%d)\n", ret);
-        goto call_usermodehelper_fail;
     }
 
-    dbl_kfree(argv[1]);
-    dbl_kfree(argv[0]);
-    return 0;
-
-call_usermodehelper_fail:
-snprintf_s_fail:
-    dbl_kfree(argv[1]);
-kzalloc_argv1_fail:
-    dbl_kfree(argv[0]);
-kzalloc_argv0_fail:
+free_argv:
+    devmng_free_dev_boot_argv(argv);
     return ret;
 }
 #endif
-
-STATIC int devdrv_manager_none_trans_init(u32 dev_id)
-{
-    void *no_trans_chan = NULL;
-    struct devdrv_info *dev_info = NULL;
-
-    dev_info = devdrv_get_devdrv_info_array(dev_id);
-    if (dev_info == NULL) {
-        devdrv_drv_err("Device is not initialize. (dev_id=%u)\n", dev_id);
-       return -ENODEV;
-    }
-
-    no_trans_chan = devdrv_pcimsg_alloc_non_trans_queue(dev_id, &dev_manager_msg_chan_info);
-    if (no_trans_chan == NULL) {
-        devdrv_drv_err("no_trans_chan alloc failed. (dev_id=%u)\n", dev_id);
-        return -EIO;
-    }
-
-    devdrv_manager_set_no_trans_chan(dev_id, no_trans_chan);
-    devdrv_set_msg_chan_priv(no_trans_chan, (void *)dev_info);
-    return 0;
-}
-
-STATIC void devdrv_manager_non_trans_uninit(u32 dev_id)
-{
-    void *no_trans_chan = NULL;
-
-    no_trans_chan = devdrv_manager_get_no_trans_chan(dev_id);
-    if (no_trans_chan != NULL) {
-        devdrv_set_msg_chan_priv(no_trans_chan, NULL);
-        devdrv_pcimsg_free_non_trans_queue(no_trans_chan);
-        devdrv_manager_set_no_trans_chan(dev_id, NULL);
-        no_trans_chan = NULL;
-    }
-}
 
 STATIC void devdrv_board_info_init(unsigned int dev_id)
 {
@@ -5403,7 +1353,7 @@ STATIC void devdrv_board_info_init(unsigned int dev_id)
     }
 }
 
-STATIC void devdrv_manager_dev_ready_work(struct work_struct *work)
+STATIC void devdrv_manager_dev_ready_work(ka_work_struct_t *work)
 {
     struct devdrv_info *dev_info = NULL;
     u32 tsid = 0;
@@ -5411,7 +1361,7 @@ STATIC void devdrv_manager_dev_ready_work(struct work_struct *work)
     u32 chip_type;
     int ret;
 
-    dev_info = container_of(work, struct devdrv_info, work);
+    dev_info = ka_container_of(work, struct devdrv_info, work);
     dev_id = dev_info->pci_dev_id;
     if (dev_id >= ASCEND_DEV_MAX_NUM) {
         devdrv_drv_err("invalid dev_id(%u)\n", dev_id);
@@ -5431,7 +1381,7 @@ STATIC void devdrv_manager_dev_ready_work(struct work_struct *work)
 
 #ifdef CFG_FEATURE_TIMESYNC
     dms_time_sync_init(dev_id);
-#if !defined(CFG_FEATURE_ASCEND910_95_STUB)
+#if !defined(CFG_FEATURE_ASCEND950_STUB)
     devdrv_refresh_aicore_info_init(dev_id);
 #endif
 #endif
@@ -5467,73 +1417,6 @@ STATIC void devdrv_manager_dev_ready_work(struct work_struct *work)
     }
 }
 
-STATIC inline void devdrv_manager_common_chan_init(void)
-{
-    /* this function will be called at ka_module_init, doesn't need lock */
-    devdrv_manager_common_chan.type = DEVDRV_COMMON_MSG_DEVDRV_MANAGER;
-    devdrv_manager_common_chan.common_msg_recv = devdrv_manager_rx_common_msg_process;
-    devdrv_manager_common_chan.init_notify = devdrv_manager_msg_chan_notify;
-}
-
-STATIC inline void devdrv_manager_common_chan_uninit(void)
-{
-    /* this function will be called at ka_module_init, doesn't need lock */
-    devdrv_manager_common_chan.type = DEVDRV_COMMON_MSG_TYPE_MAX;
-    devdrv_manager_common_chan.common_msg_recv = NULL;
-    devdrv_manager_common_chan.init_notify = NULL;
-}
-
-STATIC inline struct devdrv_common_msg_client *devdrv_manager_get_common_chan(u32 dev_id)
-{
-    return &devdrv_manager_common_chan;
-}
-
-void *devdrv_manager_get_no_trans_chan(u32 dev_id)
-{
-    void *no_trans_chan = NULL;
-
-    /* dev_manager_no_trasn_chan doesn't need lock */
-    if (dev_id >= ASCEND_DEV_MAX_NUM) {
-        devdrv_drv_err("get no trans chan failed, dev_id(%u)\n", dev_id);
-        return NULL;
-    }
-    no_trans_chan = dev_manager_no_trasn_chan[dev_id];
-    return no_trans_chan;
-}
-
-STATIC void devdrv_manager_set_no_trans_chan(u32 dev_id, void *no_trans_chan)
-{
-    if (dev_id >= ASCEND_DEV_MAX_NUM) {
-        devdrv_drv_err("set no trans chan failed, dev_id(%u)\n", dev_id);
-        return;
-    }
-    dev_manager_no_trasn_chan[dev_id] = no_trans_chan;
-}
-
-int devdrv_agent_sync_msg_send(u32 dev_id, struct devdrv_manager_msg_info *msg_info, u32 payload_len, u32 *out_len)
-{
-    u32 in_len;
-    void *no_trans_chan = NULL;
-
-    if ((dev_id >= ASCEND_DEV_MAX_NUM) || (msg_info == NULL) || (out_len == NULL) ||
-        (payload_len > sizeof(msg_info->payload))) {
-        devdrv_drv_err("invalid dev_id(%u) or msg_info(%pK) is null or out_len(%pK) is null.\n",
-            dev_id, msg_info, out_len);
-        return -EINVAL;
-    }
-
-    no_trans_chan = devdrv_manager_get_no_trans_chan(dev_id);
-    if (no_trans_chan == NULL) {
-        devdrv_drv_err("get device(%u) no trans chan failed", dev_id);
-        return -ENODEV;
-    }
-
-    in_len = sizeof(struct devdrv_manager_msg_head) + payload_len;
-
-    return devdrv_sync_msg_send(no_trans_chan, msg_info, in_len, in_len, out_len);
-}
-KA_EXPORT_SYMBOL(devdrv_agent_sync_msg_send);
-
 struct tsdrv_drv_ops *devdrv_manager_get_drv_ops(void)
 {
     return &devdrv_host_drv_ops;
@@ -5543,23 +1426,23 @@ KA_EXPORT_SYMBOL(devdrv_manager_get_drv_ops);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
 struct devdrv_check_start_s {
     u32 dev_id;
-    struct timer_list check_timer;
+    ka_timer_list_t check_timer;
 };
 
 STATIC struct devdrv_check_start_s devdrv_check_start[ASCEND_DEV_MAX_NUM];
 
-STATIC void devdrv_check_start_event(struct timer_list *t)
+STATIC void devdrv_check_start_event(ka_timer_list_t *t)
 {
     struct devdrv_info *dev_info = NULL;
-    struct timespec stamp;
-    struct devdrv_check_start_s *devdrv_start_check = from_timer(devdrv_start_check, t, check_timer);
+    ka_timespec_t stamp;
+    struct devdrv_check_start_s *devdrv_start_check = ka_system_from_timer(devdrv_start_check, t, check_timer);
     u32 dev_id;
     u32 tsid = 0;
 
     dev_id = devdrv_start_check->dev_id;
-#else  /* LINUX_VERSION_CODE >= KERNEL_VERSION(4,15,0) */
+#else /* LINUX_VERSION_CODE >= KERNEL_VERSION(4,15,0) */
 
-STATIC struct timer_list devdrv_check_start[ASCEND_DEV_MAX_NUM];
+STATIC ka_timer_list_t devdrv_check_start[ASCEND_DEV_MAX_NUM];
 
 STATIC void devdrv_check_start_event(unsigned long data)
 {
@@ -5595,7 +1478,7 @@ STATIC void devdrv_check_start_event(unsigned long data)
 STATIC int devdrv_manager_dev_state_notify(u32 probe_num, u32 devid, u32 state)
 {
     struct devdrv_black_box_state_info *bbox_state_info = NULL;
-    struct timespec tstemp = {0};
+    ka_timespec_t tstemp = {0};
     struct devdrv_info *dev_info = NULL;
     unsigned long flags;
     int ret;
@@ -5619,7 +1502,7 @@ STATIC int devdrv_manager_dev_state_notify(u32 probe_num, u32 devid, u32 state)
         return -ENODEV;
     }
 
-    CLR_BIT_64(dev_manager_info->prob_device_bitmap[devid / BITS_PER_LONG_LONG], devid % BITS_PER_LONG_LONG);
+    CLR_BIT_64(dev_manager_info->prob_device_bitmap[devid / KA_BITS_PER_LONG_LONG], devid % KA_BITS_PER_LONG_LONG);
 
     bbox_state_info = dbl_kzalloc(sizeof(struct devdrv_black_box_state_info), KA_GFP_ATOMIC | __KA_GFP_ACCOUNT);
     if (bbox_state_info == NULL) {
@@ -5652,7 +1535,7 @@ STATIC int devdrv_manager_dev_startup_notify(u32 prob_num, const u32 devids[], u
 {
 #ifndef DEVDRV_MANAGER_HOST_UT_TEST
     struct devdrv_black_box_devids *bbox_devids = NULL;
-    struct timespec tstemp = {0};
+    ka_timespec_t tstemp = {0};
     unsigned long flags;
     int ret;
     u32 i;
@@ -5667,8 +1550,8 @@ STATIC int devdrv_manager_dev_startup_notify(u32 prob_num, const u32 devids[], u
     dev_manager_info->prob_num = prob_num;
     for (i = 0; i < devnum; i++) {
         if (devdrv_manager_is_pf_device(devids[i]) || devdrv_manager_is_mdev_vm_mode(devids[i])) {
-            SET_BIT_64(dev_manager_info->prob_device_bitmap[devids[i] / BITS_PER_LONG_LONG],
-                devids[i] % BITS_PER_LONG_LONG);
+            SET_BIT_64(dev_manager_info->prob_device_bitmap[devids[i] / KA_BITS_PER_LONG_LONG],
+                devids[i] % KA_BITS_PER_LONG_LONG);
         }
     }
     ka_task_spin_unlock_irqrestore(&dev_manager_info->spinlock, flags);
@@ -5697,28 +1580,6 @@ STATIC int devdrv_manager_dev_startup_notify(u32 prob_num, const u32 devids[], u
     return 0;
 }
 
-STATIC void devmng_devlog_addr_uninit(void)
-{
-    int devid;
-    int log_type;
-
-    for (devid = 0; devid < ASCEND_DEV_MAX_NUM; devid++) {
-        if (g_devdrv_ts_log_array[devid] != NULL) {
-            dbl_kfree(g_devdrv_ts_log_array[devid]);
-            g_devdrv_ts_log_array[devid] = NULL;
-        }
-    }
-
-    for (devid = 0; devid < DEVDRV_PF_DEV_MAX_NUM; devid++) {
-        for (log_type = 0; log_type < DEVDRV_LOG_DUMP_TYPE_MAX; log_type++) {
-            if (g_devdrv_dev_log_array[log_type][devid] != NULL) {
-                ka_mm_kfree(g_devdrv_dev_log_array[log_type][devid]);
-                g_devdrv_dev_log_array[log_type][devid] = NULL;
-            }
-        }
-    }
-}
-
 STATIC void devmng_basic_info_uninit(void)
 {
     int devid;
@@ -5729,247 +1590,6 @@ STATIC void devmng_basic_info_uninit(void)
             g_devdrv_board_info[devid] = NULL;
         }
     }
-}
-
-STATIC int devmng_devlog_addr_init(void)
-{
-    int devid;
-    int log_type;
-
-    for (devid = 0; devid < ASCEND_DEV_MAX_NUM; devid++) {
-        g_devdrv_ts_log_array[devid] = dbl_kzalloc(sizeof(struct devdrv_ts_log), KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
-        if (g_devdrv_ts_log_array[devid] == NULL) {
-            devmng_devlog_addr_uninit();
-            return -ENOMEM;
-        }
-    }
-
-    for (devid = 0; devid < DEVDRV_PF_DEV_MAX_NUM; devid++) {
-        for (log_type = 0; log_type < DEVDRV_LOG_DUMP_TYPE_MAX; log_type++) {
-            g_devdrv_dev_log_array[log_type][devid] = ka_mm_kzalloc(sizeof(struct devdrv_dev_log),
-                KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
-            if (g_devdrv_dev_log_array[log_type][devid] == NULL) {
-                devmng_devlog_addr_uninit();
-                return -ENOMEM;
-            }
-        }
-    }
-    return 0;
-}
-
-#ifdef CFG_FEATURE_SHM_DEVMNG
-STATIC int devdrv_manager_get_pf_vf_id(u32 udevid, u32 *pf_id, u32 *vf_id)
-{
-    int ret;
-
-    if (!uda_is_phy_dev(udevid)) {
-        /* mia device */
-        struct uda_mia_dev_para mia_para = {0};
-        ret = uda_udevid_to_mia_devid(udevid, &mia_para);
-        if (ret != 0) {
-            devdrv_drv_err("Dev udevid to mia devid failed. (udevid=%u; ret=%d)\n", udevid, ret);
-            return ret;
-        }
-        *pf_id = mia_para.phy_devid;
-        *vf_id = mia_para.sub_devid;
-    } else {
-        *pf_id = udevid;
-        *vf_id = 0;
-    }
-
-    return 0;
-}
-
-STATIC int devmng_get_mem_by_devmanage_shm_pf(u32 dev_id, u64 *shm_addr, size_t *shm_size)
-{
-    int ret;
-    struct soc_rsv_mem_info rsv_mem = {0};
-
-    ret = soc_resmng_dev_get_rsv_mem(dev_id, "DEVMNG_RSV_MEM", &rsv_mem);
-    if (ret != 0) {
-        devdrv_drv_err("Get devmng rsv mem addr fail. (dev_id=%u; ret=%d)\n", dev_id, ret);
-        return ret;
-    }
-    *shm_addr = rsv_mem.rsv_mem;
-    *shm_size = DEVDRV_SHM_TOTAL_SIZE_PF;
-
-    return ret;
-}
-
-STATIC int devmng_get_mem_by_devmanage_shm_vf(u32 dev_id, u64 *shm_addr, size_t *shm_size)
-{
-    int ret;
-    u32 pf_id = 0;
-    u32 vf_id = 0;
-    u64 shm_addr_pf = 0;
-    size_t shm_size_pf = 0;
-
-    devdrv_manager_get_pf_vf_id(dev_id, &pf_id, &vf_id);
-
-    ret = devmng_get_mem_by_devmanage_shm_pf(pf_id, &shm_addr_pf, &shm_size_pf);
-    if (ret != 0) {
-        devdrv_drv_err("Get pf rsv mem addr fail. (dev_id=%u; pf_id=%u, ret=%d)\n", dev_id, pf_id, ret);
-        return ret;
-    }
-
-    *shm_addr = shm_addr_pf + DEVDRV_SHM_TOTAL_VF_OFFSET + (vf_id * DEVDRV_SHM_TOTAL_SIZE_VF);
-    *shm_size = DEVDRV_SHM_TOTAL_SIZE_VF;
-
-    return ret;
-}
-
-STATIC int devmng_get_mem_by_devmanage_shm(u32 dev_id, u64 *shm_addr, size_t *shm_size)
-{
-    int ret;
-
-    if (uda_is_pf_dev(dev_id)) {
-        ret = devmng_get_mem_by_devmanage_shm_pf(dev_id, shm_addr, shm_size);
-    } else {
-        ret = devmng_get_mem_by_devmanage_shm_vf(dev_id, shm_addr, shm_size);
-    }
-    if (ret != 0) {
-        devdrv_drv_err("Get devmng rsv mem addr fail. (dev_id=%u; ret=%d)\n", dev_id, ret);
-        return ret;
-    }
-    return ret;
-}
-#endif
-
-STATIC int devmng_shm_init_pcie(struct devdrv_info *dev_info)
-{
-    size_t shm_size;
-    u64 shm_addr;
-    int ret;
-
-#ifdef CFG_FEATURE_SHM_DEVMNG
-    ret = devmng_get_mem_by_devmanage_shm(dev_info->dev_id, &shm_addr, &shm_size);
-    if (ret != 0) {
-        devdrv_drv_err("Get shm addr by devmanage fail. (dev_id=%u; ret=%d)\n", dev_info->dev_id, ret);
-        return ret;
-    }
-#else
-    ret = adap_get_addr_info(dev_info->dev_id, DEVDRV_ADDR_DEVMNG_RESV_BASE,
-                             0, &shm_addr, &shm_size);
-    if (ret != 0) {
-        devdrv_drv_err("Get shm addr by pcie fail. (dev_id=%u; ret=%d)\n", dev_info->dev_id, ret);
-        return ret;
-    }
-#endif
-
-    dev_info->shm_size = shm_size;
-    dev_info->shm_vaddr = ka_mm_ioremap(shm_addr, shm_size);
-    if (dev_info->shm_vaddr == NULL) {
-        devdrv_drv_err("[devid=%u] ka_mm_ioremap shm_vaddr fail.\n", dev_info->dev_id);
-        return -ENOMEM;
-    }
-
-    return 0;
-}
-#ifndef DEVDRV_MANAGER_HOST_UT_TEST
-STATIC int devmng_shm_init_ub(struct devdrv_info *dev_info)
-{
-    int ret = 0;
-
-    dev_info->shm_size_register_rao = DEVDRV_SHM_GEGISTER_RAO_SIZE;
-    dev_info->shm_vaddr = ka_mm_kzalloc(dev_info->shm_size_register_rao, KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
-    if (dev_info->shm_vaddr == NULL) {
-        devdrv_drv_err("Kzalloc rao mem fail. (dev_id=%u, shm_size=0x%x)\n",
-                       dev_info->dev_id, dev_info->shm_size);
-        return -ENOMEM;
-    }
-
-    ret = devdrv_register_rao_client(dev_info->dev_id, DEVDRV_RAO_CLIENT_DEVMNG,
-                                     (u64)(dev_info->shm_vaddr), dev_info->shm_size_register_rao, DEVDRV_RAO_PERM_RMT_READ);
-    if (ret != 0) {
-        devdrv_drv_err("Register rao client fail. (dev_id=%u, ret=%d)\n", dev_info->dev_id, ret);
-        ka_mm_kfree(dev_info->shm_vaddr);
-        dev_info->shm_vaddr = NULL;
-        return ret;
-    }
-    devdrv_drv_info("Register raorequest client success. (dev_id=%u, size=0x%x)\n", dev_info->dev_id, dev_info->shm_size_register_rao);
-
-    dev_info->shm_size = dev_info->shm_size_register_rao;
-    return ret;
-}
-#endif
-
-STATIC int devmng_shm_init(struct devdrv_info *dev_info)
-{
-    int ret;
-
-    if (devdrv_get_connect_protocol(dev_info->dev_id) == CONNECT_PROTOCOL_UB) {
-#ifndef DEVDRV_MANAGER_HOST_UT_TEST
-        ret = devmng_shm_init_ub(dev_info);
-#endif
-    } else {
-        ret = devmng_shm_init_pcie(dev_info);
-    }
-    if (ret != 0) {
-        devdrv_drv_err("Get mem fail. (dev_id=%u; ret=%d)\n", dev_info->dev_id, ret);
-        return ret;
-    }
-
-    dev_info->shm_head = (U_SHM_INFO_HEAD __iomem *)((uintptr_t)dev_info->shm_vaddr);
-    dev_info->shm_head->head_info.offset_soc    = sizeof(U_SHM_INFO_HEAD);
-    dev_info->shm_head->head_info.offset_board  = dev_info->shm_head->head_info.offset_soc +
-                                                  sizeof(U_SHM_INFO_SOC);
-    dev_info->shm_head->head_info.offset_status = dev_info->shm_head->head_info.offset_board +
-                                                  sizeof(U_SHM_INFO_BOARD);
-    dev_info->shm_head->head_info.offset_heartbeat = dev_info->shm_head->head_info.offset_status +
-                                                  sizeof(U_SHM_INFO_STATUS);
-
-    dev_info->shm_soc    = (U_SHM_INFO_SOC __iomem *)((uintptr_t)((uintptr_t)dev_info->shm_vaddr +
-                           dev_info->shm_head->head_info.offset_soc));
-    dev_info->shm_status = (U_SHM_INFO_STATUS __iomem *)((uintptr_t)((uintptr_t)dev_info->shm_vaddr +
-                           dev_info->shm_head->head_info.offset_status));
-    dev_info->shm_board  = (U_SHM_INFO_BOARD __iomem *)((uintptr_t)((uintptr_t)dev_info->shm_vaddr +
-                           dev_info->shm_head->head_info.offset_board));
-    dev_info->shm_heartbeat = (U_SHM_INFO_HEARTBEAT __iomem *)((uintptr_t)((uintptr_t)dev_info->shm_vaddr +
-                           dev_info->shm_head->head_info.offset_heartbeat));
-    return 0;
-}
-
-STATIC void devmng_shm_uninit(struct devdrv_info *dev_info)
-{
-    int ret;
-    if (devdrv_get_connect_protocol(dev_info->dev_id) == CONNECT_PROTOCOL_UB) {
-#ifndef DEVDRV_MANAGER_HOST_UT_TEST
-        ret = devdrv_unregister_rao_client(dev_info->dev_id, DEVDRV_RAO_CLIENT_DEVMNG);
-        if (ret != 0) {
-            devdrv_drv_err("Unregister rao client failed. (dev_id=%u)\n", dev_info->dev_id);
-            return;
-        }
-
-        if (dev_info->shm_vaddr != NULL) {
-            ka_mm_kfree(dev_info->shm_vaddr);
-        }
-#endif
-    } else {
-        if (dev_info->shm_vaddr != NULL) {
-            ka_mm_iounmap(dev_info->shm_vaddr);
-        }
-    }
-
-    dev_info->shm_vaddr = NULL;
-    dev_info->shm_head = NULL;
-    dev_info->shm_soc = NULL;
-    dev_info->shm_board = NULL;
-    dev_info->shm_status = NULL;
-    dev_info->shm_heartbeat = NULL;
-    return;
-}
-
-int devdrv_manager_check_capability(u32 dev_id, devdrv_capability_type type)
-{
-    struct devdrv_info *dev_info = NULL;
-
-    dev_info = devdrv_get_devdrv_info_array(dev_id);
-    if (dev_info == NULL) {
-        devdrv_drv_err("dev_id(%u) get device info failed.\n", dev_id);
-        return -EINVAL;
-    }
-
-    return (dev_info->capability & (unsigned int)(1U << (unsigned int)type)) ? 0 : -EOPNOTSUPP;
 }
 
 STATIC struct devdrv_info *devdrv_manager_dev_info_alloc(u32 dev_id)
@@ -5998,26 +1618,6 @@ STATIC struct devdrv_info *devdrv_manager_dev_info_alloc(u32 dev_id)
     }
 
     return dev_info;
-}
-
-STATIC int devdrv_manager_init_common_chan(u32 dev_id)
-{
-    int ret;
-    struct devdrv_common_msg_client *devdrv_commn_chan = NULL;
-
-    devdrv_commn_chan = devdrv_manager_get_common_chan(dev_id);
-    if (devdrv_commn_chan->init_notify == NULL) {
-        devdrv_drv_err("common chan get failed. (dev_id=%u)\n", dev_id);
-        return -ENODEV;
-    }
-
-    ret = devdrv_register_common_msg_client(devdrv_commn_chan);
-    if (ret) {
-        devdrv_drv_err("devdrv register common msg channel failed. (ret=%d, dev_id=%u)\n", ret, dev_id);
-        return ret;
-    }
-
-    return 0;
 }
 
 struct devdrv_board_info_cache *devdrv_get_board_info_host(unsigned int dev_id)
@@ -6093,7 +1693,7 @@ STATIC int devdrv_manager_init_cpu_info(u32 udevid, struct devdrv_info *dev_info
         return ret;
     }
     dev_info->ctrl_cpu_core_num = info.total_num;
-    dev_info->ctrl_cpu_id = __ffs(info.bitmap);
+    dev_info->ctrl_cpu_id = __ka_base_ffs(info.bitmap);
     dev_info->ctrl_cpu_occupy_bitmap = info.bitmap;
 #if defined(__LITTLE_ENDIAN)
     dev_info->ctrl_cpu_endian_little = 1;
@@ -6106,7 +1706,7 @@ STATIC int devdrv_manager_init_cpu_info(u32 udevid, struct devdrv_info *dev_info
         devdrv_drv_err("Get acpu info failed. (dev_id=%u; ret=%d)\n", udevid, ret);
         return ret;
     }
-    dev_info->ai_cpu_core_id = __ffs(info.bitmap);
+    dev_info->ai_cpu_core_id = __ka_base_ffs(info.bitmap);
     dev_info->ai_cpu_core_num = info.total_num;
     dev_info->aicpu_occupy_bitmap = info.bitmap;
 
@@ -6184,6 +1784,33 @@ STATIC int devdrv_manager_init_res_info(struct devdrv_info *dev_info)
     return ret;
 }
 
+STATIC int devdrv_manager_clear_cpu_cfg(u32 udevid)
+{
+    int ret;
+
+    ret = soc_resmng_dev_set_mia_res(udevid, MIA_CPU_DEV_CCPU, 0, 1);
+    if (ret != 0) {
+        devdrv_drv_err("Set ctrl cpu num to 0 failed. (dev_id=%u; ret=%d)\n", udevid, ret);
+    }
+
+    ret = soc_resmng_dev_set_mia_res(udevid, MIA_CPU_DEV_DCPU, 0, 1);
+    if (ret != 0) {
+        devdrv_drv_err("Set data cpu num to 0 failed. (dev_id=%u; ret=%d)\n", udevid, ret);
+    }
+
+    ret = soc_resmng_dev_set_mia_res(udevid, MIA_CPU_DEV_ACPU, 0, 1);
+    if (ret != 0) {
+        devdrv_drv_err("Set aicpu num to 0 failed. (dev_id=%u; ret=%d)\n", udevid, ret);
+    }
+
+    ret = soc_resmng_dev_set_mia_res(udevid, MIA_CPU_DEV_COMCPU, 0, 1);
+    if (ret != 0) {
+        devdrv_drv_err("Set communication cpu num to 0 failed. (dev_id=%u; ret=%d)\n", udevid, ret);
+    }
+
+    return 0;
+}
+
 STATIC int devdrv_manager_init_devinfo(struct devdrv_info *dev_info)
 {
     int ret;
@@ -6256,8 +1883,8 @@ STATIC int devdrv_manager_init_vf_splited_res(struct devdrv_info *dev_info_vf)
         devdrv_drv_err("Get vf acpu info failed. (dev_id=%u; ret=%d)\n", dev_id, ret);
         return ret;
     }
-    dev_info_vf->ai_cpu_core_id = __ffs(bitmap);
-    dev_info_vf->ai_cpu_core_num = (ka_base_bitmap_weight((unsigned long *)&bitmap, BITS_PER_LONG_LONG)) * unit_per_bit;
+    dev_info_vf->ai_cpu_core_id = __ka_base_ffs(bitmap);
+    dev_info_vf->ai_cpu_core_num = (ka_base_bitmap_weight((unsigned long *)&bitmap, KA_BITS_PER_LONG_LONG)) * unit_per_bit;
     dev_info_vf->aicpu_occupy_bitmap = bitmap;
 
     return 0;
@@ -6348,7 +1975,7 @@ STATIC int devdrv_manager_init_vf_devinfo(struct devdrv_info *dev_info_vf)
 #endif
 
 #ifndef DEVDRV_MANAGER_HOST_UT_TEST
-STATIC int devdrv_manager_init_instance(u32 dev_id, struct device *dev)
+STATIC int devdrv_manager_init_instance(u32 dev_id, ka_device_t *dev)
 {
 #ifndef CFG_FEATURE_REFACTOR
     struct devdrv_platform_data *pdata = NULL;
@@ -6443,7 +2070,8 @@ STATIC int devdrv_manager_init_instance(u32 dev_id, struct device *dev)
     ka_system_add_timer(&devdrv_check_start[dev_id]);
 #endif
     /* device online inform user */
-    devdrv_manager_online_devid_update(dev_id);   
+    devdrv_manager_online_devid_update(dev_id); 
+    dbl_dev_base_info_init(dev_id);
     devdrv_drv_info("devdrv_manager_init_instance dev_id :%u OUT !\n", dev_id);
     return 0;
 
@@ -6489,7 +2117,7 @@ STATIC int devdrv_manager_uninit_instance(u32 dev_id)
         ka_system_msleep(1);
     }
     devmng_shm_uninit(dev_info);
-    g_device_process_status[dev_id] = 0;
+    devdrv_manager_device_status_init(dev_id);
 
     ret = ka_task_down_timeout(&dev_info->no_trans_chan_wait_sema, DEVDRV_INIT_INSTANCE_TIMEOUT);
     if (ret) {
@@ -6507,7 +2135,7 @@ STATIC int devdrv_manager_uninit_instance(u32 dev_id)
 
 #ifdef CFG_FEATURE_TIMESYNC
     dms_time_sync_exit(dev_id);
-#if !defined(CFG_FEATURE_ASCEND910_95_STUB)
+#if !defined(CFG_FEATURE_ASCEND950_STUB)
     devdrv_refresh_aicore_info_exit(dev_id);
 #endif
 #endif
@@ -6520,6 +2148,10 @@ STATIC int devdrv_manager_uninit_instance(u32 dev_id)
     devdrv_manager_non_trans_uninit(dev_id);
     devdrv_manager_unregister(dev_info);
     devdrv_manager_online_del_devids(dev_id);
+    dbl_dev_base_info_init(dev_id);
+#ifdef CFG_FEATURE_REFACTOR
+    devdrv_manager_clear_cpu_cfg(dev_id);
+#endif
 
     if (!devdrv_manager_is_pf_device(dev_id)) {
         /* VF device need to destroy all device info when destroy vdevice */
@@ -6588,26 +2220,6 @@ static int devdrv_manager_host_notifier_func(u32 udevid, enum uda_notified_actio
     return ret;
 }
 #endif
-static const struct pci_device_id devdrv_driver_tbl[] = {{ KA_PCI_VDEVICE(HUAWEI, 0xd100), 0 },
-                                                         { KA_PCI_VDEVICE(HUAWEI, 0xd105), 0 },
-                                                         { KA_PCI_VDEVICE(HUAWEI, PCI_DEVICE_CLOUD), 0 },
-                                                         { KA_PCI_VDEVICE(HUAWEI, 0xd801), 0 },
-                                                         { KA_PCI_VDEVICE(HUAWEI, 0xd500), 0 },
-                                                         { KA_PCI_VDEVICE(HUAWEI, 0xd501), 0 },
-                                                         { KA_PCI_VDEVICE(HUAWEI, 0xd802), 0 },
-                                                         { KA_PCI_VDEVICE(HUAWEI, 0xd803), 0 },
-                                                         { KA_PCI_VDEVICE(HUAWEI, 0xd804), 0 },
-                                                         { KA_PCI_VDEVICE(HUAWEI, 0xd805), 0 },
-                                                         { KA_PCI_VDEVICE(HUAWEI, 0xd806), 0 },
-                                                         { KA_PCI_VDEVICE(HUAWEI, 0xd807), 0 },
-                                                         { DEVDRV_DIVERSITY_PCIE_VENDOR_ID, 0xd500,
-                                                           KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
-                                                         { 0x20C6, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
-                                                         { 0x203F, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
-                                                         { 0x20C6, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
-                                                         { 0x203F, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
-                                                         {}};
-KA_MODULE_DEVICE_TABLE(pci, devdrv_driver_tbl);
 
 void devdrv_manager_ops_sem_down_write(void)
 {
@@ -6633,13 +2245,13 @@ void devdrv_manager_ops_sem_up_read(void)
 }
 KA_EXPORT_SYMBOL(devdrv_manager_ops_sem_up_read);
 
-STATIC int devdrv_manager_reboot_handle(struct notifier_block *self, unsigned long event, void *data)
+STATIC int devdrv_manager_reboot_handle(ka_notifier_block_t *self, unsigned long event, void *data)
 {
 #ifdef CFG_FEATURE_TIMESYNC
     int count = 0;
 #endif
 
-    if (event != SYS_RESTART && event != SYS_HALT && event != SYS_POWER_OFF) {
+    if (event != KA_SYS_RESTART && event != KA_SYS_HALT && event != KA_SYS_POWER_OFF) {
             return KA_NOTIFY_DONE;
     }
 #ifdef CFG_FEATURE_TIMESYNC
@@ -6668,13 +2280,13 @@ void devdrv_check_pid_map_process_sign(ka_pid_t tgid, u64 start_time)
 {
     struct devdrv_manager_info *d_info = devdrv_get_manager_info();
     struct devdrv_process_sign *d_sign_hostpid = NULL, *d_sign_devpid = NULL;
-    struct hlist_node *local_sign = NULL;
+    ka_hlist_node_t *local_sign = NULL;
     struct devdrv_process_sign *free_sign = NULL, *free_sign_tmp = NULL;
     u32 bkt;
     int release_flag = 0;
-    struct list_head *pos = NULL;
-    struct list_head *n = NULL;
-    struct list_head free_list_head;
+    ka_list_head_t *pos = NULL;
+    ka_list_head_t *n = NULL;
+    ka_list_head_t free_list_head;
     KA_INIT_LIST_HEAD(&free_list_head);
 
     if (d_info == NULL) {
@@ -6723,7 +2335,7 @@ void devdrv_check_pid_map_process_sign(ka_pid_t tgid, u64 start_time)
 #endif
 #endif
 
-STATIC int devdrv_manage_release_prepare(struct file *file_op, unsigned long mode)
+STATIC int devdrv_manage_release_prepare(ka_file_t *file_op, unsigned long mode)
 {
     struct devdrv_manager_context *dev_manager_context = NULL;
 
@@ -6749,9 +2361,9 @@ STATIC int devdrv_manage_release_prepare(struct file *file_op, unsigned long mod
     return 0;
 }
 
-STATIC int devdrv_manager_process_exit(struct notifier_block *nb, unsigned long mode, void *data)
+STATIC int devdrv_manager_process_exit(ka_notifier_block_t *nb, unsigned long mode, void *data)
 {
-    struct task_struct *task = (struct task_struct *)data;
+    ka_task_struct_t *task = (ka_task_struct_t *)data;
     (void)mode;
     (void)nb;
 
@@ -6767,11 +2379,11 @@ STATIC const struct notifier_operations g_drv_intf_notifier_ops = {
     .notifier_call = devdrv_manage_release_prepare,
 };
 
-STATIC struct notifier_block g_process_sign_exit_nb = {
+STATIC ka_notifier_block_t g_process_sign_exit_nb = {
     .notifier_call = devdrv_manager_process_exit,
 };
 
-static struct notifier_block devdrv_manager_reboot_notifier = {
+static ka_notifier_block_t devdrv_manager_reboot_notifier = {
     .notifier_call = devdrv_manager_reboot_handle,
 };
 
@@ -6785,25 +2397,17 @@ STATIC int devdrv_manager_register_notifier(void)
         return -ENODEV;
     }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)
-    (void)g_process_sign_exit_nb;
-#else
     ret = ka_dfx_profile_event_register(KA_PROFILE_TASK_EXIT, &g_process_sign_exit_nb);
     if (ret != 0) {
         devdrv_drv_err("Register ka_dfx_profile_event_register fail. (ret=%d).\n", ret);
         return -ENODEV;
     }
-#endif
 
     ret = ka_dfx_register_reboot_notifier(&devdrv_manager_reboot_notifier);
     if (ret != 0) {
         devdrv_drv_err("ka_dfx_register_reboot_notifier failed.\n");
         (void)ka_dfx_unregister_reboot_notifier(&devdrv_manager_reboot_notifier);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)
-    (void)g_process_sign_exit_nb;
-#else
         (void)ka_dfx_profile_event_unregister(KA_PROFILE_TASK_EXIT, &g_process_sign_exit_nb);
-#endif
         return ret;
     }
     return 0;
@@ -6812,11 +2416,7 @@ STATIC int devdrv_manager_register_notifier(void)
 STATIC void devdrv_manager_unregister_notifier(void)
 {
     (void)ka_dfx_unregister_reboot_notifier(&devdrv_manager_reboot_notifier);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)
-    (void)g_process_sign_exit_nb;
-#else
     (void)ka_dfx_profile_event_unregister(KA_PROFILE_TASK_EXIT, &g_process_sign_exit_nb);
-#endif
 }
 
 STATIC int devdrv_manager_info_init(void)
@@ -6842,7 +2442,7 @@ STATIC int devdrv_manager_info_init(void)
 
     dev_manager_info->prob_num = 0;
 
-    for (i = 0; i < ASCEND_DEV_MAX_NUM / BITS_PER_LONG_LONG + 1; i++) {
+    for (i = 0; i < ASCEND_DEV_MAX_NUM / KA_BITS_PER_LONG_LONG + 1; i++) {
         dev_manager_info->prob_device_bitmap[i] = 0;
     }
 
@@ -6872,7 +2472,7 @@ STATIC void devdrv_manager_info_free(void)
 int devdrv_manager_init(void)
 {
     struct uda_dev_type type;
-    struct device *i_device = NULL;
+    ka_device_t *i_device = NULL;
     int ret = 0;
 
     ret = drv_davinci_register_sub_module(DAVINCI_INTF_MODULE_DEVMNG, &devdrv_manager_file_operations);
@@ -7006,8 +2606,8 @@ register_sub_module_fail:
 
 void devdrv_manager_exit(void)
 {
-    struct list_head *pos = NULL;
-    struct list_head *n = NULL;
+    ka_list_head_t *pos = NULL;
+    ka_list_head_t *n = NULL;
     struct devdrv_pm *pm = NULL;
     struct uda_dev_type type;
 
@@ -7056,3 +2656,4 @@ void devdrv_manager_exit(void)
     devdrv_pid_map_uninit();
 #endif
 }
+

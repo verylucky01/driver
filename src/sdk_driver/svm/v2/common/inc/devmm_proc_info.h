@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -15,8 +15,6 @@
 #define DEVMM_PROC_INFO_H
 
 #include <linux/types.h>
-#include <linux/mmu_notifier.h>
-#include <linux/hugetlb.h>
 
 #include "ka_base_pub.h"
 #include "ka_common_pub.h"
@@ -58,19 +56,7 @@
 
 #define DEVMM_FAULT_OK VM_FAULT_NOPAGE
 
-/*
- * linux kernel < 3.11 not defined VM_FAULT_SIGSEGV,
- * euler LINUX_VERSION_CODE 3.10 defined VM_FAULT_SIGSEGV
- */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0)
-#define DEVMM_FAULT_ERROR KA_VM_FAULT_SIGSEGV
-#else
-#ifdef KA_VM_FAULT_SIGSEGV
-#define DEVMM_FAULT_ERROR KA_VM_FAULT_SIGSEGV
-#else
-#define DEVMM_FAULT_ERROR KA_VM_FAULT_SIGBUS
-#endif
-#endif
+#define DEVMM_FAULT_ERROR KA_MM_FAULT_ERROR
 
 #define devmm_pin_page(page) ka_mm_get_page(page)
 #define devmm_unpin_page(page) ka_mm_put_page(page)
@@ -80,28 +66,6 @@
 #define DEVMM_DEV_CLOSE_WAITTIME_MIN 500000 /* us */
 #define DEVMM_DEV_CLOSE_WAITTIME_MAX 600000 /* us */
 #define DEVMM_DEV_CLOSE_TIMES 1000          /* 500s */
-
-#define PXD_JUDGE(pxd) (((pxd) == NULL) || (pxd##_none(*(pxd##_t *)(pxd)) != 0) || \
-    (pxd##_bad(*(pxd##_t *)(pxd)) != 0))
-#define PMD_JUDGE(pmd) (((pmd) == NULL) || (pmd_none(*(ka_pmd_t *)(pmd)) != 0) || \
-    (pmd_bad(*(ka_pmd_t *)(pmd)) != 0))
-
-#if defined(__arm__) || defined(__aarch64__)
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0)
-#define PMD_HUGE(pmd) (((pmd) != NULL) && (pmd_val(*(ka_pmd_t *)(pmd)) != 0) && \
-    ((pmd_val(*(ka_pmd_t *)(pmd)) & PMD_TABLE_BIT) == 0))
-#define PUD_GIANT(pud) (((pud) != NULL) && (pud_val(*(pud_t *)(pud)) != 0) && \
-    ((pud_val(*(pud_t *)(pud)) & PUD_TABLE_BIT) == 0))
-#else
-#define PMD_HUGE(pmd) (((pmd) != NULL) && (pmd_none(*(ka_pmd_t *)(pmd)) == 0) && \
-    (pte_huge(*(ka_pte_t *)(pmd)) != 0))
-#define PUD_GIANT(pud) (((pud) != NULL) && (pud_none(*(pud_t *)(pud)) == 0) && \
-    (pte_huge(*(ka_pte_t *)(pud)) != 0))
-#endif
-#else
-#define PMD_HUGE(pmd) 0
-#define PUD_GIANT(pud) 0
-#endif
 
 #define HEAP_USED_PER_MASK_SIZE (1UL << 30)   /* 1G */
 
@@ -384,11 +348,7 @@ struct devmm_custom_process {
     ka_mm_struct_t *mm;
     struct devmm_svm_process *aicpu_proc;
 #ifndef ADAPT_KP_OS_FOR_EMU_TEST
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
     ka_mmu_notifier_t *notifier;
-#else
-    ka_mmu_notifier_t notifier;
-#endif
 #endif
     ka_mutex_t proc_lock;
 };
@@ -439,10 +399,10 @@ struct devmm_svm_process {
 
     u32 real_phy_devid[SVM_MAX_AGENT_NUM]; /* Real physical devid id. Agent devid is ignored  */
     /*
-     * start_addr:mapped start addr of this process
+     * start_addr:svm mapped start addr of this process
      * brk_addr:used add,we used range start_addr~brk_addr
      * brk addr=start_addr+heap_size*heap_cnt
-     * end_addr:mapped end addr of this process
+     * end_addr:svm mapped end addr of this process
      */
     unsigned long start_addr;
     unsigned long end_addr;
@@ -465,11 +425,7 @@ struct devmm_svm_process {
     u64 device_fault_printf; /* smmu page faults always retry, printf too much */
     struct devmm_fault_err fault_err[DEVMM_SVM_MAX_AICORE_NUM];
 #ifndef ADAPT_KP_OS_FOR_EMU_TEST
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
     ka_mmu_notifier_t *notifier;
-#else
-    ka_mmu_notifier_t notifier;
-#endif
 #endif
     ka_rw_semaphore_t host_fault_sem; /* free use read lock, fault use write lock */
     ka_semaphore_t fault_sem;
@@ -981,7 +937,6 @@ int devmm_insert_normal_pages(struct page_map_info *page_map_info, struct devmm_
 int devmm_dev_is_self_system(unsigned int dev_id);
 int devmm_txatu_target_to_base(u32 to_devid, u32 from_devid, phys_addr_t target_addr, phys_addr_t *base_addr);
 void devmm_zap_vma_ptes(ka_vm_area_struct_t *vma, unsigned long vaddr, unsigned long size);
-ka_pmd_t *devmm_get_va_to_pmd(const ka_vm_area_struct_t *vma, unsigned long va);
 void *devmm_get_pte(const ka_vm_area_struct_t *vma, u64 va, u64 *kpg_size);
 int devmm_va_to_pmd(const ka_vm_area_struct_t *vma, unsigned long va, int huge_flag, ka_pmd_t **tem_pmd);
 void devmm_init_dev_private(struct devmm_svm_dev *dev, ka_file_operations_t *svm_fops);
@@ -1020,8 +975,10 @@ void devmm_zap_normal_pages(struct devmm_svm_process *svm_proc, u64 va, u64 page
 int devmm_ioctl_dispatch(struct devmm_svm_process *svm_proc, u32 cmd_id, u32 cmd_flag,
     struct devmm_ioctl_arg *buffer);
 void devmm_proc_debug_info_print(struct devmm_svm_process *svm_proc);
+int devmm_ioctl_free_pages(struct devmm_svm_process *svm_pro, struct devmm_ioctl_arg *arg);
 
 /* host */
+u32 *devmm_get_fst_alloc_bitmap_by_heap(struct devmm_svm_process *svm_process, struct devmm_svm_heap *heap, u64 va);
 u32 *devmm_get_alloced_va_fst_page_bitmap_with_heap(struct devmm_svm_heap *heap, u64 va);
 u32 *devmm_get_alloced_va_fst_page_bitmap(struct devmm_svm_process *svm_proc, u64 va);
 int devmm_get_alloced_va(struct devmm_svm_process *svm_proc, u64 va, u64 *alloced_va);
@@ -1095,7 +1052,7 @@ int devmm_chan_query_process_status_h2d(struct devmm_svm_process *svm_proc, stru
 int _devmm_insert_virt_range(struct devmm_svm_process *svm_proc, u32 pg_type, u64 vaddr,
     u64 *paddr, u32 pg_num);
 
-int devmm_ioctl_handler_register(int cmd, struct devmm_ioctl_handlers_st hander);
+int devmm_ioctl_handler_register(int cmd, struct devmm_ioctl_handlers_st handler);
 void devmm_clear_page_ref_after_ioctl(struct devmm_svm_process *svm_proc,
     u32 cmd_flag, int ret, struct devmm_ioctl_addr_info *addr_info);
 int devmm_set_page_ref_before_ioctl(struct devmm_svm_process *svm_proc, u32 cmd_flag,

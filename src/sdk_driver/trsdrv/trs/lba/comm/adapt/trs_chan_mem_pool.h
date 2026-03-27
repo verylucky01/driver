@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -16,6 +16,7 @@
 #include <linux/types.h>
 
 #include "ka_common_pub.h"
+#include "ka_compiler_pub.h"
 
 #include "trs_pub_def.h"
 
@@ -41,5 +42,5 @@ void trs_chan_mem_node_proc_fs_init(void);
 void trs_chan_mem_node_proc_fs_uninit(void);
 
 int chan_mem_node_ops_open(ka_inode_t *inode, ka_file_t *file);
-ssize_t chan_mem_node_ops_write(ka_file_t *filp, const char __user *ubuf, size_t count, loff_t *ppos);
+ssize_t chan_mem_node_ops_write(ka_file_t *filp, const char __ka_user *ubuf, size_t count, loff_t *ppos);
 #endif

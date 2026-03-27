@@ -12,7 +12,7 @@
 #include "hdc_pcie_drv.h"
 #include "hdc_core.h"
 #include "hdc_adapt.h"
-#include "hdc_file_trans.h"
+#include "hdc_file_common.h"
 #include "hdcdrv_cmd_ioctl.h"
 
 #ifdef CFG_SOC_PLATFORM_HELPER_V51

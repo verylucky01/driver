@@ -69,7 +69,11 @@
 #define DMS_SUBCMD_GET_HCOM_CPU_NUM 55
 #define DMS_SUBCMD_GET_UDIS_DEVICE_INFO 56
 #define DMS_SUBCMD_SET_UDIS_DEVICE_INFO 57
-
+#define DMS_SUBCMD_GET_PHY_DEVICE_INFO 58
+#define DMS_SUBCMD_CREATE_CAPABILITY_GROUP 59
+#define DMS_SUBCMD_DELETE_CAPABILITY_GROUP 60
+#define DMS_SUBCMD_GET_CAPABILITY_GROUP 61
+#define DMS_SUBCMD_GET_CAPABILITY_GROUP_NUM 62
 
 /* subcmd: The main cmd is DMS_MAIN_CMD_SOC */
 #define DMS_SUBCMD_GET_PCB_ID    0
@@ -188,6 +192,7 @@
 #define ASCEND_UB_SUBCMD_GET_EID_INDEX 2
 #define ASCEND_UB_SUBCMD_GET_D2D_EID 3
 #define ASCEND_UB_SUBCMD_GET_BUS_INST_EID 4
+#define ASCEND_UB_SUBCMD_GET_DEV_ID_INFO 5
 
 /* subcmd: The main cmd is DMS_MAIN_CMD_DVPP */
 #define DMS_SUBCMD_GET_DVPP_STATUS  0
@@ -202,7 +207,7 @@
 #define DMS_SUBCMD_GET_SILS_HARDWARE_TEST 5
 
 /* subcmd: The main cmd is DMS_MAIN_CMD_P2P_COM */
-#define DMS_SUBCMD_P2P_COM_LINK_INFO 0
+#define DMS_SUBCMD_P2P_COM_STATUS 0
 #define DMS_SUBCMD_P2P_COM_FORCE_LINKDOWN 1
 
 
@@ -325,6 +330,7 @@ struct urd_p2p_attr {
     unsigned int op;
     unsigned int dev_id;
     unsigned int peer_dev_id;
+    unsigned int type;
     int status;
     unsigned long long capability;
 };

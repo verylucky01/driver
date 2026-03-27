@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -18,6 +18,7 @@
 #include "ka_memory_pub.h"
 #include "ka_kernel_def_pub.h"
 #include "ka_system_pub.h"
+#include "ka_compiler_pub.h"
 
 #include "ascend_hal_define.h"
 
@@ -63,7 +64,7 @@ static bool trs_is_id_query_cmd(unsigned int cmd)
 static int ioctl_trs_res_id_comm(struct trs_proc_ctx *proc_ctx, unsigned int cmd, unsigned long arg)
 {
     struct trs_core_ts_inst *ts_inst = NULL;
-    struct trs_res_id_para *usr_para = (struct trs_res_id_para __user *)arg;
+    struct trs_res_id_para *usr_para = (struct trs_res_id_para __ka_user *)arg;
     struct trs_res_id_para para;
     int ret;
 
@@ -129,7 +130,7 @@ Exit:
 static int ioctl_trs_ssid_query(struct trs_proc_ctx *proc_ctx, unsigned int cmd, unsigned long arg)
 {
     struct trs_core_ts_inst *ts_inst = NULL;
-    struct trs_ssid_query_para *usr_para = (struct trs_ssid_query_para __user *)arg;
+    struct trs_ssid_query_para *usr_para = (struct trs_ssid_query_para __ka_user *)arg;
     int user_visible_flag;
     int ret;
 
@@ -162,10 +163,10 @@ static int ioctl_trs_ssid_query(struct trs_proc_ctx *proc_ctx, unsigned int cmd,
 static int ioctl_trs_hw_info_query(struct trs_proc_ctx *proc_ctx, unsigned int cmd, unsigned long arg)
 {
     struct trs_core_ts_inst *ts_inst = NULL;
-    struct trs_hw_info_query_para *usr_para = (struct trs_hw_info_query_para __user *)arg;
+    struct trs_hw_info_query_para *usr_para = (struct trs_hw_info_query_para __ka_user *)arg;
     int hw_type = TRS_HW_TYPE_STARS;
     int connection_type = TRS_CONNECT_PROTOCOL_UNKNOWN;
-    enum trsSqSendMode sq_send_mode = TRS_MODE_TYPE_SQ_SEND_HIGH_PERFORMANCE;
+    enum trsSqSendMode sq_send_mode = TRS_MODE_TYPE_SQ_SEND_HIGH_SECURITY;
     int tsnum = 0;
     int ret, tsid;
 
@@ -224,7 +225,7 @@ static int ioctl_trs_sqcq_alloc(struct trs_proc_ctx *proc_ctx, unsigned int cmd,
     struct trs_uio_info uio_info;
     int ret;
 
-    ret = ka_base_copy_from_user(&para, (struct halSqCqInputInfo __user *)arg, sizeof(para));
+    ret = ka_base_copy_from_user(&para, (struct halSqCqInputInfo __ka_user *)arg, sizeof(para));
     if (ret != 0) {
 #ifndef EMU_ST
         trs_err("Copy from user failed. (ret=%d)\n", ret);
@@ -234,7 +235,7 @@ static int ioctl_trs_sqcq_alloc(struct trs_proc_ctx *proc_ctx, unsigned int cmd,
 
     alloc_para = get_alloc_para_addr(&para);
     user_uio_info = alloc_para->uio_info;
-    ret = ka_base_copy_from_user(&uio_info, (struct trs_uio_info __user *)user_uio_info, sizeof(uio_info));
+    ret = ka_base_copy_from_user(&uio_info, (struct trs_uio_info __ka_user *)user_uio_info, sizeof(uio_info));
     if (ret != 0) {
 #ifndef EMU_ST
         trs_err("Copy from user uio info failed. (ret=%d)\n", ret);
@@ -262,8 +263,8 @@ static int ioctl_trs_sqcq_alloc(struct trs_proc_ctx *proc_ctx, unsigned int cmd,
     trs_core_inst_put(ts_inst);
 
     if (ret == 0) {
-        ret = ka_base_copy_to_user((struct halSqCqInputInfo __user *)arg, &para, sizeof(para));
-        ret |= ka_base_copy_to_user((struct trs_uio_info __user *)user_uio_info, &uio_info, sizeof(uio_info));
+        ret = ka_base_copy_to_user((struct halSqCqInputInfo __ka_user *)arg, &para, sizeof(para));
+        ret |= ka_base_copy_to_user((struct trs_uio_info __ka_user *)user_uio_info, &uio_info, sizeof(uio_info));
         if (ret != 0) {
             trs_err("Copy to user failed. (ret=%d)\n", ret);
         }
@@ -288,7 +289,7 @@ static int ioctl_trs_sqcq_free(struct trs_proc_ctx *proc_ctx, unsigned int cmd, 
     struct halSqCqFreeInfo para;
     int ret;
 
-    ret = ka_base_copy_from_user(&para, (struct halSqCqFreeInfo __user *)arg, sizeof(para));
+    ret = ka_base_copy_from_user(&para, (struct halSqCqFreeInfo __ka_user *)arg, sizeof(para));
     if (ret != 0) {
 #ifndef EMU_ST
         trs_err("Copy from user failed. (ret=%d)\n", ret);
@@ -327,7 +328,7 @@ static int ioctl_trs_sqcq_config(struct trs_proc_ctx *proc_ctx, unsigned int cmd
     struct halSqCqConfigInfo para;
     int ret;
 
-    ret = ka_base_copy_from_user(&para, (struct halSqCqConfigInfo __user *)arg, sizeof(para));
+    ret = ka_base_copy_from_user(&para, (struct halSqCqConfigInfo __ka_user *)arg, sizeof(para));
     if (ret != 0) {
 #ifndef EMU_ST
         trs_err("Copy from user failed. (ret=%d)\n", ret);
@@ -355,7 +356,7 @@ static int ioctl_trs_sqcq_config(struct trs_proc_ctx *proc_ctx, unsigned int cmd
 static int ioctl_trs_sqcq_query(struct trs_proc_ctx *proc_ctx, unsigned int cmd, unsigned long arg)
 {
     struct trs_core_ts_inst *ts_inst = NULL;
-    struct halSqCqQueryInfo *usr_para = (struct halSqCqQueryInfo __user *)arg;
+    struct halSqCqQueryInfo *usr_para = (struct halSqCqQueryInfo __ka_user *)arg;
     struct halSqCqQueryInfo para;
     int ret;
 
@@ -401,7 +402,7 @@ static int (*const trs_sqcq_send_handles[DRV_INVALID_TYPE])(struct trs_proc_ctx 
 static int ioctl_trs_sqcq_send(struct trs_proc_ctx *proc_ctx, unsigned int cmd, unsigned long arg)
 {
     struct trs_core_ts_inst *ts_inst = NULL;
-    struct halTaskSendInfo __user *usr_para = (struct halTaskSendInfo __user *)arg;
+    struct halTaskSendInfo __ka_user *usr_para = (struct halTaskSendInfo __ka_user *)arg;
     struct halTaskSendInfo para;
     int ret;
 
@@ -449,7 +450,7 @@ static int (*const trs_sqcq_recv_handles[DRV_INVALID_TYPE])(struct trs_proc_ctx 
 static int ioctl_trs_sqcq_recv(struct trs_proc_ctx *proc_ctx, unsigned int cmd, unsigned long arg)
 {
     struct trs_core_ts_inst *ts_inst = NULL;
-    struct halReportRecvInfo *usr_para = (struct halReportRecvInfo __user *)arg;
+    struct halReportRecvInfo *usr_para = (struct halReportRecvInfo __ka_user *)arg;
     struct halReportRecvInfo para;
     int ret;
 
@@ -524,7 +525,7 @@ int ioctl_trs_stl_launch(struct trs_proc_ctx *proc_ctx, unsigned int cmd, unsign
 {
     struct trs_stl_launch_para para = {};
     struct trs_id_inst id_inst = {};
-    struct trs_stl_launch_para *usr_para = (struct trs_stl_launch_para __user *)arg;
+    struct trs_stl_launch_para *usr_para = (struct trs_stl_launch_para __ka_user *)arg;
     struct trs_core_ts_inst *ts_inst = NULL;
     int ret;
 
@@ -556,7 +557,7 @@ int ioctl_trs_stl_query(struct trs_proc_ctx *proc_ctx, unsigned int cmd, unsigne
 {
     struct trs_id_inst id_inst = {};
     struct trs_stl_query_para para;
-    struct trs_stl_query_para *usr_para = (struct trs_stl_query_para __user *)arg;
+    struct trs_stl_query_para *usr_para = (struct trs_stl_query_para __ka_user *)arg;
     struct trs_core_ts_inst *ts_inst = NULL;
     int ret;
 
@@ -587,7 +588,7 @@ int ioctl_trs_stl_query(struct trs_proc_ctx *proc_ctx, unsigned int cmd, unsigne
 #endif
     }
 
-    ret = ka_base_copy_to_user((void __user *)usr_para, (void *)&para, sizeof(struct trs_stl_query_para));
+    ret = ka_base_copy_to_user((void __ka_user *)usr_para, (void *)&para, sizeof(struct trs_stl_query_para));
     if (ret != 0) {
 #ifndef EMU_ST
         trs_err("Copy to user err. (ret=%d)\n", ret);
@@ -617,7 +618,7 @@ int ioctl_trs_ub_info_query(struct trs_proc_ctx *proc_ctx, unsigned int cmd, uns
 {
     struct trs_id_inst id_inst = {0};
     struct trs_ub_info_query_para para;
-    struct trs_ub_info_query_para *usr_para = (struct trs_ub_info_query_para __user *)arg;
+    struct trs_ub_info_query_para *usr_para = (struct trs_ub_info_query_para __ka_user *)arg;
     struct trs_core_ts_inst *ts_inst = NULL;
     int ret;
 
@@ -652,7 +653,7 @@ int ioctl_trs_ub_info_query(struct trs_proc_ctx *proc_ctx, unsigned int cmd, uns
 #endif
     }
     trs_debug("(devid=%u; dieid=%u; funcid=%u)\n", id_inst.devid, para.die_id, para.func_id);
-    ret = ka_base_copy_to_user((void __user *)usr_para, (void *)&para, sizeof(struct trs_ub_info_query_para));
+    ret = ka_base_copy_to_user((void __ka_user *)usr_para, (void *)&para, sizeof(struct trs_ub_info_query_para));
     if (ret != 0) {
 #ifndef EMU_ST
         trs_err("Copy to user err. (ret=%d)\n", ret);
@@ -703,7 +704,7 @@ int ioctl_trs_msg_ctrl(struct trs_proc_ctx *proc_ctx, unsigned int cmd, unsigned
 {
     struct trs_id_inst id_inst = {0};
     struct trs_ctrl_msg_para para = {0};
-    struct trs_ctrl_msg_para *usr_para = (struct trs_ctrl_msg_para __user *)arg;
+    struct trs_ctrl_msg_para *usr_para = (struct trs_ctrl_msg_para __ka_user *)arg;
     struct trs_rpc_call_msg rpc_call_msg;
     int ret = 0;
 
@@ -728,7 +729,7 @@ int ioctl_trs_msg_ctrl(struct trs_proc_ctx *proc_ctx, unsigned int cmd, unsigned
     }
 
     ret = ka_base_put_user(rpc_call_msg.rpc_call_header.len, &usr_para->msg_len);
-    ret |= ka_base_copy_to_user((void __user *)usr_para->msg, (void *)rpc_call_msg.data, rpc_call_msg.rpc_call_header.len);
+    ret |= ka_base_copy_to_user((void __ka_user *)usr_para->msg, (void *)rpc_call_msg.data, rpc_call_msg.rpc_call_header.len);
     if (ret != 0) {
         trs_err("Copy to user err. (len=%u; ret=%d)\n", rpc_call_msg.rpc_call_header.len, ret);
     }
@@ -739,7 +740,7 @@ int ioctl_trs_msg_ctrl(struct trs_proc_ctx *proc_ctx, unsigned int cmd, unsigned
 static int ioctl_trs_set_close_type(struct trs_proc_ctx *proc_ctx, unsigned int cmd, unsigned long arg)
 {
     struct trs_set_close_para para;
-    struct trs_set_close_para *usr_para = (struct trs_set_close_para __user *)arg;
+    struct trs_set_close_para *usr_para = (struct trs_set_close_para __ka_user *)arg;
     struct trs_core_ts_inst *ts_inst = NULL;
     int ret;
 
@@ -773,7 +774,7 @@ static int ioctl_trs_set_close_type(struct trs_proc_ctx *proc_ctx, unsigned int 
 
 static int ioctl_trs_id_res_map(struct trs_proc_ctx *proc_ctx, unsigned int cmd, unsigned long arg)
 {
-    struct trs_cmd_res_map *usr_para = (struct trs_cmd_res_map __user *)arg;
+    struct trs_cmd_res_map *usr_para = (struct trs_cmd_res_map __ka_user *)arg;
     struct trs_core_ts_inst *ts_inst = NULL;
     struct trs_notify_reg_map_para map_para = {0};
     struct trs_cmd_res_map para = {0};
@@ -812,7 +813,7 @@ static int ioctl_trs_id_res_map(struct trs_proc_ctx *proc_ctx, unsigned int cmd,
 
     para.va = map_para.va;
     para.len = map_para.len;
-    ret = ka_base_copy_to_user((void __user *)usr_para, (void *)&para, sizeof(struct trs_cmd_res_map));
+    ret = ka_base_copy_to_user((void __ka_user *)usr_para, (void *)&para, sizeof(struct trs_cmd_res_map));
     if (ret != 0) {
 #ifndef EMU_ST
         if (ts_inst->ops.notify_reg_unmap != NULL) {
@@ -838,7 +839,7 @@ static int (*const trs_sqcq_get_handles[DRV_INVALID_TYPE])(struct trs_proc_ctx *
 
 int ioctl_trs_sqcq_get(struct trs_proc_ctx *proc_ctx, unsigned int cmd, unsigned long arg)
 {
-    struct halSqCqInputInfo *usr_para = (struct halSqCqInputInfo __user *)arg;
+    struct halSqCqInputInfo *usr_para = (struct halSqCqInputInfo __ka_user *)arg;
     struct trs_core_ts_inst *ts_inst = NULL;
     struct halSqCqInputInfo para = {0};
     int ret;
@@ -871,7 +872,7 @@ int ioctl_trs_sqcq_get(struct trs_proc_ctx *proc_ctx, unsigned int cmd, unsigned
     trs_core_inst_put(ts_inst);
 
     if (ret == 0) {
-        ret = ka_base_copy_to_user((void __user *)usr_para, (void *)&para, sizeof(struct halSqCqInputInfo));
+        ret = ka_base_copy_to_user((void __ka_user *)usr_para, (void *)&para, sizeof(struct halSqCqInputInfo));
         if (ret != 0) {
             trs_err("Copy to user failed. (ret=%d)\n", ret);
         }
@@ -890,7 +891,7 @@ int ioctl_trs_sqcq_restore(struct trs_proc_ctx *proc_ctx, unsigned int cmd,
     struct halSqCqInputInfo para = {0};
     int ret;
 
-    ret = ka_base_copy_from_user(&para, (struct halSqCqInputInfo __user *)arg, sizeof(para));
+    ret = ka_base_copy_from_user(&para, (struct halSqCqInputInfo __ka_user *)arg, sizeof(para));
     if (ret != 0) {
 #ifndef EMU_ST
         trs_err("Copy from user failed. (ret=%d)\n", ret);
@@ -900,7 +901,7 @@ int ioctl_trs_sqcq_restore(struct trs_proc_ctx *proc_ctx, unsigned int cmd,
 
     alloc_para = get_alloc_para_addr(&para);
     user_uio_info = alloc_para->uio_info;
-    ret = ka_base_copy_from_user(&uio_info, (struct trs_uio_info __user *)user_uio_info, sizeof(uio_info));
+    ret = ka_base_copy_from_user(&uio_info, (struct trs_uio_info __ka_user *)user_uio_info, sizeof(uio_info));
     if (ret != 0) {
 #ifndef EMU_ST
         trs_err("Copy from user uio info failed. (ret=%d)\n", ret);
@@ -931,8 +932,8 @@ int ioctl_trs_sqcq_restore(struct trs_proc_ctx *proc_ctx, unsigned int cmd,
     trs_core_inst_put(ts_inst);
 
     if (ret == 0) {
-        ret = ka_base_copy_to_user((struct halSqCqInputInfo __user *)arg, &para, sizeof(para));
-        ret |= ka_base_copy_to_user((struct trs_uio_info __user *)user_uio_info, &uio_info, sizeof(uio_info));
+        ret = ka_base_copy_to_user((struct halSqCqInputInfo __ka_user *)arg, &para, sizeof(para));
+        ret |= ka_base_copy_to_user((struct trs_uio_info __ka_user *)user_uio_info, &uio_info, sizeof(uio_info));
         if (ret != 0) {
             trs_err("Copy to user failed. (ret=%d)\n", ret);
         }
@@ -943,7 +944,7 @@ int ioctl_trs_sqcq_restore(struct trs_proc_ctx *proc_ctx, unsigned int cmd,
 
 static int ioctl_trs_dma_desc_create(struct trs_proc_ctx *proc_ctx, unsigned int cmd, unsigned long arg)
 {
-    struct trs_cmd_dma_desc *usr_para = (struct trs_cmd_dma_desc __user *)arg;
+    struct trs_cmd_dma_desc *usr_para = (struct trs_cmd_dma_desc __ka_user *)arg;
     struct trs_cmd_dma_desc para;
     struct trs_core_ts_inst *ts_inst = NULL;
     int ret;
@@ -981,7 +982,7 @@ static int ioctl_trs_dma_desc_create(struct trs_proc_ctx *proc_ctx, unsigned int
 
 static int ioctl_trs_ts_cmdlist_map_unmap(struct trs_proc_ctx *proc_ctx, unsigned int cmd, unsigned long arg)
 {
-    struct trs_cmd_cmdlist_map_unmap *usr_para = (struct trs_cmd_cmdlist_map_unmap __user *)(uintptr_t)arg;
+    struct trs_cmd_cmdlist_map_unmap *usr_para = (struct trs_cmd_cmdlist_map_unmap __ka_user *)(uintptr_t)arg;
     struct trs_cmd_cmdlist_map_unmap para;
     struct trs_core_ts_inst *ts_inst = NULL;
     int ret;
@@ -1025,7 +1026,7 @@ static int ioctl_trs_ts_cmdlist_map_unmap(struct trs_proc_ctx *proc_ctx, unsigne
 #ifdef CFG_FEATURE_SUPPORT_STREAM_TASK
 static int ioctl_trs_stream_task_fill(struct trs_proc_ctx *proc_ctx, unsigned int cmd, unsigned long arg)
 {
-    struct trs_stream_task_para *usr_para = (struct trs_stream_task_para __user *)arg;
+    struct trs_stream_task_para *usr_para = (struct trs_stream_task_para __ka_user *)arg;
     struct trs_stream_task_para para;
     struct trs_core_ts_inst *ts_inst = NULL;
     void *usr_task_info = NULL;
@@ -1037,7 +1038,7 @@ static int ioctl_trs_stream_task_fill(struct trs_proc_ctx *proc_ctx, unsigned in
         return -EFAULT;
     }
 
-    if ((para.stream_mem == NULL) || (para.task_info == NULL)) {
+    if (para.task_info == NULL) {
         trs_err("Invalid para.\n");
         return -EINVAL;
     }
@@ -1084,7 +1085,7 @@ static int ioctl_trs_stream_task_fill(struct trs_proc_ctx *proc_ctx, unsigned in
 #ifdef CFG_FEATURE_SUPPORT_STREAM_TASK
 static int ioctl_trs_sq_switch_stream_batch(struct trs_proc_ctx *proc_ctx, unsigned int cmd, unsigned long arg)
 {
-    struct trs_sq_switch_stream_para *usr_para = (struct trs_sq_switch_stream_para __user *)arg;
+    struct trs_sq_switch_stream_para *usr_para = (struct trs_sq_switch_stream_para __ka_user *)arg;
     struct trs_sq_switch_stream_para para;
     struct sq_switch_stream_info *info = NULL;
     struct trs_core_ts_inst *ts_inst = NULL;
@@ -1098,33 +1099,35 @@ static int ioctl_trs_sq_switch_stream_batch(struct trs_proc_ctx *proc_ctx, unsig
         return -EFAULT;
     }
 
-    if ((para.info == NULL) || (para.num == 0) || (para.num > 32768)) { /* 32768: max stream num */
-        trs_err("Invalid para. (num=%u)\n", para.num);
-        return -EINVAL;
-    }
-
     if (!uda_is_phy_dev(proc_ctx->devid)) {
         return -ENOTSUPP;
     }
 
+    ts_inst = trs_core_inst_get(proc_ctx->devid, 0);
+    if (ts_inst == NULL) {
+        trs_err("Invalid para. (devid=%u)\n", proc_ctx->devid);
+        return -EINVAL;
+    }
+
+    if ((para.info == NULL) || (para.num == 0) || (para.num > trs_res_get_max_id(ts_inst, TRS_STREAM))) {
+        trs_core_inst_put(ts_inst);
+        trs_err("Invalid para. (num=%u)\n", para.num);
+        return -EINVAL;
+    }
+
     info = trs_vzalloc(sizeof(struct sq_switch_stream_info) * para.num);
     if (info == NULL) {
+        trs_core_inst_put(ts_inst);
         trs_err("Alloc memory failed. (num=%u)\n", para.num);
         return -ENOMEM;
     }
 
     ret = ka_base_copy_from_user(info, para.info, sizeof(struct sq_switch_stream_info) * para.num);
     if (ret != 0) {
+        trs_core_inst_put(ts_inst);
         trs_err("Copy from user failed. (ret=%d; num=%u)\n", ret, para.num);
         trs_vfree(info);
         return -EFAULT;
-    }
-
-    ts_inst = trs_core_inst_get(proc_ctx->devid, 0);
-    if (ts_inst == NULL) {
-        trs_err("Invalid para. (devid=%u)\n", proc_ctx->devid);
-        trs_vfree(info);
-        return -EINVAL;
     }
 
     ka_task_mutex_lock(&proc_ctx->ts_ctx[0].mutex);
@@ -1266,7 +1269,7 @@ static int trs_ts_inst_open(struct trs_proc_ctx *proc_ctx)
         }
 
         /* When core ts inst is obtained, the module reference counting of ops must be added. */
-        if (!try_module_get(ts_inst->ops.owner)) {
+        if (!ka_system_try_module_get(ts_inst->ops.owner)) {
             trs_err("Get trs core module failed. (devid=%u)\n", devid);
             goto exit;
         }
@@ -1284,11 +1287,7 @@ static int trs_ts_inst_open(struct trs_proc_ctx *proc_ctx)
         }
 
         proc_ctx->mm = ka_task_get_current_mm();
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0))
         ka_mm_mmget(proc_ctx->mm);
-#else
-        ka_base_atomic_inc(&proc_ctx->mm->mm_users);
-#endif
 
         trs_debug("Ts inst open success. (devid=%u; tsid=%u)\n", devid, tsid);
     }
@@ -1474,39 +1473,25 @@ static int trs_mmap_not_support(ka_file_t *file, ka_vm_area_struct_t *vma)
     return -ENOTSUPP;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 3, 0)
 static int trs_mremap(ka_vm_area_struct_t * area)
 {
     return -ENOTSUPP;
 }
-#endif
 
-static struct vm_operations_struct trs_vm_ops = {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 3, 0)
-    .mremap = trs_mremap,
-#endif
+static ka_vm_operations_struct_t trs_vm_ops = {
+    ka_vm_ops_init_mremap(trs_mremap)
 };
 
 static int trs_mmap(ka_file_t *file, ka_vm_area_struct_t *vma)
 {
-    vma->vm_ops = &trs_vm_ops;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
-    vm_flags_set(vma, vma->vm_flags | VM_LOCKED | VM_DONTEXPAND | VM_DONTDUMP | VM_DONTCOPY | VM_IO);
-    if (!(vma->vm_flags & VM_WRITE)) {
-        vm_flags_clear(vma, VM_MAYWRITE);
+    ka_mm_set_vm_ops(vma, &trs_vm_ops);
+    ka_mm_set_vm_flags(vma, ka_mm_get_vm_flags(vma) | KA_VM_LOCKED | KA_VM_DONTEXPAND |
+                                KA_VM_DONTDUMP | KA_VM_DONTCOPY | KA_VM_IO | KA_VM_PFNMAP);
+    if (!(ka_mm_get_vm_flags(vma) & KA_VM_WRITE))
+    {
+        ka_mm_vm_flags_clear(vma, KA_VM_MAYWRITE);
     }
-#else
-    vma->vm_flags |= VM_DONTEXPAND;
-    vma->vm_flags |= VM_LOCKED;
-    vma->vm_flags |= VM_PFNMAP;
-    vma->vm_flags |= VM_DONTDUMP;
-    vma->vm_flags |= VM_DONTCOPY;
-    vma->vm_flags |= VM_IO;
-    if (!(vma->vm_flags & VM_WRITE)) {
-        vma->vm_flags &= ~VM_MAYWRITE;
-    }
-#endif
-    vma->vm_private_data = ka_fs_get_file_private_data(file);
+    ka_mm_set_vm_private_data(vma, ka_fs_get_file_private_data(file));
 
     return 0;
 }
@@ -1661,6 +1646,7 @@ static int _trs_release_by_exit_stage(struct trs_proc_ctx *proc_ctx, int stage)
             }
             ret = trs_proc_recycle(ts_inst, proc_ctx);
         } else if ((stage == APM_STAGE_RECYCLE_RES) && (ts_inst->location != UDA_LOCAL)) {
+            /* Notice device cp, app recycle finish */
             if (ts_inst->ops.notice_proc_release != NULL) {
                 (void)ts_inst->ops.notice_proc_release(&ts_inst->inst, proc_ctx->pid);
             }
@@ -1669,6 +1655,7 @@ static int _trs_release_by_exit_stage(struct trs_proc_ctx *proc_ctx, int stage)
         result |= ret;
     }
 
+    proc_ctx->release_stage = (result == 0) ? stage : proc_ctx->release_stage;
     return result;
 }
 
@@ -1697,7 +1684,7 @@ static bool trs_notify_apm_release_task(struct trs_proc_ctx *proc_ctx)
     return false;
 }
 
-static int trs_release_by_exit_stage(struct notifier_block *self, unsigned long val, void *data,
+static int trs_release_by_exit_stage(ka_notifier_block_t *self, unsigned long val, void *data,
     TRS_PROC_RELEASE_FLAG flag)
 {
     int tgid = apm_get_exit_tgid(val);
@@ -1748,25 +1735,25 @@ release_next:
         trs_core_ts_inst_put(ts_inst);
     }
 
-    return NOTIFY_OK;
+    return KA_NOTIFY_OK;
 }
 
-static int trs_master_release_by_exit_stage(struct notifier_block *self, unsigned long val, void *data)
+static int trs_master_release_by_exit_stage(ka_notifier_block_t *self, unsigned long val, void *data)
 {
     return trs_release_by_exit_stage(self, val, data, TRS_PROC_RELEASE_BY_APM_MASTER);
 }
 
-static int trs_slave_release_by_exit_stage(struct notifier_block *self, unsigned long val, void *data)
+static int trs_slave_release_by_exit_stage(ka_notifier_block_t *self, unsigned long val, void *data)
 {
     return trs_release_by_exit_stage(self, val, data, TRS_PROC_RELEASE_BY_APM_SLAVE);
 }
 
-static struct notifier_block trs_master_task_exit_nb = {
+static ka_notifier_block_t trs_master_task_exit_nb = {
     .notifier_call = trs_master_release_by_exit_stage,
     .priority = APM_EXIT_NOTIFIY_PRI_TSDRV,
 };
 
-static struct notifier_block trs_slave_task_exit_nb = {
+static ka_notifier_block_t trs_slave_task_exit_nb = {
     .notifier_call = trs_slave_release_by_exit_stage,
     .priority = APM_EXIT_NOTIFIY_PRI_TSDRV,
 };

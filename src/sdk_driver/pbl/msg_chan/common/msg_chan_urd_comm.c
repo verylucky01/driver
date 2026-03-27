@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,24 +11,17 @@
  * GNU General Public License for more details.
  */
 
+#include "ka_memory_pub.h"
+#include "ka_kernel_def_pub.h"
 #include "pbl/pbl_feature_loader.h"
 #include "pbl/pbl_runenv_config.h"
 #include "pbl/pbl_urd_sub_cmd_def.h"
 
-#include "devdrv_user_common.h"
-
+#include "ascend_dev_num.h"
 #include "msg_chan_main.h"
-#include "ka_memory_pub.h"
-#include "ka_kernel_def_pub.h"
 
-#ifndef BITS_PER_LONG_LONG
-#define BITS_PER_LONG_LONG 64
-#endif
-
-#ifndef __KA_GFP_ACCOUNT
-#ifdef __GFP_KMEMCG
-#define __KA_GFP_ACCOUNT __GFP_KMEMCG /* for linux version 3.10 */
-#endif
+#ifndef KA_BITS_PER_LONG_LONG
+#define KA_BITS_PER_LONG_LONG 64
 #endif
 
 #define SET_BIT_64(x, y) ((x) |= ((u64)0x01 << (y)))
@@ -65,7 +58,7 @@ STATIC int devdrv_get_all_device_count_inner(u32 *count)
     struct devdrv_comm_dev_ops *dev_ops = devdrv_add_ops_ref();
     if (dev_ops == NULL) {
         devdrv_warn("Can not get dev_ops.\n");
-        return -EOPNOTSUPP;
+        return -ENODEV;
     }
 
     if (dev_ops->ops.get_all_device_count != NULL) {
@@ -105,22 +98,22 @@ docker_out:
     return 0;
 }
 
-u64 g_prob_device_bitmap[DEVDRV_MAX_DAVINCI_NUM/BITS_PER_LONG_LONG + 1];
+u64 g_prob_device_bitmap[ASCEND_DEV_MAX_NUM/KA_BITS_PER_LONG_LONG + 1];
 void devdrv_set_probe_dev_bitmap(u32 devid)
 {
-    SET_BIT_64(g_prob_device_bitmap[devid / BITS_PER_LONG_LONG], devid % BITS_PER_LONG_LONG);
+    SET_BIT_64(g_prob_device_bitmap[devid / KA_BITS_PER_LONG_LONG], devid % KA_BITS_PER_LONG_LONG);
 }
 KA_EXPORT_SYMBOL(devdrv_set_probe_dev_bitmap);
 
 void devdrv_clr_probe_dev_bitmap(u32 devid)
 {
-    CLR_BIT_64(g_prob_device_bitmap[devid / BITS_PER_LONG_LONG], devid % BITS_PER_LONG_LONG);
+    CLR_BIT_64(g_prob_device_bitmap[devid / KA_BITS_PER_LONG_LONG], devid % KA_BITS_PER_LONG_LONG);
 }
 KA_EXPORT_SYMBOL(devdrv_clr_probe_dev_bitmap);
 
 u64 devdrv_check_probe_dev_bitmap(u32 devid)
 {
-    return CHECK_BIT_64(g_prob_device_bitmap[devid / BITS_PER_LONG_LONG], devid % BITS_PER_LONG_LONG);
+    return CHECK_BIT_64(g_prob_device_bitmap[devid / KA_BITS_PER_LONG_LONG], devid % KA_BITS_PER_LONG_LONG);
 }
 KA_EXPORT_SYMBOL(devdrv_check_probe_dev_bitmap);
 
@@ -130,7 +123,7 @@ STATIC int devdrv_get_device_probe_list_inner(u32 *devids, u32 *count)
     struct devdrv_comm_dev_ops *dev_ops = devdrv_add_ops_ref();
     if (dev_ops == NULL) {
         devdrv_err("Get dev_ops fail.\n");
-        return -EINVAL;
+        return -ENODEV;
     }
 
     if (dev_ops->ops.get_device_probe_list != NULL) {
@@ -160,7 +153,7 @@ int devdrv_get_device_probe_list_urd(void *feature, char *in, u32 in_len, char *
     is_normal_docker = run_in_normal_docker();
     if (is_normal_docker) {
         probe_devinfo->num_dev = uda_get_cur_ns_dev_num();
-        ret = uda_get_cur_ns_udevids(probe_devinfo->devids, DEVDRV_MAX_DAVINCI_NUM);
+        ret = uda_get_cur_ns_udevids(probe_devinfo->devids, ASCEND_DEV_MAX_NUM);
         if (ret != 0) {
             devdrv_err("Docker get device probe list failed. (ret=%d)\n", ret);
         }

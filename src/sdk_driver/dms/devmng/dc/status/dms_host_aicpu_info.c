@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,10 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-#include <linux/vmalloc.h>
-#include <linux/fcntl.h>
-#include <linux/slab.h>
-#include <linux/uaccess.h>
+#include "ka_common_pub.h"
 #include "pbl/pbl_feature_loader.h"
 #include "dms_define.h"
 #include "dms_template.h"
@@ -78,7 +75,7 @@ int dms_set_host_aicpu_info(void *feature, char *in, u32 in_len, char *out, u32 
 
 STATIC char* dms_read_cpuinfo_file(void)
 {
-    struct file *fp = NULL;
+    ka_file_t *fp = NULL;
     size_t buf_len = CPUINFO_FILE_LEN;
     ssize_t read_len;
     char *buf = NULL;

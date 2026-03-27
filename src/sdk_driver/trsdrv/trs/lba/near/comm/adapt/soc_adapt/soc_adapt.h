@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -25,6 +25,8 @@ void trs_soc_set_chip_type(u32 phy_devid, int chip_type);
 int trs_soc_get_chip_type(u32 phy_devid);
 int trs_soc_get_notify_offset(struct trs_id_inst *inst, u32 notify_id, u32 *offset);
 int trs_soc_get_notify_size(struct trs_id_inst *inst, size_t *notify_size);
+int trs_soc_get_cnt_notify_offset(struct trs_id_inst *inst, u32 cnt_notify_id, u32 *offset);
+int trs_soc_get_cnt_notify_size(struct trs_id_inst *inst, size_t *cnt_notify_size);
 int trs_soc_get_event_offset(struct trs_id_inst *inst, u32 event_id, u32 *offset);
 u32 trs_soc_get_sq_mem_side(struct trs_id_inst *inst, struct trs_chan_type *types);
 u32 trs_soc_get_cq_mem_side(struct trs_id_inst *inst);

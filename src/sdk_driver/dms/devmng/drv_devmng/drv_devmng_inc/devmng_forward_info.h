@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,8 +13,6 @@
 
 #ifndef __DEVMANAGER_FORWARD_INFO_H
 #define __DEVMANAGER_FORWARD_INFO_H
-
-#include <linux/types.h>
 
 #include "dms_msg.h"
 

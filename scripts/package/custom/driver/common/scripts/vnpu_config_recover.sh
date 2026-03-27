@@ -196,9 +196,9 @@ function config_recover()
     local vgroup_id=0
     local start=0
     local end=0
-    local max_retries=20 # 定义最大重试次数
-    local retry_interval=1  # 每次重试间隔 1 秒
-    local retry_count=0 # 初始化计数器
+    local max_retries=20 
+    local retry_interval=1  
+    local retry_count=0 
 
     cat "${VNPU_CONF}" | while read cfg_line
     do
@@ -217,28 +217,24 @@ function config_recover()
                 vnpu_id=`echo ${cmd_info} | awk -F ' ' '{print $12}'`
                 vgroup_sign=`echo ${cmd_info} | awk -F ' ' '{print $13}'`
                 vgroup_id=`echo ${cmd_info} | awk -F ' ' '{print $14}'`
-                # 循环获取 card_id_cur 和 chip_id_cur，直到获取成功或达到最大重试次数
+
                 while [ -z "$card_id_cur" ] || [ -z "$chip_id_cur" ]; do
-                    # 检查是否达到最大重试次数
                     if [ $retry_count -ge $max_retries ]; then
                         log "Error: Failed to get card_id_cur or chip_id_cur for phy_id ${phy_id} after ${max_retries} retries."
-                        break  # 超出最大重试次数，退出 while 循环
+                        break  
                     fi
 
-                    # 尝试获取 card_id_cur 和 chip_id_cur
                     card_id_cur=$(/usr/local/sbin/npu-smi info -t phyid-remap -p ${phy_id} | grep "NPU ID" | awk -F ':' '{print $2}' | xargs)
                     chip_id_cur=$(/usr/local/sbin/npu-smi info -t phyid-remap -p ${phy_id} | grep "Chip ID" | awk -F ':' '{print $2}' | xargs)
 
-                    # 如果仍然为空，记录警告并等待一段时间后重试
                     if [ -z "$card_id_cur" ] || [ -z "$chip_id_cur" ]; then
                         log "Warning: card_id_cur or chip_id_cur is empty for phy_id ${phy_id}. Retrying... (Attempt ${retry_count}/${max_retries})"
                         sleep $retry_interval
                     fi
 
-                    # 增加重试计数器
                     retry_count=$((retry_count + 1))
                 done
-                # 区分310P场景和其他场景持久化，只有310P场景切分命令涉及-g参数
+
                 if [ "$vgroup_sign" == "-g" ];then
                     cmd_info="npu-smi set -t create-vnpu -i ${card_id_cur} -c ${chip_id_cur} -f ${vnpu_config} -v ${vnpu_id} -g ${vgroup_id}"
                 else
@@ -251,7 +247,7 @@ function config_recover()
                     log "wait_device_ready /dev/davinci${phy_id} failed."
                     continue
                 fi
-                # device侧tsd任务启动比较慢，失败情况，增加重试
+
                 for ((j = 0; j <= 4; j++))
                 do
                     /usr/local/sbin/${cmd_info}
@@ -270,7 +266,7 @@ function config_recover()
 }
 
 if [ ! -f "$VNPU_CONF" ]; then
-    log "VNPU_CONF path is not exist, do not need to recover, exit."
+    log "VNPU_CONF path is not exist, restore to default, exit."
     exit 0
 fi
 

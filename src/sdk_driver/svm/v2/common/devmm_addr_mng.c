@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -275,7 +275,7 @@ STATIC void devmm_dma_unmap_all_page(struct devmm_mem_node *mem_node)
             devmm_try_cond_resched(&stamp);
         }
     }
-    atomic_sub(num, &mem_node->valid_page_num);
+    ka_base_atomic_sub(num, &mem_node->valid_page_num);
 }
 
 void devmm_addr_mng_free_res(struct devmm_addr_mng *addr_mng)
@@ -354,7 +354,7 @@ void devmm_put_addr_mem_node(struct devmm_addr_mng *addr_mng, u64 va, u64 len)
         ka_task_up_read(&addr_mng->rbtree_mutex);
         return;
     }
-    (void)atomic_dec_if_positive(&mem_node->user_cnt);
+    (void)ka_base_atomic_dec_if_positive(&mem_node->user_cnt);
     ka_task_up_read(&addr_mng->rbtree_mutex);
 
     return;

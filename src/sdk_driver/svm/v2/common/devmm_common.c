@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -691,7 +691,7 @@ void devmm_phy_addr_attr_pack(struct devmm_svm_process *svm_proc, u32 pg_type, u
 #define DEVMM_NSEC_PER_SEC 1000000000L
 u64 devmm_get_tgid_start_time(void)
 {
-    int vnr = task_tgid_vnr(ka_task_get_current());
+    int vnr = ka_task_task_tgid_vnr(ka_task_get_current());
     ka_task_struct_t *task = NULL;
     ka_struct_pid_t *pgrp = NULL;
     u64 start_time;

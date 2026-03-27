@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -21,6 +21,7 @@
 #include "ka_memory_pub.h"
 #include "ka_system_pub.h"
 #include "ka_task_pub.h"
+#include "ka_pci_pub.h"
 
 #include "securec.h"
 #include "soc_resmng_log.h"
@@ -1651,7 +1652,7 @@ int soc_resmng_dev_set_mia_res(u32 devid, enum soc_mia_res_type type, u64 bitmap
     info.bitmap = bitmap;
     info.unit_per_bit = unit_per_bit;
     info.start = 0;
-    info.total_num = hweight64(bitmap) * unit_per_bit;
+    info.total_num = ka_base_hweight64(bitmap) * unit_per_bit;
 
     return soc_resmng_dev_set_mia_res_ex(devid, type, &info);
 }
@@ -1881,7 +1882,7 @@ int soc_resmng_set_mia_res(struct res_inst_info *inst, enum soc_mia_res_type typ
         info.bitmap = bitmap;
         info.unit_per_bit = unit_per_bit;
         info.start = 0;
-        info.total_num = hweight64(bitmap) * unit_per_bit;
+        info.total_num = ka_base_hweight64(bitmap) * unit_per_bit;
         ret = subsys_ts_set_mia_res_ex(&resmng->ts_resmng[inst->subid], type, &info);
         if ((ret != 0) && (ret != -ENOENT)) {
             soc_err("Set first. (devid=%u; tsid=%u; type=%u; ret=%d)\n", resmng->devid, inst->subid, type, ret);
@@ -2170,7 +2171,7 @@ int soc_resmng_set_pdev_by_devid(u32 devid, ka_pci_dev_t *pdev)
 }
 KA_EXPORT_SYMBOL_GPL(soc_resmng_set_pdev_by_devid);
 
-int soc_resmng_get_pdev_by_devid(u32 devid, ka_pci_dev_t *pdev)
+int soc_resmng_get_pdev_by_devid(u32 devid, ka_pci_dev_t **pdev)
 {
     struct soc_dev_resmng *resmng = NULL;
 
@@ -2183,7 +2184,7 @@ int soc_resmng_get_pdev_by_devid(u32 devid, ka_pci_dev_t *pdev)
         return -ENOSPC;
     }
 
-    pdev = resmng->pcie_info.pdev;
+    *pdev = resmng->pcie_info.pdev;
 
     return 0;
 }
@@ -2247,16 +2248,20 @@ int soc_resmng_get_dev_topology(u32 devid, u32 peer_devid, int *topo_type)
         return ret;
     }
 
-    ret = soc_resmng_get_pdev_by_devid(devid, pdev_a);
-    ret = soc_resmng_get_pdev_by_devid(peer_devid, pdev_b);
-    if ((pdev_a == NULL) || (pdev_b == NULL) || (ret != 0) || (ret != 0)) {
-        soc_err("Get pdev failed. (%s=NULL;devid=%u;peer_devid=%u;ret=%d;)\n",
-            pdev_a == NULL ? "pdevA" : "pdevB", devid, peer_devid, ret);
+    ret = soc_resmng_get_pdev_by_devid(devid, &pdev_a);
+    if ((pdev_a == NULL) || (ret != 0)) {
+        soc_err("Get pdev failed, pdev_a is NULL. (devid=%u;peer_devid=%u;ret=%d;)\n", devid, peer_devid, ret);
         return -EINVAL;
     }
 
-    bridge_a = pci_upstream_bridge(pdev_a);
-    bridge_b = pci_upstream_bridge(pdev_b);
+    ret = soc_resmng_get_pdev_by_devid(peer_devid, &pdev_b);
+    if ((pdev_b == NULL) || (ret != 0)) {
+        soc_err("Get pdev failed, pdev_b is NULL. (devid=%u;peer_devid=%u;ret=%d;)\n", devid, peer_devid, ret);
+        return -EINVAL;
+    }
+
+    bridge_a = ka_pci_upstream_bridge(pdev_a);
+    bridge_b = ka_pci_upstream_bridge(pdev_b);
     if ((bridge_a != NULL) && (bridge_b != NULL)) {
         // If two devices in the same switch, return PIX
         if ((bridge_a->bus->self != NULL) && (bridge_a->bus->self == bridge_b->bus->self)) {

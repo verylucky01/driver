@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -62,7 +62,7 @@ static inline u64 trs_stars_cq_get_timestamp(rt_stars_cqe_t *cqe)
     u64 timestamp;
 
     timestamp = (u64)(((u64)cqe->cqe_status.sys_cnt.syscnt_high) <<
-        (sizeof(cqe->cqe_status.sys_cnt.syscnt_low) * BITS_PER_BYTE));
+        (sizeof(cqe->cqe_status.sys_cnt.syscnt_low) * KA_BITS_PER_BYTE));
     timestamp |= (u64)cqe->cqe_status.sys_cnt.syscnt_low;
 
     return timestamp;
@@ -76,6 +76,11 @@ static inline u8 trs_stars_cq_get_sqe_type(rt_stars_cqe_t *cqe)
 static inline bool trs_stars_cq_is_dvpp_type(rt_stars_cqe_t *cqe)
 {
     return (trs_stars_cq_get_sqe_type(cqe) >= 12) && (trs_stars_cq_get_sqe_type(cqe) <= 14); /* dvpp sqe type, 12~14 */
+}
+
+static inline bool trs_stars_cq_is_async_dma_type(rt_stars_cqe_t *cqe)
+{
+    return ((trs_stars_cq_get_sqe_type(cqe) == 9) || (trs_stars_cq_get_sqe_type(cqe) == 10)); /* async sqe type, 9~10 */
 }
 
 static inline u8 trs_stars_cq_get_warn_type(rt_stars_cqe_t *cqe)
@@ -148,6 +153,14 @@ void trs_stars_v2_cqe_to_logic_cqe(void *hw_cqe, struct trs_logic_cqe *logic_cqe
             logic_cqe->error_code = trs_stars_cq_get_err_code(cqe);
         }
         logic_cqe->error_type = trs_stars_cq_get_err_type(cqe);
+        if (trs_stars_cq_is_async_dma_type(cqe)) {
+            logic_cqe->jettyid0 = cqe->cqe_status.ubdma_info.jettyid0;
+            logic_cqe->jettyid1 = cqe->cqe_status.ubdma_info.jettyid1;
+            logic_cqe->status0 = cqe->cqe_status.ubdma_info.status0;
+            logic_cqe->sub_status0 = cqe->cqe_status.ubdma_info.sub_status0;
+            logic_cqe->status1 = cqe->cqe_status.ubdma_info.status1;
+            logic_cqe->sub_status1 = cqe->cqe_status.ubdma_info.sub_status1;
+        }
     }
     logic_cqe->stream_id = cqe->stream_id;
     logic_cqe->match_flag = trs_stars_v2_cqe_get_match_flag(cqe);

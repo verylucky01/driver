@@ -136,10 +136,11 @@
 
 **调用示例<a name="zh-cn_topic_0000001251107199_zh-cn_topic_0000001223414423_zh-cn_topic_0000001146259777_toc533412083"></a>**
 
-```c
+```
 int ret = 0;
 int card_id = 0;
 int device_id = 0;
 ret = dcmi_set_device_clear_pcie_error(card_id, device_id);
 …
 ```
+

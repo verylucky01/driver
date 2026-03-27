@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,12 +11,12 @@
  * GNU General Public License for more details.
  */
 
-
 #ifndef URD_KV_H
 #define URD_KV_H
 
-#include <linux/types.h>
-#include <linux/mutex.h>
+#include "ka_type.h"
+#include "ka_common_pub.h"
+#include "ka_task_pub.h"
 
 #define KV_TABLE_BIT 10
 #define KV_TABLE_SIZE (0x1 << KV_TABLE_BIT)
@@ -30,15 +30,15 @@
 #define STATE_STOP 3U
 
 struct dms_kv_node {
-    struct hlist_node hnode;
+    ka_hlist_node_t hnode;
     char *key;
     int data_len;
     void *data;
 };
 
 struct dms_kv_table {
-    struct hlist_head *table;
-    struct mutex lock;
+    ka_hlist_head_t *table;
+    ka_mutex_t lock;
 };
 typedef ssize_t (*key_dump_handle)(void *node, char *buf, ssize_t *offset);
 void dms_kv_dump(char *buf, ssize_t *offset, key_dump_handle handle);

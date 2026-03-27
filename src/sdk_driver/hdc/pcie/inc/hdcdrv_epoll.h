@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,10 +14,10 @@
 #ifndef _HDCDRV_EPOLL_H_
 #define _HDCDRV_EPOLL_H_
 
-#include "hdcdrv_cmd.h"
-#include "hdcdrv_adapt.h"
 #include "ka_list_pub.h"
 #include "ka_task_pub.h"
+#include "hdcdrv_cmd.h"
+#include "hdcdrv_adapt.h"
 
 #define HDCDRV_INV_DIVISOR 0x1999999A /* this is (2^32)/10 */
 

@@ -286,6 +286,7 @@ checkArch() {
         exitLog 1
     fi
 }
+
 # Script entry
 crossVersion
 

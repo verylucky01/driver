@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,14 +14,7 @@
 #ifndef HW_VDAVINCI_H_
 #define HW_VDAVINCI_H_
 
-#include <linux/version.h>
-#include <linux/list.h>
-#include <linux/scatterlist.h>
-#include <linux/uuid.h>
-#include <linux/dma-mapping.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6,4,0)
-#include <linux/mei_uuid.h>
-#endif
+#include "ka_kvm_pub.h"
 
 #define RESERVE_SIZE 40
 #define HW_DVT_MAX_TYPE_NAME 32
@@ -127,33 +120,33 @@ enum HW_VDAVINCI_TYPE_910_93_V3 {
 };
 
 /* 36core, 128G */
-enum HW_VDAVINCI_TYPE_910D_BIN0 {
+enum HW_VDAVINCI_TYPE_950_BIN0 {
     TYPE_VIR16_7C_60G_BIN0,
     TYPE_VIR08_3C_30G_BIN0,
     TYPE_VIR04_1C_15G_BIN0,
-    TYPE_MAX_910D_BIN0
+    TYPE_MAX_950_BIN0
 };
  
 /* 32core, 128G */
-enum HW_VDAVINCI_TYPE_910D_BIN1 {
+enum HW_VDAVINCI_TYPE_950_BIN1 {
     TYPE_VIR16_7C_60G_BIN1,
     TYPE_VIR08_3C_30G_BIN1,
     TYPE_VIR04_1C_15G_BIN1,
-    TYPE_MAX_910D_BIN1
+    TYPE_MAX_950_BIN1
 };
  
 /* 28core, 128G */
-enum HW_VDAVINCI_TYPE_910D_BIN2 {
+enum HW_VDAVINCI_TYPE_950_BIN2 {
     TYPE_VIR14_5C_60G_BIN2,
     TYPE_VIR07_2C_30G_BIN2,
-    TYPE_MAX_910D_BIN2
+    TYPE_MAX_950_BIN2
 };
  
 /* 28core, 112G */
-enum HW_VDAVINCI_TYPE_910D_BIN3 {
+enum HW_VDAVINCI_TYPE_950_BIN3 {
     TYPE_VIR14_5C_52G_BIN3,
     TYPE_VIR07_2C_26G_BIN3,
-    TYPE_MAX_910D_BIN3
+    TYPE_MAX_950_BIN3
 };
 
 struct dvt_devinfo {

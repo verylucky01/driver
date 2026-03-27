@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,16 +14,16 @@
 #ifndef __DEVDRV_MANAGER_COMMON_H
 #define __DEVDRV_MANAGER_COMMON_H
 
-
-#include <linux/list.h>
-#include <linux/cdev.h>
-#include <linux/mutex.h>
-#include <linux/types.h>
-#include <linux/uio_driver.h>
-#include <linux/notifier.h>
-#include <linux/radix-tree.h>
-#include <linux/hashtable.h>
-#include <linux/wait.h>
+#include "ka_hashtable_pub.h"
+#include "ka_task_pub.h"
+#include "ka_dfx_pub.h"
+#include "ka_base_pub.h"
+#include "ka_memory_pub.h"
+#include "ka_list_pub.h"
+#include "ka_common_pub.h"
+#include "ka_system_pub.h"
+#include "ka_ioctl_pub.h"
+#include "ka_compiler_pub.h"
 
 #include "devdrv_common.h"
 #include "devdrv_platform_resource.h"
@@ -39,235 +39,235 @@
 #define DAVINCI_INTF_MODULE_DEVMNG "DEVMNG"
 #define PCI_VENDOR_ID_HUAWEI 0x19e5
 
-#ifndef __GFP_ACCOUNT
+#ifndef __KA_GFP_ACCOUNT
 #ifdef __GFP_KMEMCG
-#define __GFP_ACCOUNT __GFP_KMEMCG /* for linux version 3.10 */
+#define __KA_GFP_ACCOUNT __GFP_KMEMCG /* for linux version 3.10 */
 #endif
 #ifdef __GFP_NOACCOUNT
-#define __GFP_ACCOUNT 0 /* for linux version 4.1 */
+#define __KA_GFP_ACCOUNT 0 /* for linux version 4.1 */
 #endif
 #endif
 /* manager */
 #define DEVDRV_MANAGER_MAGIC                                    'M'
-#define DEVDRV_MANAGER_GET_PCIINFO                              _IO(DEVDRV_MANAGER_MAGIC, 1)
-#define DEVDRV_MANAGER_GET_DEVNUM                               _IO(DEVDRV_MANAGER_MAGIC, 2)    /* RSVD */
-#define DEVDRV_MANAGER_GET_PLATINFO                             _IO(DEVDRV_MANAGER_MAGIC, 3)
-#define DEVDRV_MANAGER_SVMVA_TO_DEVID                           _IO(DEVDRV_MANAGER_MAGIC, 4)    /* RSVD */
-#define DEVDRV_MANAGER_GET_CHANNELINFO                          _IO(DEVDRV_MANAGER_MAGIC, 5)    /* RSVD */
-#define DEVDRV_MANAGER_CONFIG_CQ                                _IO(DEVDRV_MANAGER_MAGIC, 6)    /* RSVD */
-#define DEVDRV_MANAGER_DEVICE_STATUS                            _IO(DEVDRV_MANAGER_MAGIC, 7)
+#define DEVDRV_MANAGER_GET_PCIINFO                              _KA_IO(DEVDRV_MANAGER_MAGIC, 1)
+#define DEVDRV_MANAGER_GET_DEVNUM                               _KA_IO(DEVDRV_MANAGER_MAGIC, 2)    /* RSVD */
+#define DEVDRV_MANAGER_GET_PLATINFO                             _KA_IO(DEVDRV_MANAGER_MAGIC, 3)
+#define DEVDRV_MANAGER_SVMVA_TO_DEVID                           _KA_IO(DEVDRV_MANAGER_MAGIC, 4)    /* RSVD */
+#define DEVDRV_MANAGER_GET_CHANNELINFO                          _KA_IO(DEVDRV_MANAGER_MAGIC, 5)    /* RSVD */
+#define DEVDRV_MANAGER_CONFIG_CQ                                _KA_IO(DEVDRV_MANAGER_MAGIC, 6)    /* RSVD */
+#define DEVDRV_MANAGER_DEVICE_STATUS                            _KA_IO(DEVDRV_MANAGER_MAGIC, 7)
 
-#define DEVDRV_MANAGER_GET_CORE_SPEC                            _IO(DEVDRV_MANAGER_MAGIC, 17)
-#define DEVDRV_MANAGER_GET_CORE_INUSE                           _IO(DEVDRV_MANAGER_MAGIC, 18)
-#define DEVDRV_MANAGER_GET_DEVIDS                               _IO(DEVDRV_MANAGER_MAGIC, 19)    /* RSVD */
-#define DEVDRV_MANAGER_GET_DEVINFO                              _IO(DEVDRV_MANAGER_MAGIC, 20)
-#define DEVDRV_MANAGER_GET_PCIE_ID_INFO                         _IO(DEVDRV_MANAGER_MAGIC, 21)
-#define DEVDRV_MANAGER_GET_FLASH_COUNT                          _IO(DEVDRV_MANAGER_MAGIC, 22)
+#define DEVDRV_MANAGER_GET_CORE_SPEC                            _KA_IO(DEVDRV_MANAGER_MAGIC, 17)
+#define DEVDRV_MANAGER_GET_CORE_INUSE                           _KA_IO(DEVDRV_MANAGER_MAGIC, 18)
+#define DEVDRV_MANAGER_GET_DEVIDS                               _KA_IO(DEVDRV_MANAGER_MAGIC, 19)    /* RSVD */
+#define DEVDRV_MANAGER_GET_DEVINFO                              _KA_IO(DEVDRV_MANAGER_MAGIC, 20)
+#define DEVDRV_MANAGER_GET_PCIE_ID_INFO                         _KA_IO(DEVDRV_MANAGER_MAGIC, 21)
+#define DEVDRV_MANAGER_GET_FLASH_COUNT                          _KA_IO(DEVDRV_MANAGER_MAGIC, 22)
 
-#define DEVDRV_MANAGER_GET_VOLTAGE                              _IO(DEVDRV_MANAGER_MAGIC, 24)   /* RSVD */
-#define DEVDRV_MANAGER_GET_TEMPERATURE                          _IO(DEVDRV_MANAGER_MAGIC, 25)   /* RSVD */
-#define DEVDRV_MANAGER_GET_AI_USE_RATE                          _IO(DEVDRV_MANAGER_MAGIC, 26)   /* RSVD */
-#define DEVDRV_MANAGER_GET_FREQUENCY                            _IO(DEVDRV_MANAGER_MAGIC, 27)   /* RSVD */
-#define DEVDRV_MANAGER_GET_POWER                                _IO(DEVDRV_MANAGER_MAGIC, 28)   /* RSVD */
-#define DEVDRV_MANAGER_GET_HEALTH_CODE                          _IO(DEVDRV_MANAGER_MAGIC, 29)
-#define DEVDRV_MANAGER_GET_ERROR_CODE                           _IO(DEVDRV_MANAGER_MAGIC, 30)
-#define DEVDRV_MANAGER_GET_DDR_CAPACITY                         _IO(DEVDRV_MANAGER_MAGIC, 31)   /* RSVD */
-#define DEVDRV_MANAGER_LPM3_SMOKE                               _IO(DEVDRV_MANAGER_MAGIC, 32)   /* RSVD */
-#define DEVDRV_MANAGER_BLACK_BOX_GET_EXCEPTION                  _IO(DEVDRV_MANAGER_MAGIC, 33)
-#define DEVDRV_MANAGER_DEVICE_MEMORY_DUMP                       _IO(DEVDRV_MANAGER_MAGIC, 34)
-#define DEVDRV_MANAGER_DEVICE_RESET_INFORM                      _IO(DEVDRV_MANAGER_MAGIC, 35)
-#define DEVDRV_MANAGER_GET_MODULE_STATUS                        _IO(DEVDRV_MANAGER_MAGIC, 36)
-#define DEVDRV_MANAGER_GET_DEVICE_DMA_ADDR                      _IO(DEVDRV_MANAGER_MAGIC, 37)   /* RSVD */
-#define DEVDRV_MANAGER_GET_INTERRUPT_INFO                       _IO(DEVDRV_MANAGER_MAGIC, 38)   /* RSVD */
-#define DEVDRV_MANAGER_REG_DDR_READ                             _IO(DEVDRV_MANAGER_MAGIC, 39)
-#define DEVDRV_MANAGER_GPIOIRQ_REGISTER                         _IO(DEVDRV_MANAGER_MAGIC, 40)   /* RSVD */
-#define DEVDRV_MANAGER_GPIOIRQ_WAIT_INT                         _IO(DEVDRV_MANAGER_MAGIC, 41)   /* RSVD */
-#define DEVDRV_MANAGER_GET_MINI_DEVID                           _IO(DEVDRV_MANAGER_MAGIC, 42)   /* RSVD */
-#define DEVDRV_MANAGER_GET_MINI_BOARD_ID                        _IO(DEVDRV_MANAGER_MAGIC, 43)   /* RSVD */
-#define DEVDRV_MANAGER_PCIE_PRE_RESET                           _IO(DEVDRV_MANAGER_MAGIC, 44)
-#define DEVDRV_MANAGER_PCIE_RESCAN                              _IO(DEVDRV_MANAGER_MAGIC, 45)
-#define DEVDRV_MANAGER_ALLOC_HOST_DMA_ADDR                      _IO(DEVDRV_MANAGER_MAGIC, 46)   /* RSVD */
-#define DEVDRV_MANAGER_FREE_HOST_DMA_ADDR                       _IO(DEVDRV_MANAGER_MAGIC, 47)   /* RSVD */
-#define DEVDRV_MANAGER_PCIE_READ                                _IO(DEVDRV_MANAGER_MAGIC, 48)
-#define DEVDRV_MANAGER_PCIE_SRAM_WRITE                          _IO(DEVDRV_MANAGER_MAGIC, 49)   /* RSVD */
-#define DEVDRV_MANAGER_PCIE_WRITE                               _IO(DEVDRV_MANAGER_MAGIC, 50)
-#define DEVDRV_MANAGER_GET_EMMC_VOLTAGE                         _IO(DEVDRV_MANAGER_MAGIC, 51)
-#define DEVDRV_MANAGER_GET_DEVICE_BOOT_STATUS                   _IO(DEVDRV_MANAGER_MAGIC, 52)
-#define DEVDRV_MANAGER_ENABLE_EFUSE_LDO                         _IO(DEVDRV_MANAGER_MAGIC, 53)
-#define DEVDRV_MANAGER_DISABLE_EFUSE_LDO                        _IO(DEVDRV_MANAGER_MAGIC, 54)
-#define DEVDRV_MANAGER_GET_TSENSOR                              _IO(DEVDRV_MANAGER_MAGIC, 55)   /* RSVD */
-#define DEVDRV_MANAGER_PCIE_SRAM_READ                           _IO(DEVDRV_MANAGER_MAGIC, 56)   /* RSVD */
-#define DEVDRV_MANAGER_CHECK_CANCEL_STATUS                      _IO(DEVDRV_MANAGER_MAGIC, 57)   /* RSVD */
-#define DEVDRV_MANAGER_CONTAINER_CMD                            _IO(DEVDRV_MANAGER_MAGIC, 58)
-#define DEVDRV_MANAGER_GET_HOST_PHY_MACH_FLAG                   _IO(DEVDRV_MANAGER_MAGIC, 59)
-#define DEVDRV_MANAGER_LOAD_KERNEL_LIB                          _IO(DEVDRV_MANAGER_MAGIC, 60)   /* RSVD */
-#define DEVDRV_MANAGER_GET_KERNEL_LIB                           _IO(DEVDRV_MANAGER_MAGIC, 61)   /* RSVD */
-#define DEVDRV_MANAGER_GET_LOCAL_DEVICEIDS                      _IO(DEVDRV_MANAGER_MAGIC, 62)   /* RSVD */
-#define DEVDRV_MANAGER_IMU_SMOKE                                _IO(DEVDRV_MANAGER_MAGIC, 63)
-#define DEVDRV_MANAGER_SYSTEM_RDY_CHECK                         _IO(DEVDRV_MANAGER_MAGIC, 64)   /* RSVD */
-#define DEVDRV_MANAGER_IPC_NOTIFY_CREATE                        _IO(DEVDRV_MANAGER_MAGIC, 65)
-#define DEVDRV_MANAGER_IPC_NOTIFY_OPEN                          _IO(DEVDRV_MANAGER_MAGIC, 66)
-#define DEVDRV_MANAGER_IPC_NOTIFY_CLOSE                         _IO(DEVDRV_MANAGER_MAGIC, 67)
-#define DEVDRV_MANAGER_IPC_NOTIFY_DESTROY                       _IO(DEVDRV_MANAGER_MAGIC, 68)
-#define DEVDRV_MANAGER_SET_NEW_TIME                             _IO(DEVDRV_MANAGER_MAGIC, 69)   /* RSVD */
-#define DEVDRV_MANAGER_CONFIG_DISABLE_WAKELOCK                  _IO(DEVDRV_MANAGER_MAGIC, 70)   /* RSVD */
-#define DEVDRV_MANAGER_PCIE_DDR_READ                            _IO(DEVDRV_MANAGER_MAGIC, 71)   /* RSVD */
-#define DEVDRV_MANAGER_PCIE_DDR_WRITE                           _IO(DEVDRV_MANAGER_MAGIC, 72)   /* RSVD */
+#define DEVDRV_MANAGER_GET_VOLTAGE                              _KA_IO(DEVDRV_MANAGER_MAGIC, 24)   /* RSVD */
+#define DEVDRV_MANAGER_GET_TEMPERATURE                          _KA_IO(DEVDRV_MANAGER_MAGIC, 25)   /* RSVD */
+#define DEVDRV_MANAGER_GET_AI_USE_RATE                          _KA_IO(DEVDRV_MANAGER_MAGIC, 26)   /* RSVD */
+#define DEVDRV_MANAGER_GET_FREQUENCY                            _KA_IO(DEVDRV_MANAGER_MAGIC, 27)   /* RSVD */
+#define DEVDRV_MANAGER_GET_POWER                                _KA_IO(DEVDRV_MANAGER_MAGIC, 28)   /* RSVD */
+#define DEVDRV_MANAGER_GET_HEALTH_CODE                          _KA_IO(DEVDRV_MANAGER_MAGIC, 29)
+#define DEVDRV_MANAGER_GET_ERROR_CODE                           _KA_IO(DEVDRV_MANAGER_MAGIC, 30)
+#define DEVDRV_MANAGER_GET_DDR_CAPACITY                         _KA_IO(DEVDRV_MANAGER_MAGIC, 31)   /* RSVD */
+#define DEVDRV_MANAGER_LPM3_SMOKE                               _KA_IO(DEVDRV_MANAGER_MAGIC, 32)   /* RSVD */
+#define DEVDRV_MANAGER_BLACK_BOX_GET_EXCEPTION                  _KA_IO(DEVDRV_MANAGER_MAGIC, 33)
+#define DEVDRV_MANAGER_DEVICE_MEMORY_DUMP                       _KA_IO(DEVDRV_MANAGER_MAGIC, 34)
+#define DEVDRV_MANAGER_DEVICE_RESET_INFORM                      _KA_IO(DEVDRV_MANAGER_MAGIC, 35)
+#define DEVDRV_MANAGER_GET_MODULE_STATUS                        _KA_IO(DEVDRV_MANAGER_MAGIC, 36)
+#define DEVDRV_MANAGER_GET_DEVICE_DMA_ADDR                      _KA_IO(DEVDRV_MANAGER_MAGIC, 37)   /* RSVD */
+#define DEVDRV_MANAGER_GET_INTERRUPT_INFO                       _KA_IO(DEVDRV_MANAGER_MAGIC, 38)   /* RSVD */
+#define DEVDRV_MANAGER_REG_DDR_READ                             _KA_IO(DEVDRV_MANAGER_MAGIC, 39)
+#define DEVDRV_MANAGER_GPIOIRQ_REGISTER                         _KA_IO(DEVDRV_MANAGER_MAGIC, 40)   /* RSVD */
+#define DEVDRV_MANAGER_GPIOIRQ_WAIT_INT                         _KA_IO(DEVDRV_MANAGER_MAGIC, 41)   /* RSVD */
+#define DEVDRV_MANAGER_GET_MINI_DEVID                           _KA_IO(DEVDRV_MANAGER_MAGIC, 42)   /* RSVD */
+#define DEVDRV_MANAGER_GET_MINI_BOARD_ID                        _KA_IO(DEVDRV_MANAGER_MAGIC, 43)   /* RSVD */
+#define DEVDRV_MANAGER_PCIE_PRE_RESET                           _KA_IO(DEVDRV_MANAGER_MAGIC, 44)
+#define DEVDRV_MANAGER_PCIE_RESCAN                              _KA_IO(DEVDRV_MANAGER_MAGIC, 45)
+#define DEVDRV_MANAGER_ALLOC_HOST_DMA_ADDR                      _KA_IO(DEVDRV_MANAGER_MAGIC, 46)   /* RSVD */
+#define DEVDRV_MANAGER_FREE_HOST_DMA_ADDR                       _KA_IO(DEVDRV_MANAGER_MAGIC, 47)   /* RSVD */
+#define DEVDRV_MANAGER_PCIE_READ                                _KA_IO(DEVDRV_MANAGER_MAGIC, 48)
+#define DEVDRV_MANAGER_PCIE_SRAM_WRITE                          _KA_IO(DEVDRV_MANAGER_MAGIC, 49)   /* RSVD */
+#define DEVDRV_MANAGER_PCIE_WRITE                               _KA_IO(DEVDRV_MANAGER_MAGIC, 50)
+#define DEVDRV_MANAGER_GET_EMMC_VOLTAGE                         _KA_IO(DEVDRV_MANAGER_MAGIC, 51)
+#define DEVDRV_MANAGER_GET_DEVICE_BOOT_STATUS                   _KA_IO(DEVDRV_MANAGER_MAGIC, 52)
+#define DEVDRV_MANAGER_ENABLE_EFUSE_LDO                         _KA_IO(DEVDRV_MANAGER_MAGIC, 53)
+#define DEVDRV_MANAGER_DISABLE_EFUSE_LDO                        _KA_IO(DEVDRV_MANAGER_MAGIC, 54)
+#define DEVDRV_MANAGER_GET_TSENSOR                              _KA_IO(DEVDRV_MANAGER_MAGIC, 55)   /* RSVD */
+#define DEVDRV_MANAGER_PCIE_SRAM_READ                           _KA_IO(DEVDRV_MANAGER_MAGIC, 56)   /* RSVD */
+#define DEVDRV_MANAGER_CHECK_CANCEL_STATUS                      _KA_IO(DEVDRV_MANAGER_MAGIC, 57)   /* RSVD */
+#define DEVDRV_MANAGER_CONTAINER_CMD                            _KA_IO(DEVDRV_MANAGER_MAGIC, 58)
+#define DEVDRV_MANAGER_GET_HOST_PHY_MACH_FLAG                   _KA_IO(DEVDRV_MANAGER_MAGIC, 59)
+#define DEVDRV_MANAGER_LOAD_KERNEL_LIB                          _KA_IO(DEVDRV_MANAGER_MAGIC, 60)   /* RSVD */
+#define DEVDRV_MANAGER_GET_KERNEL_LIB                           _KA_IO(DEVDRV_MANAGER_MAGIC, 61)   /* RSVD */
+#define DEVDRV_MANAGER_GET_LOCAL_DEVICEIDS                      _KA_IO(DEVDRV_MANAGER_MAGIC, 62)   /* RSVD */
+#define DEVDRV_MANAGER_IMU_SMOKE                                _KA_IO(DEVDRV_MANAGER_MAGIC, 63)
+#define DEVDRV_MANAGER_SYSTEM_RDY_CHECK                         _KA_IO(DEVDRV_MANAGER_MAGIC, 64)   /* RSVD */
+#define DEVDRV_MANAGER_IPC_NOTIFY_CREATE                        _KA_IO(DEVDRV_MANAGER_MAGIC, 65)
+#define DEVDRV_MANAGER_IPC_NOTIFY_OPEN                          _KA_IO(DEVDRV_MANAGER_MAGIC, 66)
+#define DEVDRV_MANAGER_IPC_NOTIFY_CLOSE                         _KA_IO(DEVDRV_MANAGER_MAGIC, 67)
+#define DEVDRV_MANAGER_IPC_NOTIFY_DESTROY                       _KA_IO(DEVDRV_MANAGER_MAGIC, 68)
+#define DEVDRV_MANAGER_SET_NEW_TIME                             _KA_IO(DEVDRV_MANAGER_MAGIC, 69)   /* RSVD */
+#define DEVDRV_MANAGER_CONFIG_DISABLE_WAKELOCK                  _KA_IO(DEVDRV_MANAGER_MAGIC, 70)   /* RSVD */
+#define DEVDRV_MANAGER_PCIE_DDR_READ                            _KA_IO(DEVDRV_MANAGER_MAGIC, 71)   /* RSVD */
+#define DEVDRV_MANAGER_PCIE_DDR_WRITE                           _KA_IO(DEVDRV_MANAGER_MAGIC, 72)   /* RSVD */
 
-#define DEVDRV_MANAGER_GET_CPU_INFO                             _IO(DEVDRV_MANAGER_MAGIC, 74)   /* RSVD */
-#define DEVDRV_MANAGER_INVAILD_TLB                              _IO(DEVDRV_MANAGER_MAGIC, 75)   /* RSVD */
-#define DEVDRV_MANAGER_SEND_TO_IMU                              _IO(DEVDRV_MANAGER_MAGIC, 76)   /* RSVD */
-#define DEVDRV_MANAGER_RECV_FROM_IMU                            _IO(DEVDRV_MANAGER_MAGIC, 77)   /* RSVD */
-#define DEVDRV_MANAGER_GET_HBM_CAPACITY                         _IO(DEVDRV_MANAGER_MAGIC, 78)   /* RSVD */
-#define DEVDRV_MANAGER_GET_DDR_BW_UTILIZATION                   _IO(DEVDRV_MANAGER_MAGIC, 79)   /* RSVD */
-#define DEVDRV_MANAGER_GET_HBM_BW_UTILIZATION                   _IO(DEVDRV_MANAGER_MAGIC, 80)   /* RSVD */
-#define DEVDRV_MANAGER_GET_IMU_INFO                             _IO(DEVDRV_MANAGER_MAGIC, 81)
-#define DEVDRV_MANAGER_GET_ECC_STATICS                          _IO(DEVDRV_MANAGER_MAGIC, 82)   /* RSVD */
-#define DEVDRV_MANAGER_CONFIG_ECC_ENABLE                        _IO(DEVDRV_MANAGER_MAGIC, 83)   /* RSVD */
-#define DEVDRV_MANAGER_GET_DDR_UTILIZATION                      _IO(DEVDRV_MANAGER_MAGIC, 84)   /* RSVD */
-#define DEVDRV_MANAGER_GET_HBM_UTILIZATION                      _IO(DEVDRV_MANAGER_MAGIC, 85)   /* RSVD */
-#define DEVDRV_MANAGER_GET_PMU_VOLTAGE                          _IO(DEVDRV_MANAGER_MAGIC, 86)
-#define DEVDRV_MANAGER_GET_BOOT_DEV_ID                          _IO(DEVDRV_MANAGER_MAGIC, 87)
-#define DEVDRV_MANAGER_CFG_DDR_STAT_INFO                        _IO(DEVDRV_MANAGER_MAGIC, 88)   /* RSVD */
-#define DEVDRV_MANAGER_GET_PMU_DIEID                            _IO(DEVDRV_MANAGER_MAGIC, 89)   /* RSVD */
-#define DEVDRV_MANAGER_GET_PROBE_NUM                            _IO(DEVDRV_MANAGER_MAGIC, 90)
-#define DEVDRV_MANAGER_DEBUG_INFORM                             _IO(DEVDRV_MANAGER_MAGIC, 91)
-#define DEVDRV_MANAGER_COMPUTE_POWER                            _IO(DEVDRV_MANAGER_MAGIC, 92)
-#define DEVDRV_MANAGER_GET_DEVID_BY_LOCALDEVID                  _IO(DEVDRV_MANAGER_MAGIC, 93)   /* RSVD */
-#define DEVDRV_MANAGER_SYNC_MATRIX_DAEMON_READY                 _IO(DEVDRV_MANAGER_MAGIC, 94)   /* RSVD */
-#define DEVDRV_MANAGER_GET_CONTAINER_DEVIDS                     _IO(DEVDRV_MANAGER_MAGIC, 95)
-#define DEVDRV_MANAGER_GET_DECFREQ_REASON                       _IO(DEVDRV_MANAGER_MAGIC, 96)   /* RSVD */
-#define DEVDRV_MANAGER_GET_BBOX_ERRSTR                          _IO(DEVDRV_MANAGER_MAGIC, 97)
-#define DEVDRV_MANAGER_GET_LLC_PERF_PARA                        _IO(DEVDRV_MANAGER_MAGIC, 98)
-#define DEVDRV_MANAGER_PCIE_IMU_DDR_READ                        _IO(DEVDRV_MANAGER_MAGIC, 99)
-#define DEVDRV_MANAGER_GET_SLOT_ID                              _IO(DEVDRV_MANAGER_MAGIC, 100)
-#define DEVDRV_MANAGER_PCIE_HOT_RESET                           _IO(DEVDRV_MANAGER_MAGIC, 101)   /* RSVD */
-#define DEVDRV_MANAGER_GET_SOC_DIE_ID                           _IO(DEVDRV_MANAGER_MAGIC, 102)   /* RSVD */
-#define DEVDRV_MANAGER_GET_CHIP_INFO                            _IO(DEVDRV_MANAGER_MAGIC, 103)
-#define DEVDRV_MANAGER_RST_I2C_CTROLLER                         _IO(DEVDRV_MANAGER_MAGIC, 104)
-#define DEVDRV_MANAGER_GET_XLOADER_BOOT_INFO                    _IO(DEVDRV_MANAGER_MAGIC, 105)
-#define DEVDRV_MANAGER_GET_GPIO_STATE                           _IO(DEVDRV_MANAGER_MAGIC, 106)
-#define DEVDRV_MANAGER_APPMON_BBOX_EXCEPTION_CMD                _IO(DEVDRV_MANAGER_MAGIC, 107)
-#define DEVDRV_MANAGER_GET_CONTAINER_FLAG                       _IO(DEVDRV_MANAGER_MAGIC, 108)
-#define DEVDRV_MANAGER_IPC_NOTIFY_SET_PID                       _IO(DEVDRV_MANAGER_MAGIC, 109)
-#define DEVDRV_MANAGER_IPC_NOTIFY_RECORD                        _IO(DEVDRV_MANAGER_MAGIC, 110)
-#define DEVDRV_MANAGER_P2P_ATTR                                 _IO(DEVDRV_MANAGER_MAGIC, 111)   /* RSVD */
-#define DEVDRV_MANAGER_GET_PROCESS_SIGN                         _IO(DEVDRV_MANAGER_MAGIC, 112)
-#define DEVDRV_MANAGER_GET_MASTER_DEV_IN_THE_SAME_OS            _IO(DEVDRV_MANAGER_MAGIC, 113)   /* RSVD */
-#define DEVDRV_MANAGER_GET_LOCAL_DEV_ID_BY_HOST_DEV_ID          _IO(DEVDRV_MANAGER_MAGIC, 114)
-#define DEVDRV_MANAGER_GET_FAULT_REPORT                         _IO(DEVDRV_MANAGER_MAGIC, 115)   /* RSVD */
-#define DEVDRV_MANAGER_GET_FLASH_INFO                           _IO(DEVDRV_MANAGER_MAGIC, 116)
+#define DEVDRV_MANAGER_GET_CPU_INFO                             _KA_IO(DEVDRV_MANAGER_MAGIC, 74)   /* RSVD */
+#define DEVDRV_MANAGER_INVAILD_TLB                              _KA_IO(DEVDRV_MANAGER_MAGIC, 75)   /* RSVD */
+#define DEVDRV_MANAGER_SEND_TO_IMU                              _KA_IO(DEVDRV_MANAGER_MAGIC, 76)   /* RSVD */
+#define DEVDRV_MANAGER_RECV_FROM_IMU                            _KA_IO(DEVDRV_MANAGER_MAGIC, 77)   /* RSVD */
+#define DEVDRV_MANAGER_GET_HBM_CAPACITY                         _KA_IO(DEVDRV_MANAGER_MAGIC, 78)   /* RSVD */
+#define DEVDRV_MANAGER_GET_DDR_BW_UTILIZATION                   _KA_IO(DEVDRV_MANAGER_MAGIC, 79)   /* RSVD */
+#define DEVDRV_MANAGER_GET_HBM_BW_UTILIZATION                   _KA_IO(DEVDRV_MANAGER_MAGIC, 80)   /* RSVD */
+#define DEVDRV_MANAGER_GET_IMU_INFO                             _KA_IO(DEVDRV_MANAGER_MAGIC, 81)
+#define DEVDRV_MANAGER_GET_ECC_STATICS                          _KA_IO(DEVDRV_MANAGER_MAGIC, 82)   /* RSVD */
+#define DEVDRV_MANAGER_CONFIG_ECC_ENABLE                        _KA_IO(DEVDRV_MANAGER_MAGIC, 83)   /* RSVD */
+#define DEVDRV_MANAGER_GET_DDR_UTILIZATION                      _KA_IO(DEVDRV_MANAGER_MAGIC, 84)   /* RSVD */
+#define DEVDRV_MANAGER_GET_HBM_UTILIZATION                      _KA_IO(DEVDRV_MANAGER_MAGIC, 85)   /* RSVD */
+#define DEVDRV_MANAGER_GET_PMU_VOLTAGE                          _KA_IO(DEVDRV_MANAGER_MAGIC, 86)
+#define DEVDRV_MANAGER_GET_BOOT_DEV_ID                          _KA_IO(DEVDRV_MANAGER_MAGIC, 87)
+#define DEVDRV_MANAGER_CFG_DDR_STAT_INFO                        _KA_IO(DEVDRV_MANAGER_MAGIC, 88)   /* RSVD */
+#define DEVDRV_MANAGER_GET_PMU_DIEID                            _KA_IO(DEVDRV_MANAGER_MAGIC, 89)   /* RSVD */
+#define DEVDRV_MANAGER_GET_PROBE_NUM                            _KA_IO(DEVDRV_MANAGER_MAGIC, 90)
+#define DEVDRV_MANAGER_DEBUG_INFORM                             _KA_IO(DEVDRV_MANAGER_MAGIC, 91)
+#define DEVDRV_MANAGER_COMPUTE_POWER                            _KA_IO(DEVDRV_MANAGER_MAGIC, 92)
+#define DEVDRV_MANAGER_GET_DEVID_BY_LOCALDEVID                  _KA_IO(DEVDRV_MANAGER_MAGIC, 93)   /* RSVD */
+#define DEVDRV_MANAGER_SYNC_MATRIX_DAEMON_READY                 _KA_IO(DEVDRV_MANAGER_MAGIC, 94)   /* RSVD */
+#define DEVDRV_MANAGER_GET_CONTAINER_DEVIDS                     _KA_IO(DEVDRV_MANAGER_MAGIC, 95)
+#define DEVDRV_MANAGER_GET_DECFREQ_REASON                       _KA_IO(DEVDRV_MANAGER_MAGIC, 96)   /* RSVD */
+#define DEVDRV_MANAGER_GET_BBOX_ERRSTR                          _KA_IO(DEVDRV_MANAGER_MAGIC, 97)
+#define DEVDRV_MANAGER_GET_LLC_PERF_PARA                        _KA_IO(DEVDRV_MANAGER_MAGIC, 98)
+#define DEVDRV_MANAGER_PCIE_IMU_DDR_READ                        _KA_IO(DEVDRV_MANAGER_MAGIC, 99)
+#define DEVDRV_MANAGER_GET_SLOT_ID                              _KA_IO(DEVDRV_MANAGER_MAGIC, 100)
+#define DEVDRV_MANAGER_PCIE_HOT_RESET                           _KA_IO(DEVDRV_MANAGER_MAGIC, 101)   /* RSVD */
+#define DEVDRV_MANAGER_GET_SOC_DIE_ID                           _KA_IO(DEVDRV_MANAGER_MAGIC, 102)   /* RSVD */
+#define DEVDRV_MANAGER_GET_CHIP_INFO                            _KA_IO(DEVDRV_MANAGER_MAGIC, 103)
+#define DEVDRV_MANAGER_RST_I2C_CTROLLER                         _KA_IO(DEVDRV_MANAGER_MAGIC, 104)
+#define DEVDRV_MANAGER_GET_XLOADER_BOOT_INFO                    _KA_IO(DEVDRV_MANAGER_MAGIC, 105)
+#define DEVDRV_MANAGER_GET_GPIO_STATE                           _KA_IO(DEVDRV_MANAGER_MAGIC, 106)
+#define DEVDRV_MANAGER_APPMON_BBOX_EXCEPTION_CMD                _KA_IO(DEVDRV_MANAGER_MAGIC, 107)
+#define DEVDRV_MANAGER_GET_CONTAINER_FLAG                       _KA_IO(DEVDRV_MANAGER_MAGIC, 108)
+#define DEVDRV_MANAGER_IPC_NOTIFY_SET_PID                       _KA_IO(DEVDRV_MANAGER_MAGIC, 109)
+#define DEVDRV_MANAGER_IPC_NOTIFY_RECORD                        _KA_IO(DEVDRV_MANAGER_MAGIC, 110)
+#define DEVDRV_MANAGER_P2P_ATTR                                 _KA_IO(DEVDRV_MANAGER_MAGIC, 111)   /* RSVD */
+#define DEVDRV_MANAGER_GET_PROCESS_SIGN                         _KA_IO(DEVDRV_MANAGER_MAGIC, 112)
+#define DEVDRV_MANAGER_GET_MASTER_DEV_IN_THE_SAME_OS            _KA_IO(DEVDRV_MANAGER_MAGIC, 113)   /* RSVD */
+#define DEVDRV_MANAGER_GET_LOCAL_DEV_ID_BY_HOST_DEV_ID          _KA_IO(DEVDRV_MANAGER_MAGIC, 114)
+#define DEVDRV_MANAGER_GET_FAULT_REPORT                         _KA_IO(DEVDRV_MANAGER_MAGIC, 115)   /* RSVD */
+#define DEVDRV_MANAGER_GET_FLASH_INFO                           _KA_IO(DEVDRV_MANAGER_MAGIC, 116)
 
-#define DEVDRV_MANAGER_GET_HISSSTATUS                           _IO(DEVDRV_MANAGER_MAGIC, 118)
-#define DEVDRV_MANAGER_GET_LPSTATUS                             _IO(DEVDRV_MANAGER_MAGIC, 119)   /* RSVD */
-#define DEVDRV_MANAGER_GET_VECTOR_INFO                          _IO(DEVDRV_MANAGER_MAGIC, 120)   /* RSVD */
-#define DEVDRV_MANAGER_GET_UARTSTATUS                           _IO(DEVDRV_MANAGER_MAGIC, 121)   /* RSVD */
-#define DEVDRV_MANAGER_GET_CANSTATUS                            _IO(DEVDRV_MANAGER_MAGIC, 122)   /* RSVD */
-#define DEVDRV_MANAGER_GET_UFSSTATUS                            _IO(DEVDRV_MANAGER_MAGIC, 123)
-#define DEVDRV_MANAGER_GET_SENSORHUBSTATUS                      _IO(DEVDRV_MANAGER_MAGIC, 124)   /* RSVD */
-#define DEVDRV_MANAGER_GET_ISPSTATUS                            _IO(DEVDRV_MANAGER_MAGIC, 125)   /* RSVD */
-#define DEVDRV_MANAGER_GET_CANCONFIG                            _IO(DEVDRV_MANAGER_MAGIC, 126)   /* RSVD */
-#define DEVDRV_MANAGER_GET_UFSINFO                              _IO(DEVDRV_MANAGER_MAGIC, 127)
-#define DEVDRV_MANAGER_SET_UFSINFO                              _IO(DEVDRV_MANAGER_MAGIC, 128)
-#define DEVDRV_MANAGER_GET_SENSORHUBCONFIG                      _IO(DEVDRV_MANAGER_MAGIC, 129)   /* RSVD */
-#define DEVDRV_MANAGER_GET_EMU_SUBSYS_STATUS                    _IO(DEVDRV_MANAGER_MAGIC, 130)   /* RSVD */
-#define DEVDRV_MANAGER_GET_SAFETYISLAND_STATUS                  _IO(DEVDRV_MANAGER_MAGIC, 131)   /* RSVD */
-#define DEVDRV_MANAGER_GET_ISPCONFIG                            _IO(DEVDRV_MANAGER_MAGIC, 132)   /* RSVD */
-#define DEVDRV_MANAGER_GET_TSDRV_DEV_COM_INFO                   _IO(DEVDRV_MANAGER_MAGIC, 133)
-#define DEVDRV_MANAGER_GET_ALL_TEMPERATURE                      _IO(DEVDRV_MANAGER_MAGIC, 134)   /* RSVD */
-#define DEVDRV_MANAGER_SAFETYISLAND_IPC_MSG_SEND                _IO(DEVDRV_MANAGER_MAGIC, 135)   /* RSVD */
-#define DEVDRV_MANAGER_SAFETYISLAND_IPC_MSG_RECV                _IO(DEVDRV_MANAGER_MAGIC, 136)   /* RSVD */
-#define DEVDRV_MANAGER_GET_DVPP_STATUS                          _IO(DEVDRV_MANAGER_MAGIC, 137)   /* RSVD */
-#define DEVDRV_MANAGER_GET_TS_GROUP_NUM                         _IO(DEVDRV_MANAGER_MAGIC, 138)
-#define DEVDRV_MANAGER_GET_CAPABILITY_GROUP_INFO                _IO(DEVDRV_MANAGER_MAGIC, 139)
-#define DEVDRV_MANAGER_DELETE_CAPABILITY_GROUP                  _IO(DEVDRV_MANAGER_MAGIC, 140)
-#define DEVDRV_MANAGER_CREATE_CAPABILITY_GROUP                  _IO(DEVDRV_MANAGER_MAGIC, 141)
-#define DEVDRV_MANAGER_PASSTHRU_MCU                             _IO(DEVDRV_MANAGER_MAGIC, 142)   /* RSVD */
-#define DEVDRV_MANAGER_GET_P2P_CAPABILITY                       _IO(DEVDRV_MANAGER_MAGIC, 143)   /* RSVD */
-#define DEVDRV_MANAGER_SET_CAN_CONFIG                           _IO(DEVDRV_MANAGER_MAGIC, 144)   /* RSVD */
-#define DEVDRV_MANAGER_GET_CAN_CONFIG                           _IO(DEVDRV_MANAGER_MAGIC, 145)   /* RSVD */
-#define DEVDRV_MANAGER_GET_SUBSYS_TEMPERATURE                   _IO(DEVDRV_MANAGER_MAGIC, 146)   /* RSVD */
-#define DEVDRV_MANAGER_GET_DVPP_RATIO                           _IO(DEVDRV_MANAGER_MAGIC, 147)   /* RSVD */
-#define DEVDRV_MANAGER_GET_ETH_ID                               _IO(DEVDRV_MANAGER_MAGIC, 148)
-#define DEVDRV_MANAGER_BIND_PID_ID                              _IO(DEVDRV_MANAGER_MAGIC, 149)
-#define DEVDRV_MANAGER_GET_H2D_DEVINFO                          _IO(DEVDRV_MANAGER_MAGIC, 150)
-#define DEVDRV_MANAGER_GET_DEV_INFO_BY_PHYID                    _IO(DEVDRV_MANAGER_MAGIC, 151)   /* RSVD */
-#define DEVDRV_MANAGER_GET_POWER_STATE                          _IO(DEVDRV_MANAGER_MAGIC, 152)
-#define DEVDRV_MANAGER_GET_PROBE_LIST                           _IO(DEVDRV_MANAGER_MAGIC, 153)   /* RSVD */
-#define DEVDRV_MANAGER_GET_CONSOLE_LOG_LEVEL                    _IO(DEVDRV_MANAGER_MAGIC, 154)
-#define DEVDRV_MANAGER_GET_TEMP_THOLD                           _IO(DEVDRV_MANAGER_MAGIC, 155)   /* RSVD */
-#define DEVDRV_MANAGER_SET_TEMP_THOLD                           _IO(DEVDRV_MANAGER_MAGIC, 156)   /* RSVD */
-#define DEVDRV_MANAGER_GET_LP_INFO                              _IO(DEVDRV_MANAGER_MAGIC, 157)   /* RSVD */
-#define DEVDRV_MANAGER_CREATE_VDEV                              _IO(DEVDRV_MANAGER_MAGIC, 158)   /* RSVD */
-#define DEVDRV_MANAGER_DESTROY_VDEV                             _IO(DEVDRV_MANAGER_MAGIC, 159)
-#define DEVDRV_MANAGER_GET_VDEVINFO                             _IO(DEVDRV_MANAGER_MAGIC, 160)
-#define DEVDRV_MANAGER_IPC_UNIFY_MSG                            _IO(DEVDRV_MANAGER_MAGIC, 161)
-#define DEVDRV_MANAGER_UPDATE_STARTUP_STATUS                    _IO(DEVDRV_MANAGER_MAGIC, 162)
-#define DEVDRV_MANAGER_GET_STARTUP_STATUS                       _IO(DEVDRV_MANAGER_MAGIC, 163)
-#define DEVDRV_MANAGER_GET_DEVICE_HEALTH_STATUS                 _IO(DEVDRV_MANAGER_MAGIC, 164)
-#define DEVDRV_MANAGER_QUERY_HOST_PID                           _IO(DEVDRV_MANAGER_MAGIC, 165)
-#define DEVDRV_MANAGER_EQUIPMENT_SET_SILS_INFO                  _IO(DEVDRV_MANAGER_MAGIC, 166)   /* RSVD */
-#define DEVDRV_MANAGER_EQUIPMENT_GET_SILS_INFO                  _IO(DEVDRV_MANAGER_MAGIC, 167)   /* RSVD */
-#define DEVDRV_MANAGER_GET_DDR_BASE_INFO                        _IO(DEVDRV_MANAGER_MAGIC, 168)   /* RSVD */
-#define DEVDRV_MANAGER_GET_DDR_MANUFACTURES_INFO                _IO(DEVDRV_MANAGER_MAGIC, 169)   /* RSVD */
-#define DEVDRV_MANAGER_GET_BOOTSTRAP                            _IO(DEVDRV_MANAGER_MAGIC, 170)
-#define DEVDRV_MANAGER_FLASH_USER_CMD                           _IO(DEVDRV_MANAGER_MAGIC, 171)   /* RSVD */
-#define DEVDRV_MANAGER_FLASH_ROOT_CMD                           _IO(DEVDRV_MANAGER_MAGIC, 172)   /* RSVD */
-#define DEVDRV_MANAGER_PCIE_BBOX_HDR_READ                       _IO(DEVDRV_MANAGER_MAGIC, 173)   /* RSVD */
-#define DEVDRV_MANAGER_BOARD_INFO_MEM                           _IO(DEVDRV_MANAGER_MAGIC, 174)   /* RSVD */
-#define DEVDRV_MANAGER_GET_DEV_RESOURCE_INFO                    _IO(DEVDRV_MANAGER_MAGIC, 175)
-#define DEVDRV_MANAGER_REG_VMNG_CLIENT                          _IO(DEVDRV_MANAGER_MAGIC, 176)
-#define DEVDRV_MANAGER_GET_TS_INFO                              _IO(DEVDRV_MANAGER_MAGIC, 177)   /* RSVD */
-#define DEVDRV_MANAGER_GET_CHIP_COUNT                           _IO(DEVDRV_MANAGER_MAGIC, 178)   /* RSVD */
-#define DEVDRV_MANAGER_GET_CHIP_LIST                            _IO(DEVDRV_MANAGER_MAGIC, 179)   /* RSVD */
-#define DEVDRV_MANAGER_GET_DEVICE_FROM_CHIP                     _IO(DEVDRV_MANAGER_MAGIC, 180)   /* RSVD */
-#define DEVDRV_MANAGER_GET_CHIP_FROM_DEVICE                     _IO(DEVDRV_MANAGER_MAGIC, 181)   /* RSVD */
-#define DEVDRV_MANAGER_QUERY_DEV_PID                            _IO(DEVDRV_MANAGER_MAGIC, 182)
-#define DEVDRV_MANAGER_GET_QOS_INFO                             _IO(DEVDRV_MANAGER_MAGIC, 183)   /* RSVD */
-#define DEVDRV_MANAGER_SET_QOS_INFO                             _IO(DEVDRV_MANAGER_MAGIC, 184)   /* RSVD */
-#define DEVDRV_MANAGER_SET_SVM_VDEVINFO                         _IO(DEVDRV_MANAGER_MAGIC, 185)
-#define DEVDRV_MANAGER_UNBIND_PID_ID                            _IO(DEVDRV_MANAGER_MAGIC, 186)
-#define DEVDRV_MANAGER_GET_DEVICE_VF_MAX                        _IO(DEVDRV_MANAGER_MAGIC, 187)
-#define DEVDRV_MANAGER_GET_SVM_VDEVINFO                         _IO(DEVDRV_MANAGER_MAGIC, 188)
-#define DEVDRV_MANAGER_GET_DEVICE_VF_LIST                       _IO(DEVDRV_MANAGER_MAGIC, 189)
-#define DEVDRV_MANAGER_SET_VDEVMODE                             _IO(DEVDRV_MANAGER_MAGIC, 190)
-#define DEVDRV_MANAGER_GET_VDEVMODE                             _IO(DEVDRV_MANAGER_MAGIC, 191)
-#define DEVDRV_MANAGER_SET_SIGN                                 _IO(DEVDRV_MANAGER_MAGIC, 192)
-#define DEVDRV_MANAGER_GET_SIGN                                 _IO(DEVDRV_MANAGER_MAGIC, 193)
-#define DEVDRV_MANAGER_GET_SILSINFO                             _IO(DEVDRV_MANAGER_MAGIC, 194)   /* RSVD */
-#define DEVDRV_MANAGER_SET_SILSINFO                             _IO(DEVDRV_MANAGER_MAGIC, 195)   /* RSVD */
-#define DEVDRV_MANAGER_GET_VDEVNUM                              _IO(DEVDRV_MANAGER_MAGIC, 196)   /* RSVD */
-#define DEVDRV_MANAGER_GET_VDEVIDS                              _IO(DEVDRV_MANAGER_MAGIC, 197)   /* RSVD */
-#define DEVDRV_MANAGER_TS_LOG_DUMP                              _IO(DEVDRV_MANAGER_MAGIC, 198)
-#define DEVDRV_MANAGER_GET_CORE_UTILIZATION                     _IO(DEVDRV_MANAGER_MAGIC, 199)
-#define DEVDRV_MANAGER_GET_OSC_FREQ                             _IO(DEVDRV_MANAGER_MAGIC, 200)
+#define DEVDRV_MANAGER_GET_HISSSTATUS                           _KA_IO(DEVDRV_MANAGER_MAGIC, 118)
+#define DEVDRV_MANAGER_GET_LPSTATUS                             _KA_IO(DEVDRV_MANAGER_MAGIC, 119)   /* RSVD */
+#define DEVDRV_MANAGER_GET_VECTOR_INFO                          _KA_IO(DEVDRV_MANAGER_MAGIC, 120)   /* RSVD */
+#define DEVDRV_MANAGER_GET_UARTSTATUS                           _KA_IO(DEVDRV_MANAGER_MAGIC, 121)   /* RSVD */
+#define DEVDRV_MANAGER_GET_CANSTATUS                            _KA_IO(DEVDRV_MANAGER_MAGIC, 122)   /* RSVD */
+#define DEVDRV_MANAGER_GET_UFSSTATUS                            _KA_IO(DEVDRV_MANAGER_MAGIC, 123)
+#define DEVDRV_MANAGER_GET_SENSORHUBSTATUS                      _KA_IO(DEVDRV_MANAGER_MAGIC, 124)   /* RSVD */
+#define DEVDRV_MANAGER_GET_ISPSTATUS                            _KA_IO(DEVDRV_MANAGER_MAGIC, 125)   /* RSVD */
+#define DEVDRV_MANAGER_GET_CANCONFIG                            _KA_IO(DEVDRV_MANAGER_MAGIC, 126)   /* RSVD */
+#define DEVDRV_MANAGER_GET_UFSINFO                              _KA_IO(DEVDRV_MANAGER_MAGIC, 127)
+#define DEVDRV_MANAGER_SET_UFSINFO                              _KA_IO(DEVDRV_MANAGER_MAGIC, 128)
+#define DEVDRV_MANAGER_GET_SENSORHUBCONFIG                      _KA_IO(DEVDRV_MANAGER_MAGIC, 129)   /* RSVD */
+#define DEVDRV_MANAGER_GET_EMU_SUBSYS_STATUS                    _KA_IO(DEVDRV_MANAGER_MAGIC, 130)   /* RSVD */
+#define DEVDRV_MANAGER_GET_SAFETYISLAND_STATUS                  _KA_IO(DEVDRV_MANAGER_MAGIC, 131)   /* RSVD */
+#define DEVDRV_MANAGER_GET_ISPCONFIG                            _KA_IO(DEVDRV_MANAGER_MAGIC, 132)   /* RSVD */
+#define DEVDRV_MANAGER_GET_TSDRV_DEV_COM_INFO                   _KA_IO(DEVDRV_MANAGER_MAGIC, 133)
+#define DEVDRV_MANAGER_GET_ALL_TEMPERATURE                      _KA_IO(DEVDRV_MANAGER_MAGIC, 134)   /* RSVD */
+#define DEVDRV_MANAGER_SAFETYISLAND_IPC_MSG_SEND                _KA_IO(DEVDRV_MANAGER_MAGIC, 135)   /* RSVD */
+#define DEVDRV_MANAGER_SAFETYISLAND_IPC_MSG_RECV                _KA_IO(DEVDRV_MANAGER_MAGIC, 136)   /* RSVD */
+#define DEVDRV_MANAGER_GET_DVPP_STATUS                          _KA_IO(DEVDRV_MANAGER_MAGIC, 137)   /* RSVD */
+#define DEVDRV_MANAGER_GET_TS_GROUP_NUM                         _KA_IO(DEVDRV_MANAGER_MAGIC, 138)
+#define DEVDRV_MANAGER_GET_CAPABILITY_GROUP_INFO                _KA_IO(DEVDRV_MANAGER_MAGIC, 139)
+#define DEVDRV_MANAGER_DELETE_CAPABILITY_GROUP                  _KA_IO(DEVDRV_MANAGER_MAGIC, 140)
+#define DEVDRV_MANAGER_CREATE_CAPABILITY_GROUP                  _KA_IO(DEVDRV_MANAGER_MAGIC, 141)
+#define DEVDRV_MANAGER_PASSTHRU_MCU                             _KA_IO(DEVDRV_MANAGER_MAGIC, 142)   /* RSVD */
+#define DEVDRV_MANAGER_GET_P2P_CAPABILITY                       _KA_IO(DEVDRV_MANAGER_MAGIC, 143)   /* RSVD */
+#define DEVDRV_MANAGER_SET_CAN_CONFIG                           _KA_IO(DEVDRV_MANAGER_MAGIC, 144)   /* RSVD */
+#define DEVDRV_MANAGER_GET_CAN_CONFIG                           _KA_IO(DEVDRV_MANAGER_MAGIC, 145)   /* RSVD */
+#define DEVDRV_MANAGER_GET_SUBSYS_TEMPERATURE                   _KA_IO(DEVDRV_MANAGER_MAGIC, 146)   /* RSVD */
+#define DEVDRV_MANAGER_GET_DVPP_RATIO                           _KA_IO(DEVDRV_MANAGER_MAGIC, 147)   /* RSVD */
+#define DEVDRV_MANAGER_GET_ETH_ID                               _KA_IO(DEVDRV_MANAGER_MAGIC, 148)
+#define DEVDRV_MANAGER_BIND_PID_ID                              _KA_IO(DEVDRV_MANAGER_MAGIC, 149)
+#define DEVDRV_MANAGER_GET_H2D_DEVINFO                          _KA_IO(DEVDRV_MANAGER_MAGIC, 150)
+#define DEVDRV_MANAGER_GET_DEV_INFO_BY_PHYID                    _KA_IO(DEVDRV_MANAGER_MAGIC, 151)   /* RSVD */
+#define DEVDRV_MANAGER_GET_POWER_STATE                          _KA_IO(DEVDRV_MANAGER_MAGIC, 152)
+#define DEVDRV_MANAGER_GET_PROBE_LIST                           _KA_IO(DEVDRV_MANAGER_MAGIC, 153)   /* RSVD */
+#define DEVDRV_MANAGER_GET_CONSOLE_LOG_LEVEL                    _KA_IO(DEVDRV_MANAGER_MAGIC, 154)
+#define DEVDRV_MANAGER_GET_TEMP_THOLD                           _KA_IO(DEVDRV_MANAGER_MAGIC, 155)   /* RSVD */
+#define DEVDRV_MANAGER_SET_TEMP_THOLD                           _KA_IO(DEVDRV_MANAGER_MAGIC, 156)   /* RSVD */
+#define DEVDRV_MANAGER_GET_LP_INFO                              _KA_IO(DEVDRV_MANAGER_MAGIC, 157)   /* RSVD */
+#define DEVDRV_MANAGER_CREATE_VDEV                              _KA_IO(DEVDRV_MANAGER_MAGIC, 158)   /* RSVD */
+#define DEVDRV_MANAGER_DESTROY_VDEV                             _KA_IO(DEVDRV_MANAGER_MAGIC, 159)
+#define DEVDRV_MANAGER_GET_VDEVINFO                             _KA_IO(DEVDRV_MANAGER_MAGIC, 160)
+#define DEVDRV_MANAGER_IPC_UNIFY_MSG                            _KA_IO(DEVDRV_MANAGER_MAGIC, 161)
+#define DEVDRV_MANAGER_UPDATE_STARTUP_STATUS                    _KA_IO(DEVDRV_MANAGER_MAGIC, 162)
+#define DEVDRV_MANAGER_GET_STARTUP_STATUS                       _KA_IO(DEVDRV_MANAGER_MAGIC, 163)
+#define DEVDRV_MANAGER_GET_DEVICE_HEALTH_STATUS                 _KA_IO(DEVDRV_MANAGER_MAGIC, 164)
+#define DEVDRV_MANAGER_QUERY_HOST_PID                           _KA_IO(DEVDRV_MANAGER_MAGIC, 165)
+#define DEVDRV_MANAGER_EQUIPMENT_SET_SILS_INFO                  _KA_IO(DEVDRV_MANAGER_MAGIC, 166)   /* RSVD */
+#define DEVDRV_MANAGER_EQUIPMENT_GET_SILS_INFO                  _KA_IO(DEVDRV_MANAGER_MAGIC, 167)   /* RSVD */
+#define DEVDRV_MANAGER_GET_DDR_BASE_INFO                        _KA_IO(DEVDRV_MANAGER_MAGIC, 168)   /* RSVD */
+#define DEVDRV_MANAGER_GET_DDR_MANUFACTURES_INFO                _KA_IO(DEVDRV_MANAGER_MAGIC, 169)   /* RSVD */
+#define DEVDRV_MANAGER_GET_BOOTSTRAP                            _KA_IO(DEVDRV_MANAGER_MAGIC, 170)
+#define DEVDRV_MANAGER_FLASH_USER_CMD                           _KA_IO(DEVDRV_MANAGER_MAGIC, 171)   /* RSVD */
+#define DEVDRV_MANAGER_FLASH_ROOT_CMD                           _KA_IO(DEVDRV_MANAGER_MAGIC, 172)   /* RSVD */
+#define DEVDRV_MANAGER_PCIE_BBOX_HDR_READ                       _KA_IO(DEVDRV_MANAGER_MAGIC, 173)   /* RSVD */
+#define DEVDRV_MANAGER_BOARD_INFO_MEM                           _KA_IO(DEVDRV_MANAGER_MAGIC, 174)   /* RSVD */
+#define DEVDRV_MANAGER_GET_DEV_RESOURCE_INFO                    _KA_IO(DEVDRV_MANAGER_MAGIC, 175)
+#define DEVDRV_MANAGER_REG_VMNG_CLIENT                          _KA_IO(DEVDRV_MANAGER_MAGIC, 176)
+#define DEVDRV_MANAGER_GET_TS_INFO                              _KA_IO(DEVDRV_MANAGER_MAGIC, 177)   /* RSVD */
+#define DEVDRV_MANAGER_GET_CHIP_COUNT                           _KA_IO(DEVDRV_MANAGER_MAGIC, 178)   /* RSVD */
+#define DEVDRV_MANAGER_GET_CHIP_LIST                            _KA_IO(DEVDRV_MANAGER_MAGIC, 179)   /* RSVD */
+#define DEVDRV_MANAGER_GET_DEVICE_FROM_CHIP                     _KA_IO(DEVDRV_MANAGER_MAGIC, 180)   /* RSVD */
+#define DEVDRV_MANAGER_GET_CHIP_FROM_DEVICE                     _KA_IO(DEVDRV_MANAGER_MAGIC, 181)   /* RSVD */
+#define DEVDRV_MANAGER_QUERY_DEV_PID                            _KA_IO(DEVDRV_MANAGER_MAGIC, 182)
+#define DEVDRV_MANAGER_GET_QOS_INFO                             _KA_IO(DEVDRV_MANAGER_MAGIC, 183)   /* RSVD */
+#define DEVDRV_MANAGER_SET_QOS_INFO                             _KA_IO(DEVDRV_MANAGER_MAGIC, 184)   /* RSVD */
+#define DEVDRV_MANAGER_SET_SVM_VDEVINFO                         _KA_IO(DEVDRV_MANAGER_MAGIC, 185)
+#define DEVDRV_MANAGER_UNBIND_PID_ID                            _KA_IO(DEVDRV_MANAGER_MAGIC, 186)
+#define DEVDRV_MANAGER_GET_DEVICE_VF_MAX                        _KA_IO(DEVDRV_MANAGER_MAGIC, 187)
+#define DEVDRV_MANAGER_GET_SVM_VDEVINFO                         _KA_IO(DEVDRV_MANAGER_MAGIC, 188)
+#define DEVDRV_MANAGER_GET_DEVICE_VF_LIST                       _KA_IO(DEVDRV_MANAGER_MAGIC, 189)
+#define DEVDRV_MANAGER_SET_VDEVMODE                             _KA_IO(DEVDRV_MANAGER_MAGIC, 190)
+#define DEVDRV_MANAGER_GET_VDEVMODE                             _KA_IO(DEVDRV_MANAGER_MAGIC, 191)
+#define DEVDRV_MANAGER_SET_SIGN                                 _KA_IO(DEVDRV_MANAGER_MAGIC, 192)
+#define DEVDRV_MANAGER_GET_SIGN                                 _KA_IO(DEVDRV_MANAGER_MAGIC, 193)
+#define DEVDRV_MANAGER_GET_SILSINFO                             _KA_IO(DEVDRV_MANAGER_MAGIC, 194)   /* RSVD */
+#define DEVDRV_MANAGER_SET_SILSINFO                             _KA_IO(DEVDRV_MANAGER_MAGIC, 195)   /* RSVD */
+#define DEVDRV_MANAGER_GET_VDEVNUM                              _KA_IO(DEVDRV_MANAGER_MAGIC, 196)   /* RSVD */
+#define DEVDRV_MANAGER_GET_VDEVIDS                              _KA_IO(DEVDRV_MANAGER_MAGIC, 197)   /* RSVD */
+#define DEVDRV_MANAGER_TS_LOG_DUMP                              _KA_IO(DEVDRV_MANAGER_MAGIC, 198)
+#define DEVDRV_MANAGER_GET_CORE_UTILIZATION                     _KA_IO(DEVDRV_MANAGER_MAGIC, 199)
+#define DEVDRV_MANAGER_GET_OSC_FREQ                             _KA_IO(DEVDRV_MANAGER_MAGIC, 200)
 
-#define DEVDRV_MANAGER_GET_CURRENT_AIC_FREQ                     _IO(DEVDRV_MANAGER_MAGIC, 202)
-#define DEVDRV_MANAGER_GET_HOST_KERN_LOG                        _IO(DEVDRV_MANAGER_MAGIC, 203)
-#define DEVDRV_MANAGER_DEVICE_VMCORE_DUMP                       _IO(DEVDRV_MANAGER_MAGIC, 204)
-#define DEVDRV_MANAGER_IPC_NOTIFY_SET_ATTR                      _IO(DEVDRV_MANAGER_MAGIC, 205)
-#define DEVDRV_MANAGER_IPC_NOTIFY_GET_INFO                      _IO(DEVDRV_MANAGER_MAGIC, 206)
-#define DEVDRV_MANAGER_IPC_NOTIFY_GET_ATTR                      _IO(DEVDRV_MANAGER_MAGIC, 207)
-#define DEVDRV_MANAGER_CONFIG_DEVICE_SHARE                      _IO(DEVDRV_MANAGER_MAGIC, 208)
+#define DEVDRV_MANAGER_GET_CURRENT_AIC_FREQ                     _KA_IO(DEVDRV_MANAGER_MAGIC, 202)
+#define DEVDRV_MANAGER_GET_HOST_KERN_LOG                        _KA_IO(DEVDRV_MANAGER_MAGIC, 203)
+#define DEVDRV_MANAGER_DEVICE_VMCORE_DUMP                       _KA_IO(DEVDRV_MANAGER_MAGIC, 204)
+#define DEVDRV_MANAGER_IPC_NOTIFY_SET_ATTR                      _KA_IO(DEVDRV_MANAGER_MAGIC, 205)
+#define DEVDRV_MANAGER_IPC_NOTIFY_GET_INFO                      _KA_IO(DEVDRV_MANAGER_MAGIC, 206)
+#define DEVDRV_MANAGER_IPC_NOTIFY_GET_ATTR                      _KA_IO(DEVDRV_MANAGER_MAGIC, 207)
+#define DEVDRV_MANAGER_CONFIG_DEVICE_SHARE                      _KA_IO(DEVDRV_MANAGER_MAGIC, 208)
 #define DEVDRV_MANAGER_CMD_MAX_NR                               209
 
 #define DEVDRV_MANAGER_IPC_NOTIFY_CMD_NUM \
-    (_IOC_NR(DEVDRV_MANAGER_IPC_NOTIFY_DESTROY) - _IOC_NR(DEVDRV_MANAGER_IPC_NOTIFY_CREATE))
+    (_KA_IOC_NR(DEVDRV_MANAGER_IPC_NOTIFY_DESTROY) - _KA_IOC_NR(DEVDRV_MANAGER_IPC_NOTIFY_CREATE))
 
 #define MAX_EXCEPTION_THREAD 2
 struct devdrv_black_box {
-    struct semaphore black_box_sema[MAX_EXCEPTION_THREAD];
-    struct list_head exception_list[MAX_EXCEPTION_THREAD];
+    ka_semaphore_t black_box_sema[MAX_EXCEPTION_THREAD];
+    ka_list_head_t exception_list[MAX_EXCEPTION_THREAD];
     u32 exception_num[MAX_EXCEPTION_THREAD];
-    pid_t black_box_pid[MAX_EXCEPTION_THREAD];
-    spinlock_t spinlock;
+    ka_pid_t black_box_pid[MAX_EXCEPTION_THREAD];
+    ka_task_spinlock_t spinlock;
     u8 thread_should_stop;
 };
 
 /* only use in device */
 struct devdrv_lib_serve_master {
-    struct radix_tree_root lib_tree;  // host_pid is tag, client context is item
-    struct mutex lock;                // lock when initing
+    ka_radix_tree_root_t lib_tree;  // host_pid is tag, client context is item
+    ka_mutex_t lock;                // lock when initing
     u32 status;                       // flag whether lib_tree is inited
 };
 
@@ -275,14 +275,10 @@ struct devdrv_lib_serve_master {
 #define DEVDRV_PROC_HASH_TABLE_SIZE (0x1 << DEVDRV_PROC_HASH_TABLE_BIT)
 #define DEVDRV_PROC_HASH_TABLE_MASK (DEVDRV_PROC_HASH_TABLE_SIZE - 1)
 
-#ifndef BITS_PER_LONG_LONG
-#define BITS_PER_LONG_LONG 64
-#endif
-
 struct devdrv_manager_info {
     /* number of devices probed by pcie */
     u32 prob_num;
-    u64 prob_device_bitmap[ASCEND_DEV_MAX_NUM/BITS_PER_LONG_LONG + 1];
+    u64 prob_device_bitmap[ASCEND_DEV_MAX_NUM/KA_BITS_PER_LONG_LONG + 1];
 
     u32 num_dev;
     u32 pf_num;
@@ -294,36 +290,36 @@ struct devdrv_manager_info {
     u32 dev_id_flag[ASCEND_DEV_MAX_NUM]; /* get device id from host */
     u32 dev_id[ASCEND_DEV_MAX_NUM];      /* device id assigned by host device driver */
 
-    struct device *dev; /* device manager dev */
-    spinlock_t spinlock;
-    struct workqueue_struct *dev_rdy_work;
+    ka_device_t *dev; /* device manager dev */
+    ka_task_spinlock_t spinlock;
+    ka_workqueue_struct_t *dev_rdy_work;
 
     int msg_chan_rdy[ASCEND_DEV_MAX_NUM]; /* wait for msg channel ready */
-    struct device *dma_dev[ASCEND_DEV_MAX_NUM]; /* device dma dev */
-    wait_queue_head_t msg_chan_wait[ASCEND_DEV_MAX_NUM];
+    ka_device_t *dma_dev[ASCEND_DEV_MAX_NUM]; /* device dma dev */
+    ka_wait_queue_head_t msg_chan_wait[ASCEND_DEV_MAX_NUM];
     struct devdrv_info *dev_info[ASCEND_DEV_MAX_NUM];
     int device_status[ASCEND_DEV_MAX_NUM];
-    struct list_head pm_list_header; /* for power manager */
-    struct mutex pm_list_lock;         /* for power manager */
+    ka_list_head_t pm_list_header; /* for power manager */
+    ka_mutex_t pm_list_lock;         /* for power manager */
 
-    struct list_head hostpid_list_header;   /* for hostpid check only in host */
-    spinlock_t proc_hash_table_lock;
+    ka_list_head_t hostpid_list_header;   /* for hostpid check only in host */
+    ka_task_spinlock_t proc_hash_table_lock;
 #if (!defined (DEVMNG_UT)) && (!defined (DEVDRV_MANAGER_HOST_UT_TEST))
-    DECLARE_HASHTABLE(proc_hash_table, DEVDRV_PROC_HASH_TABLE_BIT); /* a process can only run on one numa node */
+    KA_DECLARE_HASHTABLE(proc_hash_table, DEVDRV_PROC_HASH_TABLE_BIT); /* a process can only run on one numa node */
 #endif
-    struct mutex devdrv_sign_list_lock; /* for hostpid check */
+    ka_mutex_t devdrv_sign_list_lock; /* for hostpid check */
     u32 devdrv_sign_count[MAX_DOCKER_NUM + 1U]; /* for hostpid check , 0~68 : container, 69 :non-container */
 
-    struct list_head msg_pm_list_header; /* for logdrv and other module register on lowpower case */
-    spinlock_t msg_pm_list_lock;         /* for logdrv and other module register on lowpower case */
+    ka_list_head_t msg_pm_list_header; /* for logdrv and other module register on lowpower case */
+    ka_task_spinlock_t msg_pm_list_lock;         /* for logdrv and other module register on lowpower case */
 
-    struct notifier_block ipc_monitor;
-    struct notifier_block m3_ipc_monitor;
+    ka_notifier_block_t ipc_monitor;
+    ka_notifier_block_t m3_ipc_monitor;
     /* for heart beat between TS and driver
      * DEVICE manager use this workqueue to
      * start a exception process.
      */
-    struct workqueue_struct *heart_beat_wq;
+    ka_workqueue_struct_t *heart_beat_wq;
     struct devdrv_black_box black_box;
     u32 host_type;
     struct tsdrv_drv_ops *drv_ops;
@@ -346,12 +342,12 @@ struct devdrv_manager_info {
 struct devdrv_heart_beat_sq {
     u32 number;              /* increment counter */
     u32 cmd;                 /* always 0xAABBCCDD */
-    struct timespec64 stamp; /* system time */
+    ka_timespec64_t stamp; /* system time */
     u32 devid;
     u32 reserved;           /* used for judge different host-type */
-    struct timespec64 wall; /* wall time */
+    ka_timespec64_t wall; /* wall time */
     u64 cntpct;             /* ccpu sys counter */
-    time64_t time_zone_interval;   /* unit: second */
+    ka_time64_t time_zone_interval;   /* unit: second */
     u32 rsv[DEVDRV_HB_SQ_RSV];
 };
 
@@ -365,7 +361,7 @@ struct devdrv_heart_beat_cq {
 
     u32 report_type; /* 0: heart beat report, 1: exception report */
     u32 exception_code;
-    struct timespec64 exception_time;
+    ka_timespec64_t exception_time;
 };
 
 #define DEVDRV_AI_SUBSYS_INIT_CHECK_SRAM_OFFSET 0
@@ -512,18 +508,18 @@ enum devdrv_lib_status {
 };
 
 struct devdrv_lib_serve_client {
-    pid_t host_pid;
-    pid_t device_pid;
+    ka_pid_t host_pid;
+    ka_pid_t device_pid;
     u32 status;
     u32 proc_state;
-    wait_queue_head_t wait;
-    struct list_head lib_list;  // link all library info from host
-    spinlock_t spinlock;        // lock when proc lib_list
+    ka_wait_queue_head_t wait;
+    ka_list_head_t lib_list;  // link all library info from host
+    ka_task_spinlock_t spinlock;        // lock when proc lib_list
 };
 
 struct devdrv_lib_info {
     struct devdrv_load_kernel kernel_info;
-    struct list_head list;
+    ka_list_head_t list;
 };
 
 #define RANDOM_SIZE          24
@@ -532,7 +528,7 @@ struct devdrv_lib_info {
 #if !defined(DEVMNG_UT) && !defined(LOG_UT)
 struct sq_perf {
     u32 taskid;
-    struct timeval tv;
+    ka_timeval_t tv;
     u32 valid;
 };
 
@@ -663,8 +659,8 @@ int devdrv_get_devinfo(unsigned int devid, struct devdrv_device_info *info);
 int devdrv_get_core_inuse(u32 devid, u32 vfid, struct devdrv_hardware_inuse *inuse);
 int devdrv_get_core_spec(u32 devid, u32 vfid, struct devdrv_hardware_spec *spec);
 struct devdrv_info *devdrv_manager_get_devdrv_info(u32 dev_id);
-int copy_from_user_safe(void *to, const void __user *from, unsigned long n);
-int copy_to_user_safe(void __user *to, const void *from, unsigned long n);
+int copy_from_user_safe(void *to, const void __ka_user *from, unsigned long n);
+int copy_to_user_safe(void __ka_user *to, const void *from, unsigned long n);
 void devdrv_timestamp_sync_exit(struct devdrv_info *info);
 u32 devdrv_manager_get_devid(u32 local_devid);
 u32 devdrv_manager_get_devid_flag(u32 local_devid);

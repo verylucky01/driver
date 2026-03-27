@@ -65,3 +65,28 @@ void (*get_log_Print(void))(int32_t, int32_t, const char *, ...)
 {
     return get_log_print_inner();
 }
+
+int32_t drv_log_report_err_msg_handle_register(struct err_msg_report_handle *handle, size_t input_size)
+{
+    return drv_log_report_err_msg_handle_register_impl(handle, input_size);
+}
+
+int32_t drv_log_report_err_msg_handle_unregister(void)
+{
+    return drv_log_report_err_msg_handle_unregister_impl();
+}
+
+register_format_err_msg_func get_format_err_msg_register_func(void) 
+{ 
+    return get_format_err_msg_register_func_impl(); 
+}
+
+report_predefined_err_msg_func get_predefined_err_msg_report_func(void)
+{
+    return get_predefined_err_msg_report_func_impl();
+}
+
+report_inner_err_msg_func get_inner_err_msg_report_func(void) 
+{ 
+    return get_inner_err_msg_report_func_impl(); 
+}

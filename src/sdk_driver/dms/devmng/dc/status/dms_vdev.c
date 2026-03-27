@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -79,7 +79,7 @@ int dms_feature_set_sriov_switch(void *feature, char *in, u32 in_len, char *out,
     }
 
     sriov_switch_in = (struct dms_sriov_switch_in *)in;
-    if (sriov_switch_in->dev_id >= DEVDRV_PF_DEV_MAX_NUM) {
+    if (sriov_switch_in->dev_id >= ASCEND_PDEV_MAX_NUM) {
         dms_err("Device id invalid. (dev_id=%u)\n", sriov_switch_in->dev_id);
         return -EINVAL;
     }

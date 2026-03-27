@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,11 +13,9 @@
 
 #ifndef QUEUE_DMA_H
 #define QUEUE_DMA_H
-
-#include <linux/types.h>
-#include <linux/device.h>
-#include <linux/mm.h>
-
+#include "ka_common_pub.h"
+#include "ka_memory_pub.h"
+#include "ka_task_pub.h"
 #include "comm_kernel_interface.h"
 
 enum queue_dma_side {
@@ -28,7 +26,7 @@ enum queue_dma_side {
 
 struct queue_dma_block {
     u64 sz;
-    dma_addr_t dma;
+    ka_dma_addr_t dma;
 };
 
 struct queue_dma_list {
@@ -37,7 +35,7 @@ struct queue_dma_list {
     bool dma_flag;
 
     u64 page_num;
-    struct page **page;
+    ka_page_t **page;
     u64 blks_num;
     struct queue_dma_block *blks;
 };
@@ -50,11 +48,11 @@ struct queue_va_info {
     u64 blks_num;
 };
 
-int queue_make_dma_list(struct device *dev, bool hccs_vm_flag, u32 dev_id, struct queue_dma_list *dma_list);
-void queue_clear_dma_list(struct device *dev, bool hccs_vm_flag, struct queue_dma_list *dma_list);
+int queue_make_dma_list(ka_device_t *dev, bool hccs_vm_flag, u32 dev_id, struct queue_dma_list *dma_list);
+void queue_clear_dma_list(ka_device_t *dev, bool hccs_vm_flag, struct queue_dma_list *dma_list);
 
 int queue_dma_sync_link_copy(u32 dev_id, struct devdrv_dma_node *dma_node, u64 dma_node_num);
-void *queue_kvalloc(u64 size, gfp_t flags);
+void *queue_kvalloc(u64 size, ka_gfp_t flags);
 void queue_kvfree(const void *ptr);
 
 void queue_try_cond_resched(unsigned long *pre_stamp);

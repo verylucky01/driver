@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,6 +13,8 @@
 
 #ifndef TRS_CHAN_H
 #define TRS_CHAN_H
+
+#include "ka_task_pub.h"
 
 #include "trs_pub_def.h"
 #include "ascend_kernel_hal.h"
@@ -87,7 +89,7 @@ int trs_chan_get_chan_id(struct trs_id_inst *inst, int res_type, u32 res_id, int
 int trs_chan_get_sq_info(struct trs_id_inst *inst, int chan_id, struct trs_chan_sq_info *info);
 int trs_chan_get_cq_info(struct trs_id_inst *inst, int chan_id, struct trs_chan_cq_info *info);
 int trs_chan_to_string(struct trs_id_inst *inst, int chan_id, char *buff, u32 buff_len);
-int trs_chan_stream_task_update(struct trs_id_inst *inst, int pid, void *vaddr);
+int trs_chan_stream_task_update(struct trs_id_inst *inst, int pid, void *vaddr, u32 *long_task_cnt);
 int trs_chan_update_sq_depth(struct trs_id_inst *inst, u32 chan_id, u32 sq_depth);
 
 struct trs_chan_info {
@@ -98,7 +100,7 @@ struct trs_chan_info {
     u8 remote_id_flag : 1;
     u8 agent_id_flag : 1;
     u8 rsv : 4;
-    pid_t pid;
+    ka_pid_t pid;
     int irq_type;
     struct trs_chan_type types;
     struct trs_chan_sq_info sq_info;
@@ -112,7 +114,7 @@ struct trs_sq_mem_map_para {
     struct trs_chan_type chan_types;
     struct trs_chan_sq_para sq_para;
     u64 sq_phy_addr;
-    pid_t host_pid;
+    ka_pid_t host_pid;
     u32 mem_type;
 };
 
@@ -178,7 +180,7 @@ struct trs_chan_dma_desc {
 };
 
 struct trs_chan_adapt_ops {
-    struct module *owner;
+    ka_module_t *owner;
     void* (*sq_mem_alloc)(struct trs_id_inst *inst, struct trs_chan_type *types, struct trs_chan_sq_para *sq_para,
         struct trs_chan_mem_attr *mem_attr);
     void (*sq_mem_free)(struct trs_id_inst *inst, struct trs_chan_type *types, void *sq_addr,
@@ -218,7 +220,7 @@ struct trs_chan_adapt_ops {
     int (*sqcq_rts_rsv_id_alloc)(struct trs_id_inst *inst, int type, u32 *id);
 };
 
-int trs_chan_ts_inst_register(struct trs_id_inst *inst, int hw_type, struct trs_chan_adapt_ops *ops);
+int trs_chan_ts_inst_register(struct trs_id_inst *inst, int hw_type, int location, struct trs_chan_adapt_ops *ops);
 void trs_chan_ts_inst_unregister(struct trs_id_inst *inst);
 
 typedef int (*trs_chan_abnormal_handle)(struct trs_id_inst *inst, u32 sqid, void *sqe, void *info);
@@ -232,5 +234,6 @@ void hal_kernel_trs_chan_destroy_ex(struct trs_id_inst *inst, u32 flag, int chan
 int trs_chan_init_module(void);
 void trs_chan_exit_module(void);
 int trs_chan_dma_desc_create(struct trs_id_inst *inst, int chan_id, struct trs_chan_dma_desc *para);
+int trs_chan_dma_desc_destroy(struct trs_id_inst *inst, int chan_id);
 
 #endif

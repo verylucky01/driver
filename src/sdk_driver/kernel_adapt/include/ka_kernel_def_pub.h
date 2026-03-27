@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -16,7 +16,8 @@
 
 #include <linux/pci.h>
 #include <linux/module.h>
-
+#define KA_MODULE_INIT __init
+#define KA_MODULE_EXIT __exit
 #define KA_PCI_VDEVICE(vend, dev)    PCI_VDEVICE(vend, dev)
 #define KA_PCI_DEVICE(vend,dev)      PCI_DEVICE(vend,dev)
 

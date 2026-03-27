@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,6 +14,7 @@
 
 #include "ascend_hal_define.h"
 #include "dpa_kernel_interface.h"
+#include "pbl/pbl_uda.h"
 #include "trs_core_near_ops.h"
 #ifdef CFG_FEATURE_TRS_SIA_ADAPT
 #include "trs_sia_adapt_auto_init.h"
@@ -24,9 +25,39 @@
 int trs_res_map_ops_init(void);
 void trs_res_map_ops_uninit(void);
 
+static int trs_host_update_res_info(u32 udevid, struct res_map_info_in *res_info)
+{
+    if (res_info->priv != NULL) {
+        struct trs_res_map_priv *priv = (struct trs_res_map_priv *)res_info->priv;
+        u32 local_add_id, remote_add_id;
+        int ret;
+
+        if ((priv->flag & TSDRV_FLAG_REMOTE_ID) != 0) {
+            ret = uda_udevid_to_add_id(udevid, &local_add_id);
+            if (ret != 0) {
+                trs_err("Fail to get local add id. (ret=%d; udevid=%u)\n", ret, udevid);
+                return ret;
+            }
+
+            ret = uda_udevid_to_add_id(priv->remote_devid, &remote_add_id);
+            if (ret != 0) {
+                trs_err("Fail to get remote add id. (ret=%d; remote_udevid=%u)\n", ret, priv->remote_devid);
+                return ret;
+            }
+            trs_debug("Update priv. (udevid=%u; local_add_id=%u; remote_udevid=%u; remote_add_id=%u)\n",
+                udevid, local_add_id, priv->remote_devid, remote_add_id);
+            priv->local_devid = local_add_id;
+            priv->remote_devid = remote_add_id;
+            res_info->res_id = (remote_add_id << 20) | res_info->res_id; /* first 20 bits for res id */
+        }
+    }
+    return 0;
+}
+
 struct apm_res_map_ops g_res_map_ops = {
     .owner = KA_THIS_MODULE,
     .res_is_belong_to_proc = trs_host_res_is_belong_to_proc,
+    .update_res_info = trs_host_update_res_info,
 };
 
 int trs_res_map_ops_init(void)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,9 +14,7 @@
 #ifndef DMS_TIME_H
 #define DMS_TIME_H
 
-#include <linux/mutex.h>
-#include <linux/time64.h>
-#include <linux/time.h>
+#include "ka_task_pub.h"
 
 #include "dms_define.h"
 #include "drv_type.h"
@@ -55,7 +53,7 @@ struct dms_time_sync_info {
     u32 timer_node_id;              /* for timer task id, used at unregister task process */
     char *pre_timezone;
     char *new_timezone;
-    struct mutex time_sync_lock;    /* protect for localtime read */
+    ka_mutex_t time_sync_lock;    /* protect for localtime read */
     u32 timezone_sync_state;        /* for localtime sync state: syncing、stop or idle */
     u32 time_update_flag;           /* for localtime sync: need to sync or not */
     unsigned long pre_walltime;

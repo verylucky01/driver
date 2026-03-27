@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -120,6 +120,7 @@ STATIC char *ka_module_type_to_str(uint32_t module_type)
             [HAL_MODULE_TYPE_VMNG] = "VMNG",
             [HAL_MODULE_TYPE_COMMON] = "COMMON",
             [HAL_MODULE_TYPE_APM] = "APM",
+            [HAL_MODULE_TYPE_ASDRV_UB] = "ASDRV_UB",
     };
 
     return module_str[module_type];

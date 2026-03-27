@@ -36,6 +36,10 @@ ADD_FEATURE_COMMAND(DMS_PRODUCT_CMD_NAME, DMS_MAIN_CMD_PRODUCT, DMS_SUBCMD_GET_P
 #ifdef CFG_FEATURE_DMS_PRODUCT_HOST
 ADD_FEATURE_COMMAND(DMS_PRODUCT_CMD_NAME, DMS_MAIN_CMD_PRODUCT, DMS_SUBCMD_GET_WORK_MODE, NULL, NULL,
                     DMS_SUPPORT_ALL, devdrv_get_work_mode)
+ADD_FEATURE_COMMAND(DMS_PRODUCT_CMD_NAME, DMS_MAIN_CMD_PRODUCT, DMS_SUBCMD_GET_CARD_MULTI_DIE_POLICY, NULL, NULL,
+                    DMS_SUPPORT_ALL, devdrv_get_card_multi_die_policy)
+ADD_FEATURE_COMMAND(DMS_PRODUCT_CMD_NAME, DMS_MAIN_CMD_PRODUCT, DMS_SUBCMD_SET_CARD_MULTI_DIE_POLICY, NULL, NULL,
+                    DMS_SUPPORT_ALL, devdrv_set_card_multi_die_policy)
 #endif
 
 #ifdef CFG_SOC_PLATFORM_CLOUD_V2
@@ -521,6 +525,7 @@ int dms_feature_get_pcie_bandwidth_info(void *feature, char *in, u32 in_len, cha
 #endif
 
 #if (defined(CFG_FEATURE_HBM_MANUFACTURER_ID) && !defined(CFG_FEATURE_DMS_PRODUCT_HOST))
+#ifndef CFG_SOC_PLATFORM_CLOUD_V4
 STATIC int dms_get_chip_die_offset(u32 dev_id, u64 *chip_base_addr, u64 *chip_offset, u64 *die_offset)
 {
     u32 connect_type;
@@ -562,11 +567,10 @@ STATIC int dms_get_local_sram_base_addr(u32 dev_id, u64 *base)
     *base = chip_base_addr + (uint64_t)chip_id * chip_offset;
     return 0;
 }
+#endif
 
 int dms_feature_get_hbm_manufacturer_id(void *feature, char *in, u32 in_len, char *out, u32 out_len)
 {
-    int ret;
-    unsigned int dev_id;
     unsigned int *manufacturer_id = NULL;
     u32 tmp_manufacturer_id = MANUFACTURER_ID_ERROR;
     u64 chip_base = CHIP_BASE_ADDR;
@@ -583,14 +587,18 @@ int dms_feature_get_hbm_manufacturer_id(void *feature, char *in, u32 in_len, cha
         return -EINVAL;
     }
 
-    dev_id = *(unsigned int *)in;
     manufacturer_id = (unsigned int *)out;
 
+#ifndef CFG_SOC_PLATFORM_CLOUD_V4
+    int ret;
+    unsigned int dev_id;
+    dev_id = *(unsigned int *)in;
     ret = dms_get_local_sram_base_addr(dev_id, &chip_base);
     if (ret != 0) {
         dms_err("Get local sram base addr failed. (ret=%d)\n", ret);
         return -EINVAL;
     }
+#endif
 
     load_sram_base = chip_base + DEVDRV_LOAD_SRAM_ADDR;
     manufacturer_sram_base = ioremap(load_sram_base + DEVDRV_MANUFACTURER_ID_OFFSET, DEVDRV_LOAD_SRAM_SIZE);

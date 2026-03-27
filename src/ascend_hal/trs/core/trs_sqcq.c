@@ -63,8 +63,9 @@ struct trs_dev_ctx {
     int hw_type;
     int connection_type;
     trs_mode_type_t sq_send_mode;
-    void **d2d_dev_ctx; // index: send_dev_id
+    void *d2d_dev_ctx;
     pthread_mutex_t dev_mutex;
+    pthread_mutex_t stream_mutex;
     struct trs_ts_ctx ts_ctx[TRS_TS_NUM];
 };
 
@@ -82,19 +83,24 @@ void trs_dev_ctx_mutex_un_lock(uint32_t dev_id)
     (void)pthread_mutex_unlock(&dev_ctx[dev_id].dev_mutex);
 }
 
-void *trs_getd2d_dev_ctx(uint32_t recv_dev_id, uint32_t send_dev_id)
+void trs_dev_ctx_stream_mutex_lock(uint32_t dev_id)
 {
-    if (dev_ctx[recv_dev_id].d2d_dev_ctx != NULL) {
-        return dev_ctx[recv_dev_id].d2d_dev_ctx[send_dev_id];
-    }
-    return NULL;
+    (void)pthread_mutex_lock(&dev_ctx[dev_id].stream_mutex);
 }
 
-void trs_setd2d_dev_ctx(uint32_t recv_dev_id, uint32_t send_dev_id, void *ctx)
+void trs_dev_ctx_stream_mutex_unlock(uint32_t dev_id)
 {
-    if (dev_ctx[recv_dev_id].d2d_dev_ctx != NULL) {
-        dev_ctx[recv_dev_id].d2d_dev_ctx[send_dev_id] = ctx;
-    }
+    (void)pthread_mutex_unlock(&dev_ctx[dev_id].stream_mutex);
+}
+
+void *trs_get_d2d_dev_ctx(uint32_t recv_dev_id)
+{
+    return dev_ctx[recv_dev_id].d2d_dev_ctx;
+}
+
+void trs_set_d2d_dev_ctx(uint32_t recv_dev_id, void *ctx)
+{
+    dev_ctx[recv_dev_id].d2d_dev_ctx = ctx;
 }
 
 int trs_get_connection_type(uint32_t dev_id)
@@ -105,28 +111,6 @@ int trs_get_connection_type(uint32_t dev_id)
 int trs_get_sq_send_mode(uint32_t dev_id)
 {
     return dev_ctx[dev_id].sq_send_mode;
-}
-
-int trs_d2d_info_init(uint32_t dev_id)
-{
-    if (trs_get_connection_type(dev_id) != TRS_CONNECT_PROTOCOL_UB) {
-        return 0;
-    }
-
-    dev_ctx[dev_id].d2d_dev_ctx = calloc(1, sizeof(void *) * TRS_DEV_NUM);
-    if (dev_ctx[dev_id].d2d_dev_ctx == NULL) {
-        trs_err("Malloc failed. (dev_id=%u)\n", dev_id);
-        return DRV_ERROR_OUT_OF_MEMORY;
-    }
-    return 0;
-}
-
-void trs_d2d_info_uninit(uint32_t dev_id)
-{
-    if (dev_ctx[dev_id].d2d_dev_ctx != NULL) {
-        free(dev_ctx[dev_id].d2d_dev_ctx);
-        dev_ctx[dev_id].d2d_dev_ctx = NULL;
-    }
 }
 
 uint32_t trs_get_ts_num(uint32_t dev_id)
@@ -292,6 +276,7 @@ int trs_hw_info_init(uint32_t dev_id)
     dev_ctx[dev_id].connection_type = para.connection_type;
     dev_ctx[dev_id].sq_send_mode = para.sq_send_mode;
     (void)pthread_mutex_init(&dev_ctx[dev_id].dev_mutex, NULL);
+    (void)pthread_mutex_init(&dev_ctx[dev_id].stream_mutex, NULL);
 
     return 0;
 }
@@ -563,6 +548,22 @@ static UINT64 trs_get_sq_que_addr(struct sqcq_usr_info *info)
     return (uintptr_t)info->sq_ctrl.que_addr;
 }
 
+static UINT64 trs_get_sq_bind_que_addr(uint32_t dev_id, uint32_t ts_id, struct sqcq_usr_info *sq_info)
+{
+    if (sq_info->sq_ctrl.que_addr != NULL) {
+        return (uintptr_t)sq_info->sq_ctrl.que_addr;
+    }
+
+    if (sq_info->switch_stream_flag) {
+        struct res_id_usr_info *stream_usr_info = trs_get_res_id_info(dev_id, ts_id, DRV_STREAM_ID, sq_info->stream_id);
+        if ((stream_usr_info != NULL) && (stream_usr_info->valid != 0)) {
+            return stream_usr_info->res_addr;
+        }
+    }
+
+    return (uintptr_t)NULL;
+}
+
 static uint32_t trs_get_sq_mem_attr(struct sqcq_usr_info *info)
 {
     return info->sq_ctrl.mem_local_flag;
@@ -649,7 +650,8 @@ static inline bool trs_is_support_sq_mem_ops(uint32_t dev_id, struct halSqCqInpu
 {
     if (in->type == DRV_NORMAL_TYPE) {
         if ((trs_get_connection_type(dev_id) == TRS_CONNECT_PROTOCOL_PCIE) &&
-            ((in->flag & TSDRV_FLAG_REUSE_SQ) == 0) && ((in->flag & TSDRV_FLAG_ONLY_SQCQ_ID) == 0)) {
+            ((in->flag & TSDRV_FLAG_REUSE_SQ) == 0) && ((in->flag & TSDRV_FLAG_ONLY_SQCQ_ID) == 0) &&
+            ((in->flag & TSDRV_FLAG_NO_SQ_MEM) == 0)) {
             return true;
         }
     }
@@ -725,6 +727,8 @@ static void trs_sq_usr_info_un_init(uint32_t dev_id, struct sqcq_usr_info *info)
     info->flag = 0;
     info->status = 0;
     info->urma_ctx = NULL;
+    info->switch_stream_flag = 0;
+    info->stream_id = UINT32_MAX;
 }
 
 static void trs_cq_usr_info_init(struct sqcq_usr_info *info, struct halSqCqInputInfo *in)
@@ -1002,7 +1006,7 @@ drvError_t trs_sqcq_alloc(uint32_t dev_id, struct halSqCqInputInfo *in, struct h
 
     ret = trs_local_sqcq_alloc(dev_id, in, out);
     if (ret != 0) {
-        trs_err("Failed to alloc sqcq. (dev_id=%u)\n", dev_id);
+        trs_warn("Alloc sqcq warn. (dev_id=%u)\n", dev_id);
         return ret;
     }
     trs_debug("Alloc sqcq success. (dev_id=%u; sq_id=%u; cq_id=%u)\n", dev_id, out->sqId, out->cqId);
@@ -1618,6 +1622,7 @@ drvError_t trs_sq_switch_stream_batch(uint32_t dev_id, struct sq_switch_stream_i
 {
     struct trs_sq_switch_stream_para para;
     drvError_t ret;
+    uint32_t i;
 
     para.info = info;
     para.num = num;
@@ -1627,7 +1632,85 @@ drvError_t trs_sq_switch_stream_batch(uint32_t dev_id, struct sq_switch_stream_i
         return ret;
     }
 
-    trs_debug("Sq switch stream success. (dev_id=%u; num=%u)\n", dev_id, num);
+    if (trs_get_sq_send_mode(dev_id) != TRS_MODE_TYPE_SQ_SEND_HIGH_PERFORMANCE) {
+        return DRV_ERROR_NONE;
+    }
+
+    for (i = 0; i < num; i++) {
+        struct sqcq_usr_info *sq_info = NULL;
+        uint32_t stream_id = info[i].stream_id;
+
+        sq_info = trs_get_sq_info(dev_id, 0, DRV_NORMAL_TYPE, info[i].sq_id);
+        if (sq_info == NULL) {
+            trs_err("Get sq_info failed. (dev_id=%u; sq_id=%u)\n", dev_id, info[i].sq_id);
+            return DRV_ERROR_INVALID_VALUE;
+        }
+
+        sq_info->depth = info[i].sq_depth;
+        sq_info->switch_stream_flag = (stream_id != UINT32_MAX) ? 1 : 0;
+        sq_info->stream_id = stream_id;
+
+        /* init stream usr info when first bind sq */
+        if ((stream_id != UINT32_MAX) && (trs_get_res_id_info(dev_id, 0, DRV_STREAM_ID, stream_id) == NULL)) {
+            struct res_id_info_val id_info_val = {0};
+
+            id_info_val.res_addr = (uintptr_t)info[i].stream_mem;
+            id_info_val.res_len = (info[i].sq_depth * TRS_HW_SQE_SIZE);
+            ret = trs_res_id_info_init(dev_id, 0, stream_id, DRV_STREAM_ID, &id_info_val);
+            if (ret != 0) {
+                trs_err("Failed to init stream id info. (dev_id=%u; id=%u)\n", dev_id, stream_id);
+                return ret;
+            }
+        }
+    }
+
+    return DRV_ERROR_NONE;
+}
+
+drvError_t trs_stream_task_fill(uint32_t dev_id, uint32_t stream_id, void *stream_mem, void *task_info, uint32_t task_cnt)
+{
+    drvError_t ret = 0;
+
+    if (trs_get_sq_send_mode(dev_id) == TRS_MODE_TYPE_SQ_SEND_HIGH_PERFORMANCE) {
+        struct res_id_usr_info *stream_usr_info = NULL;
+        uint64_t stream_task_addr = 0;
+
+        stream_usr_info = trs_get_res_id_info(dev_id, 0, DRV_STREAM_ID, stream_id);
+        if ((stream_usr_info == NULL) || (stream_usr_info->valid == 0) ||
+            ((stream_mem != NULL) && (stream_usr_info->res_addr != (uint64_t)(uintptr_t)stream_mem))) {
+            trs_err("Stream not inited or stream_mem not match. (devid=%u; stream_id=%u)\n", dev_id, stream_id);
+            return DRV_ERROR_INVALID_VALUE;
+        }
+
+        stream_task_addr = (stream_usr_info->res_addr + stream_usr_info->priv * TRS_HW_SQE_SIZE);
+        if ((stream_task_addr + task_cnt * TRS_HW_SQE_SIZE) > (stream_usr_info->res_addr + stream_usr_info->res_len)) {
+            trs_err("Fill task exceed stream queue. (devid=%u; streamid=%u; queue_len=0x%x; tail=%u; task_cnt=%u)\n",
+            dev_id, stream_id, stream_usr_info->res_len, stream_usr_info->priv, task_cnt);
+            return DRV_ERROR_NO_RESOURCES;
+        }
+
+        ret = drvMemcpy(stream_task_addr, task_cnt * TRS_HW_SQE_SIZE, (uintptr_t)task_info, task_cnt * TRS_HW_SQE_SIZE);
+        if (ret != DRV_ERROR_NONE) {
+            trs_err("Memcpy failed. (ret=%d).\n", ret);
+            return DRV_ERROR_INNER_ERR;
+        }
+
+        stream_usr_info->priv += task_cnt;
+    } else {
+        struct trs_stream_task_para para = {0};
+
+        para.stream_id = stream_id;
+        para.stream_mem = stream_mem;
+        para.task_info = task_info;
+        para.task_cnt = task_cnt;
+        ret = trs_dev_io_ctrl(dev_id, TRS_STREAM_TASK_FILL, &para);
+        if (ret != DRV_ERROR_NONE) {
+            trs_err("Ioctl failed. (dev_id=%u; ret=%d)\n", dev_id, ret);
+            return ret;
+        }
+    }
+
+    trs_debug("Fill stream task success. (dev_id=%u; stream_id=%u; task_cnt=%u)\n", dev_id, stream_id, task_cnt);
     return DRV_ERROR_NONE;
 }
 
@@ -1743,7 +1826,7 @@ drvError_t halSqMsgSend(uint32_t devId, struct halSqMsgInfo *info)
         return DRV_ERROR_INVALID_VALUE;
     }
 
-    if (!trs_is_sq_support_send(sq_info)) {
+    if ((!trs_is_sq_support_send(sq_info)) || (trs_is_sq_init_without_sq_mem(sq_info->flag))) {
         trs_warn("Sq is only id type, not support send. (dev_id=%u; ts_id=%u; sq_id=%u; flag=%u)\n",
             devId, info->tsId, info->sqId, sq_info->flag);
         return DRV_ERROR_NOT_SUPPORT;
@@ -1951,7 +2034,7 @@ drvError_t trs_async_dma_desc_create(uint32_t dev_id, struct halAsyncDmaInputPar
     }
 
     if (trs_get_sq_send_mode(dev_id) == TRS_MODE_TYPE_SQ_SEND_HIGH_PERFORMANCE) {
-        unsigned long long dst_addr;
+        unsigned long long sq_base_addr, dst_addr;
         struct sqcq_usr_info *sq_info = NULL;
 
         sq_info = trs_get_sq_info(dev_id, in->tsId, in->type, in->info.sq_id);
@@ -1961,7 +2044,14 @@ drvError_t trs_async_dma_desc_create(uint32_t dev_id, struct halAsyncDmaInputPar
             return DRV_ERROR_INVALID_VALUE;
         }
 
-        dst_addr = trs_get_sq_que_addr(sq_info) + in->info.sqe_pos * sq_info->e_size;
+        sq_base_addr = trs_get_sq_bind_que_addr(dev_id, in->tsId, sq_info);
+        if (sq_base_addr == 0) {
+            trs_err("Get sq addr failed. (dev_id=%u; ts_id=%u; type=%d; sq_id=%u)\n",
+                dev_id, in->tsId, in->type, in->info.sq_id);
+            return DRV_ERROR_INVALID_VALUE;
+        }
+
+        dst_addr = sq_base_addr + in->info.sqe_pos * sq_info->e_size;
         out->dma_addr.offsetAddr.devid = dev_id; /* sqe update h2d only, use dev addr devid */
         ret = drvMemConvertAddr((uintptr_t)in->src, dst_addr, in->len, &out->dma_addr);
         if (ret != 0) {

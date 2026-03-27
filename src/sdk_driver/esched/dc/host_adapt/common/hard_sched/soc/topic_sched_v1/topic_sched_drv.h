@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,7 +13,6 @@
 #ifndef TOPIC_SCHED_DRV_H
 #define TOPIC_SCHED_DRV_H
 
-#include <linux/types.h>
 #include "ascend_kernel_hal.h"
 #include "topic_sched_v1/topic_sched_drv_shmem.h"
 

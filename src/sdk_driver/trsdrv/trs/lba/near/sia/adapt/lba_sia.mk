@@ -8,7 +8,7 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # ------------------------------------------------------------------------------------------------------------
 
-$(MODULE_NAME)-objs += lba/near/comm/adapt/trs_host_comm.o lba/near/comm/adapt/trs_host_ts_cq.o lba/near/comm/adapt/trs_host_id.o lba/near/comm/adapt/trs_host_msg.o lba/near/comm/adapt/trs_host_rpc.o lba/near/comm/adapt/trs_near_adapt_init.o lba/near/comm/adapt/trs_host_group.o
+$(MODULE_NAME)-objs += lba/near/comm/adapt/trs_host_comm.o lba/near/comm/adapt/trs_host_ts_cq.o lba/near/comm/adapt/trs_host_id.o lba/near/comm/adapt/trs_host_msg.o lba/near/comm/adapt/trs_host_rpc.o lba/near/comm/adapt/trs_near_adapt_init.o lba/near/comm/adapt/trs_host_group.o lba/near/comm/adapt/trs_host_accelerator_util.o
 $(MODULE_NAME)-objs += lba/near/comm/adapt/soc_adapt/soc_adapt.o lba/near/sia/adapt/trs_host_init/trs_host.o lba/near/sia/adapt/trs_host_chan/trs_host_chan.o lba/near/sia/adapt/trs_host_chan/trs_sqe_update.o lba/near/sia/adapt/trs_host_core/trs_host_core.o
 $(MODULE_NAME)-objs += lba/near/comm/adapt/trs_host_chan/stars_v1/trs_chan_stars_v1_ops.o lba/near/comm/adapt/trs_host_chan/stars_v1/trs_chan_stars_v1_ops_stars.o
 $(MODULE_NAME)-objs += lba/near/comm/adapt/trs_host_chan/stars_v2/trs_chan_stars_v2_ops.o lba/near/comm/adapt/trs_host_chan/stars_v2/trs_chan_stars_v2_ops_stars.o lba/near/comm/adapt/trs_host_chan/stars_v2/trs_chan_stars_v2_maint_sqcq.o
@@ -78,13 +78,16 @@ EXTRA_CFLAGS += -DCFG_FEATURE_TRS_SIA_ADAPT
 ifneq ($(filter $(PRODUCT), ascend910B),)
     EXTRA_CFLAGS += -DCFG_FEATURE_KA_ALLOC_INTERFACE
     EXTRA_CFLAGS += -DCFG_FEATURE_SUPPORT_RMO
+    EXTRA_CFLAGS += -DCFG_FEATURE_HOST_ACCELERATOR_UTIL
 endif
-ifneq ($(filter $(PRODUCT), ascend910_95),)
+ifneq ($(filter $(PRODUCT), ascend950),)
     EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/trsdrv/trs/lba/near/sia/adapt/trs_host_ub
     # urma include
     EXTRA_CFLAGS += -I$(TOP_DIR)/ubengine/ssapi/kernelspace/urma/code/kmod/ubcore/include/
     EXTRA_CFLAGS += -DCFG_FEATURE_SUPPORT_APM
+    EXTRA_CFLAGS += -DCFG_FEATURE_SUPPORT_RMO
     EXTRA_CFLAGS += -DCFG_FEATURE_SQ_SUPPORT_SVM_MEM
+    EXTRA_CFLAGS += -DCFG_FEATURE_KA_ALLOC_INTERFACE
     ifeq ($(ENABLE_UBE), true) 
         EXTRA_CFLAGS +=  -DCFG_FEATURE_SUPPORT_UB_CONNECTION
         $(MODULE_NAME)-objs += lba/near/sia/adapt/trs_host_ub/trs_ub_host_init.o lba/near/comm/trs_ub_init_common.o

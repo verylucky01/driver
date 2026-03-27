@@ -38,7 +38,7 @@ if(${PRODUCT} STREQUAL ascend910B)
         rt
     )
 
-elseif(${PRODUCT} STREQUAL ascend910_95)
+elseif(${PRODUCT} STREQUAL ascend950)
     target_link_libraries(ascend_hal PRIVATE
         $<BUILD_INTERFACE:intf_pub>
         urd_obj

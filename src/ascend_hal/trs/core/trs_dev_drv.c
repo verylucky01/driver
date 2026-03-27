@@ -256,15 +256,10 @@ static int trs_dev_init(uint32_t dev_id)
         return ret;
     }
 
-    ret = trs_d2d_info_init(dev_id);
-    if (ret != DRV_ERROR_NONE) {
-        return ret;
-    }
-
     ret = trs_urma_proc_ctx_init_by_devid(dev_id);
     if (ret != 0) {
         trs_err("Failed to init urma proc ctx. (devid=%u; ret=%d)\n", dev_id, ret);
-        goto urma_ctx_init_fail;
+        return ret;
     }
 
     ret = trs_dev_res_id_init(dev_id);
@@ -303,8 +298,6 @@ sqcq_init_fail:
     trs_dev_res_id_uninit(dev_id);
 res_id_init_fail:
     trs_urma_proc_ctx_uninit_by_devid(dev_id);
-urma_ctx_init_fail:
-    trs_d2d_info_uninit(dev_id);
     return ret;
 }
 
@@ -316,7 +309,6 @@ static void trs_dev_uninit(uint32_t dev_id, uint32_t close_type)
     trs_dev_sq_cq_uninit(dev_id, close_type);
     trs_dev_res_id_uninit(dev_id);
     trs_urma_proc_ctx_uninit_by_devid(dev_id);
-    trs_d2d_info_uninit(dev_id);
 }
 
 static drvError_t drvDeviceOpenComm(void **dev_info, uint32_t dev_id)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,9 +10,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
- 
-#include <linux/workqueue.h>
-#include <linux/moduleparam.h>
 
 #include "ascend_kernel_hal.h"
 #include "davinci_interface.h"
@@ -41,7 +38,6 @@
 #define HEART_BEAT_TIMER_EXPIRE_MS 6000
 #define HEART_BEAT_TIMER_URGENT_EXPIRE_MS (50)
 #endif
-#define RAO_READ_FAIL_MAX_NUM 3
 
 #ifndef DMS_UT
 unsigned int heart_beat_get_max_lost_count(unsigned int dev_id)
@@ -71,7 +67,7 @@ int hb_set_heart_beat_count(unsigned int dev_id, unsigned long long count)
     return devdrv_set_heartbeat_count(dev_id, count);
 }
 
-int hb_get_heart_beat_count(unsigned int dev_id, unsigned long long* heart_beat_count)
+int hb_get_heart_beat_count(unsigned int dev_id, unsigned long long* heart_beat_count, unsigned int* hb_read_fail_count)
 {
     int ret = 0;
 
@@ -97,8 +93,11 @@ int hb_get_heart_beat_count(unsigned int dev_id, unsigned long long* heart_beat_
         ret = devdrv_rao_read(dev_id, DEVDRV_RAO_CLIENT_DEVMNG, dev_info->shm_head->head_info.offset_heartbeat, sizeof(U_SHM_INFO_HEARTBEAT));
         if (ret != 0) {
             devdrv_put_dev_info_occupy(dev_info);
+            (*hb_read_fail_count)++;
             dms_err("Read rao data fail. (dev_id=%u; ret=%d)\n", dev_id, ret);
             return ret;
+        } else {
+            (*hb_read_fail_count) = 0;
         }
         *heart_beat_count = dev_info->shm_heartbeat->heartbeat_cnt;
         devdrv_put_dev_info_occupy(dev_info);
@@ -139,8 +138,8 @@ int check_and_update_link_abnormal_status(u32 dev_id, u64 count)
 STATIC void host_manager_device_exception(u32 dev_id)
 {
     struct devdrv_manager_info *d_info = NULL;
-    struct list_head *pos = NULL;
-    struct list_head *n = NULL;
+    ka_list_head_t *pos = NULL;
+    ka_list_head_t *n = NULL;
     struct devdrv_pm *pm = NULL;
 
     d_info = devdrv_get_manager_info();
@@ -253,7 +252,7 @@ int hb_read_item_work_start(unsigned int dev_id, struct hb_read_block *hb_read_i
 STATIC int heartbeat_dev_node_config(unsigned int user_id, struct soft_dev *s_dev)
 {
     int ret;
-    int pid = current->tgid;
+    int pid = ka_task_get_current_tgid();
     u32 len = DMS_SENSOR_DESCRIPT_LENGTH;
     struct dms_node_operations *soft_ops = soft_get_ops();
     struct dms_node s_node = SOFT_NODE_DEF(DMS_DEV_TYPE_BASE_SERVCIE, "davinci", s_dev->dev_id,
@@ -359,7 +358,7 @@ STATIC int heart_beat_urgent_judge(u32 dev_id)
     struct hb_read_block *heartbeat_info = get_heart_beat_read_item(dev_id);
     struct devdrv_manager_info *manager_info = devdrv_get_manager_info();
     struct devdrv_info *dev_info = devdrv_manager_get_devdrv_info(dev_id);
-    static unsigned int rao_read_fail_count = 0;
+    static unsigned int rao_read_fail_count[ASCEND_PDEV_MAX_NUM] = {0};
 
     if (dev_info == NULL || heartbeat_info->hb_stutas != HEART_BEAT_READY) {
         return DRV_ERROR_NONE;
@@ -380,14 +379,11 @@ STATIC int heart_beat_urgent_judge(u32 dev_id)
     ret = devdrv_rao_read(dev_id, DEVDRV_RAO_CLIENT_DEVMNG , dev_info->shm_head->head_info.offset_heartbeat, sizeof(U_SHM_INFO_HEARTBEAT));
     if (ret != 0) {
         devdrv_put_dev_info_occupy(dev_info);
-        rao_read_fail_count++;
-        dms_err("Read rao data fail. (dev_id=%u; ret=%d; fial_count=%u)\n", dev_id, ret, rao_read_fail_count);
-        if (rao_read_fail_count == RAO_READ_FAIL_MAX_NUM) {
-            goto HEARTBEAT_LOST;
-        }
-        return ret;
+        rao_read_fail_count[dev_id]++;
+        dms_warn("Can not read rao data. (dev_id=%u; ret=%d; fail_cnt=%u)\n", dev_id, ret, rao_read_fail_count[dev_id]);
+  	    return DRV_ERROR_NONE;
     } else {
-        rao_read_fail_count = 0;
+        rao_read_fail_count[dev_id] = 0;
     }
 
     if ((dev_info->shm_heartbeat->magic == DEVMNG_HEART_BEAT_MAGIC) && (dev_info->shm_heartbeat->heartbeat_lost_flag == DEVMNG_HEART_BEAT_LOST)) {
@@ -396,6 +392,7 @@ STATIC int heart_beat_urgent_judge(u32 dev_id)
         goto HEARTBEAT_LOST;
     }
 
+    devdrv_put_dev_info_occupy(dev_info);
     return DRV_ERROR_NONE;
 
 HEARTBEAT_LOST:

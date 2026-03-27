@@ -1,0 +1,10 @@
+get_filename_component(SVM_UMC_DIR "${CMAKE_CURRENT_LIST_DIR}" ABSOLUTE)
+
+file(GLOB SVM_UMC_SRCS
+    ${SVM_UMC_DIR}/*.c
+)
+
+list(APPEND SVM_SRC_FILES ${SVM_UMC_SRCS})
+list(APPEND SVM_SRC_INC_DIRS
+    ${SVM_UMC_DIR}/
+)

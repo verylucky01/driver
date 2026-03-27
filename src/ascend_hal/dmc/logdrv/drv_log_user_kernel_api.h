@@ -42,6 +42,12 @@ const char *get_log_get_print_time_inner(void);
 uint32_t get_log_level_shift_inner(uint32_t level);
 void (*get_log_print_inner(void))(int32_t, int32_t, const char *, ...);
 
+int32_t drv_log_report_err_msg_handle_register_impl(struct err_msg_report_handle *handle, size_t input_size);
+int32_t drv_log_report_err_msg_handle_unregister_impl(void);
+register_format_err_msg_func get_format_err_msg_register_func_impl(void);
+report_predefined_err_msg_func get_predefined_err_msg_report_func_impl(void);
+report_inner_err_msg_func get_inner_err_msg_report_func_impl(void);
+
 #ifdef __cplusplus
 }
 #endif

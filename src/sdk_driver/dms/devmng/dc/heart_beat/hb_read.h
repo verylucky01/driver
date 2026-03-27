@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,12 +14,12 @@
 #ifndef __HB_READ_H
 #define __HB_READ_H
 
-#include <linux/workqueue.h>
+#include "ka_task_pub.h"
 
 struct hb_read_block {
     unsigned int dev_id;
-    struct work_struct hb_lost_work; /* work for deal with the tasks when heartbeat is lost */
-    struct workqueue_struct *hb_lost_wq;
+    ka_work_struct_t hb_lost_work; /* work for deal with the tasks when heartbeat is lost */
+    ka_workqueue_struct_t *hb_lost_wq;
     unsigned int hb_stutas;
     volatile u32 lost_count;
     volatile u64 old_count;

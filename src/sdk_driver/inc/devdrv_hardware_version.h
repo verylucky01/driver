@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -50,14 +50,14 @@ enum devdrv_chip_type {
     CHIP_RSVD_4 = 12, /* Reserved */
     CHIP_CLOUD_V3 = 13,  /* Ascend910_93 */
     CHIP_RSVD_5 = 14,    /* Reserved */
-    CHIP_CLOUD_V4 = 15,  /* Ascend910_95 */
+    CHIP_CLOUD_V4 = 15,  /* Ascend950 */
     CHIP_CLOUD_V5 = 16,  /* Ascend910_96 */
     CHIP_RSVD_6 = 17,    /* Reserved */
     CHIP_END
 };
 
 enum devdrv_chip_name {
-    CHIP_NAME_CLOUD_V4 = 6514, /* 6514 = 0x1972, 910_95 */
+    CHIP_NAME_CLOUD_V4 = 6514, /* 6514 = 0x1972, 950 */
     CHIP_NAME_END
 };
 

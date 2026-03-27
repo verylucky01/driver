@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,8 +14,8 @@
 #ifndef DEVDRV_ADAPT_H
 #define DEVDRV_ADAPT_H
 
-#include "comm_kernel_interface.h"
 #include "ka_common_pub.h"
+#include "comm_kernel_interface.h"
 
 #define HOST_PRODUCT_DC 0
 
@@ -78,7 +78,7 @@ void devdrv_peer_ctrl_init(void);
 /* devdrv_pcie.c */
 int devdrv_get_product(void);
 extern const ka_pci_device_id_t g_devdrv_tbl[];
-extern const struct pci_error_handlers g_devdrv_err_handler;
+extern const ka_pci_error_handlers_t g_devdrv_err_handler;
 int devdrv_get_device_id_tbl_num(void);
 void devdrv_shutdown(ka_pci_dev_t *pdev);
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -21,7 +21,7 @@
 #include "dms_define.h"
 #include "devdrv_manager_container.h"
 #include "ka_memory_pub.h"
-#include "dpa/dpa_pids_map.h"
+#include "dpa_kernel_interface.h"
 
 #define DMS_PROCESS_INFO_CMD_NAME "DMS_PROCESS_INFO"
 #define DMS_VDEV_MAX_NUM_PER_PHY_DEV     16U
@@ -53,6 +53,57 @@ STATIC void dms_get_valid_dev_list(struct urd_cmd_kernel_para *kernel_para,
     *dev_num = num;
 }
 
+#ifndef DMS_UT
+STATIC bool process_is_in_current_container(ka_task_struct_t *tsk)
+{
+    if (!tsk->nsproxy || !current->nsproxy) {
+        return false;
+    }
+    /* Mount namespace, file system isolation. */
+    if (tsk->nsproxy->mnt_ns != current->nsproxy->mnt_ns) {
+        return false;
+    }
+    /* Network namespace, network isolation. */
+    if (tsk->nsproxy->net_ns != current->nsproxy->net_ns) {
+        return false;
+    }
+    /* UTS namespace, host name isolation. */
+    if (tsk->nsproxy->uts_ns != current->nsproxy->uts_ns) {
+        return false;
+    }
+    /* IPC namespace, semaphore/shared memory isolation. */
+    if (tsk->nsproxy->ipc_ns != current->nsproxy->ipc_ns) {
+        return false;
+    }
+
+    return true;
+}
+#endif
+
+STATIC int dms_get_normal_docker_process_list(unsigned int udevid, int *master_tgid)
+{
+#ifndef DMS_UT
+    ka_task_struct_t *tsk = NULL;
+    int ret;
+
+    ka_for_each_process(tsk) {
+        if ((tsk != NULL) && (tsk->pid == *master_tgid)) {
+            if (process_is_in_current_container(tsk)) {
+                break;
+            }
+            return -EINVAL;
+        }
+    }
+
+    ret = dbl_host_pid_to_container_pid(*master_tgid, master_tgid);
+    if (ret != 0) {
+        dms_err("Convert container pid failed. (udevid=%u; master_tgid=%d; ret=%d)\n", udevid, *master_tgid, ret);
+        return ret;
+    }
+#endif
+    return 0;
+}
+
 STATIC int _dms_get_process_list(struct urd_cmd_kernel_para *kernel_para, struct urd_cmd_para *para,
     int *master_tgids, unsigned int master_num)
 {
@@ -77,10 +128,8 @@ STATIC int _dms_get_process_list(struct urd_cmd_kernel_para *kernel_para, struct
             if (hal_kernel_apm_query_slave_tgid_by_master(master_tgids[i], dev_list[j], PROCESS_CP1, &slave_tgid) != 0) {
                 continue;
             }
-            ret = devdrv_devpid_container_convert(&master_tgids[i]);
-            if (ret != 0) {
-                dms_err("Convert devpid container fail. (udevid=%u; master_tgids=%d; ret=%d)\n",
-                    kernel_para->udevid, master_tgids[i], ret);
+            if (run_in_normal_docker() &&
+                (dms_get_normal_docker_process_list(kernel_para->udevid, &master_tgids[i]) != 0)) {
                 continue;
             }
             pid_list[pid_num++] = master_tgids[i];
@@ -169,10 +218,14 @@ int dms_get_process_memory(const struct urd_cmd *cmd,
     }
 
     pid = *(int *)para->input;
-    ret = devdrv_get_tgid_by_pid(pid, &master_tgid);
-    if (ret != 0) {
-        dms_err("Failed to get master tgid. (udevid=%u; pid=%d; ret=%d)\n", kernel_para->udevid, pid, ret);
-        return ret;
+    if (run_in_normal_docker()) {
+        ret = devdrv_get_tgid_by_pid(pid, &master_tgid);
+        if (ret != 0) {
+            dms_err("Failed to get master tgid. (udevid=%u; pid=%d; ret=%d)\n", kernel_para->udevid, pid, ret);
+            return ret;
+        }
+    } else {
+        master_tgid = pid;
     }
 
     ret = apm_query_slave_all_meminfo_by_master(master_tgid, kernel_para->udevid, PROCESS_CP1, &mem_size);

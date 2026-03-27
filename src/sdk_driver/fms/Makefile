@@ -20,5 +20,12 @@ include ${DRIVER_SOURCE_DIR}/fms/soft_fault/soft_fault.mk
 
 EXTRA_CFLAGS += -Wno-type-limits
 
+# configuring module feature
+EXTRA_CFLAGS += -DCFG_HOST_ENV
+EXTRA_CFLAGS += -DCFG_EDGE_HOST
+
+EXTRA_CFLAGS += -DCFG_FEATURE_MEMALLOC_MODULE_TYPE=5
+EXTRA_CFLAGS += -DCFG_FEATURE_MEMALLOC_SUBMODULE_TYPE=0
+
 modules:
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) modules

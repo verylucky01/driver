@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,6 +11,8 @@
  * GNU General Public License for more details.
  */
 
+#include "ka_pci_pub.h"
+#include "ka_kernel_def_pub.h"
 #include "res_drv.h"
 #include "res_drv_mini_v2.h"
 #include "res_drv_cloud_v1.h"
@@ -21,7 +23,6 @@
 #include "devdrv_util.h"
 #include "devdrv_pci.h"
 #include "devdrv_adapt.h"
-#include "ka_kernel_def_pub.h"
 
 const ka_pci_device_id_t g_devdrv_tbl[] = {
     { KA_PCI_VDEVICE(HUAWEI, CLOUD_V1_DEVICE), HISI_CLOUD_V1 },
@@ -40,6 +41,8 @@ const ka_pci_device_id_t g_devdrv_tbl[] = {
     { DEVDRV_PCI_SUBSYS_PRIVATE_VENDOR_KL, MINI_V2_DEVICE, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, HISI_MINI_V2 },
     { DEVDRV_PCI_SUBSYS_PRIVATE_VENDOR_HK, CLOUD_V2_DEVICE, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, HISI_CLOUD_V2 },
     { DEVDRV_PCI_SUBSYS_PRIVATE_VENDOR_KL, CLOUD_V2_DEVICE, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, HISI_CLOUD_V2 },
+    { DEVDRV_PCI_SUBSYS_PRIVATE_VENDOR_CJ, CLOUD_V2_DEVICE, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, HISI_CLOUD_V2 },
+    { DEVDRV_PCI_SUBSYS_PRIVATE_VENDOR_CJ, MINI_V2_DEVICE, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, HISI_MINI_V2 },
     {}};
 KA_MODULE_DEVICE_TABLE(pci, g_devdrv_tbl);
 
@@ -175,10 +178,10 @@ STATIC void devdrv_error_resume(ka_pci_dev_t *pdev)
     ka_pci_enable_pcie_error_reporting(pdev);
 }
 
-const struct pci_error_handlers g_devdrv_err_handler = {
-    .error_detected = devdrv_error_detected,
-    .slot_reset = devdrv_slot_reset,
-    .resume = devdrv_error_resume,
+const ka_pci_error_handlers_t g_devdrv_err_handler = {
+    ka_pci_error_detected(devdrv_error_detected)
+    ka_pci_slot_reset(devdrv_slot_reset)
+    ka_pci_resume(devdrv_error_resume)
 };
 
 /* devdrv_dma.c */

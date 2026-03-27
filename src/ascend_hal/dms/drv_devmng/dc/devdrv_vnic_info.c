@@ -39,14 +39,16 @@ int devdrv_get_vnic_ip(unsigned int dev_id, unsigned int *ip_addr)
         DEVDRV_DRV_ERR("Host devid transform to local devid failed. (devid=%u; ret=%d)", dev_id, ret);
         return DRV_ERROR_NO_DEVICE;
     }
-
+#ifndef CFG_FEATURE_VNIC_IP_STATIC
     ret = dms_get_spod_item(device_dev_id, INFO_TYPE_SERVER_ID, &server_id);
     if ((ret != DRV_ERROR_NONE) || (server_id > SERVER_ID_MAX)) {
         *ip_addr = DMANAGE_VNIC_IPADDR_CALCULATE(VNIC_IPADDR_SECOND_OCTET_DEFAULT, device_dev_id, dev_id);
     } else {
         *ip_addr = DMANAGE_VNIC_IPADDR_CALCULATE(server_id, device_dev_id, dev_id);
     }
-
+#else
+    *ip_addr = DMANAGE_VNIC_IPADDR_CALCULATE(VNIC_IPADDR_SECOND_OCTET_DEFAULT, device_dev_id, dev_id);
+#endif
     return DRV_ERROR_NONE;
 }
 

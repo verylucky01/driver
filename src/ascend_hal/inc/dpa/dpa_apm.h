@@ -12,13 +12,7 @@
 #define DPA_APM_H
 
 #include "ascend_hal_define.h"
-
-typedef enum tagProcMemType {
-    PROC_MEM_TYPE_ALL = 0,
-    PROC_MEM_TYPE_VMRSS,
-    PROC_MEM_TYPE_SP,
-    PROC_MEM_MAX
-} processMemType_t;
+#include "apm_kernel_ioctl.h"
 
 drvError_t halQuerySlaveProcMeminfo(int master_pid, uint32_t devid, processType_t processType,
     processMemType_t memType, unsigned long long *size);

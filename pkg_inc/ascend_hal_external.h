@@ -611,6 +611,7 @@ typedef enum {
     QUEUE_QUERY_QUEUE_MBUF_INFO,
     QUEUE_QUERY_MAX_IOVEC_NUM,
     QUEUE_QUERY_DEPLOY_TYPE,
+    QUEUE_QUERY_SUPPORT_INTER_DEV_QUE,
     QUEUE_QUERY_CMD_MAX,
 } QueueQueryCmdType;
 
@@ -663,6 +664,10 @@ typedef struct {
     unsigned int deployType;
 } QueQueryDeployInfo;
 
+typedef struct {
+    unsigned int value; /* 0:not support; 1:support */
+} QueQuerySupportInterDevQue;
+
 #define MAX_QUEUE_NUM 8192
 typedef union {
     QueQueryQueueAttrInfo queQueryQueueAttrInfo;
@@ -670,6 +675,7 @@ typedef union {
     QueQueryQueueMbufInfo queQueryQueueMbufInfo;
     QueQueryMaxIovecNum queQueryMaxIovecNum;
     QueQueryDeployInfo queQueryDeployInfo;
+    QueQuerySupportInterDevQue queQuerySupportInterDevQue;
 } QueueQueryOutput;
 
 typedef enum {
@@ -740,7 +746,7 @@ typedef enum {
 /**
 * @ingroup driver
 * @brief  queue init
-* @attention null
+* @attention this interface is not supported on the aicpu of the device.
 * @param [in] devId: logic devid
 * @return   0 for success, others for fail
 */

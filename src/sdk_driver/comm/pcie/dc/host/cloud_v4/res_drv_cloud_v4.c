@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,12 +11,12 @@
  * GNU General Public License for more details.
  */
 
+#include "ka_driver_pub.h"
 #include "res_drv.h"
 #include "devdrv_util.h"
 #include "devdrv_ctrl.h"
 #include "res_drv_cloud_v4.h"
 #include "pbl/pbl_uda.h"
-#include "ka_driver_pub.h"
 
 #ifndef DRV_UT
 
@@ -34,7 +34,7 @@
 #define DEVDRV_WAIT_MODE_SWITCH_RETRY_COUNT 300
 #define DEVDRV_WAIT_MODE_SWITCH_TIME 100 /* 100ms */
 
-#define DEVDRV_CLOUD_V4_P2P_SUPPORT_MAX_DEVICE 8
+#define DEVDRV_CLOUD_V4_P2P_SUPPORT_MAX_DEVICE 16
 
 #define DEVDRV_CLOUD_V4_2DIE_DEVID_STRIDE_2  2
 #define DEVDRV_CLOUD_V4_2DIE_BOARD_ID        0x80
@@ -241,8 +241,8 @@ STATIC u64 g_reserver_mem_msg_offset = DEVDRV_RESERVE_MEM_MSG_OFFSET;
 #define DEVDRV_MAX_DMA_CH_CQ_DEPTH 0x10000
 #define DEVDRV_DMA_CH_SQ_DESC_RSV  0x400
 
-#define CLOUD_V4_MODULE_NUM        8
-#define CLOUD_V4_VF_VM_MODULE_NUM  6
+#define CLOUD_V4_MODULE_NUM        5
+#define CLOUD_V4_VF_VM_MODULE_NUM  0
 #define DEVDRV_MAX_MSG_PF_CHAN_CNT 46
 #define DEVDRV_MAX_MSG_VF_CHAN_CNT 16
 /* msg chan cnt for modules */
@@ -285,37 +285,47 @@ STATIC unsigned int devdrv_vf_msg_chan_cnt_cloud_v4[devdrv_msg_client_max] = {
 };
 
 #ifdef CFG_FEATURE_LOAD_TEE_IMAGE
-#define CLOUD_V4_BLOCKS_NUM        6
+#define CLOUD_V4_BLOCKS_NUM        8
 #else
-#define CLOUD_V4_BLOCKS_NUM        5
+#define CLOUD_V4_BLOCKS_NUM        7
 #endif
 
 /* load file adapt */
 STATIC struct devdrv_load_file_cfg cloud_v4_file[CLOUD_V4_BLOCKS_NUM] = {
 #ifdef CFG_FEATURE_LOAD_TEE_IMAGE
     {
-        .file_name = "/driver/device/ascend_910_95_tee.bin",
+        .file_name = "/driver/device/ascend_950_tee.bin",
         .file_type = DEVDRV_CRITICAL_FILE,
         .fail_mode = DEVDRV_NON_NOTICE,
     },
 #endif
     {
-        .file_name = "/driver/device/ascend_910_95.image",
+        .file_name = "/driver/device/ascend_950_device_sw.img",
         .file_type = DEVDRV_CRITICAL_FILE,
         .fail_mode = DEVDRV_NON_NOTICE,
     },
     {
-        .file_name = "/driver/device/ascend_910_95.cpio.gz",
+        .file_name = "/driver/device/ascend_950_device_sw.bin",
         .file_type = DEVDRV_CRITICAL_FILE,
         .fail_mode = DEVDRV_NON_NOTICE,
     },
     {
-        .file_name = "/driver/device/ascend_910_95_dt.img",
+        .file_name = "/driver/device/ascend_950_device_config.bin",
         .file_type = DEVDRV_CRITICAL_FILE,
         .fail_mode = DEVDRV_NON_NOTICE,
     },
     {
-        .file_name = "/driver/device/ascend_910_95_imu.bin",
+        .file_name = "/driver/device/ascend_950_imu.bin",
+        .file_type = DEVDRV_CRITICAL_FILE,
+        .fail_mode = DEVDRV_NON_NOTICE,
+    },
+    {
+        .file_name = "/driver/device/ascend_950_lp.bin",
+        .file_type = DEVDRV_CRITICAL_FILE,
+        .fail_mode = DEVDRV_NON_NOTICE,
+    },
+    {
+        .file_name = "/driver/device/ascend_950_ubcfg.bin",
         .file_type = DEVDRV_CRITICAL_FILE,
         .fail_mode = DEVDRV_NON_NOTICE,
     },
@@ -360,6 +370,29 @@ STATIC struct devdrv_load_file_cfg cloud_v5_file[CLOUD_V5_BLOCKS_NUM] = {
         .file_name = "/driver/device/ascend_cloud_v5.crl",
         .file_type = DEVDRV_NON_CRITICAL_FILE,
         .fail_mode = DEVDRV_NON_NOTICE,
+    },
+};
+
+STATIC struct devdrv_depend_module cloud_v4_module[CLOUD_V4_MODULE_NUM] = {
+    {
+        .module_name = "asdrv_buff",
+        .status = DEVDRV_MODULE_UNPROBED,
+    },
+    {
+        .module_name = "asdrv_vnic",
+        .status = DEVDRV_MODULE_UNPROBED,
+    },
+    {
+        .module_name = "asdrv_queue",
+        .status = DEVDRV_MODULE_UNPROBED,
+    },
+    {
+        .module_name = "asdrv_trs",
+        .status = DEVDRV_MODULE_UNPROBED,
+    },
+    {
+        .module_name = "ts_agent",
+        .status = DEVDRV_MODULE_UNPROBED,
     },
 };
 
@@ -544,6 +577,18 @@ STATIC void devdrv_cloud_v4_init_load_file_info(struct devdrv_pci_ctrl *pci_ctrl
     }
 }
 
+STATIC void devdrv_cloud_v4_init_depend_module_info(struct devdrv_pci_ctrl *pci_ctrl)
+{
+    if ((pci_ctrl->env_boot_mode == DEVDRV_MDEV_FULL_SPEC_VF_VM_BOOT) ||
+        (pci_ctrl->env_boot_mode == DEVDRV_MDEV_VF_VM_BOOT)) {
+        pci_ctrl->res.depend_info.module_num = CLOUD_V4_VF_VM_MODULE_NUM;
+        pci_ctrl->res.depend_info.module_list = NULL;
+    } else {
+        pci_ctrl->res.depend_info.module_num = CLOUD_V4_MODULE_NUM;
+        pci_ctrl->res.depend_info.module_list = cloud_v4_module;
+    }
+}
+
 STATIC enum devdrv_load_wait_mode devdrv_cloud_v4_get_load_wait_mode(struct devdrv_pci_ctrl *pci_ctrl)
 {
     if (pci_ctrl->ops.pre_cfg != NULL) {
@@ -720,29 +765,7 @@ STATIC void devdrv_cloud_v4_set_dev_shr_info(struct devdrv_pci_ctrl *pci_ctrl)
     pci_ctrl->shr_para->host_io_bar_base = (u64)pci_ctrl->io_phy_base;
 }
 
-STATIC unsigned devdrv_cloud_v4_get_server_id(struct devdrv_pci_ctrl *pci_ctrl)
-{
-    devdrv_hw_info_t *hw_data = NULL;
-    void __iomem *hw_info_addr = pci_ctrl->io_base + DEVDRV_IO_LOAD_SRAM_OFFSET + DEVDRV_CLOUD_V4_HW_INFO_SRAM_OFFSET;
-
-    hw_data = (devdrv_hw_info_t*)hw_info_addr;
-    g_hw_info.server_id = hw_data->server_id;
-
-    return g_hw_info.server_id;
-}
-
-STATIC unsigned devdrv_cloud_v4_get_max_server_num(struct devdrv_pci_ctrl *pci_ctrl)
-{
-    devdrv_hw_info_t *hw_data = NULL;
-    void __iomem *hw_info_addr = pci_ctrl->io_base + DEVDRV_IO_LOAD_SRAM_OFFSET + DEVDRV_CLOUD_V4_HW_INFO_SRAM_OFFSET;
-
-    hw_data = (devdrv_hw_info_t*)hw_info_addr;
-    g_hw_info.scale_type = hw_data->scale_type;
-
-    return (g_hw_info.scale_type / DEVDRV_S2S_MAX_CHIP_NUM);
-}
-
-STATIC bool devdrv_cloud_v4_is_need_reorder(struct devdrv_pci_ctrl *pci_ctrl, void __iomem * para_addr)
+STATIC bool devdrv_cloud_v4_is_need_reorder(struct devdrv_pci_ctrl *pci_ctrl, void __ka_mm_iomem * para_addr)
 {
     struct udevid_reorder_para *reorder_para = NULL;
     devdrv_hw_mainboard_id_t value = {{0}};
@@ -770,11 +793,11 @@ STATIC bool devdrv_cloud_v4_is_need_reorder(struct devdrv_pci_ctrl *pci_ctrl, vo
 
 STATIC int devdrv_cloud_v4_set_udevid_reorder_para(struct devdrv_pci_ctrl *pci_ctrl)
 {
-    void __iomem * para_addr = NULL;
+    void __ka_mm_iomem * para_addr = NULL;
     bool reorder_flag = false;
     int ret;
 
-    para_addr = (void __iomem *)pci_ctrl->shr_para + ka_offsetof(struct devdrv_shr_para, reorder_para);
+    para_addr = (void __ka_mm_iomem *)pci_ctrl->shr_para + ka_offsetof(struct devdrv_shr_para, reorder_para);
     if (para_addr == NULL) {
         devdrv_err("para_addr is NULL.(index_id=%u)\n", pci_ctrl->dev_id);
         return false;
@@ -819,8 +842,8 @@ STATIC void devdrv_cloud_v4_ops_init(struct devdrv_pci_ctrl *pci_ctrl)
     pci_ctrl->ops.get_vf_dma_info = devdrv_cloud_v4_init_vf_dma_info;
     pci_ctrl->ops.get_hccs_link_info = NULL;
     pci_ctrl->ops.is_mdev_vm_full_spec = devdrv_cloud_v4_is_mdev_vm_full_spec;
-    pci_ctrl->ops.get_server_id = devdrv_cloud_v4_get_server_id;
-    pci_ctrl->ops.get_max_server_num = devdrv_cloud_v4_get_max_server_num;
+    pci_ctrl->ops.get_server_id = NULL;
+    pci_ctrl->ops.get_max_server_num = NULL;
     pci_ctrl->ops.devdrv_deal_suspend_handshake = NULL;
     pci_ctrl->ops.is_all_dev_unified_addr = NULL;
     pci_ctrl->ops.flush_cache = NULL;
@@ -852,7 +875,7 @@ STATIC void devdrv_cloud_v4_init_vf_msg_cnt(struct devdrv_pci_ctrl *pci_ctrl)
 
 STATIC int devdrv_init_hw_info(struct devdrv_pci_ctrl *pci_ctrl)
 {
-    void __iomem *hw_info_addr = pci_ctrl->io_base + DEVDRV_IO_LOAD_SRAM_OFFSET + DEVDRV_CLOUD_V4_HW_INFO_SRAM_OFFSET;
+    void __ka_mm_iomem *hw_info_addr = pci_ctrl->io_base + DEVDRV_IO_LOAD_SRAM_OFFSET + DEVDRV_CLOUD_V4_HW_INFO_SRAM_OFFSET;
     int retry_times = 0;
 
 retry:
@@ -1050,6 +1073,7 @@ int devdrv_cloud_v4_res_init(struct devdrv_pci_ctrl *pci_ctrl)
         devdrv_cloud_v4_init_pf_dma_info(pci_ctrl);
     }
     devdrv_cloud_v4_init_load_file_info(pci_ctrl);
+    devdrv_cloud_v4_init_depend_module_info(pci_ctrl);
     devdrv_cloud_v4_ops_init(pci_ctrl);
 #endif
 

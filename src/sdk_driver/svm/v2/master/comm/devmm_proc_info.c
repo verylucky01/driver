@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,6 +13,7 @@
 
 #include <linux/types.h>
 
+#include "pbl/pbl_runenv_config.h"
 #include "devmm_chan_handlers.h"
 #include "devmm_proc_mem_copy.h"
 #include "svm_kernel_msg.h"
@@ -175,9 +176,6 @@ void devmm_zap_giant_pages(struct devmm_svm_process *svm_proc, u64 va, u64 page_
     return;
 }
 
-STATIC int devmm_free_page_process(struct devmm_svm_process *svm_pro, struct devmm_svm_heap *heap, u32 *page_bitmap,
-    u64 va, bool reuse);
-
 bool devmm_dev_is_same_system(u32 src_devid, u32 dst_devid)
 {
     if (src_devid >= DEVMM_MAX_DEVICE_NUM || dst_devid >= DEVMM_MAX_DEVICE_NUM) {
@@ -217,7 +215,7 @@ u32 *devmm_get_page_bitmap(struct devmm_svm_process *svm_process, u64 va)
     return devmm_get_page_bitmap_with_heap(heap, va);
 }
 
-STATIC u32 *devmm_get_fst_alloc_bitmap_by_heap(struct devmm_svm_process *svm_process,
+u32 *devmm_get_fst_alloc_bitmap_by_heap(struct devmm_svm_process *svm_process,
     struct devmm_svm_heap *heap, u64 va)
 {
     u32 *page_bitmap = NULL;
@@ -1134,14 +1132,14 @@ int devmm_get_svm_mem_attrs(struct devmm_svm_process *svm_proc, u64 addr, struct
     return _devmm_get_svm_mem_attrs(svm_proc, heap, bitmap, addr, attr);
 }
 
-int devmm_get_memory_attributes(struct devmm_svm_process *svm_proc, u64 addr, struct devmm_memory_attributes *attr)
-{
-    if (devmm_va_is_not_svm_process_addr(svm_proc, addr)) {
-        devmm_get_local_host_mem_attrs(svm_proc, addr, attr);
-        return 0;
-    } else {
-        return devmm_get_svm_mem_attrs(svm_proc, addr, attr);
-    }
+int devmm_get_memory_attributes(struct devmm_svm_process *svm_proc, u64 addr, struct devmm_memory_attributes *attr)	 
+{	 
+    if (devmm_va_is_not_svm_process_addr(svm_proc, addr)) {	 
+        devmm_get_local_host_mem_attrs(svm_proc, addr, attr);	 
+        return 0;	 
+    } else {	 
+        return devmm_get_svm_mem_attrs(svm_proc, addr, attr);	 
+    }	 
 }
 
 bool devmm_acquire_aligned_addr_and_cnt(u64 address, u64 byte_count, int is_svm_huge,
@@ -1282,7 +1280,6 @@ clear_pfn_range:
         devmm_try_cond_resched(&stamp);
     }
     return -EINVAL;
-
 }
 
 bool devmm_is_master(struct devmm_memory_attributes *attr)
@@ -1290,9 +1287,9 @@ bool devmm_is_master(struct devmm_memory_attributes *attr)
     return (attr->is_svm_host || attr->is_local_host || attr->is_host_pin || attr->is_svm_host_agent);
 }
 
-bool devmm_is_device_agent(struct devmm_memory_attributes *attr)
-{
-    return ((attr->is_svm_device && (!devmm_is_host_agent(attr->devid))) || attr->is_local_device);
+bool devmm_is_device_agent(struct devmm_memory_attributes *attr)	 
+{	 
+    return ((attr->is_svm_device && (!devmm_is_host_agent(attr->devid))) || attr->is_local_device);	 
 }
 
 STATIC void devmm_set_translate_bitmap(struct devmm_svm_process *svm_pro, u64 va)
@@ -1655,7 +1652,7 @@ STATIC int devmm_free_page_process(struct devmm_svm_process *svm_pro, struct dev
     return 0;
 }
 
-static int devmm_ioctl_free_pages(struct devmm_svm_process *svm_pro, struct devmm_ioctl_arg *arg)
+int devmm_ioctl_free_pages(struct devmm_svm_process *svm_pro, struct devmm_ioctl_arg *arg)
 {
     struct devmm_free_pages_para *free_pages_para = &arg->data.free_pages_para;
     struct devmm_svm_heap *heap = NULL;
@@ -1685,7 +1682,6 @@ static int devmm_ioctl_free_pages(struct devmm_svm_process *svm_pro, struct devm
     ka_task_up_read(&svm_pro->host_fault_sem);
     return ret;
 }
-
 
 STATIC void devmm_svm_bitmap_writelock(struct devmm_svm_process *svm_proc)
 {
@@ -2178,7 +2174,7 @@ STATIC int devmm_ioctl_update_heap(struct devmm_svm_process *svm_pro, struct dev
 
 STATIC int devmm_set_svm_proc_docker_id(struct devmm_svm_process *svm_proc)
 {
-    return devdrv_manager_get_docker_id(&svm_proc->docker_id);
+    return uda_get_container_docker_id(&svm_proc->docker_id);
 }
 
 static int devmm_ioctl_init_process(struct devmm_svm_process *svm_process, struct devmm_ioctl_arg *arg)
@@ -2697,13 +2693,13 @@ struct devmm_ioctl_handlers_st devmm_ioctl_handlers[DEVMM_SVM_CMD_MAX_CMD] = {
     [_KA_IOC_NR(DEVMM_SVM_MEM_MAP_CAP)] = {devmm_ioctl_mem_map_capability, DEVMM_CONVERT_ID | DEVMM_CMD_NOT_SURPORT_VDEV},
 };
 
-int devmm_ioctl_handler_register(int cmd, struct devmm_ioctl_handlers_st hander)
+int devmm_ioctl_handler_register(int cmd, struct devmm_ioctl_handlers_st handler)
 {
     if ((cmd < 0) || (cmd >= DEVMM_SVM_CMD_MAX_CMD)) {
         devmm_drv_err("Invalid cmd. (cmd=%d)\n", cmd);
         return -EINVAL;
     }
-    devmm_ioctl_handlers[cmd] = hander;
+    devmm_ioctl_handlers[cmd] = handler;
     return 0;
 }
 

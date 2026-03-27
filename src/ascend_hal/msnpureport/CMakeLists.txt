@@ -47,9 +47,13 @@ target_include_directories(msnpureport PRIVATE ${reportHeaderDir})
 target_compile_definitions(msnpureport PRIVATE
     $<$<NOT:$<STREQUAL:${TARGET_SYSTEM_NAME},Windows>>:OS_TYPE_DEF=0>
     $<$<STREQUAL:${TARGET_SYSTEM_NAME},Windows>:OS_TYPE_DEF=1>
-    $<$<NOT:$<STREQUAL:${TARGET_SYSTEM_NAME},Windows>>:OS_TYPE=0>
-    $<$<STREQUAL:${TARGET_SYSTEM_NAME},Windows>:OS_TYPE=1>
     $<$<STREQUAL:${TARGET_SYSTEM_NAME},Windows>:SECUREC_USING_STD_SECURE_LIB=0>
+    $<$<STREQUAL:${PRODUCT},ascend950>:UB_SUPPORT>
+    $<$<STREQUAL:${PRODUCT},ascend950esl>:UB_SUPPORT>
+    $<$<STREQUAL:${PRODUCT},ascend950>:HDC_NEW_CHANNEL>
+    $<$<STREQUAL:${PRODUCT},ascend950esl>:HDC_NEW_CHANNEL>
+    $<$<STREQUAL:${PRODUCT},ascend910_96>:HDC_NEW_CHANNEL>
+    $<$<STREQUAL:${PRODUCT},ascend910_96esl>:HDC_NEW_CHANNEL>
 )
 
 target_compile_options(msnpureport PRIVATE
@@ -95,6 +99,8 @@ target_link_libraries(msnpureport PRIVATE
 
     # Core libraries
     mmpa
+    $<$<AND:$<STREQUAL:${PRODUCT},ascend950>,$<STREQUAL:${PRODUCT_SIDE},host>>:drvdsmi_host>
+    $<$<AND:$<STREQUAL:${PRODUCT},ascend950esl>,$<STREQUAL:${PRODUCT_SIDE},host>>:drvdsmi_host>
     c_sec
     adcore
     bbox_dump
@@ -115,11 +121,11 @@ target_link_libraries(msnpureport PRIVATE
     $<$<AND:$<STREQUAL:${PRODUCT},ascend910_55esl>,$<STREQUAL:${CMAKE_HOST_SYSTEM_PROCESSOR},aarch64>>:urma>
     $<$<AND:$<STREQUAL:${PRODUCT},ascend910_55esl>,$<STREQUAL:${CMAKE_HOST_SYSTEM_PROCESSOR},aarch64>>:urma_common>
 
-    $<$<AND:$<STREQUAL:${PRODUCT},ascend910_95>,$<STREQUAL:${ENABLE_UBE},true>,$<STREQUAL:${CMAKE_HOST_SYSTEM_PROCESSOR},aarch64>>:urma>
-    $<$<AND:$<STREQUAL:${PRODUCT},ascend910_95>,$<STREQUAL:${ENABLE_UBE},true>,$<STREQUAL:${CMAKE_HOST_SYSTEM_PROCESSOR},aarch64>>:urma_common>
+    $<$<AND:$<STREQUAL:${PRODUCT},ascend950>,$<STREQUAL:${ENABLE_UBE},true>,$<STREQUAL:${CMAKE_HOST_SYSTEM_PROCESSOR},aarch64>>:urma>
+    $<$<AND:$<STREQUAL:${PRODUCT},ascend950>,$<STREQUAL:${ENABLE_UBE},true>,$<STREQUAL:${CMAKE_HOST_SYSTEM_PROCESSOR},aarch64>>:urma_common>
 
-    $<$<AND:$<STREQUAL:${PRODUCT},ascend910_95esl>,$<STREQUAL:${ENABLE_UBE},true>,$<STREQUAL:${CMAKE_HOST_SYSTEM_PROCESSOR},aarch64>>:urma>
-    $<$<AND:$<STREQUAL:${PRODUCT},ascend910_95esl>,$<STREQUAL:${ENABLE_UBE},true>,$<STREQUAL:${CMAKE_HOST_SYSTEM_PROCESSOR},aarch64>>:urma_common>
+    $<$<AND:$<STREQUAL:${PRODUCT},ascend950esl>,$<STREQUAL:${ENABLE_UBE},true>,$<STREQUAL:${CMAKE_HOST_SYSTEM_PROCESSOR},aarch64>>:urma>
+    $<$<AND:$<STREQUAL:${PRODUCT},ascend950esl>,$<STREQUAL:${ENABLE_UBE},true>,$<STREQUAL:${CMAKE_HOST_SYSTEM_PROCESSOR},aarch64>>:urma_common>
 
     $<$<AND:$<STREQUAL:${PRODUCT},ascend910_96>,$<STREQUAL:${CMAKE_HOST_SYSTEM_PROCESSOR},aarch64>>:urma>
     $<$<AND:$<STREQUAL:${PRODUCT},ascend910_96>,$<STREQUAL:${CMAKE_HOST_SYSTEM_PROCESSOR},aarch64>>:urma_common>
@@ -131,8 +137,8 @@ target_link_libraries(msnpureport PRIVATE
 target_link_directories(msnpureport PRIVATE
     $<$<AND:$<STREQUAL:${PRODUCT},ascend910_55>,$<STREQUAL:${PRODUCT_SIDE},host>>:${TOP_DIR}/build/bin/ccec_for_milan/lib/urma>
     $<$<AND:$<STREQUAL:${PRODUCT},ascend910_55esl>,$<STREQUAL:${PRODUCT_SIDE},host>>:${TOP_DIR}/build/bin/ccec_for_milan/lib/urma>
-    $<$<AND:$<STREQUAL:${PRODUCT},ascend910_95>,$<STREQUAL:${PRODUCT_SIDE},host>,$<STREQUAL:${ENABLE_UBE},true>>:${TOP_DIR}/build/bin/ccec_for_milan/lib/urma>
-    $<$<AND:$<STREQUAL:${PRODUCT},ascend910_95esl>,$<STREQUAL:${PRODUCT_SIDE},host>,$<STREQUAL:${ENABLE_UBE},true>>:${TOP_DIR}/build/bin/ccec_for_milan/lib/urma>
+    $<$<AND:$<STREQUAL:${PRODUCT},ascend950>,$<STREQUAL:${PRODUCT_SIDE},host>,$<STREQUAL:${ENABLE_UBE},true>>:${TOP_DIR}/build/bin/ccec_for_milan/lib/urma>
+    $<$<AND:$<STREQUAL:${PRODUCT},ascend950esl>,$<STREQUAL:${PRODUCT_SIDE},host>,$<STREQUAL:${ENABLE_UBE},true>>:${TOP_DIR}/build/bin/ccec_for_milan/lib/urma>
     $<$<AND:$<STREQUAL:${PRODUCT},ascend910_96>,$<STREQUAL:${PRODUCT_SIDE},host>>:${TOP_DIR}/build/bin/ccec_for_milan/lib/urma>
     $<$<AND:$<STREQUAL:${PRODUCT},ascend910_96esl>,$<STREQUAL:${PRODUCT_SIDE},host>>:${TOP_DIR}/build/bin/ccec_for_milan/lib/urma>
 )

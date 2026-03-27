@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,6 +11,11 @@
  * GNU General Public License for more details.
  */
 
+#include "ka_task_pub.h"
+#include "ka_ioctl_pub.h"
+#include "ka_list_pub.h"
+#include "ka_memory_pub.h"
+#include "ka_compiler_pub.h"
 #include "pbl/pbl_uda.h"
 #include "pbl/pbl_soc_res.h"
 
@@ -19,12 +24,6 @@
 #include "hdcdrv_core.h"
 #include "hdcdrv_mem_com.h"
 #include "hdcdrv_adapter.h"
-#include "ka_task_pub.h"
-#include "ka_base_pub.h"
-#include "ka_ioctl_pub.h"
-#include "ka_list_pub.h"
-#include "ka_memory_pub.h"
-#include "ka_compiler_pub.h"
 
 STATIC int vhdch_dev_id_check(u32 dev_id, u32 fid)
 {
@@ -122,6 +121,9 @@ STATIC int vhdch_update_mem_tree(u32 dev_id, u32 fid, int flag, struct hdcdrv_ct
         ret = vhdch_rb_mem_insert(vdev, fast_node);
         if (ret != HDCDRV_OK) {
             hdcdrv_kvfree((void **)&fast_node, KA_SUB_MODULE_TYPE_2);
+#ifndef DRV_UT
+            fast_node = NULL;
+#endif
             hdcdrv_warn("hash_va insert failed. (dev_id=%u; fid=%u; hash_va=%llu)\n", dev_id, fid, mem_info->hash_va);
             ka_task_mutex_unlock(&vdev->mutex);
             return ret;
@@ -134,6 +136,9 @@ STATIC int vhdch_update_mem_tree(u32 dev_id, u32 fid, int flag, struct hdcdrv_ct
         if (fast_node != NULL) {
             vhdch_rb_mem_erase(vdev, fast_node);
             hdcdrv_kvfree((void **)&fast_node, KA_SUB_MODULE_TYPE_2);
+#ifndef DRV_UT
+            fast_node = NULL;
+#endif
             vdev->fast_node_num_avaliable++;
             vdev->fnode_phy_num_avaliable += mem_info->phy_addr_num;
         } else {
@@ -1005,6 +1010,9 @@ STATIC struct hdcdrv_ctx *vhdch_search_create_ctx(struct vhdch_vdev *vdev, u64 h
         ka_task_mutex_unlock(&vdev->release_mutex);
         hdcdrv_err("vhdch rbtree insert ctx failed.\n");
         hdcdrv_free_ctx(ctx);
+#ifndef DRV_UT
+        ctx = NULL;
+#endif
         return NULL;
     }
 
@@ -1052,6 +1060,7 @@ STATIC void vhdch_ctx_put(struct vhdch_vdev *vdev, struct hdcdrv_ctx *ctx)
     if (ctx->refcnt <= 0) {
         hdcdrv_release_by_ctx(ctx);
         hdcdrv_free_ctx(ctx);
+        ctx = NULL;
     }
 }
 
@@ -1348,6 +1357,9 @@ STATIC void vhdch_mem_tree_uninit(u32 devid, u32 fid)
         ret = hdcdrv_set_mem_info((int)devid, fid, HDCDRV_RBTREE_SIDE_LOCAL, &msg);
         vhdch_rb_mem_erase(vdev, fast_node);
         hdcdrv_kvfree((void **)&fast_node, KA_SUB_MODULE_TYPE_2);
+#ifndef DRV_UT
+        fast_node = NULL;
+#endif
     }
 }
 
@@ -1365,6 +1377,9 @@ STATIC void vhdch_stop_work(struct vhdch_vdev *vdev)
             hdcdrv_release_by_ctx(ctx);
             vhdch_rb_ctx_erase(vdev, ctx);
             hdcdrv_free_ctx(ctx);
+#ifndef DRV_UT
+            ctx = NULL;
+#endif
         }
         ka_task_mutex_unlock(&vdev->release_mutex);
     }

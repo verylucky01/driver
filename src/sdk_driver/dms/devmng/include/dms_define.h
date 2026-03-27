@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,15 +14,8 @@
 #ifndef __DMS_DEFINE_H__
 #define __DMS_DEFINE_H__
 
-#include <linux/list.h>
-#include <linux/kthread.h>
-#include <linux/wait.h>
-#include <linux/mutex.h>
-#include <linux/gfp.h>
-#include <linux/types.h>
-#include <linux/vmalloc.h>
-#include <linux/fs.h>
-#include <linux/sched/clock.h>
+#include "ka_memory_pub.h"
+#include "ka_dfx_pub.h"
 #include "ascend_hal_error.h"
 #include "dms_sensor.h"
 #include "dms_event.h"
@@ -30,6 +23,7 @@
 #include "dmc_kernel_interface.h"
 #include "dms/dms_devdrv_manager_comm.h"
 #include "ascend_dev_num.h"
+#include "ka_system_pub.h"
 
 #include "fms_kernel_interface.h"
 
@@ -43,13 +37,13 @@
 #define STATIC                     static
 #endif
 
-#ifndef __GFP_ACCOUNT
+#ifndef __KA_GFP_ACCOUNT
 #ifdef __GFP_KMEMCG
-#define __GFP_ACCOUNT __GFP_KMEMCG /* for linux version 3.10 */
+#define __KA_GFP_ACCOUNT __GFP_KMEMCG /* for linux version 3.10 */
 #endif
 
 #ifdef __GFP_NOACCOUNT
-#define __GFP_ACCOUNT 0 /* for linux version 4.1 */
+#define __KA_GFP_ACCOUNT 0 /* for linux version 4.1 */
 #endif
 #endif
 
@@ -145,13 +139,13 @@ struct dms_dev_data_view {
 } while (0)
 #else
 #define dms_fault_mng_event(assertion, fmt, ...) do {                       \
-    u64 ts = local_clock();                                                 \
+    u64 ts = ka_system_local_clock();                                                 \
     u64 rem_nsec = do_div(ts, 1000000000);                                  \
     drv_slog_event("fault_manager", "[%5lu.%06lu] " fmt, ts, rem_nsec / 1000, ##__VA_ARGS__);   \
 } while (0)
 #endif
-#define dms_fmng_event(args...) (void)printk(KERN_NOTICE "[fault_manager] " args)
-#define dms_fmng_err(args...) (void)printk(KERN_ERR "[fault_manager] " args)
+#define dms_fmng_event(args...) (void)ka_dfx_printk(KA_KERN_NOTICE "[fault_manager] " args)
+#define dms_fmng_err(args...) (void)ka_dfx_printk(KA_KERN_ERR "[fault_manager] " args)
 
 #define dms_ex_notsupport_err(ret, fmt, ...) do {                      \
     if (((ret) != (int)DRV_ERROR_NOT_SUPPORT) && ((ret) != -EOPNOTSUPP)) {  \

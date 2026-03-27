@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,11 +10,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-#include <linux/string.h>
-#include <linux/slab.h>
-#include <linux/errno.h>
-#include <linux/dmi.h>
-#include <linux/cred.h>
 
 #include "securec.h"
 #include "ascend_hal_error.h"
@@ -26,6 +21,7 @@
 #include "ka_driver_pub.h"
 #include "ka_memory_pub.h"
 #include "ka_kernel_def_pub.h"
+#include "ka_task_pub.h"
 #include "ka_base_pub.h"
 
 #ifndef CFG_HOST_ENV
@@ -125,7 +121,7 @@ STATIC u32 dms_get_run_env(void)
 
 STATIC u32 dms_get_user_role(void)
 {
-    const struct cred *cred = current_cred();
+    const ka_cred_t *cred = ka_current_cred();
     u32 acc;
 
     /* check user role */

@@ -30,10 +30,7 @@ else
 endif
 
 EXTRA_CFLAGS += -DCFG_FEATURE_SHARE_LOG
-ifneq ($(filter $(PRODUCT), ascend910B),)
-    EXTRA_CFLAGS += -DCFG_FEATURE_KA_ALLOC_INTERFACE
-endif
-
+EXTRA_CFLAGS += -DCFG_FEATURE_KA_ALLOC_INTERFACE
 EXTRA_CFLAGS += -DCFG_FEATURE_HOST_LOG
 EXTRA_CFLAGS += -DDRV_HOST
 ccflags-y += -fno-common -fstack-protector-all -funsigned-char -pipe -s -Wall -Wcast-align -Wdate-time -Wfloat-equal -Wformat -Wstack-usage=2048 -Wstrict-prototypes -Wtrampolines -Wundef -Wunused -Wvla

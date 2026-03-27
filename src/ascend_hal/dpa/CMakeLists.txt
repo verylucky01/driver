@@ -8,9 +8,9 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # ------------------------------------------------------------------------------------------------------------
 add_subdirectory(dp_proc_mng)
-if(${PRODUCT} STREQUAL ascend910B OR ${PRODUCT} STREQUAL ascend910_95)
+if(${PRODUCT} STREQUAL ascend910B OR ${PRODUCT} STREQUAL ascend950)
     add_subdirectory(rmo)
 endif ()
-if(${PRODUCT} STREQUAL ascend910_95)
+if(${PRODUCT} STREQUAL ascend950)
     add_subdirectory(apm)
 endif ()

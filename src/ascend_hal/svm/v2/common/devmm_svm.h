@@ -164,7 +164,7 @@ DVresult halMemCpyAsyncInner(DVdeviceptr dst, size_t dest_max, DVdeviceptr src,
     size_t byte_count, uint64_t *copy_fd);
 DVresult halMemcpyWaitInner(struct DMA_ADDR *dma_addr);
 
-drvError_t devmm_register_mem_to_dma(void *src_va, uint64_t size, uint32_t devid);
+drvError_t devmm_register_mem_to_dma(void *src_va, uint64_t size, uint32_t flag, uint32_t devid);
 drvError_t devmm_unregister_mem_to_dma(void *src_va, uint32_t devid);
 
 int drvGetProcStatus(void);

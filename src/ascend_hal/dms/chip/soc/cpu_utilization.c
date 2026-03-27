@@ -163,15 +163,16 @@ int dms_get_aicpu_utilization(unsigned int dev_id, unsigned int *utilization)
     return DRV_ERROR_NONE;
 }
 
+#define TAISHAN_CORE_NUM_MAX 40
 int dms_get_ctlcpu_utilization(unsigned int dev_id, unsigned int *utilization)
 {
-    unsigned int utilRate[TAISHAN_CORE_NUM] = {0};
+    unsigned int utilRate[TAISHAN_CORE_NUM_MAX] = {0};
     drvCpuInfo_t cpu_info = {0};
     unsigned int total_rate = 0;
     unsigned int i;
     int ret;
 
-    if ((dev_id >= ASCEND_PDEV_MAX_NUM) || (utilization == NULL)) {
+    if ((utilization == NULL) || (dev_id >= ASCEND_PDEV_MAX_NUM)) {
         return DRV_ERROR_NOT_SUPPORT;
     }
 
@@ -181,7 +182,7 @@ int dms_get_ctlcpu_utilization(unsigned int dev_id, unsigned int *utilization)
         return ret;
     }
 
-    if ((cpu_info.ccpu_num == 0) || (cpu_info.ccpu_num > TAISHAN_CORE_NUM)) {
+    if ((cpu_info.ccpu_num == 0) || (cpu_info.ccpu_num > TAISHAN_CORE_NUM_MAX)) {
         DMS_ERR("invalid ctrl cpu num. (dev_id=%u;ccpu_num=%u)\n", dev_id, cpu_info.ccpu_num);
         return DRV_ERROR_INVALID_VALUE;
     }

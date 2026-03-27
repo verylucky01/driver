@@ -9,9 +9,13 @@
  */
 
 #include <sys/ioctl.h>
+#include <dlfcn.h>
 #ifdef CFG_FEATURE_SUPPORT_UB
 #include "urma_types.h"
 #include "urma_api.h"
+#endif
+#ifdef CFG_FEATURE_SUPPORT_MAMI
+#include "mami_api.h"
 #endif
 #include "securec.h"
 #include "devmng_common.h"
@@ -37,21 +41,21 @@ pthread_mutex_t ub_token_val_lock = PTHREAD_MUTEX_INITIALIZER;
 
 int dms_get_urma_name_by_devid(u32 dev_id, char *name, u32 len)
 {
-    int ret;
     struct dms_ioctl_arg ioarg = {0};
+    int ret;
 
     if (!name || len == 0) {
         DMS_ERR("Name is null or len is 0. (len=%u)\n", len);
         return DRV_ERROR_PARA_ERROR;
     }
 
-    ioarg.main_cmd = ASCEND_UB_CMD_BASIC;
-    ioarg.sub_cmd = ASCEND_UB_SUBCMD_GET_URMA_NAME;
-    ioarg.filter_len = 0;
     ioarg.input = (void *)&dev_id;
     ioarg.input_len = sizeof(u32);
     ioarg.output = (void *)name;
     ioarg.output_len = len;
+    ioarg.main_cmd = ASCEND_UB_CMD_BASIC;
+    ioarg.sub_cmd = ASCEND_UB_SUBCMD_GET_URMA_NAME;
+    ioarg.filter_len = 0;
 
     ret = errno_to_user_errno(DmsIoctl(DMS_IOCTL_CMD, &ioarg));
     if (ret == DRV_ERROR_NO_DEVICE) {
@@ -93,10 +97,10 @@ STATIC int dms_cmp_urma_eid(urma_eid_t *eid1, urma_eid_t *eid2)
 STATIC int dms_fill_eid_index_and_urma_dev(struct dms_eid_query_info *query_info, struct dms_ub_dev_info *eid_info,
     uint32_t dev_id)
 {
+    urma_device_t *urma_dev = NULL;
     urma_eid_t eid;
     urma_eid_info_t *eid_list;
     uint32_t eid_cnt, i;
-    urma_device_t *urma_dev = NULL;
 
     dms_copy_urma_eid_from_addr_info(&eid, &query_info->local_eid[query_info->min_idx]);
     urma_dev = urma_get_device_by_eid(eid, URMA_TRANSPORT_UB);
@@ -133,10 +137,10 @@ STATIC int dms_fill_eid_index_and_urma_dev(struct dms_eid_query_info *query_info
 drvError_t dms_get_ub_dev_info(unsigned int dev_id, struct dms_ub_dev_info *eid_info, int *num)
 {
 #ifdef CFG_FEATURE_SUPPORT_UB
-    struct urd_cmd cmd = {0};
-    struct urd_cmd_para cmd_para = {0};
-    int ret, i;
     struct dms_eid_query_info query_info = {0};
+    struct urd_cmd_para cmd_para = {0};
+    struct urd_cmd cmd = {0};
+    int ret, i;
 
     if ((eid_info == NULL) || (num == NULL)) {
         DMS_ERR("eid_info or num is Null.(devid=%u)\n", dev_id);
@@ -191,10 +195,10 @@ unsigned int g_share_token_val[DMS_MAX_DEV_NUM] = {0};
 #define DMS_INVALID_TOKEN_VAL 0
 drvError_t dms_get_token_val(unsigned int dev_id, unsigned int type, unsigned int *val)
 {
-    struct urd_cmd cmd = {0};
     struct urd_cmd_para cmd_para = {0};
-    int ret;
+    struct urd_cmd cmd = {0};
     unsigned int tmp_val;
+    int ret;
 
     if ((type >= TOKEN_VAL_TYPE_MAX) || (val == NULL)) {
         DMS_ERR("Type is invalid or val is Null.(type=%u; devid=%u)\n", type, dev_id);
@@ -235,11 +239,11 @@ drvError_t dms_get_token_val(unsigned int dev_id, unsigned int type, unsigned in
 drvError_t DmsGetUbInfo(unsigned int dev_id, int module_type, int info_type,
     void *buf, unsigned int *size)
 {
-    int ret;
-    struct dms_filter_st filter = {0};
-    struct urd_cmd cmd = {0};
-    struct urd_cmd_para cmd_para = {0};
     struct dms_hal_device_info_stru in = {0};
+    struct dms_filter_st filter = {0};
+    struct urd_cmd_para cmd_para = {0};
+    struct urd_cmd cmd = {0};
+    int ret;
 
     if ((buf == NULL) || (size == NULL) || (*size == 0)) {
         return DRV_ERROR_PARA_ERROR;
@@ -359,4 +363,181 @@ drvError_t dms_get_ub_bus_inst_eid(unsigned int dev_id, struct dms_ub_bus_inst_e
     (void)bus_inst_eid;
     return DRV_ERROR_NOT_SUPPORT;
 #endif
+}
+
+drvError_t dms_get_ub_dev_id_info(unsigned int dev_id, struct dms_ubdev_id_info *id_info)
+{
+#if (defined CFG_FEATURE_SUPPORT_UB) && (defined DRV_HOST)
+    struct urd_cmd_para cmd_para = {0};
+    struct urd_cmd cmd = {0};
+    int ret;
+
+    if (id_info == NULL) {
+        DMS_ERR("id_info is Null.(devid=%u)\n", dev_id);
+        return DRV_ERROR_PARA_ERROR;
+    }
+
+    if (dev_id >= DMS_MAX_DEV_NUM) {
+        DMS_ERR("dev_id is invalid.(devid=%u)\n", dev_id);
+        return DRV_ERROR_PARA_ERROR;
+    }
+
+    urd_usr_cmd_fill(&cmd, ASCEND_UB_CMD_BASIC, ASCEND_UB_SUBCMD_GET_DEV_ID_INFO, NULL, 0);
+    urd_usr_cmd_para_fill(&cmd_para, (void *)&dev_id, sizeof(unsigned int),
+        (void *)id_info, sizeof(struct dms_ubdev_id_info));
+    ret = urd_dev_usr_cmd(dev_id, &cmd, &cmd_para);
+    if (ret != 0) {
+        DMS_EX_NOTSUPPORT_ERR(ret, "Get id_info failed. (dev_id=%u; ret=%d)\n", dev_id, ret);
+        return DRV_ERROR_IOCRL_FAIL;
+    }
+    return DRV_ERROR_NONE;
+#else
+    (void)dev_id;
+    (void)id_info;
+    return DRV_ERROR_NOT_SUPPORT;
+#endif
+}
+
+#ifdef CFG_FEATURE_SUPPORT_MAMI
+#define MAMI_INPUT_MAX_SIZE 4096
+typedef int (*mami_init)(void *);
+typedef int (*mami_get_local_devid)(unsigned int *);
+typedef int (*mami_open_device)(unsigned int, struct mamiOpenDevInfo *);
+typedef int (*mami_get)(unsigned int, struct mamiCmdInfo *, unsigned char *, unsigned int);
+STATIC int dms_mami_int(void *handle, unsigned int *mami_dev_id)
+{
+    mami_init mami_init_func;
+    mami_get_local_devid mami_get_local_devid_func;
+    mami_open_device mami_open_device_func;
+    struct mamiOpenDevInfo info = {0};
+    int ret = 0;
+
+    mami_init_func = (mami_init)dlsym(handle, "mamiInit");
+    mami_get_local_devid_func = (mami_get_local_devid)dlsym(handle, "mamiGetLocalDevid");
+    mami_open_device_func = (mami_open_device)dlsym(handle, "mamiOpenDevice");
+    if ((mami_init_func == NULL) || (mami_get_local_devid_func == NULL) || (mami_open_device_func == NULL)) {
+        DMS_ERR("Unable to find the API for mami. (mami_init_is_NULL=%d; mami_get_local_devid_is_NULL=%d; "
+            "mami_open_device_is_NULL=%d)\n", (mami_init_func == NULL), (mami_get_local_devid_func == NULL),
+            (mami_open_device_func == NULL));
+        return DRV_ERROR_INNER_ERR;
+    }
+
+    ret = mami_init_func(NULL);
+    if (ret != 0) {
+        DMS_ERR("Failed to invoke mamiInit. (ret=%d)\n", ret);
+        return DRV_ERROR_INNER_ERR;
+    }
+
+    ret = mami_get_local_devid_func(mami_dev_id);
+    if (ret != 0) {
+        DMS_ERR("Failed to invoke mamiGetLocalDevid. (ret=%d)\n", ret);
+        return DRV_ERROR_INNER_ERR;
+    }
+
+    ret = mami_open_device_func(*mami_dev_id, &info);
+    if (ret != 0) {
+        DMS_ERR("Failed to invoke mamiOpenDevice. (mami_dev_id=%u; ret=%d)\n", *mami_dev_id, ret);
+        ret = DRV_ERROR_INNER_ERR;
+    }
+
+    return ret;
+}
+
+STATIC int dms_mami_get(void *handle, unsigned int mami_dev_id, struct mamiCmdInfo *cmd, void *buf, unsigned int size)
+{
+    mami_get mami_get_func = NULL;
+    int ret;
+
+    mami_get_func = (mami_get)dlsym(handle, "mamiGet");
+    if (mami_get_func == NULL) {
+        DMS_ERR("Unable to find the mamiGet.\n");
+        return DRV_ERROR_INNER_ERR;
+    }
+
+    ret = mami_get_func(mami_dev_id, cmd, (unsigned char *)buf, size);
+    if (ret != 0) {
+        DMS_ERR("Failed to query the ub dfx info. (mami_dev_id=%u; major=%u; minor=%u; size=%u; ret=%d)\n",
+            mami_dev_id, cmd->major, cmd->minor, size, ret);
+        ret = DRV_ERROR_INNER_ERR;
+    }
+
+    return ret;
+}
+
+STATIC int dms_get_ub_dfx_info(unsigned int dev_id, void *buf, unsigned int *size)
+{
+    struct dsmi_ub_dfx_input *input = (struct dsmi_ub_dfx_input *)buf;
+    unsigned char *input_buf = NULL;
+    struct mamiCmdInfo cmd = {0};
+    unsigned int mami_dev_id;
+    void *handle = NULL;
+    int ret = 0;
+
+    handle = dlopen("/usr/local/lib64/mami/libmami.so", RTLD_GLOBAL | RTLD_NOW);
+    if (handle == NULL) {
+        return DRV_ERROR_NOT_SUPPORT;
+    }
+
+    if (input->buf_size > MAMI_INPUT_MAX_SIZE) {
+        DMS_ERR("Invalid input buf size. (dev_id=%u; size=%u)\n", dev_id, input->buf_size);
+        dlclose(handle);
+        return DRV_ERROR_PARA_ERROR;
+    } else if (input->buf_size != 0 ) {
+        input_buf = (unsigned char *)malloc(input->buf_size);
+        if (input_buf == NULL) {
+            DMS_ERR("Failed to allocate memory. (dev_id=%u)", dev_id);
+            dlclose(handle);
+            return DRV_ERROR_OUT_OF_MEMORY;
+        }
+
+        ret = memcpy_s(input_buf, input->buf_size, input->buf, input->buf_size);
+        if (ret != 0) {
+            DMS_ERR("Failed to copy the input buf memory. (dev_id=%u; ret=%d)\n", dev_id, ret);
+            ret = DRV_ERROR_INNER_ERR;
+            goto UB_DFX_INFO_OUT;
+        }
+    }
+
+    ret = dms_mami_int(handle, &mami_dev_id);
+    if (ret != 0) {
+        goto UB_DFX_INFO_OUT;
+    }
+
+    cmd.major = input->major;
+    cmd.minor = input->minor;
+    cmd.size = input->buf_size;
+    cmd.buffer = input_buf;
+    ret = dms_mami_get(handle, mami_dev_id, &cmd, buf, *size);
+UB_DFX_INFO_OUT:
+    dlclose(handle);
+    if (input_buf != NULL) {
+        free(input_buf);
+        input_buf = NULL;
+    }
+    return ret;
+}
+#else
+STATIC int dms_get_ub_dfx_info(unsigned int dev_id, void *buf, unsigned int *size)
+{
+    (void)dev_id;
+    (void)buf;
+    (void)size;
+    return DRV_ERROR_NOT_SUPPORT;
+}
+#endif
+
+int dms_get_ub_info_by_dmp(unsigned int dev_id, unsigned int vfid, unsigned int sub_cmd, void *buf, unsigned int *size)
+{
+    (void)vfid;
+    if (dev_id > DMS_MAX_DEV_NUM || buf == NULL || size == NULL) {
+        DMS_ERR("Invalid parameter. (dev_id=%u; buf_is_NULL=%d; size_is_NULL=%d)\n",
+            dev_id, (buf == NULL), (size == NULL));
+        return DRV_ERROR_PARA_ERROR;
+    }
+
+    if (sub_cmd == DSMI_UB_INFO_SUB_CMD_UB_DFX_INFO) {
+        return dms_get_ub_dfx_info(dev_id, buf, size);
+    }
+
+    return DRV_ERROR_NOT_SUPPORT;
 }

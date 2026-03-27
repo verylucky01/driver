@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,14 +14,9 @@
 #ifndef _UDIS_TIMER_H_
 #define _UDIS_TIMER_H_
 
-#include <linux/list.h>
-#include <linux/rculist.h>
-#include <linux/mutex.h>
-#include <linux/hrtimer.h>
-#include <linux/workqueue.h>
-#include <linux/kthread.h>
-#include <linux/time.h>
-#include <linux/atomic.h>
+#include "ka_system_pub.h"
+#include "ka_task_pub.h"
+#include "ka_list_pub.h"
 #include "ka_base_pub.h"
 
 #define UDIS_TIMER_TASK_MAX_NUM 2048
@@ -43,8 +38,8 @@ struct udis_timer_task {
 };
 
 struct udis_period_task_node {
-    struct list_head node;
-    struct rcu_head rcu;
+    ka_list_head_t node;
+    ka_rcu_head_t rcu;
     char task_name[TASK_NAME_MAX_LEN];
     unsigned long privilege_data;
     int (*period_task_func)(unsigned int udevid, unsigned long privilege_data);
@@ -54,16 +49,16 @@ struct udis_period_task_node {
     unsigned int udevid;
     enum udis_timer_work_type work_type;
     ka_atomic_t queueflag;
-    struct workqueue_struct *workqueue;
-    struct work_struct work;
+    ka_workqueue_struct_t *workqueue;
+    ka_work_struct_t work;
 };
 
 struct udis_timer {
-    struct hrtimer timer;
-    struct mutex task_list_lock;
-    struct list_head period_task_list;
+    ka_hrtimer_t timer;
+    ka_mutex_t task_list_lock;
+    ka_list_head_t period_task_list;
     unsigned int task_num;
-    struct workqueue_struct *common_wq;
+    ka_workqueue_struct_t *common_wq;
 };
 
 int udis_timer_init(void);

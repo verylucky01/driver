@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -21,20 +21,7 @@
 #undef CONFIG_DEBUG_BUGVERBOSE
 #endif
 
-#include <linux/delay.h>
-#include <linux/irq.h>
-#include <linux/module.h>
-#include <linux/of_address.h>
-#include <linux/platform_device.h>
-#include <linux/uaccess.h>
-#include <linux/idr.h>
-#include <linux/errno.h>
-#include <linux/fs.h>
-#include <linux/sched.h>
-#include <linux/stat.h>
-#include <linux/io.h>
-#include <linux/pci.h>
-
+#include "ka_base_pub.h"
 #include "devdrv_user_common.h"
 #include "devdrv_manager_common.h"
 #include "devdrv_manager.h"
@@ -49,9 +36,8 @@
 #include "dms/dms_cmd_def.h"
 #include "urd_feature.h"
 #include "dms_urd_forward.h"
-#include "hvdevmng_cmd_proc.h"
-#include "ka_base_pub.h"
 #include "dms_urd_forward_uk_msg.h"
+#include "hvdevmng_cmd_proc.h"
 
 int hvdevmng_get_h2d_devinfo(u32 dev_id, u32 fid, struct vdevmng_ioctl_msg *iomsg)
 {

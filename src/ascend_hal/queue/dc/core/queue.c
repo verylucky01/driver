@@ -241,6 +241,7 @@ static drvError_t queue_init_mng_info(struct queue_manages *que_mng, const Queue
     que_mng->remote_devpid = QUE_INTER_DEV_INVALID_VALUE;
     que_mng->remote_grpid = QUE_INTER_DEV_INVALID_VALUE;
     que_mng->valid = QUEUE_CREATED;
+    que_mng->inter_dev_state = QUEUE_STATE_DISABLED;
 
     return DRV_ERROR_NONE;
 }
@@ -474,7 +475,7 @@ static drvError_t queue_destroy_local(unsigned int dev_id, unsigned int qid)
         return DRV_ERROR_NONE;
     }
 
-    if (que_manage->inter_dev_state == QUEUE_INTER_DEV_STATE_IMPORTED) {
+    if (que_manage->inter_dev_state == QUEUE_STATE_IMPORTED) {
         QUEUE_LOG_ERR("queue inter dev state err. (qid=%u)\n", qid);
         return DRV_ERROR_PARA_ERROR;
     }
@@ -549,6 +550,7 @@ drvError_t queue_reset_local(unsigned int dev_id, unsigned int qid)
             dev_id, qid, que_manage->valid);
         return DRV_ERROR_NOT_EXIST;
     }
+    
 #ifndef EMU_ST
     if (CAS(&que_manage->enque_cas, 0, 1) == false) {
         queue_put(qid);
@@ -908,7 +910,7 @@ static inline drvError_t queue_enqueue_para_check(unsigned int dev_id,  unsigned
     return DRV_ERROR_NONE;
 }
 
-drvError_t queue_en_queue_local(unsigned int dev_id, unsigned int qid, void *mbuf)
+drvError_t queue_enqueue_local(unsigned int dev_id, unsigned int qid, void *mbuf)
 {
     struct queue_manages *que_manage = NULL;
     enque_timestamps enque_timestamp = {0};
@@ -1175,7 +1177,7 @@ static inline drvError_t queue_dequeue_para_check(unsigned int dev_id, unsigned 
     return DRV_ERROR_NONE;
 }
 
-STATIC drvError_t queue_de_queue_local(unsigned int dev_id, unsigned int qid, void **mbuf)
+drvError_t queue_dequeue_local(unsigned int dev_id, unsigned int qid, void **mbuf)
 {
     struct queue_manages *que_manage = NULL;
     static THREAD pid_t g_deque_pid = 0;
@@ -2134,7 +2136,7 @@ static drvError_t (*g_peek_data[QUEUE_PEEK_DATA_TYPE_MAX])
         [QUEUE_PEEK_DATA_COPY_REF] = queue_peek_data_copy_ref,
 };
 
-static drvError_t queue_peek_data_local(unsigned int dev_id, unsigned int qid, unsigned int flag, QueuePeekDataType type,
+drvError_t queue_peek_data_local(unsigned int dev_id, unsigned int qid, unsigned int flag, QueuePeekDataType type,
     void **mbuf)
 {
     if (g_peek_data[type] == NULL) {
@@ -2368,6 +2370,37 @@ drvError_t queue_get_qid_create_time(unsigned int dev_id, unsigned int qid, unsi
     queue_put(qid);
     return DRV_ERROR_NONE;
 }
+
+bool queue_is_inter_dev(unsigned int dev_id, unsigned int qid)
+{
+    struct queue_manages *que_mng = NULL;
+    drvError_t ret;
+
+    ret = get_queue_manage_by_qid(dev_id, qid, &que_mng);
+    if (ret != DRV_ERROR_NONE) {
+        QUEUE_LOG_ERR("get que manage failed. (qid=%u; ret=%d)\n", qid, ret);
+        return false;
+    }
+
+    if (!queue_get(qid)) {
+        QUEUE_LOG_ERR("que get failed. (qid=%u)\n", qid);
+        return false;
+    }
+
+    if (que_mng->valid != QUEUE_CREATED) {
+        queue_put(qid);
+        QUEUE_LOG_ERR("que is not created. (qid=%u)\n", qid);
+        return false;
+    }
+
+    if ((que_mng->inter_dev_state == QUEUE_STATE_IMPORTED) || (que_mng->inter_dev_state == QUEUE_STATE_EXPORTED)) {
+        queue_put(qid);
+        return true;
+    }
+    queue_put(qid);
+    return false;
+}
+
 STATIC struct queue_comm_interface_list g_core_interface = {
     .queue_dc_init = queue_init_local,
     .queue_uninit = NULL,
@@ -2376,8 +2409,8 @@ STATIC struct queue_comm_interface_list g_core_interface = {
     .queue_attach = queue_attach_local,
     .queue_destroy = queue_destroy_local,
     .queue_reset = queue_reset_local,
-    .queue_en_queue = queue_en_queue_local,
-    .queue_de_queue = queue_de_queue_local,
+    .queue_en_queue = queue_enqueue_local,
+    .queue_de_queue = queue_dequeue_local,
     .queue_subscribe = queue_subscribe_local,
     .queue_unsubscribe = queue_unsubscribe_local,
     .queue_sub_f_to_nf_event = queue_sub_f_to_nf_event_local,

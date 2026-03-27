@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,10 +14,10 @@
 #ifndef VMNG_MEM_ALLOC_INTERFACE_H
 #define VMNG_MEM_ALLOC_INTERFACE_H
 
+#include "ka_memory_pub.h"
 #include "pbl/pbl_ka_memory.h"
 #include "ascend_hal_define.h"
-#include "ka_memory_pub.h"
-#ifndef CFG_SOC_PLATFORM_CLOUD_V4
+
 #define vmng_kmalloc(size, flags) ka_kmalloc(size, flags, ka_get_module_id(HAL_MODULE_TYPE_VMNG, KA_SUB_MODULE_TYPE_0))
 #define vmng_kzalloc(size, flags) ka_kzalloc(size, flags, ka_get_module_id(HAL_MODULE_TYPE_VMNG, KA_SUB_MODULE_TYPE_0))
 #define vmng_kcalloc(size, flags) ka_kcalloc(size, flags, ka_get_module_id(HAL_MODULE_TYPE_VMNG, KA_SUB_MODULE_TYPE_0))
@@ -61,13 +61,5 @@
     ka_dma_alloc_coherent(dev, size, dma_handle, gfp, ka_get_module_id(HAL_MODULE_TYPE_VMNG, KA_SUB_MODULE_TYPE_0))
 #define vmng_ka_dma_free_coherent(dev, size, cpu_addr, dma_handle) \
     ka_dma_free_coherent(dev, size, cpu_addr, dma_handle, ka_get_module_id(HAL_MODULE_TYPE_VMNG, KA_SUB_MODULE_TYPE_0))
-#else
-    #define vmng_kzalloc(size, flags) ka_mm_kzalloc(size, flags)
-    #define vmng_kfree(addr) ka_mm_kfree(addr)
-    #define __vmng_vmalloc(size, gfp_mask, prot) ka_vmalloc(size, gfp_mask, prot)
-    #define vmng_vfree(addr) ka_mm_vfree(addr)
-    #define vmng_ka_dma_alloc_coherent(dev, size, dma_handle, gfp) ka_mm_dma_alloc_coherent(dev, size, dma_handle, gfp)
-    #define vmng_ka_dma_free_coherent(dev, size, cpu_addr, dma_handle) ka_mm_dma_free_coherent(dev, size, cpu_addr, dma_handle)
-#endif
 
 #endif

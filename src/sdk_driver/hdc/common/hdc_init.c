@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,11 +11,11 @@
  * GNU General Public License for more details.
  */
 
+#include "ka_kernel_def_pub.h"
+#include "ka_compiler_pub.h"
 #include "hdc_init.h"
 
-#include "ka_kernel_def_pub.h"
-
-STATIC int __init init_hdc(void)
+STATIC int __ka_init init_hdc(void)
 {
     int ret;
 
@@ -34,7 +34,7 @@ STATIC int __init init_hdc(void)
     return ret;
 }
 
-STATIC void __exit exit_hdc(void)
+STATIC void __ka_exit exit_hdc(void)
 {
 #ifdef CFG_FEATURE_UB_COMM
 	hdcdrv_ub_exit_module();

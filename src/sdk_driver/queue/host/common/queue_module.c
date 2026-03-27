@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -12,67 +12,54 @@
  */
 #ifndef QUEUE_UT
 
-#include <linux/uaccess.h>
-#include <linux/delay.h>
-#include <linux/printk.h>
-#include <linux/mutex.h>
-#include <asm/atomic.h>
-#include <linux/hashtable.h>
-#include <linux/slab.h>
-#include <linux/cdev.h>
-#include <linux/mod_devicetable.h>
-#include <linux/ioctl.h>
-
-#include <linux/fs.h>
-#include <linux/module.h>
-
+#include "ka_kernel_def_pub.h"
+#include "ka_ioctl_pub.h"
 #include "queue_module.h"
 #include "queue_fops.h"
 
-
-STATIC int queue_open(struct inode *inode, struct file *file)
+STATIC int queue_open(ka_inode_t *inode, ka_file_t *file)
 {
     return queue_drv_open(inode, file);
 }
 
-STATIC int queue_release(struct inode *inode, struct file *file)
+STATIC int queue_release(ka_inode_t *inode, ka_file_t *file)
 {
     return queue_drv_release(inode, file);
 }
 
-STATIC long queue_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
+STATIC long queue_ioctl(ka_file_t *filep, unsigned int cmd, unsigned long arg)
 {
     if (filep->private_data == NULL) {
         queue_err("The filep private_data is NULL.\n");
         return -EINVAL;
     }
 
-    if (_IOC_TYPE(cmd) != QUEUE_IOC_MAGIC || (unsigned int)_IOC_NR(cmd) >= (unsigned int)QUEUE_CMD_MAX) {
-        queue_err("Cmd is invalid. (_IOC_TYPE=%u, _IOC_NR=%u)\n", _IOC_TYPE(cmd), _IOC_NR(cmd));
+    if (_KA_IOC_TYPE(cmd) != QUEUE_IOC_MAGIC || (unsigned int)_KA_IOC_NR(cmd) >= (unsigned int)QUEUE_CMD_MAX) {
+        queue_err("Cmd is invalid. (_IOC_TYPE=%u, _IOC_NR=%u)\n", _KA_IOC_TYPE(cmd), _KA_IOC_NR(cmd));
         return -EINVAL;
     }
 
     if (arg == 0) {
-        queue_err("Arg is null. (_IOC_NR=%u)\n", _IOC_NR(cmd));
+        queue_err("Arg is null. (_IOC_NR=%u)\n", _KA_IOC_NR(cmd));
         return -EINVAL;
     }
 
-    if (drv_queue_ioctl_handlers[_IOC_NR(cmd)] == NULL) {
-        queue_err("invalid cmd, cmd = %u\n", _IOC_NR(cmd));
+    if (drv_queue_ioctl_handlers[_KA_IOC_NR(cmd)] == NULL) {
+        queue_err("invalid cmd, cmd = %u\n", _KA_IOC_NR(cmd));
         return -EINVAL;
     }
 
-    return drv_queue_ioctl_handlers[_IOC_NR(cmd)](filep, cmd, arg);
+    return drv_queue_ioctl_handlers[_KA_IOC_NR(cmd)](filep, cmd, arg);
 }
 
-static const struct file_operations g_queue_fops = {
-    .owner =    THIS_MODULE,
+static const ka_file_operations_t g_queue_fops = {
+    .owner =    KA_THIS_MODULE,
     .unlocked_ioctl = queue_ioctl,
     .open = queue_open,
     .release = queue_release,
 };
 
-STATIC int __init queue_module_init(void)
+STATIC int KA_MODULE_INIT queue_module_init(void)
 {
     int ret;
 
@@ -85,15 +72,15 @@ STATIC int __init queue_module_init(void)
     return ret;
 }
 
-STATIC void __exit queue_module_exit(void)
+STATIC void KA_MODULE_EXIT queue_module_exit(void)
 {
     queue_drv_module_exit();
 }
 
-module_init(queue_module_init);
-module_exit(queue_module_exit);
+ka_module_init(queue_module_init);
+ka_module_exit(queue_module_exit);
 
-MODULE_LICENSE("GPL");
+KA_MODULE_LICENSE("GPL");
 #else
 void queue_module_ut(void)
 {

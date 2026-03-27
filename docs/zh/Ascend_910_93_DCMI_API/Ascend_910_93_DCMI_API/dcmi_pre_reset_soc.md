@@ -70,10 +70,10 @@
 
 **约束说明<a name="zh-cn_topic_0000001251307175_zh-cn_topic_0000001178054648_zh-cn_topic_0000001148439041_toc533412082"></a>**
 
-- 该接口在后续版本将会删除，推荐使用[dcmi\_set\_device\_pre\_reset](dcmi_set_device_pre_reset.md)。
-- CPLD版本为3.13及之后的版本支持芯片预复位功能。
-- 预复位指定芯片：对于Atlas 9000 A3 SuperPoD 集群算力系统预复位指定芯片所在的NPU模组；对于Atlas 900 A3 SuperPoD 超节点、Atlas 800T A3 超节点、Atlas 800I A3 超节点会预复位指定芯片所在的NPU模组及与其具备网口互助关系的NPU模组，网口互助关系的模组查询请参见[dcmi\_get\_netdev\_brother\_device](dcmi_get_netdev_brother_device.md)。
-- 对于Atlas 9000 A3 SuperPoD 集群算力系统、Atlas 900 A3 SuperPoD 超节点、Atlas 800T A3 超节点和Atlas 800I A3 超节点，该接口支持在物理机+特权容器场景下使用。
+-   该接口在后续版本将会删除，推荐使用[dcmi\_set\_device\_pre\_reset](dcmi_set_device_pre_reset.md)。
+-   CPLD版本为3.13及之后的版本支持芯片预复位功能。
+-   预复位指定芯片：对于Atlas 9000 A3 SuperPoD 集群算力系统预复位指定芯片所在的NPU模组；对于Atlas 900 A3 SuperPoD 超节点、Atlas 800T A3 超节点、Atlas 800I A3 超节点会预复位指定芯片所在的NPU模组及与其具备网口互助关系的NPU模组，网口互助关系的模组查询请参见[dcmi\_get\_netdev\_brother\_device](dcmi_get_netdev_brother_device.md)。
+-   对于Atlas 9000 A3 SuperPoD 集群算力系统、Atlas 900 A3 SuperPoD 超节点、Atlas 800T A3 超节点和Atlas 800I A3 超节点，该接口支持在物理机+特权容器场景下使用。
 
 **表 1** 不同部署场景下的支持情况
 
@@ -141,7 +141,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001251307175_zh-cn_topic_0000001178054648_zh-cn_topic_0000001148439041_toc533412083"></a>**
 
-```c
+```
 … 
 int ret = 0;
 int card_id = 0;
@@ -153,3 +153,4 @@ if (ret != 0) {
 }
 …
 ```
+

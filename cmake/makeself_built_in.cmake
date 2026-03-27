@@ -14,27 +14,17 @@
 set(MAKESELF_EXE ${CPACK_CMAKE_BINARY_DIR}/makeself/makeself.sh)
 set(MAKESELF_HEADER_EXE ${CPACK_CMAKE_BINARY_DIR}/makeself/makeself-header.sh)
 if(NOT MAKESELF_EXE)
-    message(FATAL_ERROR "makeself not found! Install it with: sudo apt install makeself")
+    message(FATAL_ERROR "makeself not found! Install it with: apt install makeself")
 endif()
 
 # 创建临时安装目录
-set(STAGING_DIR "${CPACK_CMAKE_BINARY_DIR}/_CPack_Packages/makeself_staging")
+set(STAGING_DIR "${CPACK_CMAKE_BINARY_DIR}/${CPACK_PKG_NAME}")
 file(MAKE_DIRECTORY "${STAGING_DIR}")
-
-# 执行安装到临时目录
-execute_process(
-    COMMAND "${CMAKE_COMMAND}" --install "${CPACK_CMAKE_BINARY_DIR}" --prefix "${STAGING_DIR}"
-    RESULT_VARIABLE INSTALL_RESULT
-)
-
-if(NOT INSTALL_RESULT EQUAL 0)
-    message(FATAL_ERROR "Installation to staging directory failed: ${INSTALL_RESULT}")
-endif()
 
 # 生成安装配置文件
 set(CSV_OUTPUT ${CPACK_CMAKE_BINARY_DIR}/filelist.csv)
 execute_process(
-    COMMAND python3 ${CPACK_CMAKE_SOURCE_DIR}/scripts/package/package.py --pkg_name driver --chip_name ${CPACK_SOC} --os_arch ${CPACK_OS_VERSION}-${CPACK_ARCH}
+    COMMAND python3 ${CPACK_CMAKE_SOURCE_DIR}/scripts/package/package.py --pkg_name ${CPACK_PKG_NAME} --feature_list ${CPACK_FEATURE_LIST} --chip_name ${CPACK_SOC} --os_arch ${CPACK_OS_VERSION}-${CPACK_ARCH}
     WORKING_DIRECTORY ${CPACK_CMAKE_BINARY_DIR}
     OUTPUT_VARIABLE result
     ERROR_VARIABLE error
@@ -43,7 +33,7 @@ execute_process(
 )
 message(STATUS "package.py result: ${code}")
 if (NOT code EQUAL 0)
-    message(FATAL_ERROR "Filelist generation failed: ${result}")
+    message(FATAL_ERROR "Filelist generation failed, execution result: ${result}, error: ${error}")
 else ()
     message(STATUS "Filelist generated successfully: ${result}")
 
@@ -57,24 +47,23 @@ set(SCENE_OUT_PUT
 
 configure_file(
     ${SCENE_OUT_PUT}
-    ${STAGING_DIR}/driver/scene.info
-    COPYONLY
-)
-configure_file(
-    ${CSV_OUTPUT}
-    ${STAGING_DIR}/
+    ${STAGING_DIR}/${CPACK_PKG_SCENE_INFO_INSTALL_PATH}
     COPYONLY
 )
 
 # makeself打包
-if(${CPACK_SOC} STREQUAL "ascend910B")
+if("${CPACK_SOC}" STREQUAL "ascend910B")
     set(FIND_PACKAGE_NAME "Ascend-hdk-910b-driver")
-    set(PACKAGE_PREFIX "Ascend-hdk-910b-driver")
-elseif(${CPACK_SOC} STREQUAL "ascend910_93")
-    set(FIND_PACKAGE_NAME "Ascend-hdk-910_93-driver")
-    set(PACKAGE_PREFIX "Ascend-hdk-A3-driver")
+    if("${CPACK_SOC_EX}" STREQUAL "ascend910_93")
+        set(PACKAGE_PREFIX "Ascend-hdk-A3-driver")
+    else()
+        set(PACKAGE_PREFIX "Ascend-hdk-910b-driver")
+    endif()
+elseif("${CPACK_SOC}" STREQUAL "ascend950")
+    set(FIND_PACKAGE_NAME "Ascend-hdk-950-driver")
+    set(PACKAGE_PREFIX "Ascend-hdk-950-driver")
 else()
-    message(FATAL_ERROR "Unknow: soc=${CPACK_SOC}")
+    message(FATAL_ERROR "Unknown: soc=${CPACK_SOC}")
 endif()
 
 file(STRINGS ${CPACK_CMAKE_BINARY_DIR}/makeself.txt script_output)
@@ -88,8 +77,8 @@ message(STATUS "package: ${package_name}")
 
 execute_process(COMMAND bash ${MAKESELF_EXE}
     --header ${MAKESELF_HEADER_EXE}
-    --help-header driver/script/help.info
-    ${makeself_param_string} driver/script/install.sh
+    --help-header ${CPACK_PKG_HELP_INFO_INSTALL_PATH}
+    ${makeself_param_string} ${CPACK_PKG_INSTALL_SH_INSTALL_PATH}
     WORKING_DIRECTORY ${STAGING_DIR}
     RESULT_VARIABLE EXEC_RESULT
     ERROR_VARIABLE  EXEC_ERROR

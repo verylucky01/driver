@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -27,6 +27,7 @@
 #include "svm_master_mem_create.h"
 #include "svm_master_mem_share.h"
 #include "ka_compiler_pub.h"
+#include "ka_base_pub.h"
 
 static bool devmm_is_d2h_access(u32 owner_udevid, u32 access_udevid)
 {
@@ -483,7 +484,9 @@ int devmm_msg_to_agent_mem_unmap(struct devmm_svm_process *svm_proc, struct devm
 static int _devmm_ioctl_mem_unmap(struct devmm_svm_process *svm_proc, struct devmm_vmma_info *info)
 {
     if (info->side == MEM_HOST_SIDE) {
+        svm_set_da_status(svm_proc, info->va, info->size, DEVMM_DA_STATUS_UNMAPING);
         devmm_mem_unmap(svm_proc, info);
+        svm_set_da_status(svm_proc, info->va, info->size, DEVMM_DA_STATUS_NONE);
         return 0;
     } else {
         return devmm_msg_to_agent_mem_unmap(svm_proc, info);
@@ -809,7 +812,7 @@ void devmm_destroy_all_heap_vmmas_by_devid(struct devmm_svm_process *svm_proc, u
         if (devmm_check_heap_is_entity(heap) == false) {
             continue;
         }
-        rbtree_postorder_for_each_entry_safe(vmma, tmp, &heap->vmma_mng.root, rbnode) {
+        ka_base_rbtree_postorder_for_each_entry_safe(vmma, tmp, &heap->vmma_mng.root, rbnode) {
             bool is_da_addr;
 
             devmm_try_cond_resched(&stamp);

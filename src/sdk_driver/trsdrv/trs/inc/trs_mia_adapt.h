@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -16,7 +16,7 @@
 #include "trs_id.h"
 int trs_mia_adapt_get_cq_group(struct trs_id_inst *inst, u32 group[], u32 group_num, u32 *valid_group_num);
 
-int trs_mia_adapt_alloc_id(struct trs_id_inst *inst, int type, u32 flag, u32 *id, u32 num);
+int trs_mia_adapt_alloc_id(struct trs_id_inst *inst, int type, u32 flag, u32 req_num, u32 *alloc_num, u32 *id);
 void trs_mia_adapt_free_id(struct trs_id_inst *inst, int type, int req_num, u32 *free_num, u32 *id);
 
 int trs_mia_adapt_get_id_range(struct trs_id_inst *inst, int type, u32 *start, u32 *end);

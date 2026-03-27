@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,6 +13,7 @@
 #ifndef EMU_ST
 #include "ka_kernel_def_pub.h"
 #include "ka_pci_pub.h"
+#include "ka_compiler_pub.h"
 
 #include "comm_kernel_interface.h"
 #include "pbl/pbl_soc_res.h"
@@ -36,8 +37,10 @@ static const ka_pci_device_id_t soc_driver_tbl[] = {
     {DEVDRV_DIVERSITY_PCIE_VENDOR_ID, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0},
     { 0x20C6, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
     { 0x203F, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+    { 0x20E9, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
     { 0x20C6, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
     { 0x203F, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+    { 0x20E9, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
     {}
 };
 KA_MODULE_DEVICE_TABLE(pci, soc_driver_tbl);
@@ -441,7 +444,7 @@ static int soc_platform_host_notifier_func(u32 udevid, enum uda_notified_action 
     return ret;
 }
 
-static int __init soc_platform_init(void)
+static int __ka_init soc_platform_init(void)
 {
     struct uda_dev_type type;
     int ret;
@@ -465,7 +468,7 @@ static int __init soc_platform_init(void)
 }
 ka_module_init(soc_platform_init);
 
-static void __exit soc_platform_exit(void)
+static void __ka_exit soc_platform_exit(void)
 {
     struct uda_dev_type type;
 

@@ -9,6 +9,7 @@
  */
 
 #include "msnpureport_report.h"
+#include <sys/statvfs.h>
 #include "mmpa_api.h"
 #include "adx_api.h"
 #include "adcore_api.h"
@@ -47,6 +48,8 @@
 #define PERMANENT_TIMEOUT 1000U
 #define WAIT_ALL_DEVICE_UPDATE_TIME 10
 #define INVALID_MASTER_ID (-1)
+#define DEFAULT_BBOX_SIZE (10 * 1024 * 1024)  // 10MB = 10 * 1024 * 1024 字节
+#define DISK_SPACE_WARNING_THRESHOLD (20ULL * 1024ULL * 1024ULL)  // 20MB
 
 typedef int32_t (*DsmiSubscribeFaultEvent) (int, struct dsmi_event_filter, fault_event_callback);
 
@@ -180,8 +183,13 @@ static int GetSpecificLogs(const ThreadArgInfo *threadArgInfo, int logType, cons
         return EN_ERROR;
     }
     if (strcmp(logPath, SINGLE_EXPORT_LOG) == 0) {
+#ifdef HDC_NEW_CHANNEL
+        ret = AdxGetSpecifiedFile((uint16_t)(threadArgInfo->phyId), fullPath, logPath,
+            (int32_t)HDC_SERVICE_TYPE_PROFILING, (int32_t)COMPONENT_SYS_GET);
+#else
         ret = AdxGetSpecifiedFile((uint16_t)(threadArgInfo->phyId), fullPath, logPath,
             (int32_t)HDC_SERVICE_TYPE_LOG, (int32_t)COMPONENT_SYS_GET);
+#endif
     } else {
         ret = AdxGetDeviceFileTimeout((uint16_t)(threadArgInfo->phyId), fullPath, logPath, timeout);
     }
@@ -511,6 +519,160 @@ static void MsnReportStop(void)
     }
 }
 
+#ifdef UB_SUPPORT
+STATIC int32_t MsnWriteUBInfoData(const char *writeFile, const char *buffer, uint32_t bufferSize)
+{
+    uint32_t fileMode = 0600;
+    int32_t fd = ToolOpenWithMode(writeFile, (uint32_t)O_CREAT | (uint32_t)O_WRONLY | (uint32_t)O_APPEND, fileMode);
+    if (fd < 0) {
+        SELF_LOG_ERROR("open file failed with mode, file: %s, strerr: %s.", writeFile, strerror(ToolGetErrorCode()));
+        return EN_ERROR;
+    }
+    int32_t ret = ToolWrite(fd, buffer, bufferSize);
+    if ((ret < 0) || ((uint32_t)ret != bufferSize)) {
+        LOG_CLOSE_FD(fd);
+        SELF_LOG_ERROR("write log to file:%s failed, data length: %u bytes, strerr: %s.", writeFile,
+            bufferSize, strerror(ToolGetErrorCode()));
+        return EN_ERROR;
+    }
+    ret = ToolFChownPath(fd);
+    if (ret != EN_OK) {
+        SELF_LOG_ERROR("change file:%s owner failed, file: %s, ret: %d, strerr: %s.", writeFile,
+            writeFile, ret, strerror(ToolGetErrorCode()));
+    }
+    LOG_CLOSE_FD(fd);
+    return EN_OK;
+}
+STATIC const char* GetUBInfoFileName(unsigned int ubDataType)
+{
+    const char* ub_file_name[] = {
+        "port_status.bin",
+        "port_perf_test.bin",
+        "dlphy_get_config.bin",
+        "ubnl_dfx_statistic.bin",
+        "ubnl_dfx_ssu_schedule.bin",
+        "ubnl_dfx_config_item.bin",
+        "ubmem_daw.bin",
+        "ubtpl_acl_src.bin",
+        "sl_to_vl.bin",
+        "invalid.bin"
+    };
+    if (ubDataType >= UB_INFO_MAX) {
+        SELF_LOG_WARN("Uninvalid ub datatype, dataType=%u.", ubDataType);
+        return "invalid.bin";
+    }
+    return ub_file_name[ubDataType];
+}
+STATIC int32_t getDrvUBInfo(uint32_t devId, uint32_t ubDataType, void* buffer, uint32_t *bufferSizePtr) {
+    (void)memset_s(buffer, MAX_UB_INFO_SIZE, 0, MAX_UB_INFO_SIZE);
+    *bufferSizePtr = MAX_UB_INFO_SIZE;
+    struct DsmiUbDfxInput* ubDfxInput = (struct DsmiUbDfxInput*)buffer;
+    struct UbMamiStatsKey* UbMamiStatsKeyBufPtr = NULL;
+    struct UbMamiTplAclQry* UbMamiTplAclQryBufPtr = NULL;
+    struct UbQosSl2VlCmd* UbQosSl2VlCmdBufPtr = NULL;
+    switch (ubDataType) {
+        case UB_INFO_UBNL_DFX_STATISTIC:
+            ubDfxInput->major = UB_MAMI_CMD_UBNL;
+            ubDfxInput->minor = UB_INFO_UBNL_DFX_STATISTIC_PARAM_MINOR;
+            ubDfxInput->buf_size = sizeof(struct UbMamiStatsKey);
+            UbMamiStatsKeyBufPtr = (struct UbMamiStatsKey*)(ubDfxInput->buf);
+            UbMamiStatsKeyBufPtr->idType = UB_INFO_UBNL_DFX_PARAM_ID_TYPE;
+            UbMamiStatsKeyBufPtr->planeId = UB_INFO_UBNL_DFX_PARAM_PLANE_ID;
+            break;
+        case UB_INFO_UBNL_DFX_SSU_SCHEDULE:
+            ubDfxInput->major = UB_MAMI_CMD_UBNL;
+            ubDfxInput->minor = UB_INFO_UBNL_DFX_SSU_SCHEDULE_PARAM_MINOR;
+            ubDfxInput->buf_size = sizeof(struct UbMamiStatsKey);
+            UbMamiStatsKeyBufPtr = (struct UbMamiStatsKey*)(ubDfxInput->buf);
+            UbMamiStatsKeyBufPtr->idType = UB_INFO_UBNL_DFX_PARAM_ID_TYPE;
+            UbMamiStatsKeyBufPtr->planeId = UB_INFO_UBNL_DFX_PARAM_PLANE_ID;
+            break;
+        case UB_INFO_UBNL_DFX_CONFIG_ITEM:
+            ubDfxInput->major = UB_MAMI_CMD_UBNL;
+            ubDfxInput->minor = UB_INFO_UBNL_DFX_CONFIG_ITEM_PARAM_MINOR;
+            ubDfxInput->buf_size = sizeof(struct UbMamiStatsKey);
+            UbMamiStatsKeyBufPtr = (struct UbMamiStatsKey*)(ubDfxInput->buf);
+            UbMamiStatsKeyBufPtr->idType = UB_INFO_UBNL_DFX_PARAM_ID_TYPE;
+            UbMamiStatsKeyBufPtr->planeId = UB_INFO_UBNL_DFX_PARAM_PLANE_ID;
+            break;
+        case UB_INFO_UBMEM_DAW:
+            ubDfxInput->major = UB_MAMI_CMD_UBMEM;
+            ubDfxInput->minor = UB_INFO_UBMEM_DAW_PARAM_MINOR;
+            ubDfxInput->buf_size = 0;
+            break;
+        case UB_INFO_UBTPL_ACL:
+            ubDfxInput->major = UB_MAMI_CMD_UBTPL;
+            ubDfxInput->minor = UB_INFO_UBTPL_ACL_PARAM_MINOR;
+            ubDfxInput->buf_size = sizeof(struct UbMamiTplAclQry);
+            UbMamiTplAclQryBufPtr = (struct UbMamiTplAclQry*)(ubDfxInput->buf);
+            UbMamiTplAclQryBufPtr->fieldMask = UB_INFO_UBTPL_ACL_PARMA_MASK;
+            UbMamiTplAclQryBufPtr->planeId = 0;
+            break;
+        case UB_INFO_SL_TO_VL:
+            ubDfxInput->major = UB_MAMI_CMD_UBQOS;
+            ubDfxInput->minor = UB_INFO_SL_TO_VL_PARAM_MINOR;
+            ubDfxInput->buf_size = sizeof(struct UbQosSl2VlCmd);
+            UbQosSl2VlCmdBufPtr = (struct UbQosSl2VlCmd*)(ubDfxInput->buf);
+            UbQosSl2VlCmdBufPtr->plane_id = 0;
+            UbQosSl2VlCmdBufPtr->num = UB_INFO_UBQOS_MAX_SL_NUM;
+            *bufferSizePtr = sizeof(struct UbQosSl2VlCmd);
+            break;
+        default:
+            SELF_LOG_WARN("UNSUPPORTED UB INFO TYPE:%u", ubDataType);
+            break;
+    }
+    drvError_t err = dsmi_get_device_info(devId, DSMI_MAIN_CMD_UB, UB_SUB_CMD_UB_DFX_INFO, buffer, bufferSizePtr);
+    return err;
+}
+STATIC int32_t MsnSyncDeviceUBInfo(uint32_t devId, uint32_t ubDataType, const char* fullPath,
+        void* buffer, uint32_t *bufferSizePtr) {
+    int ret = 0;
+    ret = getDrvUBInfo(devId, ubDataType, buffer, bufferSizePtr);
+    ONE_ACT_WARN_LOG(ret != DRV_ERROR_NONE, return EN_ERROR, "Can not get device ub info, \
+        device id:%u ub info:%u, err=%d.", devId, ubDataType, ret);
+    const char* fileName = GetUBInfoFileName(ubDataType);
+    char fullFileName[MMPA_MAX_PATH + 1] = { 0 };
+    ret = snprintf_s(fullFileName, MMPA_MAX_PATH + 1, MMPA_MAX_PATH, "%s/%s", fullPath, fileName);
+    ONE_ACT_ERR_LOG(ret == -1, return EN_ERROR, "copy full file name failed, device id:%u ub info:%u",
+        devId, ubDataType);
+    ret = MsnWriteUBInfoData(fullFileName, buffer, *bufferSizePtr);
+    SELF_LOG_INFO("Export logs to dir succeed: %s/device-%u/%s", UB_INFO_HISI_LOGS_DIR, devId, UB_INFO_DIR);
+    return ret;
+}
+STATIC int32_t MsnCreateUBInfoRootDir(uint32_t logicId, char* fullPath) {
+    int32_t ret = 0;
+    ret = snprintf_s(fullPath, MMPA_MAX_PATH + 1, MMPA_MAX_PATH, "%s/%s/device-%u/%s",
+        g_logPath, UB_INFO_HISI_LOGS_DIR, logicId, UB_INFO_DIR);
+    ONE_ACT_ERR_LOG(ret == -1, return EN_ERROR, "copy path failed");
+    ret = MsnMkdirMulti(fullPath);
+    ONE_ACT_ERR_LOG(ret != EN_OK, return EN_ERROR, "mkdir path %s failed, strerr: %s, ret: %d.",
+        fullPath, strerror(ToolGetErrorCode()), ret);
+    return EN_OK;
+}
+STATIC int32_t MsnSyncDeviceAllUBInfo(uint32_t logicId) {
+    uint32_t ubTypeArr[] = {
+        UB_INFO_UBNL_DFX_STATISTIC, UB_INFO_UBNL_DFX_SSU_SCHEDULE, UB_INFO_UBNL_DFX_CONFIG_ITEM,
+        UB_INFO_UBMEM_DAW, UB_INFO_UBTPL_ACL, UB_INFO_SL_TO_VL
+    };
+    uint32_t ubTypeArrSize = sizeof(ubTypeArr)/sizeof(ubTypeArr[0]);
+    uint32_t bufferSize = MAX_UB_INFO_SIZE;
+    void *buffer = MsnMalloc(bufferSize);
+    ONE_ACT_ERR_LOG(buffer == NULL, return EN_ERROR, "malloc sync ub info failed, size=%d", MAX_UB_INFO_SIZE);
+    char fullPath[MMPA_MAX_PATH + 1] = { 0 };
+    int32_t ret = MsnCreateUBInfoRootDir(logicId, fullPath);
+    ONE_ACT_ERR_LOG(ret == -1, XFREE(buffer); return EN_ERROR, "create ub info dir failed");
+    for (uint32_t i = 0; i < ubTypeArrSize; i++) {
+        uint32_t ubDataType = ubTypeArr[i];
+        ret = MsnSyncDeviceUBInfo(logicId, ubDataType, fullPath, buffer, &bufferSize);
+        if (ret != EN_OK) {
+            SELF_LOG_WARN("MsnSyncDeviceUBInfo fail, devId=%u, dataType:%u.", logicId, ubDataType);
+        }
+        (void)ToolSleep(UB_INFO_WAIT_TIME);
+    }
+    XFREE(buffer);
+    return EN_OK;
+}
+#endif
 /**
  * @brief MsnSyncDeviceLog: start thread to receive files from device
  * @param [in]opt: bbox dump opt
@@ -529,11 +691,31 @@ static int32_t MsnSyncDeviceLog(uint32_t logicId, const struct BboxDumpOpt *opt,
     }
     int32_t err = 0;
     if ((logType == (int32_t)ALL_LOG) || (logType == (int32_t)HISILOGS_LOG) || (logType == (int32_t)VMCORE_FILE)) {
+        mmDiskSize diskSize;
+        (void)memset_s(&diskSize, sizeof(diskSize), 0, sizeof(diskSize));
+        err =  mmGetDiskFreeSpace(g_logPath, &diskSize);
+        if (err == EN_OK && diskSize.freeSize >= DEFAULT_BBOX_SIZE) {
         err = BboxStartSyncFile(logicId, opt, logType);
-        if (err != EN_OK) {
-            SELF_LOG_ERROR("start to sync bbox dump failed.");
+            ONE_ACT_ERR_LOG(err != EN_OK, return EN_ERROR, "start to sync bbox dump failed.");
+        } else {
+            ULONGLONG freeSize = diskSize.freeSize / 1024 / 1024;
+            SELF_LOG_ERROR("No space left on device.");
+            SELF_LOG_ERROR("Available space (%lluM) less than 10M. Bbox data will not be collected.", freeSize);
         }
     }
+    #ifdef UB_SUPPORT
+    if (logType == (int32_t)UB_LOG) {
+        for (uint32_t i = 0; i < g_msnDeviceInfo.devNum; i++) {
+            if ((logicId != MAX_DEV_NUM) && (i != logicId)) {
+                continue;
+            }
+            err = MsnSyncDeviceAllUBInfo(i);
+        if (err != EN_OK) {
+                SELF_LOG_WARN("start to sync ub log failed.");
+            }
+        }
+    }
+    #endif
     MsnReportStop();
     return ((ret == EN_OK) && (err == EN_OK)) ? EN_OK : EN_ERROR;
 }
@@ -601,6 +783,34 @@ STATIC int32_t CreateLogRootPath(void)
     return flag == true ? EN_OK : EN_ERROR;
 }
 
+STATIC int32_t SetLogRootPath(const char *outputPath)
+{
+    char *currentPath = (char *)calloc(1, MMPA_MAX_PATH + 1);
+    ONE_ACT_ERR_LOG(currentPath == NULL, return EN_ERROR, "calloc failed, strerr=%s.", strerror(mmGetErrorCode()));
+    bool flag = false;
+    do {
+        if (mmGetCwd(currentPath, MMPA_MAX_PATH) != EN_OK) {
+            SELF_LOG_ERROR("get current path failed, strerr=%s.", strerror(mmGetErrorCode()));
+            break;
+        }
+        if (strlen(outputPath) >= MMPA_MAX_PATH) {
+            SELF_LOG_ERROR("Output path too long.");
+            break;
+        }
+        if (sprintf_s(g_logPath, MMPA_MAX_PATH + 1, "%s/%s", currentPath, outputPath) == -1) {
+            SELF_LOG_ERROR("strcpy_s failed for output path.");
+            break;
+        }
+        if (mmAccess(g_logPath) != EN_OK) {
+            SELF_LOG_ERROR("%s is not access.", g_logPath);
+            break;
+        }
+        MSNPU_FPRINTF("Start exporting logs to specified path: %s\n", g_logPath);
+        flag = true;
+    } while (0);
+    free(currentPath);
+    return flag == true ? EN_OK : EN_ERROR;
+}
 STATIC bool IsHaveExecPermission(void)
 {
 #if (OS_TYPE == LINUX)
@@ -608,6 +818,19 @@ STATIC bool IsHaveExecPermission(void)
 #else
     return false;
 #endif
+}
+static void CheckDiskSpaceWarning(const char *path)
+{
+    struct statvfs stat;
+    if (statvfs(path, &stat) != 0) {
+        SELF_LOG_WARN("Failed to check disk space for path: %s, strerr: %s.", path, strerror(errno));
+        return;
+    }
+    uint64_t freeBytes = (uint64_t)stat.f_bavail * (uint64_t)stat.f_bsize;
+    if (freeBytes < DISK_SPACE_WARNING_THRESHOLD) {
+        MSNPU_WAR("Insufficient disk space (available: %llu MB), only partial logs may be exported.",
+            (unsigned long long)(freeBytes / (1024ULL * 1024ULL)));
+    }
 }
 
 /**
@@ -626,6 +849,7 @@ STATIC int32_t SyncDeviceLog(uint32_t logicId, const struct BboxDumpOpt *opt, in
     if (CreateLogRootPath() != EN_OK) {
         return EN_ERROR;
     }
+    CheckDiskSpaceWarning(g_logPath);
 
     if (logType == (int32_t)ALL_LOG) {
         GetHostDrvLog();
@@ -743,7 +967,11 @@ static void MsnReportSaveSlog(uint32_t devId, uint32_t timeout, void **handle, T
     while ((retryTime < MAX_RETRY_TIME) && !threadArgInfo->isThreadExit) {
         if (AdxIsCommHandleValid(*handle) != IDE_DAEMON_OK) {
             retryTime++;
+#ifdef HDC_NEW_CHANNEL
+            ret = MsnReportCreateLongLink(devId, timeout, handle, HDC_SERVICE_TYPE_PROFILING, COMPONENT_SYS_REPORT);
+#else
             ret = MsnReportCreateLongLink(devId, timeout, handle, HDC_SERVICE_TYPE_LOG, COMPONENT_SYS_REPORT);
+#endif
             if (ret == EN_OK) {
                 retryTime = 0;
                 continue;
@@ -789,7 +1017,11 @@ STATIC void *MsnReportRecvSlogd(void *args)
     uint32_t logicId = threadArgInfo->logicId;
     void *handle = NULL;
     uint32_t timeout = 1000;
+#ifdef HDC_NEW_CHANNEL
+    ret = MsnReportCreateLongLink(logicId, timeout, &handle, HDC_SERVICE_TYPE_PROFILING, COMPONENT_SYS_REPORT);
+#else
     ret = MsnReportCreateLongLink(logicId, timeout, &handle, HDC_SERVICE_TYPE_LOG, COMPONENT_SYS_REPORT);
+#endif
     if (ret != EN_OK) {
         threadArgInfo->isThreadExit = true;
         SELF_LOG_ERROR("Create long link to slogd failed, dev os %ld.", threadArgInfo->devOsId);
@@ -1038,12 +1270,19 @@ STATIC int32_t MsnReportPermanent(uint32_t devId, FileAgeingParam *param)
         SELF_LOG_ERROR("Not have permission to export files.");
         return EN_ERROR;
     }
-
+    bool setPathFlag = false;
     // create directory
+    if (param->outputFileName[0] == '\0') {
     if (CreateLogRootPath() != EN_OK) {
         return EN_ERROR;
     }
-
+    } else {
+        if (SetLogRootPath(param->outputFileName) != EN_OK) {
+            SELF_LOG_ERROR("SetLogRootPath failed");
+            return EN_ERROR;
+        }
+        setPathFlag = true;
+    }
     if (MsnReportInitDevInfo(devId) != EN_OK) {
         return EN_ERROR;
     }
@@ -1051,6 +1290,12 @@ STATIC int32_t MsnReportPermanent(uint32_t devId, FileAgeingParam *param)
     // init param
     if (MsnFileMgrInit(param, g_logPath) != EN_OK) {
         return EN_ERROR;
+    }
+    if (setPathFlag) {
+        SELF_LOG_INFO("Scanning and aging existing files in %s", g_logPath);
+        if (MsnFileMgrScanAndAge(g_logPath) != EN_OK) {
+            SELF_LOG_WARN("Scan and age existing files failed, continue anyway.");
+        }
     }
 
     // subscriber fault event

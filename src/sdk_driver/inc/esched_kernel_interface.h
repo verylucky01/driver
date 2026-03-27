@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -64,11 +64,9 @@ drvError_t register_esched_trace_record_func(unsigned int grp_id, unsigned int e
 
 int hal_kernel_sched_submit_event(unsigned int chip_id, struct sched_published_event *event);
 int sched_query_local_task_gid(unsigned int chip_id, int pid, const char *grp_name, unsigned int *gid);
-int sched_query_local_trace(unsigned int chip_id,
-    int pid, unsigned int gid, unsigned int tid, struct sched_sync_event_trace *sched_trace);
-int sched_query_sync_event_trace(unsigned int chip_id,
-    unsigned int dev_pid, unsigned int gid, unsigned int tid, struct sched_sync_event_trace *trace_result);
-
+int sched_query_local_trace(unsigned int chip_id, int pid, unsigned int gid, unsigned int tid, struct sched_sync_event_trace *sched_trace);
+int sched_query_sync_event_trace(unsigned int chip_id, struct sched_trace_input *para, struct sched_sync_event_trace *trace_result);
+int sched_query_curr_non_sched_event(unsigned int chip_id, struct sched_trace_input *para, struct sched_sync_event_trace *trace_result);
 typedef int (*sched_event_pre_proc)(unsigned int udevid, struct sched_published_event_info *event_info,
     struct sched_published_event_func *event_func);
 int hal_kernel_sched_register_event_pre_proc_handle(unsigned int event_id, SCHED_PROC_POS pos, sched_event_pre_proc handle);

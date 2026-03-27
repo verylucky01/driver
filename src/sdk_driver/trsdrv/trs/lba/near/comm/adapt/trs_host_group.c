@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,6 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
+#include "ka_memory_pub.h"
 #include "pbl/pbl_uda.h"
 #include "comm_kernel_interface.h"
 #include "pbl/pbl_soc_res.h"
@@ -48,7 +49,7 @@ int trs_get_vfid_by_grp_id(u32 devid, u32 grp_id, u32 *vfid)
 static bool *g_trs_sqcq_change_flag[TRS_DEV_MAX_NUM] = {NULL};
 static int trs_sqcq_change_flag_create(u32 udevid)
 {
-    g_trs_sqcq_change_flag[udevid] = (bool *)vzalloc(sizeof(bool) * TRS_SQCQ_MAX_SLICE_NUM);
+    g_trs_sqcq_change_flag[udevid] = (bool *)ka_mm_vzalloc(sizeof(bool) * TRS_SQCQ_MAX_SLICE_NUM);
     if (g_trs_sqcq_change_flag[udevid] == NULL) {
         return -ENOMEM;
     }
@@ -58,7 +59,7 @@ static int trs_sqcq_change_flag_create(u32 udevid)
 static void trs_sqcq_change_flag_destroy(u32 udevid)
 {
     if (g_trs_sqcq_change_flag[udevid] != NULL) {
-        vfree(g_trs_sqcq_change_flag[udevid]);
+        ka_mm_vfree(g_trs_sqcq_change_flag[udevid]);
         g_trs_sqcq_change_flag[udevid] = NULL;
     }
 }

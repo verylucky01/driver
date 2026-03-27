@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -129,4 +129,39 @@ struct hdcdrv_ctrl_msg {
     };
 } __attribute__((aligned(128)));
 
+/* dma payload is 128 bytes; cq/sq must aligned with 128, not within same cacheline */
+/* sq cq description */
+struct hdcdrv_sq_desc {
+    int local_session;
+    int remote_session;
+    unsigned long long src_data_addr;
+    unsigned long long dst_data_addr;
+    unsigned long long src_ctrl_addr;
+    unsigned long long dst_ctrl_addr;
+    unsigned int offset;         // src data addr seque offset, used for CFG_FEATURE_OVER_XCOM
+    int data_len;
+    int ctrl_len;
+    unsigned int src_pid;
+    unsigned int src_fid;
+#ifdef CFG_FEATURE_PFSTAT
+    unsigned int trans_id;
+#endif
+    unsigned int inner_checker;
+    unsigned int desc_crc;
+    unsigned int valid;
+} __attribute__((aligned(128)));
+
+struct hdcdrv_cq_desc {
+    int status; /* if status > 0  is pcie err, other hdc err */
+    unsigned int sq_head;
+    int session;
+    unsigned int desc_crc;
+    unsigned int valid;
+} __attribute__((aligned(128)));
+
+#define HDCDRV_SQ_RESV_LEN 2
+#define HDCDRV_SQ_DESC_SIZE sizeof(struct hdcdrv_sq_desc)
+#define HDCDRV_SQ_DESC_CRC_LEN ka_offsetof(struct hdcdrv_sq_desc, desc_crc)
+#define HDCDRV_CQ_DESC_SIZE sizeof(struct hdcdrv_cq_desc)
+#define HDCDRV_CQ_DESC_CRC_LEN ka_offsetof(struct hdcdrv_cq_desc, desc_crc)
 #endif

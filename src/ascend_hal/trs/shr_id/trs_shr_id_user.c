@@ -70,6 +70,7 @@ static drvError_t shrid_proc(uint32_t cmd, const char *name, struct shr_id_ioctl
     ioctl_info->shr_id = tmp_info.shr_id;
     ioctl_info->flag = tmp_info.flag;
     ioctl_info->enable_flag = tmp_info.enable_flag;
+    ioctl_info->rsv[0] = tmp_info.rsv[0];
 
     return DRV_ERROR_NONE;
 }
@@ -252,6 +253,7 @@ drvError_t halShrIdOpen(const char *name, struct drvShrIdInfo *info)
         info->shrid = ioctl_info.shr_id;
         info->id_type = ioctl_info.id_type;
         info->flag = ioctl_info.flag;   // for spod
+        info->rsv[0] = ioctl_info.rsv[0];
         if ((ioctl_info.flag & TSDRV_FLAG_REMOTE_ID) != 0) {
             if (dev_id >= TRS_DEV_NUM) {
                 (void)halShrIdClose(name);

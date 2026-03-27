@@ -16,6 +16,7 @@ if(POLICY CMP0135)
 endif()
 
 set(C_SEC_HEAD_SEARCH_PATHS
+    ${CANN_3RD_LIB_PATH}/abl/libc_sec/include             # compile with ci
     ${CANN_3RD_LIB_PATH}/libboundscheck
 )
 
@@ -36,22 +37,16 @@ if(NOT C_SEC_INCLUDE)
     set(C_SEC_INCLUDE ${EXTERN_DEPEND_SOURCE_DIR}/libc_sec/include)
 
     configure_file(
-        ${PROJECT_SOURCE_DIR}/cmake/config/c_sec_config/c_sec.mk
-        ${EXTERN_DEPEND_SOURCE_DIR}/libc_sec/Makefile
-        COPYONLY
-    )
-
-    configure_file(
         ${PROJECT_SOURCE_DIR}/cmake/config/c_sec_config/c_sec.cmake
         ${EXTERN_DEPEND_SOURCE_DIR}/libc_sec/CMakeLists.txt
         COPYONLY
     )
 
-    configure_file(
-        ${PROJECT_SOURCE_DIR}/cmake/config/c_sec_config/securecmodule.c
-        ${EXTERN_DEPEND_SOURCE_DIR}/libc_sec/src/securecmodule.c
-        COPYONLY
-    )
+    execute_process(
+            COMMAND bash -c "cp ${PROJECT_SOURCE_DIR}/src/sdk_driver/seclib/Makefile ${EXTERN_DEPEND_SOURCE_DIR}/libc_sec/Makefile"
+            COMMAND bash -c "cp ${PROJECT_SOURCE_DIR}/src/sdk_driver/seclib/securecmodule.c ${EXTERN_DEPEND_SOURCE_DIR}/libc_sec/src/securecmodule.c"
+            WORKING_DIRECTORY ${EXTERN_DEPEND_SOURCE_DIR}/libc_sec/src
+        )
 endif()
 
 get_filename_component(SECURE_C_DIR ${C_SEC_INCLUDE} DIRECTORY)

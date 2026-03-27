@@ -233,7 +233,7 @@ int dcmi_check_user_config_parameter(const char *config_name, unsigned int buf_s
 }
 
 // A2/A3热复位容器权限检查
-int dcmi_check_a2_a3_device_reset_docker_permission()
+int dcmi_check_a2_a3_a5_device_reset_docker_permission()
 {
     int ret;
     unsigned int env_flag = ENV_PHYSICAL;
@@ -244,8 +244,8 @@ int dcmi_check_a2_a3_device_reset_docker_permission()
         return ret;
     }
 
-    // 910A3，仅支持物理机特权容器，虚机不支持
-    if (dcmi_board_chip_type_is_ascend_910_93()) {
+    // A3，A5, 仅支持物理机特权容器，虚机不支持
+    if (dcmi_board_chip_type_is_ascend_910_93() || dcmi_board_chip_type_is_ascend_910_95()) {
         if (env_flag != ENV_PHYSICAL_PRIVILEGED_CONTAINER) {
             gplog(LOG_OP, "Operation not permitted, only physical privileged containers are supported.");
             return DCMI_ERR_CODE_OPER_NOT_PERMITTED;
@@ -254,7 +254,7 @@ int dcmi_check_a2_a3_device_reset_docker_permission()
         }
     }
 
-    // 910A2，支持物理机特权容器与虚机特权容器
+    // A2，支持物理机特权容器与虚机特权容器
     if (env_flag != ENV_PHYSICAL_PRIVILEGED_CONTAINER && env_flag != ENV_VIRTUAL_PRIVILEGED_CONTAINER) {
         gplog(LOG_OP, "Operation not permitted, only privileged containers are supported.");
         return DCMI_ERR_CODE_OPER_NOT_PERMITTED;

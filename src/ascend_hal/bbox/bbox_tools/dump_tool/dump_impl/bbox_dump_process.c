@@ -63,7 +63,6 @@ STATIC void bbox_dump_bin(const dump_data_config_st *config, u8 *data, const cha
 }
 #endif
 
-#ifdef CFG_BUILD_DEBUG
 /**
  * @brief       store given data as binary file to path specially for vmcore
  * @param [in]  config:      data config struct
@@ -95,15 +94,6 @@ STATIC bbox_status bbox_dump_vmcore_bin(const dump_data_config_st *config, u8 *d
     BBOX_DBG("write binary file %s/%s.", bin_path, filename);
     return BBOX_SUCCESS;
 }
-#else
-STATIC bbox_status bbox_dump_vmcore_bin(const dump_data_config_st *config, u8 *data, const char *path)
-{
-    UNUSED(config);
-    UNUSED(data);
-    UNUSED(path);
-    return BBOX_SUCCESS;
-}
-#endif
 
 /**
  * @brief       get status of data which is wait for dump

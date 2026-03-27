@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -26,7 +26,7 @@ static KA_TASK_DEFINE_RWLOCK(db_lock);
 struct trs_db_cfg_node {
     int type;
 
-    void __iomem *vaddr;
+    void __ka_mm_iomem *vaddr;
     phys_addr_t paddr;
     size_t size;
     u32 stride;
@@ -41,7 +41,7 @@ struct trs_db_cfg {
     u32 devid;
     u32 tsid;
 
-    void __iomem *vaddr;
+    void __ka_mm_iomem *vaddr;
     phys_addr_t paddr;
     size_t size;
     u32 stride;
@@ -139,7 +139,7 @@ static void trs_db_cfg_node_put(struct trs_db_cfg_node *cfg_node)
 static struct trs_db_cfg *trs_db_cfg_create(struct trs_id_inst *inst, phys_addr_t paddr, size_t size, u32 stride)
 {
     struct trs_db_cfg *db_cfg = NULL;
-    void __iomem *vaddr = NULL;
+    void __ka_mm_iomem *vaddr = NULL;
 
     db_cfg = trs_kzalloc(sizeof(struct trs_db_cfg), KA_GFP_KERNEL);
     if (db_cfg == NULL) {
@@ -288,7 +288,7 @@ int trs_ring_ts_db(struct trs_id_inst *inst, int type, u32 offset, u32 val)
     }
 
     if ((cfg_node->stride * offset) < cfg_node->size) {
-        writel(val, cfg_node->vaddr + cfg_node->stride * offset);
+        ka_mm_writel(val, cfg_node->vaddr + cfg_node->stride * offset);
     }
 
     trs_db_cfg_node_put(cfg_node);
@@ -315,7 +315,7 @@ int trs_get_ts_db_val(struct trs_id_inst *inst, int type, u32 offset, u32 *val)
 
     *val = 0;
     if ((cfg_node->stride * offset) < cfg_node->size) {
-        *val = readl(cfg_node->vaddr + cfg_node->stride * offset);
+        *val = ka_mm_readl(cfg_node->vaddr + cfg_node->stride * offset);
     }
 
     trs_db_cfg_node_put(cfg_node);

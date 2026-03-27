@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,13 +11,13 @@
  * GNU General Public License for more details.
  */
 
+#include "ka_kernel_def_pub.h"
+#include "ka_driver_pub.h"
 #include "devdrv_util.h"
 #include "devdrv_pci.h"
 #include "devdrv_ctrl.h"
 #include "devdrv_pcie_link_info.h"
 #include "pbl/pbl_uda.h"
-#include "ka_kernel_def_pub.h"
-#include "ka_driver_pub.h"
 
 static u32 g_pcie_channel_status = DEVDRV_PCIE_COMMON_CHANNEL_INIT;
 static ka_atomic_t g_peer_pcie_status;
@@ -98,7 +98,7 @@ STATIC int devdrv_get_pcie_mac_link_info(struct devdrv_pcie_link_info_para *pcie
 {
     u32 mac_reg_link_value;
     u32 ltssm_st;
-    void __iomem *apb_base = NULL;
+    void __ka_mm_iomem *apb_base = NULL;
 
     if (pcie_link_info == NULL) {
         devdrv_err("pcie_link_info is NULL.\n");
@@ -186,7 +186,7 @@ int devdrv_set_err_out_gpio(void)
 
 STATIC int devdrv_set_pcie_linkdown(void)
 {
-    void __iomem *apb_base = NULL;
+    void __ka_mm_iomem *apb_base = NULL;
     u32 tmp;
 
     apb_base = ka_mm_ioremap(PCIE_BASE_ADDR, PCIE_REG_SIZE);

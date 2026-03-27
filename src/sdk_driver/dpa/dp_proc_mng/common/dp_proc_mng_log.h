@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,19 +13,20 @@
 #ifndef __DP_PROC_MNG_LOG_H__
 #define __DP_PROC_MNG_LOG_H__
 #ifndef EMU_ST
+#include "ka_task_pub.h"
 #include "dmc_kernel_interface.h"
 
 #define module_dp_proc_mng "dp_proc_mng"
 #define dp_proc_mng_drv_err(fmt, ...) do { \
-    drv_err(module_dp_proc_mng, "<%s:%d,%d> " fmt, current->comm, current->tgid, current->pid, ##__VA_ARGS__); \
+    drv_err(module_dp_proc_mng, "<%s:%d,%d> " fmt, ka_task_get_current_comm(), ka_task_get_current_tgid(), ka_task_get_current_pid(), ##__VA_ARGS__); \
 } while (0)
 
 #define dp_proc_mng_drv_warn(fmt, ...) \
-    drv_warn(module_dp_proc_mng, "<%s:%d,%d> " fmt, current->comm, current->tgid, current->pid, ##__VA_ARGS__)
+    drv_warn(module_dp_proc_mng, "<%s:%d,%d> " fmt, ka_task_get_current_comm(), ka_task_get_current_tgid(), ka_task_get_current_pid(), ##__VA_ARGS__)
 #define dp_proc_mng_drv_info(fmt, ...) \
-    drv_info(module_dp_proc_mng, "<%s:%d,%d> " fmt, current->comm, current->tgid, current->pid, ##__VA_ARGS__)
+    drv_info(module_dp_proc_mng, "<%s:%d,%d> " fmt, ka_task_get_current_comm(), ka_task_get_current_tgid(), ka_task_get_current_pid(), ##__VA_ARGS__)
 #define dp_proc_mng_drv_debug(fmt, ...) \
-    drv_pr_debug(module_dp_proc_mng, "<%s:%d,%d> " fmt, current->comm, current->tgid, current->pid, ##__VA_ARGS__)
+    drv_pr_debug(module_dp_proc_mng, "<%s:%d,%d> " fmt, ka_task_get_current_comm(), ka_task_get_current_tgid(), ka_task_get_current_pid(), ##__VA_ARGS__)
 #else
 #include "ut_log.h"
 

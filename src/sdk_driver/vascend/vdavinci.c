@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,9 +10,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
-#include <linux/vmalloc.h>
-#include <linux/log2.h>
 
 #include "dvt.h"
 #include "hw_vdavinci.h"
@@ -91,7 +88,7 @@ STATIC int hw_get_available_vf(struct hw_vdavinci *vdavinci)
     unsigned int i;
     for (i = 0; i < dvt->sriov.vf_num; i++) {
         if (!dvt->sriov.vf_array[i].used) {
-            vdavinci->vf_index = i;
+            vdavinci->vf_index = (int)i;
             dvt->sriov.vf_array[i].used = true;
             dvt->sriov.vf_array[i].vdavinci = vdavinci;
             return i;

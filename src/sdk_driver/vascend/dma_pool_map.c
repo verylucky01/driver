@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,10 +11,6 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/kvm_host.h>
-#include <linux/vmalloc.h>
-#include <linux/iova.h>
-#include <linux/dma-mapping.h>
 #include "dvt.h"
 #include "vfio_ops.h"
 #include "dma_pool.h"
@@ -282,6 +278,9 @@ void vf_unmap_ram_range(struct hw_vdavinci *vdavinci,
     struct list_head *pos = NULL, *next = NULL;
     struct device *dev = vdavinci_get_device(vdavinci);
 
+    if (!list_empty(&(vdavinci->vdev.dev_dma_info_list_head))) {
+        return;
+    }
     list_for_each_safe(pos, next, &(vdavinci->vdev.dev_dma_info_list_head)) {
         dma_info = list_entry(pos, struct dev_dma_info, list);
         if (ram_info != dma_info->ram_info) {

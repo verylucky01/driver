@@ -46,6 +46,8 @@ int ddmp_get_last_bootstate(DM_INTF_S *intf, DM_RECV_ST *data, unsigned int stat
 int ddmp_ctrl_device_node(DM_INTF_S *intf, DM_RECV_ST *data, const void *buf, unsigned int len);
 int ddmp_get_bist_info(DM_INTF_S *intf, DM_RECV_ST *data, const void *buff, unsigned int len);
 int ddmp_get_flash_content(DM_INTF_S *intf, DM_RECV_ST *data, const void *buf, unsigned int size);
+int ddmp_get_ub_link_status(DM_INTF_S *intf, DM_RECV_ST *data, const void *buf, unsigned int size);
+int ddmp_get_ub_port_status(DM_INTF_S *intf, DM_RECV_ST *data, const void *buf, unsigned int size);
 
 /* peripheral device information, which may vary and needs to be expanded as needed */
 int ddmp_get_peripheral_device_info(DM_INTF_S *intf, DM_RECV_ST *data, const unsigned char *buff, unsigned int total_length);

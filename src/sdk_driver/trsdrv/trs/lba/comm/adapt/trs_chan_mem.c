@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -41,7 +41,7 @@ void *trs_chan_mem_alloc_ddr(struct trs_id_inst *inst, int nid, size_t size, phy
     u32 order = ka_mm_get_order(size);
     ka_page_t *p = NULL;
 
-    if (nid == NUMA_NO_NODE) {
+    if (nid == KA_NUMA_NO_NODE) {
         p = ka_mm_alloc_pages(__KA_GFP_ZERO | __KA_GFP_ACCOUNT | KA_GFP_HIGHUSER_MOVABLE | __KA_GFP_NOWARN, order);
     } else {
         p = ka_mm_alloc_pages_node(nid, __KA_GFP_THISNODE | __KA_GFP_ZERO | __KA_GFP_ACCOUNT | KA_GFP_HIGHUSER_MOVABLE | __KA_GFP_NOWARN,

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -920,7 +920,7 @@ static int devmm_ipc_pod_update_node_attr(struct devmm_ipc_node_attr *attr)
     return 0;
 }
 
-struct devmm_ioctl_handlers_st hander = {
+struct devmm_ioctl_handlers_st handler = {
     .ioctl_handler = devmm_ioctl_ipc_pod_set_pid,
     .cmd_flag = DEVMM_CMD_NOT_SURPORT_VDEV | DEVMM_CMD_NOT_SURPORT_HOST_AGENT
 };
@@ -930,7 +930,7 @@ int devmm_ipc_pod_init(void)
     struct devmm_ipc_node_ops node_ops;
     int ret;
 
-    ret = devmm_ioctl_handler_register(_KA_IOC_NR(DEVMM_SVM_IPC_MEM_SET_PID_POD), hander);
+    ret = devmm_ioctl_handler_register(_KA_IOC_NR(DEVMM_SVM_IPC_MEM_SET_PID_POD), handler);
     if (ret != 0) {
         devmm_drv_err("Ioctl handler register fail. (ret=%d)\n", ret);
         return ret;

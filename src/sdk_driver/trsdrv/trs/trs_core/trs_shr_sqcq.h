@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -34,5 +34,5 @@ int trs_shr_unmap_sq(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst *ts_
     struct trs_mem_unmap_para *para);
 int trs_shr_remap_sq(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst *ts_inst,
     struct trs_mem_map_para *para);
-ka_task_struct_t *trs_shr_get_task_struct(pid_t pid);
+ka_task_struct_t *trs_shr_get_task_struct(ka_pid_t pid);
 #endif

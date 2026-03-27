@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,11 +10,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
-#include <linux/mutex.h>
-#include <linux/list.h>
-#include <linux/errno.h>
-
 #include "fms/fms_dtm.h"
 #include "fms_define.h"
 #include "kernel_version_adapt.h"
@@ -23,8 +18,9 @@
 #include "ka_memory_pub.h"
 #include "ka_kernel_def_pub.h"
 #include "ka_task_pub.h"
+#include "ka_dfx_pub.h"
 
-#define print_sysfs (void)printk
+#define print_sysfs (void)ka_dfx_printk
 
 int dms_check_node_type(int node_type)
 {
@@ -49,7 +45,7 @@ void dev_node_release(int owner_pid)
     int i;
     struct dms_node *node = NULL;
     struct dms_node *next = NULL;
-    struct list_head tmp_node;
+    ka_list_head_t tmp_node;
     struct dms_dev_ctrl_block *dev_cb = NULL;
 
     KA_INIT_LIST_HEAD(&tmp_node);

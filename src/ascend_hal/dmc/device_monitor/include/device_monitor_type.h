@@ -276,6 +276,8 @@ typedef struct dev_mon_cmd_tag_value {
     dev_mon_cmd_handle handle;
     unsigned long long op_called_cnt[DMP_STATICSTIC_PERIOD_NUM];
     unsigned long long op_start_time[DMP_STATICSTIC_PERIOD_NUM];
+    unsigned long long timeout_count;
+    unsigned long long max_timeout;
     pthread_mutex_t op_mutex;
 } DEV_MON_CMD_TAG_VALUE_ST;
 

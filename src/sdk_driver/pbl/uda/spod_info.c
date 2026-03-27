@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -15,9 +15,24 @@
 #include "pbl_spod_info.h"
 #include "ka_barrier_pub.h"
 #include "ka_kernel_def_pub.h"
+#include "ka_base_pub.h"	 
+#include "ka_task_pub.h"	 
+#include "ka_memory_pub.h"
+#include "pbl/pbl_uda.h"
+#include "pbl_mem_alloc_interface.h"
+#include "spod_info.h"
 
 struct spod_info g_spod_info[UDA_MAX_PHY_DEV_NUM];
 bool g_spod_info_been_set[UDA_MAX_PHY_DEV_NUM];
+
+struct spod_node_status {
+    u8 status[DBL_SPOD_MAX_NUM];
+};
+
+#ifdef DRV_HOST
+static struct spod_node_status *g_spod_node_status[UDA_MAX_PHY_DEV_NUM] = {NULL};
+static ka_rw_semaphore_t g_spod_node_status_lock[UDA_MAX_PHY_DEV_NUM];
+#endif
 
 int dbl_get_spod_info(unsigned int udevid, struct spod_info *s)
 {
@@ -52,7 +67,7 @@ KA_EXPORT_SYMBOL(dbl_set_spod_info);
 
 static inline void parse_bit_shift(unsigned int *rcv, unsigned int *src, int bit_width)
 {
-    *rcv = (*src) & GENMASK(bit_width - 1, 0);
+    *rcv = (*src) & KA_GENMASK(bit_width - 1, 0);
     (*src) >>= bit_width;
 }
 
@@ -94,3 +109,157 @@ int dbl_make_sdid (struct sdid_parse_info *s, unsigned int *sdid)
 }
 KA_EXPORT_SYMBOL(dbl_make_sdid);
 
+#ifdef DRV_HOST
+static int dbl_get_spod_node_status(unsigned int local_udevid, unsigned int index, unsigned int *status)
+{
+    struct spod_node_status *nodes_status = NULL;
+
+    ka_task_down_read(&g_spod_node_status_lock[local_udevid]);
+
+    nodes_status = g_spod_node_status[local_udevid];
+    if (nodes_status == NULL) {
+        ka_task_up_read(&g_spod_node_status_lock[local_udevid]);
+        return -ENODATA;
+    }
+
+    *status = nodes_status->status[index];
+    ka_task_up_read(&g_spod_node_status_lock[local_udevid]);
+    return 0;
+}
+
+int dbl_set_spod_node_status(unsigned int local_udevid, unsigned int index, unsigned int status)
+{
+    struct spod_node_status *nodes_status = NULL;
+
+    if (local_udevid >= UDA_MAX_PHY_DEV_NUM) {
+        uda_err("Invalid udevid. (udevid=%u)\n", local_udevid);
+        return -EINVAL;
+    }
+
+    if (index >= DBL_SPOD_MAX_NUM) {
+        uda_err("Invalid index. (index=%u)\n", index);
+        return -EINVAL;
+    }
+
+    ka_task_down_write(&g_spod_node_status_lock[local_udevid]);
+    nodes_status = g_spod_node_status[local_udevid];
+    if (nodes_status == NULL) {
+        ka_task_up_write(&g_spod_node_status_lock[local_udevid]);
+        uda_err("Spod node status has not been inited. (local_udevid=%u)\n", local_udevid);
+        return -ENODATA;
+    }
+
+    nodes_status->status[index] = status;
+    ka_task_up_write(&g_spod_node_status_lock[local_udevid]);
+    return 0;
+}
+KA_EXPORT_SYMBOL_GPL(dbl_set_spod_node_status);
+
+int dbl_spod_node_status_init(unsigned int udevid)
+{
+    struct spod_node_status *nodes_status = NULL;
+
+    if (udevid >= UDA_MAX_PHY_DEV_NUM) {
+        uda_err("Invalid udevid. (udevid=%u)\n", udevid);
+        return -EINVAL;
+    }
+
+    ka_task_down_write(&g_spod_node_status_lock[udevid]);
+
+    if (g_spod_node_status[udevid] != NULL) {
+        ka_task_up_write(&g_spod_node_status_lock[udevid]);
+        uda_info("Spod node status has been inited. (udevid=%u)", udevid);
+        return 0;
+    }
+
+    nodes_status = (struct spod_node_status *)dbl_kzalloc(sizeof(struct spod_node_status), KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
+    if (nodes_status == NULL) {
+        ka_task_up_write(&g_spod_node_status_lock[udevid]);
+        uda_err("malloc spod node status failed. (udevid=%u)", udevid);
+        return -ENOMEM;
+    }
+
+    g_spod_node_status[udevid] = nodes_status;
+    ka_task_up_write(&g_spod_node_status_lock[udevid]);
+    return 0;
+}
+KA_EXPORT_SYMBOL_GPL(dbl_spod_node_status_init);
+
+void dbl_spod_node_status_uninit(unsigned int udevid)
+{
+    if (udevid >= UDA_MAX_PHY_DEV_NUM) {
+        uda_err("Invalid udevid. (udevid=%u)\n", udevid);
+        return;
+    }
+
+    ka_task_down_write(&g_spod_node_status_lock[udevid]);
+
+    if (g_spod_node_status[udevid] == NULL) {
+        ka_task_up_write(&g_spod_node_status_lock[udevid]);
+        return;
+    }
+
+    dbl_kfree(g_spod_node_status[udevid]);
+    g_spod_node_status[udevid] = NULL;
+
+    ka_task_up_write(&g_spod_node_status_lock[udevid]);
+}
+KA_EXPORT_SYMBOL_GPL(dbl_spod_node_status_uninit);
+
+void spod_info_init(void)
+{
+    int i;
+    for (i = 0; i < UDA_MAX_PHY_DEV_NUM; ++i) {
+        ka_task_init_rwsem(&g_spod_node_status_lock[i]);
+    }
+}
+#endif
+
+int hal_kernel_get_spod_node_status(unsigned int local_udevid, unsigned int remote_sdid, unsigned int *status)
+{
+#ifdef DRV_HOST
+    int ret = 0;
+    struct sdid_parse_info sdid_info = {0};
+    int index = 0;
+    unsigned int soc_type = SOC_TYPE_MAX;
+
+    if (!uda_is_phy_dev(local_udevid)) {
+        return -EOPNOTSUPP;
+    }
+
+    if (local_udevid >= UDA_MAX_PHY_DEV_NUM) {
+        return -EINVAL;
+    }
+
+    if (status == NULL) {
+        return -EFAULT;
+    }
+
+    ret = dbl_parse_sdid(remote_sdid, &sdid_info);
+    if (ret != 0) {
+        return ret;
+    }
+
+    DBL_SPOD_CHECK_SDID(sdid_info, ret);
+    if (ret != 0) {
+        return -ERANGE;
+    }
+
+    ret = hal_kernel_get_soc_type(local_udevid, &soc_type);
+    if (ret != 0) {
+        return (ret == -EOPNOTSUPP ? ret : -ENODEV);
+    }
+
+    if (soc_type != SOC_TYPE_CLOUD_V3) {
+        return -EOPNOTSUPP;
+    }
+
+    index = sdid_info.server_id * DBL_SPOD_MAX_UDEVID_NUM + sdid_info.udevid;
+    return dbl_get_spod_node_status(local_udevid, index, status);
+#else
+    (void) local_udevid;
+    (void) remote_sdid;
+    (void) status;
+    return -EOPNOTSUPP;
+#endif
+}

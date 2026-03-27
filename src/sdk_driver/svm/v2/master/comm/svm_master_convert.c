@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -27,6 +27,7 @@
 #include "devmm_mem_alloc_interface.h"
 #include "svm_master_convert.h"
 #include "ka_kernel_def_pub.h"
+#include "ka_base_pub.h"
 
 #define DEVMM_DESTROY_BATCH_MAX_NUM  DEVMM_MAX_SHM_DATA_NUM
 
@@ -371,7 +372,7 @@ static void devmm_covnert_nodes_subres_recycle_by_task_dev_res(struct devmm_task
 
     *num = 0;
     ka_task_down_read(&rb_info->rw_sem);
-    rbtree_postorder_for_each_entry_safe(pos, tmp, &rb_info->root, task_dev_res_node) {
+    ka_base_rbtree_postorder_for_each_entry_safe(pos, tmp, &rb_info->root, task_dev_res_node) {
         if (convert_node_recycle_condition(pos) == true) {
             /* Only recycle node subres, not put node, or the worker will access freed mem */
             devmm_convert_node_subres_recycle(pos);

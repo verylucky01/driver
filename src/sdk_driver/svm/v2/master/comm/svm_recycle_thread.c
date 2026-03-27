@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -25,6 +25,7 @@
 static ka_task_struct_t *g_recycle_thread = NULL;
 static void (* g_recycle_handle[SVM_MAX_RECYCLE_HANDLE_NUM])(void) = {NULL, };
 static u32 g_recycle_thread_pause = 0U;
+static u32 g_recycle_thread_quick_exit = 0U;
 
 void svm_recycle_handle_register(void (*func)(void))
 {
@@ -57,22 +58,28 @@ void svm_recycle_thread_continue(void)
 {
     g_recycle_thread_pause = 0U;
 }
-
+#ifndef EMU_ST
 static void ssleep_interruptible(u32 seconds)
 {
-    u32 msecs = seconds * 1000U;
+    u32 i;
+ 	 
+    for (i = 0; i < seconds; i++) {
+        if (g_recycle_thread_quick_exit == 1U) {
+            break;
+        }
 
-    ka_system_msleep_interruptible(msecs);
+        ka_system_msleep_interruptible(1000U);
+    }
 }
 
 static int svm_recycle_thread(void *data)
 {
+    g_recycle_thread_quick_exit = 0U;
     while (!ka_task_kthread_should_stop()) {
-#ifndef EMU_ST
         if (g_recycle_thread_pause == 0U) {
             svm_call_recycle_handle();
         }
-#endif
+
         ssleep_interruptible(60); /* 60s */
     }
 
@@ -83,6 +90,7 @@ static int svm_recycle_thread_init(void)
 {
     g_recycle_thread = ka_task_kthread_run(svm_recycle_thread, NULL, "svm_recycle_thread");
     if (KA_IS_ERR(g_recycle_thread)) {
+        g_recycle_thread = NULL;
         devmm_drv_err("Failed to create recycle thread\n");
         return -EINVAL;
     }
@@ -93,6 +101,12 @@ DECLAER_FEATURE_AUTO_INIT(svm_recycle_thread_init, FEATURE_LOADER_STAGE_2);
 
 static void svm_recycle_thread_uninit(void)
 {
-    (void)ka_task_kthread_stop(g_recycle_thread);
+    if (g_recycle_thread != NULL) {
+        g_recycle_thread_quick_exit = 1U;
+        ka_task_wake_up_process(g_recycle_thread);
+        ka_task_kthread_stop(g_recycle_thread);
+        g_recycle_thread = NULL;
+    }
 }
 DECLAER_FEATURE_AUTO_UNINIT(svm_recycle_thread_uninit, FEATURE_LOADER_STAGE_2);
+#endif

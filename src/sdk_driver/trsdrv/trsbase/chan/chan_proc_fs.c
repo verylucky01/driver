@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -15,6 +15,7 @@
 #include "ka_common_pub.h"
 #include "ka_fs_pub.h"
 #include "ka_kernel_def_pub.h"
+#include "ka_compiler_pub.h"
 
 #ifdef CFG_FEATURE_TRACE_EVENT_FUNC
 #include "pbl_uda.h"
@@ -29,7 +30,7 @@
 
 static ka_proc_dir_entry_t *chan_top_entry = NULL;
 
-ssize_t chan_trace_ops_write(ka_file_t *filp, const char __user *ubuf, size_t count, loff_t *ppos);
+ssize_t chan_trace_ops_write(ka_file_t *filp, const char __ka_user *ubuf, size_t count, loff_t *ppos);
 int chan_trace_ops_open(ka_inode_t *inode, ka_file_t *file);
 int chan_sum_ops_open(ka_inode_t *inode, ka_file_t *file);
 void chan_proc_fs_add_ts_inst(struct trs_chan_ts_inst *ts_inst);
@@ -48,14 +49,10 @@ static int chan_trace_show(ka_seq_file_t *seq, void *offset)
     return 0;
 }
 
-ssize_t chan_trace_ops_write(ka_file_t *filp, const char __user *ubuf, size_t count, loff_t *ppos)
+ssize_t chan_trace_ops_write(ka_file_t *filp, const char __ka_user *ubuf, size_t count, loff_t *ppos)
 {
     ka_inode_t *inode = ka_fs_file_inode(filp);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)
-    struct trs_chan_ts_inst *ts_inst = (struct trs_chan_ts_inst *)(uintptr_t)pde_data(inode);
-#else
-    struct trs_chan_ts_inst *ts_inst = (struct trs_chan_ts_inst *)(uintptr_t)PDE_DATA(inode);
-#endif
+    struct trs_chan_ts_inst *ts_inst = (struct trs_chan_ts_inst *)(uintptr_t)ka_base_pde_data(inode);
     char ch[2] = {0}; /* 2 bytes long */
     long val;
 
@@ -72,7 +69,7 @@ ssize_t chan_trace_ops_write(ka_file_t *filp, const char __user *ubuf, size_t co
     }
 
     ch[count - 1] = '\0';
-    if (kstrtol(ch, 10, &val)) {
+    if (ka_base_kstrtol(ch, 10, &val)) {
         return -EFAULT;
     }
     ts_inst->trace_enable = (val == 0) ? false : true;
@@ -82,31 +79,17 @@ ssize_t chan_trace_ops_write(ka_file_t *filp, const char __user *ubuf, size_t co
 
 int chan_trace_ops_open(ka_inode_t *inode, ka_file_t *file)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)
-    return ka_fs_single_open(file, chan_trace_show, pde_data(inode));
-#else
-    return ka_fs_single_open(file, chan_trace_show, PDE_DATA(inode));
-#endif
+    return ka_fs_single_open(file, chan_trace_show, ka_base_pde_data(inode));
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 5, 0)
-static const ka_file_operations_t chan_trace_ops = {
-    .owner = KA_THIS_MODULE,
-    .open = chan_trace_ops_open,
-    .read = ka_fs_seq_read,
-    .write = chan_trace_ops_write,
-    .llseek  = ka_fs_seq_lseek,
-    .release = ka_fs_single_release,
-};
-#else
 static const ka_procfs_ops_t chan_trace_ops = {
-    .proc_open    = chan_trace_ops_open,
-    .proc_read    = ka_fs_seq_read,
-    .proc_write   = chan_trace_ops_write,
-    .proc_lseek   = ka_fs_seq_lseek,
-    .proc_release = ka_fs_single_release,
+    ka_fs_init_pf_owner(KA_THIS_MODULE) \
+    ka_fs_init_pf_open(chan_trace_ops_open) \
+    ka_fs_init_pf_read(ka_fs_seq_read) \
+    ka_fs_init_pf_write(chan_trace_ops_write) \
+    ka_fs_init_pf_lseek(ka_fs_seq_lseek) \
+    ka_fs_init_pf_release(ka_fs_single_release) \
 };
-#endif
 #endif
 
 static int chan_sum_show(ka_seq_file_t *seq, void *offset)
@@ -125,29 +108,16 @@ static int chan_sum_show(ka_seq_file_t *seq, void *offset)
 
 int chan_sum_ops_open(ka_inode_t *inode, ka_file_t *file)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)
-    return ka_fs_single_open(file, chan_sum_show, pde_data(inode));
-#else
-    return ka_fs_single_open(file, chan_sum_show, PDE_DATA(inode));
-#endif
+    return ka_fs_single_open(file, chan_sum_show, ka_base_pde_data(inode));
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 5, 0)
-static const ka_file_operations_t chan_sum_ops = {
-    .owner = KA_THIS_MODULE,
-    .open    = chan_sum_ops_open,
-    .read    = ka_fs_seq_read,
-    .llseek  = ka_fs_seq_lseek,
-    .release = ka_fs_single_release,
-};
-#else
 static const ka_procfs_ops_t chan_sum_ops = {
-    .proc_open    = chan_sum_ops_open,
-    .proc_read    = ka_fs_seq_read,
-    .proc_lseek   = ka_fs_seq_lseek,
-    .proc_release = ka_fs_single_release,
+    ka_fs_init_pf_owner(KA_THIS_MODULE) \
+    ka_fs_init_pf_open(chan_sum_ops_open) \
+    ka_fs_init_pf_read(ka_fs_seq_read) \
+    ka_fs_init_pf_lseek(ka_fs_seq_lseek) \
+    ka_fs_init_pf_release(ka_fs_single_release) \
 };
-#endif
 
 static void proc_fs_format_ts_inst_dir_name(struct trs_chan_ts_inst *ts_inst, char *name, int len)
 {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,55 +11,49 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/string.h>
-#include <linux/slab.h>
-#include <linux/errno.h>
-#include <linux/workqueue.h>
-#include <linux/kthread.h>
-#include <linux/time.h>
-#include <linux/rculist.h>
+#include "ka_common_pub.h"
+#include "ka_base_pub.h"
+#include "ka_task_pub.h"
+#include "ka_list_pub.h"
+#include "ka_system_pub.h"
+#include "ka_memory_pub.h"
+#include "ka_kernel_def_pub.h"
 
 #ifndef CFG_HOST_ENV
 #include "queue_work_affinity.h"
 #include "drv_cpu_type.h"
 #include "workqueue_affinity.h"
 #endif
-
 #include "dms_define.h"
 #include "pbl_mem_alloc_interface.h"
-#include "ka_task_pub.h"
-#include "ka_list_pub.h"
-#include "ka_system_pub.h"
-#include "ka_memory_pub.h"
-#include "ka_kernel_def_pub.h"
 #include "dms_timer.h"
 
 #define TIMER_INVALID_ID    0xFFFF
 struct dms_sched_task_timer {
-    struct list_head node_list;
-    struct mutex node_lock;
-    struct hrtimer timer;
-    struct workqueue_struct *workqueue;
+    ka_list_head_t node_list;
+    ka_mutex_t node_lock;
+    ka_hrtimer_t timer;
+    ka_workqueue_struct_t *workqueue;
     u32    task_nums;
     u16    ids[MAX_TASK_NUMS];
 };
 static struct dms_sched_task_timer g_timer = {{0}};
 
 struct devdrv_sched_task_node {
-    struct list_head list;
-    struct rcu_head rcu;
+    ka_list_head_t list;
+    ka_rcu_head_t rcu;
     u32 expire_count;       // time period: ms / TIMER_STEP_MS
     u32 cur_count;
     u32 node_id;
     u64 run_time;
     u64 user_data;
     int (*exec_task)(u64 data);
-    struct work_struct work_data;
-    struct workqueue_struct *workqueue;
+    ka_work_struct_t work_data;
+    ka_workqueue_struct_t *workqueue;
     timer_task_handler_mode handler_mode;
 };
 
-STATIC enum hrtimer_restart dms_timer_irq_handler(struct hrtimer *htr)
+STATIC ka_hrtimer_restart_t dms_timer_irq_handler(ka_hrtimer_t *htr)
 {
     struct devdrv_sched_task_node *node = NULL;
 
@@ -97,11 +91,11 @@ STATIC enum hrtimer_restart dms_timer_irq_handler(struct hrtimer *htr)
     return KA_HRTIMER_RESTART;
 }
 
-STATIC void dms_timer_callback_delay(struct work_struct *work)
+STATIC void dms_timer_callback_delay(ka_work_struct_t *work)
 {
     struct devdrv_sched_task_node *sched_task = NULL;
 
-    sched_task = container_of(work, struct devdrv_sched_task_node, work_data);
+    sched_task = ka_container_of(work, struct devdrv_sched_task_node, work_data);
     sched_task->exec_task(sched_task->user_data);
 }
 
@@ -237,7 +231,7 @@ int dms_timer_task_unregister(u32 node_id)
         if (node->node_id == node_id) {
             g_timer.task_nums--;
             ka_list_del_rcu(&node->list);
-            synchronize_rcu();
+            ka_system_synchronize_rcu();
 
             // clean workqueue
             if (node->workqueue != NULL) {
@@ -261,9 +255,9 @@ int dms_timer_task_unregister(u32 node_id)
 KA_EXPORT_SYMBOL(dms_timer_task_unregister);
 
 #if defined(CFG_FEATURE_WORK_QUEUE_BIND_CORE)
-STATIC void dms_set_timer_workqueue_affinity(struct workqueue_struct *wq)
+STATIC void dms_set_timer_workqueue_affinity(ka_workqueue_struct_t *wq)
 {
-    struct cpumask wq_cpumask;
+    ka_cpumask_t wq_cpumask;
     int ret;
 
     ret = drv_get_ctrlcpu_mask(&wq_cpumask);
@@ -319,7 +313,7 @@ void dms_timer_uninit(void)
     (void)ka_system_hrtimer_cancel(&g_timer.timer);
     dms_info("Dms timer uninit success, cancel timer.\n");
 
-    synchronize_rcu();
+    ka_system_synchronize_rcu();
     ka_task_flush_workqueue(g_timer.workqueue);
     ka_task_destroy_workqueue(g_timer.workqueue);
     ka_list_for_each_entry_safe(node, next, &g_timer.node_list, list) {

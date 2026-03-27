@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,6 +13,7 @@
 #include "ka_base_pub.h"
 #include "ka_task_pub.h"
 #include "ka_barrier_pub.h"
+#include "ka_compiler_pub.h"
 #include "securec.h"
 
 #include "trs_chan.h"
@@ -55,7 +56,7 @@ static ka_irqreturn_t trs_thread_bind_irq_proc(int irq, void *para)
     struct trs_thread_bind_intr_ctx *irq_ctx = (struct trs_thread_bind_intr_ctx *)para;
 
     if (irq_ctx->valid != 0) {
-        wait_queue_head_t *wait_queue = irq_ctx->wait_queue;
+        ka_wait_queue_head_t *wait_queue = irq_ctx->wait_queue;
         ka_atomic_t *wait_flag = irq_ctx->wait_flag;
 
         if (wait_flag != NULL) {
@@ -68,7 +69,7 @@ static ka_irqreturn_t trs_thread_bind_irq_proc(int irq, void *para)
         }
     }
 
-    return IRQ_HANDLED;
+    return KA_IRQ_HANDLED;
 }
 
 void trs_thread_bind_irq_hw_res_uninit(struct trs_core_ts_inst *ts_inst, u32 irq_num)
@@ -159,7 +160,7 @@ static int trs_thread_bind_irq_init(struct trs_core_ts_inst *ts_inst)
 }
 
 static int trs_thread_bind_irq_alloc(struct trs_core_ts_inst *ts_inst,
-    ka_atomic_t *wait_flag, wait_queue_head_t *wait_queue)
+    ka_atomic_t *wait_flag, ka_wait_queue_head_t *wait_queue)
 {
     struct trs_thread_bind_intr_mng *intr_mng = &ts_inst->logic_cq_ctx.intr_mng;
     struct trs_thread_bind_intr_ctx *irq_ctx = intr_mng->irq_ctx;
@@ -203,7 +204,7 @@ static int trs_thread_bind_irq_wait(struct trs_logic_cq *logic_cq, int timeout)
 {
     long tm, ret;
 
-    tm = (timeout == -1) ? MAX_SCHEDULE_TIMEOUT : ka_system_msecs_to_jiffies((u32)timeout);
+    tm = (timeout == -1) ? KA_TASK_MAX_SCHEDULE_TIMEOUT : ka_system_msecs_to_jiffies((u32)timeout);
 
     ret = ka_task_wait_event_interruptible_timeout(logic_cq->wait_queue, ( ka_base_atomic_read(&logic_cq->wakeup_num) > 0), tm);
     if (ret == 0) {
@@ -292,7 +293,7 @@ static u32 trs_logic_cq_get_match_copy_range(struct trs_logic_cq *logic_cq, stru
     void *cqe = NULL;
 
     cqe_cnt = cqe_end - cqe_start;
-    report_cnt = min(cqe_cnt, para->cqe_num);
+    report_cnt = ka_base_min(cqe_cnt, para->cqe_num);
 
     search_start = 0;
     search_num = 0;
@@ -415,7 +416,7 @@ static void trs_logic_cq_eliminate_holes(struct trs_logic_cq *logic_cq, u32 star
     }
 
     /* move the cqes in que tail to head */
-    num = min(report_cnt, logic_cq->cq_depth - logic_cq->head);
+    num = ka_base_min(report_cnt, logic_cq->cq_depth - logic_cq->head);
     src_pos = logic_cq->cq_depth - num;
     dst_pos = report_cnt - num;
     trs_logic_cq_move_cqes(logic_cq, src_pos, dst_pos, num);
@@ -454,7 +455,7 @@ static int trs_logic_cq_match_copy(struct trs_core_ts_inst *ts_inst, struct trs_
     }
 
     trs_logic_cq_copy_trace("Logic Cq Recv Match", ts_inst, logic_cq, start, report_cnt);
-    ret = ka_base_copy_to_user((void __user *)para->cqe_addr, logic_cq->addr + ((unsigned long)start * logic_cq->cqe_size),
+    ret = ka_base_copy_to_user((void __ka_user *)para->cqe_addr, logic_cq->addr + ((unsigned long)start * logic_cq->cqe_size),
         (unsigned long)report_cnt * logic_cq->cqe_size);
     if (ret != 0) {
         trs_err("copy to user fail, cqid=%u report_cnt=%u\n", logic_cq->cqid, report_cnt);
@@ -481,7 +482,7 @@ static int trs_logic_cq_non_match_copy(struct trs_core_ts_inst *ts_inst, struct 
     report_cnt = (tail > start) ? tail - start : logic_cq->cq_depth - start;
 
     trs_logic_cq_copy_trace("Logic Cq Recv NoMatch", ts_inst, logic_cq, start, report_cnt);
-    ret = ka_base_copy_to_user((void __user *)para->cqe_addr, logic_cq->addr + ((unsigned long)start * logic_cq->cqe_size),
+    ret = ka_base_copy_to_user((void __ka_user *)para->cqe_addr, logic_cq->addr + ((unsigned long)start * logic_cq->cqe_size),
         (unsigned long)report_cnt * logic_cq->cqe_size);
     if (ret != 0) {
         trs_err("copy to user fail, cqid=%u report_cnt=%u\n", logic_cq->cqid, report_cnt);
@@ -540,22 +541,22 @@ static int trs_logic_cq_copy_report(struct trs_core_ts_inst *ts_inst,
 
 static int trs_logic_cq_wait_event(struct trs_logic_cq *logic_cq, int timeout)
 {
-    DEFINE_WAIT(wq_entry);
+    KA_TASK_DEFINE_WAIT(wq_entry);
     long ret, tm;
 
     ka_base_atomic_inc(&logic_cq->wait_thread_num);
     trs_debug("Wake wait start. (logic_cqid=%u; timeout=%d; wait_thread_num=%d)\n",
         logic_cq->cqid, timeout, ka_base_atomic_read(&logic_cq->wait_thread_num));
 
-    tm = (timeout == -1) ? MAX_SCHEDULE_TIMEOUT : ka_system_msecs_to_jiffies((u32)timeout);
-    (void)ka_task_prepare_to_wait_exclusive(&logic_cq->wait_queue, &wq_entry, TASK_INTERRUPTIBLE);
+    tm = (timeout == -1) ? KA_TASK_MAX_SCHEDULE_TIMEOUT : ka_system_msecs_to_jiffies((u32)timeout);
+    (void)ka_task_prepare_to_wait_exclusive(&logic_cq->wait_queue, &wq_entry, KA_TASK_INTERRUPTIBLE);
     if (ka_base_atomic_read(&logic_cq->wakeup_num) > 0) {
         ka_base_atomic_dec(&logic_cq->wakeup_num);
         ret = tm;
     } else {
         ret = ka_task_schedule_timeout(tm);
     }
-    if (ka_task_signal_pending_state(TASK_INTERRUPTIBLE, ka_task_get_current()) != 0) {
+    if (ka_task_signal_pending_state(KA_TASK_INTERRUPTIBLE, ka_task_get_current()) != 0) {
         ret = -ERESTARTSYS;
     }
     ka_task_finish_wait(&logic_cq->wait_queue, &wq_entry);

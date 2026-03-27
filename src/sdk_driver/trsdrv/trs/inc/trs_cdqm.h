@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -36,7 +36,7 @@ int tsdrv_cdqm_get_name_by_cdqid(u32 devid, u32 tsid, u32 cdq_id, char *name, in
 int cdqm_ts_inst_register(struct trs_id_inst *inst, struct cdqm_adapt_ops *ops);
 int cdqm_ts_inst_unregister(struct trs_id_inst *inst);
 
-bool cdqid_is_belong_to_proc(struct trs_id_inst *inst, pid_t tgid, int res_type, u32 id);
+bool cdqid_is_belong_to_proc(struct trs_id_inst *inst, ka_pid_t tgid, int res_type, u32 id);
 
 #endif
 

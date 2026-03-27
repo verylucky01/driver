@@ -222,7 +222,7 @@ checkUserProcess() {
     else
         for f_file in $davinci_files
         do
-            apps=$(ls -l /proc/*/fd | egrep "fd:|"$f_file"" | grep "$f_file" -B1 | grep "fd:" | sed 's#/fd:##;s#/proc/##' | head)
+            apps=$(ls -l /proc/*/fd 2> /dev/null | egrep "fd:|"$f_file"" | grep "$f_file" -B1 | grep "fd:" | sed 's#/fd:##;s#/proc/##' | head)
             if [ -n "${apps}" ]; then
                 log "[WARNING]"$f_file" has user process: ""$apps"
                 for app in $apps
@@ -262,20 +262,48 @@ checkPidNameMatch() {
 }
 
 killCurrentProcess(){
-    local device
     local result
     local pid
     local name
     local max_retries=3
+    local dev_files="/dev/davinci_manager /dev/devmm_svm /dev/hisi_hdc"
+    local dev_files2=$(find /dev -name "davinci[0-9]*")
+    local davinci_files=(${dev_files[*]} ${dev_files2[*]})
+    local f_file
+    local apps
+    local is_pid_occupy
+    local found=0
 
     pid=$1;
     name=$2;
-    device="/dev/davinci_manager"
 
-    result=$(lsof "$device" 2>/dev/null | grep "$pid")
-    if [[ -n "${result}" ]]; then
-        log "[INFO]: this pid ${pid} is occupy npu"
+    if which fuser >& /dev/null; then
+        for f_file in "${davinci_files[@]}"; do
+            apps=$(fuser -uv "$f_file" 2>/dev/null)
+            if [[ -n "${apps}" ]]; then
+                is_pid_occupy=$(echo "$apps" | grep -w "$pid")
+                if [[ -n "${is_pid_occupy}" ]]; then
+                    log "[INFO] PID ${pid} is actively using file: ${f_file}"
+                    found=1
+                    break
+                fi
+            fi
+        done
     else
+        for f_file in "${davinci_files[@]}"; do
+            apps=$(ls -l /proc/*/fd 2> /dev/null | egrep "fd:|"$f_file"" | grep "$f_file" -B1 | grep "fd:" | sed 's#/fd:##;s#/proc/##' | head)
+            if [[ -n "${apps}" ]]; then
+                is_pid_occupy=$(echo "$apps" | grep -w "$pid")
+                if [[ -n "${is_pid_occupy}" ]]; then
+                    log "[INFO] PID ${pid} is actively using file: ${f_file}"
+                    found=1
+                    break
+                fi
+            fi
+        done
+    fi
+
+    if [[ ${found} == 0 ]]; then
         log "[INFO]: this pid ${pid} isn't occupy npu"
         return 0
     fi
@@ -359,21 +387,18 @@ killWhiteProcess(){
                 continue
             fi
 
-            checkPidNameMatch ${pid} ${name}
+            checkPidNameMatch "${pid}" "${name}"
             if [[ $? != 0 ]]; then
                 continue
             fi
 
-            killCurrentProcess ${pid} ${name}
-            if [[ $? != 0 ]]; then
-                log "[WARNING] failed to kill this process ${name} (PID ${pid})"
-                continue
-            fi
+            killCurrentProcess "${pid}" "${name}"
         else
             log "[INFO]invalid string: ${line}"
         fi
-    done < <(head -n 20 "${cfg_file}")
+    done < <(head -n 10 "${cfg_file}")
 
+    wait
     return 0
 }
 
@@ -401,7 +426,7 @@ setHotResetFlag() {
             return 0
         fi
         log "[WARNING]The set hot reset flag failed to take effect."
-        checkUserProcess >& /dev/null
+        checkUserProcess > /dev/null 2>&1
         sleep 1
     done
     return 1

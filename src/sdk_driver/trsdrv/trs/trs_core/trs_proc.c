@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -23,6 +23,7 @@
 #include "kernel_version_adapt.h"
 #include "securec.h"
 #include "pbl_uda.h"
+#include "dpa_kernel_interface.h"
 
 #include "trs_proc_fs.h"
 #include "trs_ts_inst.h"
@@ -395,7 +396,7 @@ struct trs_proc_ctx *trs_proc_ctx_create(struct trs_core_ts_inst *all_ts_inst[],
     proc_ctx->task_id = ka_base_atomic64_inc_return(&ts_inst->cur_task_id);
     proc_ctx->pid = ka_task_get_current_tgid();
     proc_ctx->release_type = TRS_PROC_RELEASE_LOCAL_REMOTE;
-    if (strncpy_s(proc_ctx->name, TASK_COMM_LEN, ka_task_get_current_comm(), strlen(ka_task_get_current_comm())) != 0) {
+    if (strncpy_s(proc_ctx->name, TASK_COMM_LEN, ka_task_get_current_comm(), ka_base_strlen(ka_task_get_current_comm())) != 0) {
 #ifndef EMU_ST
         trs_warn("Strcpy warn. (pid=%d)\n", proc_ctx->pid);
 #endif
@@ -429,14 +430,14 @@ void trs_proc_ctx_destroy(struct kref_safe *kref)
 
 static int trs_vma_flag_check(ka_vm_area_struct_t *vma, int type)
 {
-    if ((vma->vm_flags & VM_HUGETLB) != 0) {
-        trs_err("Invalid vm_flags. (vm_flags=0x%lx)\n", vma->vm_flags);
+    if ((ka_mm_get_vm_flags(vma) & KA_VM_HUGETLB) != 0) {
+        trs_err("Invalid vm_flags. (vm_flags=0x%lx)\n", ka_mm_get_vm_flags(vma));
         return -EINVAL;
     }
 
     if ((type == TRS_MAP_TYPE_RO_DEV_MEM) || (type == TRS_MAP_TYPE_RO_REG)) {
-        if ((vma->vm_flags & VM_WRITE) != 0) {
-            trs_err("Invalid vm_flags. (vm_flags=0x%lx)\n", vma->vm_flags);
+        if ((ka_mm_get_vm_flags(vma) & KA_VM_WRITE) != 0) {
+            trs_err("Invalid vm_flags. (vm_flags=0x%lx)\n", ka_mm_get_vm_flags(vma));
             return -EINVAL;
         }
     }
@@ -447,11 +448,11 @@ static int trs_vma_flag_check(ka_vm_area_struct_t *vma, int type)
 static int trs_check_va_range(ka_vm_area_struct_t *vma, unsigned long addr, unsigned long size)
 {
     unsigned long end = addr + KA_MM_PAGE_ALIGN(size);
-    if (((addr & (KA_MM_PAGE_SIZE - 1)) != 0) || (addr < vma->vm_start) || (addr > vma->vm_end) ||
-        (end > vma->vm_end) || (addr >= end)) {
+    if (((addr & (KA_MM_PAGE_SIZE - 1)) != 0) || (addr < ka_mm_get_vm_start(vma)) || (addr > ka_mm_get_vm_end(vma)) ||
+        (end > ka_mm_get_vm_end(vma)) || (addr >= end)) {
 #ifndef EMU_ST
         trs_err("Invalid para. (addr=%pK; size=0x%lx; end=%pK; vm_start=%pK; vm_end=%pK)\n", (void *)(uintptr_t)addr,
-            size, (void *)(uintptr_t)end, (void *)(uintptr_t)vma->vm_start, (void *)(uintptr_t)vma->vm_end);
+            size, (void *)(uintptr_t)end, (void *)(uintptr_t)ka_mm_get_vm_start(vma), (void *)(uintptr_t)ka_mm_get_vm_end(vma));
 #endif
         return -EINVAL;
     }
@@ -491,15 +492,15 @@ static int trs_check_va_unmap(ka_vm_area_struct_t *vma, unsigned long addr, unsi
     return 0;
 }
 
-static int trs_get_remap_prot(int type, pgprot_t vm_page_prot, pgprot_t *prot)
+static int trs_get_remap_prot(int type, ka_mm_pgprot_t vm_page_prot, ka_mm_pgprot_t *prot)
 {
     if ((type == TRS_MAP_TYPE_REG) || (type == TRS_MAP_TYPE_RO_REG)) {
-        *prot = pgprot_device(vm_page_prot);
+        *prot = ka_mm_pgprot_device(vm_page_prot);
     } else if (type == TRS_MAP_TYPE_MEM) {
         *prot = vm_page_prot;
     } else { /* TRS_MAP_TYPE_DEV_MEM TRS_MAP_TYPE_DEV_RD_MEM */
 #ifdef CONFIG_ARM64
-        *prot = pgprot_writecombine(vm_page_prot);
+        *prot = ka_mm_pgprot_writecombine(vm_page_prot);
 #else
         *prot = vm_page_prot;
 #endif
@@ -510,36 +511,31 @@ static int trs_get_remap_prot(int type, pgprot_t vm_page_prot, pgprot_t *prot)
 
 static void trs_zap_vma_ptes(ka_vm_area_struct_t *vma, unsigned long addr, size_t len)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 18, 0)
-    int ret;
-    ret = ka_mm_zap_vma_ptes(vma, addr, KA_MM_PAGE_ALIGN(len));
+    int ret = ka_mm_zap_vma_ptes(vma, addr, KA_MM_PAGE_ALIGN(len));
     if (ret != 0) {
 #ifndef EMU_ST
         trs_err("Unmap va failed. (vma_start=%pK; end=%pK; addr=%pK; len=0x%lx)\n",
-            (void *)(uintptr_t)vma->vm_start, (void *)(uintptr_t)vma->vm_end, (void *)(uintptr_t)addr, len);
+            (void *)(uintptr_t)ka_mm_get_vm_start(vma), (void *)(uintptr_t)ka_mm_get_vm_end(vma), (void *)(uintptr_t)addr, len);
 #endif
     }
-#else
-    ka_mm_zap_vma_ptes(vma, addr, KA_MM_PAGE_ALIGN(len));
-#endif
 }
 
 static int trs_remap_pfn(struct trs_proc_ctx *proc_ctx, struct trs_mem_map_para *para,
     ka_vm_area_struct_t *vma)
 {
-    pgprot_t prot;
+    ka_mm_pgprot_t prot;
     int ret;
 
-    ret = trs_get_remap_prot(para->type, vma->vm_page_prot, &prot);
+    ret = trs_get_remap_prot(para->type, *ka_mm_get_vm_pgprot(vma), &prot);
     if (ret != 0) {
         return ret;
     }
 
-    ret = ka_mm_remap_pfn_range(vma, para->va, __phys_to_pfn(para->pa), para->len, prot);
+    ret = ka_mm_remap_pfn_range(vma, para->va, __ka_mm_phys_to_pfn(para->pa), para->len, prot);
     if (ret != 0) {
 #ifndef EMU_ST
         trs_err("Remap va failed. (vma_start=%pK; end=%pK; addr=%pK; len=0x%lx)\n",
-            (void *)(uintptr_t)vma->vm_start, (void *)(uintptr_t)vma->vm_end, (void *)(uintptr_t)para->va, para->len);
+            (void *)(uintptr_t)ka_mm_get_vm_start(vma), (void *)(uintptr_t)ka_mm_get_vm_end(vma), (void *)(uintptr_t)para->va, para->len);
 #endif
     }
 
@@ -551,7 +547,7 @@ int trs_remap_sq_mem(struct trs_proc_ctx *proc_ctx, ka_vm_area_struct_t *vma,
 {
     int ret;
 
-    if (vma->vm_private_data != proc_ctx) {
+    if (ka_mm_get_vm_private_data(vma) != proc_ctx) {
         trs_err("Invalid vm private data. (pid=%d)\n", proc_ctx->pid);
         return -EINVAL;
     }
@@ -599,7 +595,7 @@ int trs_unmap_sq_mem(struct trs_proc_ctx *proc_ctx, ka_vm_area_struct_t *vma,
 {
     int ret;
 
-    if (vma->vm_private_data != proc_ctx) {
+    if (ka_mm_get_vm_private_data(vma) != proc_ctx) {
         trs_err("Invalid vm private data. (pid=%d)\n", proc_ctx->pid);
         return -EINVAL;
     }
@@ -651,39 +647,17 @@ static int trs_proc_release_msg_send(struct trs_core_ts_inst *ts_inst, int pid, 
     return trs_core_notice_ts(ts_inst, (u8 *)&msg, sizeof(msg));
 }
 
-#define TRS_TS_LONG_RETRY_TIMES     160
 #ifdef CFG_SOC_PLATFORM_FPGA
 #define TRS_TS_RETRY_TIMES          1800
 #else
-#define TRS_TS_RETRY_TIMES          60
+#define TRS_TS_RETRY_TIMES          160
 #endif
-
-static int trs_proc_get_check_ts_times(u32 devid)
-{
-    int retry_times = TRS_TS_RETRY_TIMES;
-#ifndef CFG_FEATURE_NOTSUPPORT_BOARD_CONFIG
-    int ret;
-    u32 soc_type;
-
-    ret = hal_kernel_get_soc_type(devid, &soc_type);
-    if (ret != 0) {
-        return retry_times;
-    }
-
-    if ((soc_type == CHIP_CLOUD_V2) || (soc_type == CHIP_CLOUD_V3)) {
-        retry_times = TRS_TS_LONG_RETRY_TIMES;
-    }
-#endif
-
-    return retry_times;
-}
 
 int trs_proc_release_check_ts(struct trs_proc_ctx *proc_ctx, u32 tsid)
 {
     int i, ret;
-    int retry_times = trs_proc_get_check_ts_times(proc_ctx->devid);
 
-    for (i = 0; i < retry_times; i++) {
+    for (i = 0; i < TRS_TS_RETRY_TIMES; i++) {
         struct trs_core_ts_inst *ts_inst = trs_core_inst_get(proc_ctx->devid, tsid);
         if (ts_inst == NULL) {
             return 0;
@@ -700,12 +674,10 @@ int trs_proc_release_check_ts(struct trs_proc_ctx *proc_ctx, u32 tsid)
         trs_core_inst_put(ts_inst);
 
         if ((ret == -EIO) || (TRS_IS_REBOOT_ACTIVE == true)) {
-#ifndef EMU_ST
             return ret;
-#endif
         }
 
-        (i < 10) ? msleep(100) : msleep(1000); /* first 10 times, sleep 100 ms, then sleep 1000 ms */
+        (i < 10) ? ka_system_msleep(100) : ka_system_msleep(1000); /* fisrt 10 times, sleep 100 ms, then sleep 1000 ms */
     }
 
     return -ETIMEDOUT;
@@ -836,7 +808,7 @@ static int trs_proc_release_agent_master_check_ts(struct trs_proc_ctx *proc_ctx,
     int master_pid;
     int ret;
 
-    if (proc_ctx->agent_res_leak_flag == true) { /* no need repeat check */
+    if (proc_ctx->agent_app_pid != 0) { /* no need repeat check */
         return 0;
     }
 
@@ -847,14 +819,29 @@ static int trs_proc_release_agent_master_check_ts(struct trs_proc_ctx *proc_ctx,
 
     ret = trs_proc_release_msg_send(ts_inst, master_pid, TRS_MBOX_RECYCLE_CHECK);
     if (ret != 0) {
-#ifndef EMU_ST
-        proc_ctx->agent_app_pid = master_pid;
-        proc_ctx->agent_res_leak_flag = true;
-        trs_warn("Recycle warn. (devid=%u; tsid=%u; name=%s; pid=%d; task_id=%lld; master_pid=%d; ret=%d)\n",
+        trs_warn("App exit not finish. (devid=%u; tsid=%u; name=%s; pid=%d; task_id=%lld; master_pid=%d; ret=%d)\n",
             ts_inst->inst.devid, ts_inst->inst.tsid, proc_ctx->name, proc_ctx->pid, proc_ctx->task_id, master_pid, ret);
-        trs_proc_leak_res_show(proc_ctx, ts_inst);
-#endif
-        return -EBUSY;
+        goto exit;
+    }
+
+    /* Re check host app if exit timeout, before tsfw app exit finish and agent check success */
+    if (ts_inst->ops.notice_proc_release != NULL) {
+        ret = ts_inst->ops.notice_proc_release(&ts_inst->inst, master_pid);
+        if (ret != 0) {
+            trs_warn("App exit warn. (devid=%u; tsid=%u; name=%s; pid=%d; task_id=%lld; master_pid=%d; ret=%d)\n",
+                ts_inst->inst.devid, ts_inst->inst.tsid, proc_ctx->name, proc_ctx->pid, proc_ctx->task_id, master_pid, ret);
+            goto exit;
+        }
+    }
+
+exit:
+    /* mutex against h2d notice proc release */
+    if (ret != 0) {
+        if (ka_base_atomic_cmpxchg(&proc_ctx->agent_release_flag, 0, 1) == 0) {
+            proc_ctx->agent_app_pid = master_pid;
+            trs_proc_leak_res_show(proc_ctx, ts_inst);
+            return -EBUSY;
+        }
     }
 
     return 0;
@@ -914,11 +901,17 @@ void trs_clear_exit_proc_list(struct trs_core_ts_inst *ts_inst)
     ka_task_up_write(&ts_inst->sem);
 }
 
+#define TRS_WAIT_EXIT_PROC_LIST_MAX_CNT 10
 int trs_notice_exit_proc_list_recycle(struct trs_id_inst *inst, int pid)
 {
     struct trs_core_ts_inst *ts_inst = NULL;
     struct trs_proc_ctx *proc_ctx = NULL;
     struct trs_proc_ctx *n = NULL;
+    int master_pid;
+    s64 proc_task_id = -1;
+    bool wait_flag = false;
+    int wait_cnt = 0;
+    int ret = 0;
 
     ts_inst = trs_core_ts_inst_get(inst);
     if (ts_inst == NULL) {
@@ -927,19 +920,80 @@ int trs_notice_exit_proc_list_recycle(struct trs_id_inst *inst, int pid)
     }
 
     ka_task_down_write(&ts_inst->sem);
+    ka_list_for_each_entry(proc_ctx, &ts_inst->proc_list_head, node) {
+        ret = trs_core_get_host_pid(proc_ctx->pid, &master_pid);
+        if ((ret != 0) || (master_pid != pid)) {
+            continue;
+        }
+
+        proc_task_id = proc_ctx->task_id;
+        if (ka_base_atomic_cmpxchg(&proc_ctx->agent_release_flag, 0, 1) != 0) { /* local set flag first */
+            wait_flag = true;
+        }
+        break;
+    }
+    ka_task_up_write(&ts_inst->sem);
+
+retry:
+    ka_task_down_write(&ts_inst->sem);
     ka_list_for_each_entry_safe(proc_ctx, n, &ts_inst->exit_proc_list_head, node) {
-        if ((proc_ctx->agent_res_leak_flag != true) || (proc_ctx->agent_app_pid != pid)) {
+        if ((proc_ctx->agent_app_pid != pid) || ((proc_task_id != -1) && (proc_ctx->task_id != proc_task_id))) {
             continue;
         }
 
         trs_info("Recycle proc in exit list. (devid=%u; app_pid=%d; proc_pid=%d)\n", inst->devid, pid, proc_ctx->pid);
-
         (void)trs_proc_ts_res_recycle(proc_ctx, ts_inst);
         ka_list_del(&proc_ctx->node);
         trs_proc_ctx_put(proc_ctx);
+        wait_flag = false;
+        break;
     }
     ka_task_up_write(&ts_inst->sem);
 
+    if ((wait_flag == true) && ((wait_cnt++) < TRS_WAIT_EXIT_PROC_LIST_MAX_CNT)) {
+        ka_system_usleep_range(USEC_PER_MSEC - 100, USEC_PER_MSEC); /* 1ms, range 100 us */
+        goto retry;
+    }
+
+    trs_core_inst_put(ts_inst);
+    return 0;
+}
+
+int trs_notice_check_proc_recycle(struct trs_id_inst *inst, int pid)
+{
+    struct trs_core_ts_inst *ts_inst = NULL;
+    struct trs_proc_ctx *proc_ctx = NULL;
+
+    ts_inst = trs_core_ts_inst_get(inst);
+    if (ts_inst == NULL) {
+        trs_err("Invalid para. (devid=%u; tsid=%u)\n", inst->devid, inst->tsid);
+        return -EINVAL;
+    }
+
+    ka_task_down_write(&ts_inst->sem);
+    ka_list_for_each_entry(proc_ctx, &ts_inst->proc_list_head, node) {
+        if (proc_ctx->pid != pid) {
+            continue;
+        }
+
+        if (proc_ctx->release_stage >= APM_STAGE_PRE_RECYCLE_RES) {
+            break;
+        }
+
+        ka_task_up_write(&ts_inst->sem);
+        trs_core_inst_put(ts_inst);
+        return -EEXIST;
+    }
+
+    ka_list_for_each_entry(proc_ctx, &ts_inst->exit_proc_list_head, node) {
+        if (proc_ctx->pid == pid) {
+            ka_task_up_write(&ts_inst->sem);
+            trs_core_inst_put(ts_inst);
+            return -EEXIST;
+        }
+    }
+
+    ka_task_up_write(&ts_inst->sem);
     trs_core_inst_put(ts_inst);
     return 0;
 }

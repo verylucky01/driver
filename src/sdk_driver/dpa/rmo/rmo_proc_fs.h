@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -23,5 +23,6 @@ ka_proc_dir_entry_t *rmo_proc_fs_add_task(const char *domain, int tgid);
 void rmo_proc_fs_del_task(ka_proc_dir_entry_t *task_entry);
 
 int rmo_proc_open(ka_inode_t *inode, ka_file_t *file);
+ka_proc_dir_entry_t *rmo_get_top_entry(void);
 
 #endif /* RMO_PROC_FS_H__ */

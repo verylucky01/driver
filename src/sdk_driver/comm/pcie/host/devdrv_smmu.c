@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,14 +11,14 @@
  * GNU General Public License for more details.
  */
 
+#include "ka_kernel_def_pub.h"
+#include "ka_compiler_pub.h"
 #include "devdrv_ctrl.h"
 #include "devdrv_util.h"
 #include "devdrv_msg.h"
 #include "devdrv_mem_alloc.h"
 #include "devdrv_smmu.h"
 #include "pbl/pbl_uda.h"
-#include "ka_kernel_def_pub.h"
-#include "ka_compiler_pub.h"
 
 #ifdef CFG_FEATURE_AGENT_SMMU
 STATIC inline int devdrv_smmu_host_pa_range_check(phys_addr_t pa)

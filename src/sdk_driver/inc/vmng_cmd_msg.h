@@ -1,1 +1,0 @@
-../vmng/command/vmng_cmd_msg.h

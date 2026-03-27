@@ -25,8 +25,10 @@ STATIC struct hdc_epoll_ops *drv_hdc_epoll_get_ops(const struct hdcConfig *conf)
 #ifdef CFG_FEATURE_SUPPORT_UB
             if (conf->h2d_type == HDC_TRANS_USE_UB) {
                 epoll_ops = drv_get_hdc_ub_epoll_ops(); /* UB */
-            } else {
+            } else if (conf->h2d_type == HDC_TRANS_USE_PCIE) {
                 epoll_ops = drv_get_hdc_pcie_epoll_ops();
+            } else {
+                HDC_LOG_ERR("Variable h2d_type is invalid. (h2d_type=%#x)\n", conf->h2d_type);
             }
 #else
             epoll_ops = drv_get_hdc_pcie_epoll_ops();

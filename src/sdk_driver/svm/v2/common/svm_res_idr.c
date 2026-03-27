@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -54,21 +54,13 @@ char *devmm_idr_get_and_remove(struct svm_idr *idr, int id, idr_remove_condition
     char *ptr = NULL;
 
     ka_task_mutex_lock(&idr->lock);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
     ptr = ka_base_idr_find(&idr->idr, id);
-#else
-    ptr = ka_base_idr_find(&idr->idr, (u64)id);
-#endif
     if (ptr != NULL) {
         if ((condition != NULL) && (condition(ptr) == false)) {
             ptr = NULL;
             goto find_fail;
         }
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
         ka_base_idr_remove(&idr->idr, id);
-#else
-        (void)ka_base_idr_remove(&idr->idr, (u64)id);
-#endif
     }
 find_fail:
     ka_task_mutex_unlock(&idr->lock);
@@ -90,11 +82,7 @@ void devmm_idr_destroy(struct svm_idr *idr, void (*free_ptr)(const void *ptr))
             free_ptr(entry);
             entry = NULL;
         }
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
         ka_base_idr_remove(&idr->idr, id);
-#else
-        ka_base_idr_remove(&idr->idr, (unsigned int)id);
-#endif
     }
     ka_base_idr_destroy(&idr->idr);
     ka_task_mutex_unlock(&idr->lock);

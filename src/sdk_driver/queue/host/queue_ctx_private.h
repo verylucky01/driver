@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -12,16 +12,13 @@
  */
 #ifndef QUEUE_CTX_PRIVATE_H
 #define QUEUE_CTX_PRIVATE_H
-
-#include <linux/spinlock.h>
-#include <linux/list.h>
-
+#include "ka_list_pub.h"
 #include "queue_module.h"
 #include "queue_fops.h"
 
 struct context_private_data {
-    struct list_head node_list_head;
-    spinlock_t lock;
+    ka_list_head_t node_list_head;
+    ka_task_spinlock_t lock;
     int hdc_session[MAX_DEVICE];
 };
 

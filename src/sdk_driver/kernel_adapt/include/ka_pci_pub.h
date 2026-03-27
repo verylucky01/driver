@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -41,6 +41,7 @@ typedef struct irq_affinity ka_irq_affinity_t;
 typedef struct pci_bus ka_pci_bus_t;
 typedef struct pci_device_id ka_pci_device_id_t;
 typedef struct pci_driver ka_pci_driver_t;
+typedef struct pci_error_handlers ka_pci_error_handlers_t;
 typedef struct dev_iommu ka_dev_iommu_t;
 typedef struct iommu_fwspec ka_iommu_fwspec_t;
 typedef struct iommu_domain ka_iommu_domain_t;
@@ -52,6 +53,16 @@ typedef struct dev_pm_ops ka_dev_pm_ops_t;
 #define KA_PCI_ERS_RESULT_NEED_RESET    PCI_ERS_RESULT_NEED_RESET
 #define KA_PCI_ERS_RESULT_RECOVERED     PCI_ERS_RESULT_RECOVERED
 #define KA_PCI_ERS_RESULT_DISCONNECT    PCI_ERS_RESULT_DISCONNECT
+#define KA_PCI_EXP_LNKSTA_CLS           PCI_EXP_LNKSTA_CLS
+#define KA_PCI_EXP_LNKSTA_NLW           PCI_EXP_LNKSTA_NLW
+#define KA_PCI_EXP_LNKSTA_NLW_SHIFT     PCI_EXP_LNKSTA_NLW_SHIFT
+#define KA_PCI_CAP_ID_EXP               PCI_CAP_ID_EXP
+#define KA_PCI_EXP_LNKSTA               PCI_EXP_LNKSTA
+#define KA_PCI_EXP_LNKCTL               PCI_EXP_LNKCTL
+#define KA_PCI_EXP_LNKCTL_LD            PCI_EXP_LNKCTL_LD
+#define KA_PCI_CAP_ID_VNDR              PCI_CAP_ID_VNDR
+#define KA_PCI_EXP_LNKSTA_DLLLA         PCI_EXP_LNKSTA_DLLLA
+
 #define ka_pci_channel_io_normal        pci_channel_io_normal
 #define ka_pci_channel_io_frozen        pci_channel_io_frozen
 #define ka_pci_channel_io_perm_failure  pci_channel_io_perm_failure
@@ -115,6 +126,14 @@ typedef struct dev_pm_ops ka_dev_pm_ops_t;
 #define ka_pci_enable_sriov(dev, nr_virtfn) pci_enable_sriov(dev, nr_virtfn)
 #define ka_pci_disable_sriov(dev) pci_disable_sriov(dev)
 #define ka_pci_vfs_assigned(dev) pci_vfs_assigned(dev)
+#define ka_pci_upstream_bridge(pdev) pci_upstream_bridge(pdev)
+
+#define ka_pci_error_detected(pci_error_detected) \
+    .error_detected = pci_error_detected,
+#define ka_pci_slot_reset(pci_slot_reset) \
+    .slot_reset = pci_slot_reset,
+#define ka_pci_resume(pci_error_resume) \
+    .resume = pci_error_resume,
 
 ka_bus_type_t *ka_pci_get_bus_type(void);
 unsigned char ka_pci_get_bus_number(ka_pci_dev_t *pdev);

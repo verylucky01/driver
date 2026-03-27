@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,6 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
+#include "pbl/pbl_uda.h"
 #include "trs_pub_def.h"
 #include "trs_chan.h"
 #include "trs_core.h"
@@ -27,7 +28,8 @@ int trs_soc_cloud_v4_chan_stars_init(struct trs_id_inst *inst)
         return ret;
     }
 
-    ret = trs_chan_ts_inst_register(inst, trs_soc_get_hw_type(inst->devid), trs_chan_get_stars_v2_adapt_ops());
+    ret = trs_chan_ts_inst_register(inst, trs_soc_get_hw_type(inst->devid), UDA_NEAR,
+        trs_chan_get_stars_v2_adapt_ops());
     if (ret != 0) {
         trs_chan_stars_v2_ops_uninit(inst);
     }

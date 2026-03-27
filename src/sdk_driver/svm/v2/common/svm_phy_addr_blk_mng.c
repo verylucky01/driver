@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -206,37 +206,41 @@ void devmm_phy_addr_blk_destroy(struct devmm_phy_addr_blk_mng *mng, struct devmm
     devmm_phy_addr_blk_put(blk);
 }
 
-static void _devmm_phy_addr_blk_uninit(struct devmm_svm_process *svm_proc,
-    struct devmm_phy_addr_blk *blk, u64 to_free_pg_num, bool *is_finish)
-{
-    struct devmm_dma_blk_info *dma_blk_info = &blk->dma_blk_info;
-    struct devmm_page_info *pg_info = &blk->pg_info;
-    struct devmm_dma_blk *dma_blks = NULL;
-    ka_page_t **pages = NULL;
-    u32 devid = blk->attr.devid;
-    u64 freed_dma_blk_num, freed_pg_num;
+static void _devmm_phy_addr_blk_uninit(struct devmm_svm_process *svm_proc,	 
+ 	      struct devmm_phy_addr_blk *blk, u64 to_free_pg_num, bool *is_finish)	 
+{	 
+    struct devmm_dma_blk_info *dma_blk_info = &blk->dma_blk_info;	 
+ 	struct devmm_page_info *pg_info = &blk->pg_info;	 
+ 	struct devmm_dma_blk *dma_blks = NULL; 
+ 	ka_page_t **pages = NULL; 
+ 	u32 devid = blk->attr.devid;	 
+ 	 u64 freed_dma_blk_num, freed_pg_num;	 
+ 	  
+ 	  
+ 	/* dma_blk_info->save_num must <= pg_info->saved_num */ 
+ 	freed_pg_num = ka_base_min(to_free_pg_num, pg_info->saved_num); 
+ 	freed_dma_blk_num = ka_base_min(to_free_pg_num, dma_blk_info->saved_num); 
+ 	  
+ 	  
+ 	pages = &pg_info->pages[pg_info->saved_num - freed_pg_num]; 
+ 	dma_blks = &dma_blk_info->dma_blks[dma_blk_info->saved_num - freed_dma_blk_num]; 
+ 	  
+ 	  
+ 	devmm_phy_addr_blk_free_pages(svm_proc, &blk->attr, pages, freed_pg_num); 
+ 	pg_info->saved_num -= freed_pg_num; 
+ 	  
+ 	  
+ 	if (blk->attr.side == DEVMM_SIDE_DEVICE_AGENT) {	 
+ 	    devmm_dma_unmap_pages(devid, dma_blks, freed_dma_blk_num);	 
+ 	    dma_blk_info->saved_num -= freed_dma_blk_num;	 
+ 	}	 
 
-    /* dma_blk_info->save_num must <= pg_info->saved_num */
-    freed_pg_num = ka_base_min(to_free_pg_num, pg_info->saved_num);
-    freed_dma_blk_num = ka_base_min(to_free_pg_num, dma_blk_info->saved_num);
-
-    pages = &pg_info->pages[pg_info->saved_num - freed_pg_num];
-    dma_blks = &dma_blk_info->dma_blks[dma_blk_info->saved_num - freed_dma_blk_num];
-
-    devmm_phy_addr_blk_free_pages(svm_proc, &blk->attr, pages, freed_pg_num);
-    pg_info->saved_num -= freed_pg_num;
-
-    if (blk->attr.side == DEVMM_SIDE_DEVICE_AGENT) {
-        devmm_dma_unmap_pages(devid, dma_blks, freed_dma_blk_num);
-        dma_blk_info->saved_num -= freed_dma_blk_num;
-    }
-
-    *is_finish = (pg_info->saved_num == 0) ? true : false;
+ 	*is_finish = (pg_info->saved_num == 0) ? true : false;	 
 }
 
 /* If not so much to_free_pg_num, return actual freed_pg_num. */
-int devmm_phy_addr_blk_uninit(struct devmm_svm_process *svm_proc,
-    struct devmm_phy_addr_blk *blk, u64 to_free_pg_num, u32 free_type, bool *is_finish)
+int devmm_phy_addr_blk_uninit(struct devmm_svm_process *svm_proc,	 
+ 	      struct devmm_phy_addr_blk *blk, u64 to_free_pg_num, u32 free_type, bool *is_finish)
 {
     ka_task_down_write(&blk->rw_sem);
     if (ka_base_atomic64_read(&blk->occupied_num) != 0) {
@@ -267,13 +271,14 @@ int devmm_phy_addr_blk_uninit(struct devmm_svm_process *svm_proc,
     return 0;
 }
 
-static int _devmm_phy_addr_blk_init(struct devmm_svm_process *svm_proc,
-    struct devmm_phy_addr_blk *blk, u64 pg_num, bool *is_finish)
+static int _devmm_phy_addr_blk_init(struct devmm_svm_process *svm_proc,	 
+ 	      struct devmm_phy_addr_blk *blk, u64 pg_num, bool *is_finish)
 {
     struct devmm_dma_blk_info *dma_blk_info = &blk->dma_blk_info;
+    
     struct devmm_page_info *pg_info = &blk->pg_info;
-    struct devmm_dma_blk *dma_blks = &dma_blk_info->dma_blks[dma_blk_info->saved_num];
-    ka_page_t **pages = &pg_info->pages[pg_info->saved_num];
+    struct devmm_dma_blk *dma_blks = &dma_blk_info->dma_blks[dma_blk_info->saved_num];	 
+ 	ka_page_t **pages = &pg_info->pages[pg_info->saved_num];
     u32 pg_type = blk->attr.pg_type;
     u32 devid = blk->attr.devid;
     u64 mapped_dma_blk_num;
@@ -312,8 +317,8 @@ static int _devmm_phy_addr_blk_init(struct devmm_svm_process *svm_proc,
     return 0;
 }
 
-int devmm_phy_addr_blk_init(struct devmm_svm_process *svm_proc,
-    struct devmm_phy_addr_blk *blk, u64 pg_num)
+int devmm_phy_addr_blk_init(struct devmm_svm_process *svm_proc,	 
+ 	      struct devmm_phy_addr_blk *blk, u64 pg_num)
 {
     bool is_finish = false;
     int ret;
@@ -325,8 +330,8 @@ int devmm_phy_addr_blk_init(struct devmm_svm_process *svm_proc,
         return -EBUSY;
     }
 
-    ret = _devmm_phy_addr_blk_init(svm_proc, blk, pg_num, &is_finish);
-    blk->init_state = ((ret == 0) && is_finish) ? SVM_PHY_ADDR_BLK_IS_INITED : SVM_PHY_ADDR_BLK_IS_INITING;
+    ret = _devmm_phy_addr_blk_init(svm_proc, blk, pg_num, &is_finish);	 
+ 	blk->init_state = ((ret == 0) && is_finish) ? SVM_PHY_ADDR_BLK_IS_INITED : SVM_PHY_ADDR_BLK_IS_INITING;
     ka_task_up_write(&blk->rw_sem);
     return ret;
 }
@@ -342,6 +347,7 @@ void _devmm_phy_addr_blks_destroy(struct devmm_svm_process *svm_proc, struct dev
     ka_base_idr_for_each_entry(&mng->idr, blk, id) {
         ka_base_idr_remove(&mng->idr, (unsigned long)id);
         if ((blk->type == SVM_PYH_ADDR_BLK_NORMAL_TYPE) || (blk->type == SVM_PYH_ADDR_BLK_SHARE_TYPE)) {
+            /* pg_info determines the release policy. */
             _devmm_phy_addr_blk_uninit(svm_proc, blk, blk->pg_num, &is_finish);
         }
         devmm_phy_addr_blk_put(blk);
@@ -356,6 +362,8 @@ void devmm_phy_addr_blks_destroy(struct devmm_svm_process *svm_proc)
 
     _devmm_phy_addr_blks_destroy(svm_proc, mng);
 }
+
+
 
 ka_page_t **devmm_phy_addr_blk_get_pages(struct devmm_phy_addr_blk *blk, u64 offset, u64 pg_num)
 {

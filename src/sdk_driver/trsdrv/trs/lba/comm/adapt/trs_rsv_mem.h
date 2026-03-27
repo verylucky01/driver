@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -22,7 +22,7 @@ extern "C" {
 #endif
 #define TRS_RSV_MEM_FLAG_DEVICE (1 << 0)
 struct trs_rsv_mem_attr {
-    void __iomem *vaddr;
+    void __ka_mm_iomem *vaddr;
     phys_addr_t paddr;
     size_t total_size;
     u32 flag;

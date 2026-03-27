@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -61,6 +61,7 @@ struct devmm_phy_addr_blk {
     struct devmm_target_addr_info addr_info;
 };
 
+
 #define SVM_PYH_ADDR_BLK_NORMAL_TYPE SVM_MEM_HANDLE_NORMAL_TYPE
 #define SVM_PYH_ADDR_BLK_EXPORT_TYPE SVM_MEM_HANDLE_EXPORT_TYPE
 #define SVM_PYH_ADDR_BLK_IMPORT_TYPE SVM_MEM_HANDLE_IMPORT_TYPE
@@ -69,6 +70,7 @@ struct devmm_phy_addr_blk {
 #define SVM_PYH_ADDR_BLK_NORMAL_FREE   0x0
 #define SVM_PYH_ADDR_BLK_FREE_NO_PAGE  0x1
 
+
 void devmm_phy_addr_blk_mng_init(struct devmm_phy_addr_blk_mng *mng);
 struct devmm_phy_addr_blk *devmm_phy_addr_blk_create(struct devmm_phy_addr_blk_mng *mng,
     struct devmm_phy_addr_attr *attr, u64 pg_num, int *id);
@@ -76,10 +78,10 @@ void devmm_phy_addr_blk_destroy(struct devmm_phy_addr_blk_mng *mng, struct devmm
 struct devmm_phy_addr_blk *devmm_phy_addr_blk_get(struct devmm_phy_addr_blk_mng *mng, int id);
 void devmm_phy_addr_blk_put(struct devmm_phy_addr_blk *blk);
 
-int devmm_phy_addr_blk_init(struct devmm_svm_process *svm_proc,
-    struct devmm_phy_addr_blk *blk, u64 pg_num);
-int devmm_phy_addr_blk_uninit(struct devmm_svm_process *svm_proc,
-    struct devmm_phy_addr_blk *blk, u64 to_free_pg_num, u32 free_type, bool *is_finish);
+int devmm_phy_addr_blk_init(struct devmm_svm_process *svm_proc,	 
+ 	      struct devmm_phy_addr_blk *blk, u64 pg_num);
+int devmm_phy_addr_blk_uninit(struct devmm_svm_process *svm_proc,	 
+ 	      struct devmm_phy_addr_blk *blk, u64 to_free_pg_num, u32 free_type, bool *is_finish);
 void devmm_phy_addr_blks_destroy(struct devmm_svm_process *svm_proc);
 
 int devmm_phy_addr_blk_occupy_inc(struct devmm_phy_addr_blk *blk);

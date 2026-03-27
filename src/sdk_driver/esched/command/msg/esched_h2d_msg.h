@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -90,9 +90,7 @@ struct esched_ctrl_msg_get_pool_id {
 };
 
 struct esched_query_trace_msg {
-    u32 pid;
-    u32 gid;
-    u32 tid;
+    struct sched_trace_input para;
     struct sched_sync_event_trace sched_trace;
 };
 
@@ -114,7 +112,7 @@ static inline void sched_remote_msg_head_init(struct esched_msg_head *head, ESCH
 {
     head->type = type;
     head->error_code = 0;
-    head->src_pid = current->tgid;
+    head->src_pid = ka_task_get_current()->tgid;
     head->rsv = 0;
 }
 #endif

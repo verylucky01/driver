@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,9 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
-#include <linux/fs.h>
-#include <linux/jiffies.h>
+#include "ka_common_pub.h"
 
 #include "devdrv_manager.h"
 #include "ka_fs_pub.h"
@@ -24,7 +22,7 @@
 
 int devdrv_get_random(char *random, u32 len)
 {
-    struct file *file = NULL;
+    ka_file_t *file = NULL;
     unsigned long time;
     u32 tmp_len = len;
     u32 out_size = 0;
@@ -47,11 +45,7 @@ int devdrv_get_random(char *random, u32 len)
         pos = 0;
         tmp_len = len - out_size;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
         ret = ka_fs_kernel_read(file, random + out_size, (ssize_t)tmp_len, &pos);
-#else
-        ret = devdrv_load_file_read(file, &pos, random + out_size, (ssize_t)tmp_len);
-#endif
         if (ret == -ERESTARTSYS || ret == -EAGAIN) {
             devdrv_drv_warn("kernel read continue, ret(%d).\n", ret);
             continue;
@@ -65,7 +59,7 @@ int devdrv_get_random(char *random, u32 len)
         out_size += ret;
     } while (out_size < len);
 
-    if (time_is_before_jiffies(time + KA_HZ / 10)) {
+    if (ka_system_time_is_before_jiffies(time + KA_HZ / 10)) {
         devdrv_drv_warn("spend time : %u ms.\n", ka_system_jiffies_to_msecs(ka_jiffies - time));
     }
 

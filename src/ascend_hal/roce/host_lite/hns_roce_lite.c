@@ -137,8 +137,8 @@ int hns_roce_lite_init_mem_pool(struct rdma_lite_context *lite_ctx, struct rdma_
     HNS_ROCE_U_NULL_POINT_RETURN_ERR(lite_mem_attr);
 
     ctx = to_hr_lite_ctx(lite_ctx);
-    if (ctx->page_size != PAGE_ALIGN_2MB) {
-        roce_err("init param err, ctx->page_size[%u] invalid, valid page_size[%u]", ctx->page_size, PAGE_ALIGN_2MB);
+    if (ctx->page_size == PAGE_ALIGN_4KB) {
+        roce_err("init param err, ctx->page_size[%u] invalid", ctx->page_size);
         return -EINVAL;
     }
 
@@ -188,8 +188,8 @@ int hns_roce_lite_deinit_mem_pool(struct rdma_lite_context *lite_ctx, u32 mem_id
     HNS_ROCE_U_NULL_POINT_RETURN_ERR(lite_ctx);
 
     ctx = to_hr_lite_ctx(lite_ctx);
-    if (ctx->page_size != PAGE_ALIGN_2MB) {
-        roce_err("deinit param err, ctx->page_size[%u] invalid, valid page_size[%u]", ctx->page_size, PAGE_ALIGN_2MB);
+    if (ctx->page_size == PAGE_ALIGN_4KB) {
+        roce_err("deinit param err, ctx->page_size[%u] invalid", ctx->page_size);
         return -EINVAL;
     }
 
@@ -814,6 +814,7 @@ STATIC int hns_roce_lite_poll_one(struct hns_roce_lite_cq *cq, struct hns_roce_l
     if (roce_get_field(cqe->byte_4, CQE_BYTE_4_STATUS_M, CQE_BYTE_4_STATUS_S) != HNS_ROCE_LITE_CQE_SUCCESS) {
         hns_roce_lite_handle_error_cqe(cqe, lite_wc);
         dump_err_cqe(cq, (u32 *)cqe, lite_wc->status);
+        (*cur_qp)->lite_qp.qp_state = RDMA_LITE_QPS_ERR;
         return CQ_OK;
     }
 
@@ -912,6 +913,10 @@ STATIC int check_qp_send_recv(struct hns_roce_lite_qp *qp)
         return -EINVAL;
     }
 
+    if (unlikely(lite_qp->qp_state == RDMA_LITE_QPS_ERR)) {
+        roce_err("unsupported qp state, state = %d", lite_qp->qp_state);
+        return -EINVAL;
+    }
     return 0;
 }
 

@@ -329,6 +329,11 @@ int DmsGetImuInfo(unsigned int dev_id, unsigned int vfid, unsigned int sub_cmd, 
 drvError_t dms_get_ub_info(uint32_t devId, int32_t infoType, void *buf, int32_t *size);
 drvError_t DmsGetUbInfo(unsigned int dev_id, int module_type, int info_type,
     void *buf, unsigned int *size);
+#ifdef CFG_FEATURE_GET_DEV_INDEX_IN_GROUP
+drvError_t DmsGetIndexInGroup(unsigned int dev_id, unsigned int main_cmd, unsigned int sub_cmd,
+    void *buf, unsigned int *size);
+#endif
+int dms_get_ub_info_by_dmp(unsigned int dev_id, unsigned int vfid, unsigned int sub_cmd, void *buf, unsigned int *size);
 #ifndef CFG_SOC_PLATFORM_MINI
 int dmanage_restart_ssh(const char *ip_addr);
 #endif

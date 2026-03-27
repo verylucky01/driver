@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,11 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
-#include <linux/module.h>
-#include <linux/init.h>
-#include <linux/pci.h>
-
+#include "ka_pci_pub.h"
 #include "ka_task_pub.h"
 #include "ka_kernel_def_pub.h"
 #include "ka_list_pub.h"
@@ -36,7 +32,7 @@
 
 #define PCI_VENDOR_ID_HUAWEI            0x19e5
 #define DEVDRV_DIVERSITY_PCIE_VENDOR_ID 0xFFFF
-static const struct pci_device_id g_udis_tbl[] = {
+static const ka_pci_device_id_t g_udis_tbl[] = {
     { KA_PCI_VDEVICE(HUAWEI, 0xd100),           0 },
     { KA_PCI_VDEVICE(HUAWEI, 0xd105),           0 },
     { KA_PCI_VDEVICE(HUAWEI, PCI_DEVICE_CLOUD), 0 },
@@ -50,8 +46,10 @@ static const struct pci_device_id g_udis_tbl[] = {
     { DEVDRV_DIVERSITY_PCIE_VENDOR_ID, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
     { 0x20C6, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
     { 0x203F, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+    { 0x20E9, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
     { 0x20C6, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
     { 0x203F, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+    { 0x20E9, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
     {}
 };
 KA_MODULE_DEVICE_TABLE(pci, g_udis_tbl);
@@ -90,11 +88,19 @@ STATIC int udis_cb_constructor(unsigned int udevid, struct udis_ctrl_block *udis
 {
     int ret, i;
 
-    udis_cb->udis_info_buf = (struct udis_info_stu *)hal_kernel_devdrv_dma_alloc_coherent(uda_get_device(udevid),
-        UDIS_MODULE_OFFSET * UDIS_MODULE_MAX, &udis_cb->udis_info_buf_dma, KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
-    if (udis_cb->udis_info_buf == NULL) {
-        udis_err("Failed to call hal_kernel_devdrv_dma_alloc_coherent. (udevid=%u)\n", udevid);
-        return -ENOMEM;
+    if ((devdrv_get_connect_protocol(udevid) == CONNECT_PROTOCOL_UB)) {
+        udis_cb->udis_info_buf = (struct udis_info_stu *)dbl_kzalloc(UDIS_MODULE_OFFSET * UDIS_MODULE_MAX, KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
+        if (udis_cb->udis_info_buf == NULL) {
+            udis_err("Failed to call dbl_kzalloc. (udevid=%u)\n", udevid);
+            return -ENOMEM;
+        }
+    } else {
+        udis_cb->udis_info_buf = (struct udis_info_stu *)hal_kernel_devdrv_dma_alloc_coherent(uda_get_device(udevid),
+            UDIS_MODULE_OFFSET * UDIS_MODULE_MAX, &udis_cb->udis_info_buf_dma, KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
+        if (udis_cb->udis_info_buf == NULL) {
+            udis_err("Failed to call hal_kernel_devdrv_dma_alloc_coherent. (udevid=%u)\n", udevid);
+            return -ENOMEM;
+        }
     }
 
     ret = memset_s(udis_cb->udis_info_buf, UDIS_MODULE_OFFSET * UDIS_MODULE_MAX, 0,
@@ -114,8 +120,12 @@ STATIC int udis_cb_constructor(unsigned int udevid, struct udis_ctrl_block *udis
     return 0;
 
 free_dma_buf:
-    hal_kernel_devdrv_dma_free_coherent(uda_get_device(udevid), UDIS_MODULE_OFFSET * UDIS_MODULE_MAX,
-        udis_cb->udis_info_buf, udis_cb->udis_info_buf_dma);
+    if ((devdrv_get_connect_protocol(udevid) == CONNECT_PROTOCOL_UB)) {
+        dbl_kfree(udis_cb->udis_info_buf);
+    } else {
+        hal_kernel_devdrv_dma_free_coherent(uda_get_device(udevid), UDIS_MODULE_OFFSET * UDIS_MODULE_MAX,
+            udis_cb->udis_info_buf, udis_cb->udis_info_buf_dma);
+    }
     udis_cb->udis_info_buf = NULL;
     udis_cb->udis_info_buf_dma = 0;
     return ret;
@@ -124,7 +134,7 @@ free_dma_buf:
 STATIC void udis_cb_destructor(unsigned int udevid, struct udis_ctrl_block *udis_cb)
 {
     int i;
-    struct udis_dma_node *addr_node, *tmp;
+    struct udis_node *addr_node, *tmp;
 
     for (i = UPDATE_ONLY_ONCE; i < UPDATE_TYPE_MAX; ++i) {
         ka_list_for_each_entry_safe(addr_node, tmp, &udis_cb->addr_list[i], list) {
@@ -134,8 +144,12 @@ STATIC void udis_cb_destructor(unsigned int udevid, struct udis_ctrl_block *udis
         }
     }
 
-    hal_kernel_devdrv_dma_free_coherent(uda_get_device(udevid), UDIS_MODULE_OFFSET * UDIS_MODULE_MAX,
-        udis_cb->udis_info_buf, udis_cb->udis_info_buf_dma);
+    if ((devdrv_get_connect_protocol(udevid) == CONNECT_PROTOCOL_UB)) {
+        dbl_kfree(udis_cb->udis_info_buf);
+    } else {
+        hal_kernel_devdrv_dma_free_coherent(uda_get_device(udevid), UDIS_MODULE_OFFSET * UDIS_MODULE_MAX,
+            udis_cb->udis_info_buf, udis_cb->udis_info_buf_dma);
+    }
     udis_cb->udis_info_buf = NULL;
     udis_cb->udis_info_buf_dma = 0;
 }
@@ -198,25 +212,25 @@ STATIC void udis_uninit_ucb(unsigned int udevid)
 }
 
 enum {
-    UDIS_LINK_DMA_NODES_NOTIFY_FUNC = 0,
+    UDIS_LINK_NODES_NOTIFY_FUNC = 0,
     UDIS_CTRL_BLOCK_NOTIFY_FUNC,
     UDIS_COMMON_CHANNEL_NOTIFY_FUNC,
-    UDIS_PERIOD_LINK_DMA_TASK_NOTIFY_FUNC,
+    UDIS_PERIOD_LINK_TASK_NOTIFY_FUNC,
     UDIS_NOTIFY_FUNC_TALBE_SIZE
 };
 
 STATIC int (*udis_device_up_notify_func_table[UDIS_NOTIFY_FUNC_TALBE_SIZE])(unsigned int udevid) = {
-    [UDIS_LINK_DMA_NODES_NOTIFY_FUNC] = udis_link_dma_nodes_init,
+    [UDIS_LINK_NODES_NOTIFY_FUNC] = udis_link_nodes_init,
     [UDIS_CTRL_BLOCK_NOTIFY_FUNC] = udis_init_ucb,
     [UDIS_COMMON_CHANNEL_NOTIFY_FUNC] = udis_common_chan_register,
-    [UDIS_PERIOD_LINK_DMA_TASK_NOTIFY_FUNC] = period_link_dma_task_init,
+    [UDIS_PERIOD_LINK_TASK_NOTIFY_FUNC] = period_link_task_init,
 };
 
 STATIC void (*udis_device_down_notify_func_table[UDIS_NOTIFY_FUNC_TALBE_SIZE])(unsigned int udevid)= {
-    [UDIS_LINK_DMA_NODES_NOTIFY_FUNC] = udis_link_dma_nodes_uninit,
+    [UDIS_LINK_NODES_NOTIFY_FUNC] = udis_link_nodes_uninit,
     [UDIS_CTRL_BLOCK_NOTIFY_FUNC] = udis_uninit_ucb,
     [UDIS_COMMON_CHANNEL_NOTIFY_FUNC] = udis_common_chan_unregister,
-    [UDIS_PERIOD_LINK_DMA_TASK_NOTIFY_FUNC] = period_link_dma_task_uninit,
+    [UDIS_PERIOD_LINK_TASK_NOTIFY_FUNC] = period_link_task_uninit,
 };
 
 STATIC int udis_device_up_notify(unsigned int udevid)
@@ -224,7 +238,7 @@ STATIC int udis_device_up_notify(unsigned int udevid)
     int ret;
     int i, j;
 
-    for (i = UDIS_LINK_DMA_NODES_NOTIFY_FUNC; i < UDIS_NOTIFY_FUNC_TALBE_SIZE; ++i) {
+    for (i = UDIS_LINK_NODES_NOTIFY_FUNC; i < UDIS_NOTIFY_FUNC_TALBE_SIZE; ++i) {
         ret = udis_device_up_notify_func_table[i](udevid);
         if (ret != 0) {
             udis_err("Call udis device up notify func failed. (udevid=%u; ret=%d; func_index=%d)\n", udevid, ret, i);
@@ -275,9 +289,9 @@ STATIC void udis_dev_down_notify(unsigned int udevid, enum udis_dev_state state)
     ucb->state = state;
     udis_cb_write_unlock(udevid);
 
-    func_idx = (state == UDIS_DEV_UNINIT ? UDIS_LINK_DMA_NODES_NOTIFY_FUNC : UDIS_PERIOD_LINK_DMA_TASK_NOTIFY_FUNC);
+    func_idx = (state == UDIS_DEV_UNINIT ? UDIS_LINK_NODES_NOTIFY_FUNC : UDIS_PERIOD_LINK_TASK_NOTIFY_FUNC);
 
-    for (i = UDIS_PERIOD_LINK_DMA_TASK_NOTIFY_FUNC; i >= func_idx; --i) {
+    for (i = UDIS_PERIOD_LINK_TASK_NOTIFY_FUNC; i >= func_idx; --i) {
         udis_device_down_notify_func_table[i](udevid);
     }
 
@@ -304,9 +318,9 @@ STATIC int udis_notify_device_hotreset_cancel(unsigned int udevid)
     ucb->state = UDIS_DEV_READY;
     udis_cb_write_unlock(udevid);
 
-    ret = period_link_dma_task_init(udevid);
+    ret = period_link_task_init(udevid);
     if (ret != 0) {
-        udis_err("Init period link dma task failed. (udevid=%u; ret=%d)\n", udevid, ret);
+        udis_err("Init period link task failed. (udevid=%u; ret=%d)\n", udevid, ret);
         return ret;
     }
 

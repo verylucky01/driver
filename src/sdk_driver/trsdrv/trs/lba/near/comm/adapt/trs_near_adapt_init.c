@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -26,6 +26,7 @@
 #include "trs_sec_eh_auto_init.h"
 #endif
 
+/* in stream extend scene, sq que info get from stream  */
 static int trs_chan_get_sq_info_by_sqid(struct trs_id_inst *inst, int res_type, u32 res_id, void *info)
 {
     struct trs_chan_sq_info *sq_info = (struct trs_chan_sq_info *)info;
@@ -37,8 +38,21 @@ static int trs_chan_get_sq_info_by_sqid(struct trs_id_inst *inst, int res_type, 
     }
 
     ret = trs_chan_get_sq_info(inst, chan_id, sq_info);
-    if (ret == 0) {
-        trs_debug("Sq. (devid=%u; tsid=%u; sqid=%u)\n", inst->devid, inst->tsid, res_id);
+    if (ret != 0) {
+        return ret;
+    }
+
+    if (sq_info->sq_vaddr == NULL) {
+        struct trs_res_info_query res_info = {0};
+        ret = trs_get_sq_bind_stream_info(inst, res_id, &res_info);
+        if (ret == 0) {
+            sq_info->sq_vaddr = res_info.stream_info.stream_base_kva;
+            sq_info->sq_para.sq_depth = res_info.stream_info.stream_depth;
+            sq_info->sq_para.sqe_size = res_info.stream_info.task_size;
+            sq_info->sq_para.sq_que_uva = res_info.stream_info.stream_base_uva;
+            sq_info->sq_phy_addr = res_info.stream_info.stream_base_pa;
+            sq_info->mem_type = res_info.stream_info.mem_type;
+        }
     }
 
     return ret;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -30,6 +30,47 @@ struct trs_chan_adapt_ops *trs_chan_cloud_v4_get_stars_adapt_ops(void);
 struct trs_core_adapt_ops *trs_core_cloud_v4_get_stars_adapt_ops(void);
 int trs_soc_cloud_v4_sq_send_trigger_db_init(struct trs_id_inst *inst);
 void trs_soc_cloud_v4_sq_send_trigger_db_uninit(struct trs_id_inst *inst);
+
+/* Notify */
+#define TRS_CLOUD_V4_NOTIFY_SIZE          4
+#define TRS_CLOUD_V4_NOTIFY_INTERVAL      8
+#define TRS_CLOUD_V4_NOTIFY_SEPARATE_CNT  16
+#define TRS_CLOUD_V4_NOTIFY_SEPARATE_SIZE 0x1000
+#define TRS_CLOUD_V4_NOTIFY_SLICE_SIZE    0x200000
+#define TRS_CLOUD_V4_NOTIFY_NUM_PER_SLICE 4096 /* total slice num is 16 */
+
+static inline u32 trs_soc_get_cloud_v4_notify_offset(u32 id)
+{
+    return (id % TRS_CLOUD_V4_NOTIFY_NUM_PER_SLICE) % TRS_CLOUD_V4_NOTIFY_SEPARATE_CNT * TRS_CLOUD_V4_NOTIFY_INTERVAL +
+        (id % TRS_CLOUD_V4_NOTIFY_NUM_PER_SLICE) / TRS_CLOUD_V4_NOTIFY_SEPARATE_CNT * TRS_CLOUD_V4_NOTIFY_SEPARATE_SIZE +
+        (id / TRS_CLOUD_V4_NOTIFY_NUM_PER_SLICE) * TRS_CLOUD_V4_NOTIFY_SLICE_SIZE;
+}
+
+static inline size_t trs_soc_get_cloud_v4_notify_size(void)
+{
+    return (size_t)TRS_CLOUD_V4_NOTIFY_SIZE;
+}
+
+/* Cnt notify */
+#define TRS_CLOUD_V4_CNT_NOTIFY_SIZE          4
+#define TRS_CLOUD_V4_CNT_NOTIFY_INTERVAL      32
+#define TRS_CLOUD_V4_CNT_NOTIFY_SEPARATE_CNT  16
+#define TRS_CLOUD_V4_CNT_NOTIFY_SEPARATE_SIZE 0x1000
+#define TRS_CLOUD_V4_CNT_NOTIFY_SLICE_SIZE    0x10000
+#define TRS_CLOUD_V4_CNT_NOTIFY_NUM_PER_SLICE 128 /* total slice num is 16 */
+
+static inline u32 trs_soc_get_cloud_v4_cnt_notify_offset(u32 id)
+{
+    return (id % TRS_CLOUD_V4_CNT_NOTIFY_NUM_PER_SLICE) % TRS_CLOUD_V4_CNT_NOTIFY_SEPARATE_CNT *
+        TRS_CLOUD_V4_CNT_NOTIFY_INTERVAL + (id % TRS_CLOUD_V4_CNT_NOTIFY_NUM_PER_SLICE) /
+        TRS_CLOUD_V4_CNT_NOTIFY_SEPARATE_CNT * TRS_CLOUD_V4_CNT_NOTIFY_SEPARATE_SIZE +
+        (id / TRS_CLOUD_V4_CNT_NOTIFY_NUM_PER_SLICE) * TRS_CLOUD_V4_CNT_NOTIFY_SLICE_SIZE;
+}
+
+static inline size_t trs_soc_get_cloud_v4_cnt_notify_size(void)
+{
+    return (size_t)TRS_CLOUD_V4_CNT_NOTIFY_SIZE;
+}
 
 #define TRS_CLOUD_V4_STARS_SCHED_STRIDE (4 * 1024)
 static inline size_t trs_soc_get_cloud_v4_stars_sched_stride(void)

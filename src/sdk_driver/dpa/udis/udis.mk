@@ -33,8 +33,7 @@ ifneq ($(filter $(PRODUCT), ascend910B),)
     endif
 endif
 
-ifneq ($(filter $(PRODUCT), ascend910_95),)
-    EXTRA_CFLAGS += -DCFG_FEATURE_ASCEND910_95_STUB
+ifneq ($(filter $(PRODUCT), ascend950),)
     EXTRA_CFLAGS += -DCFG_FEATURE_UDIS_SUPPORT_VF
 endif
 

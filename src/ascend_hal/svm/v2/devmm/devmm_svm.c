@@ -7,8 +7,9 @@
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
-
-
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
 #include <sched.h>
 #include <pthread.h>
 
@@ -42,6 +43,7 @@
 #include "devmm_cache_coherence.h"
 #include "devmm_map_dev_reserve.h"
 #include "svm_mem_statistics.h"
+#include "svm_mem_register_record.h"
 #include "svm_user_interface.h"
 #include "devmm_host_mem_pool.h"
 #include "svm_user_msg.h"
@@ -55,6 +57,7 @@
 
 static THREAD uint32_t svm_devid;
 static THREAD bool g_get_user_malloc_attr = false;
+static THREAD bool g_register_query_and_get_attr = false;
 static THREAD bool g_pro_snapshot_state = false;
 static THREAD bool g_call_set_access = false;
 
@@ -67,8 +70,54 @@ struct devmm_advise_record_node {
 #define ADVISE_RECORD_MAX_DEV_NUM DEVMM_MAX_PHY_DEVICE_NUM
 STATIC struct devmm_virt_list_head advise_record_list[ADVISE_RECORD_MAX_DEV_NUM];
 STATIC pthread_mutex_t advise_record_lock[ADVISE_RECORD_MAX_DEV_NUM];
+STATIC pthread_rwlock_t svm_pipeline_rwlock = PTHREAD_RWLOCK_INITIALIZER;
 
 STATIC void devmm_del_mem_advise_record(bool is_del_all, DVdeviceptr free_ptr, size_t free_cnt, DVdevice device);
+static drvError_t devmm_remote_unmap(void *src_ptr, UINT32 devid, UINT32 flag);
+
+static inline void devmm_atomic_dec(uint32_t *val)
+{
+    __sync_fetch_and_sub(val, 1);
+}
+
+static inline void devmm_atomic_inc(uint32_t *val)
+{
+    __sync_fetch_and_add(val, 1);
+}
+
+/* If multiple threads concurrently obtain read locks, write locks may starve. 
+ * In this case, a write request counter needs to be added to ensure that write locks are prioritized and prevent write lock starvation.
+ */
+static uint32_t svm_occupy_req = 0;
+static void devmm_use_pipeline(void)
+{
+    struct timespec ts;
+
+    ts.tv_sec = 0;
+    ts.tv_nsec = 100; // sleep 100 ns
+    while (svm_occupy_req != 0) {
+        nanosleep(&ts, NULL);
+    }
+
+    (void)pthread_rwlock_rdlock(&svm_pipeline_rwlock);
+}
+
+static void devmm_unuse_pipeline(void)
+{
+    (void)pthread_rwlock_unlock(&svm_pipeline_rwlock);
+}
+
+static void devmm_occupy_pipeline(void)
+{
+    devmm_atomic_inc(&svm_occupy_req);
+    (void)pthread_rwlock_wrlock(&svm_pipeline_rwlock);
+    devmm_atomic_dec(&svm_occupy_req);
+}
+
+static void devmm_release_pipeline(void)
+{
+    (void)pthread_rwlock_unlock(&svm_pipeline_rwlock);
+}
 
 bool devmm_is_snapshot_state(void)
 {
@@ -144,12 +193,12 @@ static void devmm_setup_device_init_heap(struct devmm_virt_heap_mgmt *mgmt, uint
         (void)devmm_init_read_only_heap_by_devid(devid, SUB_DEV_READ_ONLY_TYPE);
         devmm_init_dev_reserve_addr(devid);
     }
- 
+
     mgmt->is_dev_inited[devid] = true; /* host_mem_pool need is_dev_inited set */
     if (mgmt->support_host_mem_pool && !devmm_is_snapshot_state()) {
         devmm_host_mem_pool_init(devid);
     }
- 
+
     (void)devmm_init_host_pin_heap_by_devid(devid, SUB_HOST_TYPE);
     svm_devid = devid;
 }
@@ -218,7 +267,7 @@ static DVresult devmm_free_managed_nomal(DVdeviceptr p)
 
     heap = devmm_va_to_heap(p);
     if ((heap == NULL) || heap->heap_type == DEVMM_HEAP_IDLE) {
-        DEVMM_DRV_ERR("Address is not allocated. please check ptr. (offset=%llx)\n", ADDR_TO_OFFSET(p));
+        DEVMM_DRV_ERR("Address is not allocated. please check ptr. (offset=%llx, va = %lx\n", ADDR_TO_OFFSET(p), p);
         return DRV_ERROR_INVALID_VALUE;
     }
 
@@ -318,7 +367,7 @@ DVresult devmm_alloc_managed(DVdeviceptr *pp, size_t bytesize,
         temp_ptr = devmm_alloc_from_normal_heap(p_heap_mgmt, bytesize, heap_type, advise, *pp);
     }
 
-    if ((temp_ptr < DEVMM_SVM_MEM_START && temp_ptr > DEVMM_HOST_PIN_END) || temp_ptr < DEVMM_HOST_PIN_START) {
+    if (temp_ptr < DEVMM_HOST_PIN_START) {
         return ptr_to_errcode(temp_ptr);
     }
 
@@ -563,7 +612,7 @@ STATIC INLINE DVresult devmm_copy_cache_coherence(DVdeviceptr dst, size_t dest_m
 {
     return devmm_copy_ioctl(dst, dest_max, src, byte_count, DEVMM_SVM_MEMCPY);
 }
-
+ 
 static DVresult devmm_get_devid_by_va(DVdeviceptr va, uint32_t *devid)
 {
     struct devmm_virt_com_heap *heap = NULL;
@@ -678,6 +727,7 @@ static DVresult _drvMemcpyInner(DVdeviceptr dst, size_t dest_max, DVdeviceptr sr
 
     src_is_svm = devmm_va_is_svm(src);
     dst_is_svm = devmm_va_is_svm(dst);
+
     if ((src_is_svm == false) && (dst_is_svm == false)) {
         return devmm_h2h_copy(dst, dest_max, src, byte_count);
     }
@@ -817,6 +867,10 @@ static drvError_t devmm_mem_cpy_para_check(void *dst, size_t dst_size, void *src
         return DRV_ERROR_INVALID_VALUE;
     }
 
+    if (devmm_dev_is_inited(info->devid) == false) {
+        DEVMM_DRV_ERR("Device is not inited. (devid=%u)\n", info->devid);
+        return DRV_ERROR_NOT_EXIST;
+    }
     return DRV_ERROR_NONE;
 }
 
@@ -1666,14 +1720,14 @@ DVresult halShmemCreateHandle(DVdeviceptr vptr, size_t byte_count, char *name, u
     DEVMM_DRV_DEBUG_ARG("Create share memory. (vptr=0x%llx; size=%lu)\n", vptr, byte_count);
     arg.data.ipc_create_para.vptr = vptr;
     arg.data.ipc_create_para.len = byte_count;
-    arg.data.ipc_create_para.name_len = name_len;
+    arg.data.ipc_create_para.name_len = DEVMM_MAX_NAME_SIZE;
     ret = devmm_svm_ioctl(g_devmm_mem_dev, DEVMM_SVM_IPC_MEM_CREATE, &arg);
     if (ret != DRV_ERROR_NONE) {
         DEVMM_DRV_ERR("Share memory create device error. (ret=%d; vptr=0x%llx)\n", ret, vptr);
         return ret;
     }
 
-    if (memcpy_s(name, name_len, arg.data.ipc_create_para.name, DEVMM_MAX_NAME_SIZE) != 0) {
+    if (memcpy_s(name, DEVMM_MAX_NAME_SIZE, arg.data.ipc_create_para.name, DEVMM_MAX_NAME_SIZE) != 0) {
         DEVMM_DRV_ERR("Memcpy_s error. (name_len=%u; vptr=0x%llx)\n", name_len, vptr);
         (void)devmm_shmem_destroy_handle(arg.data.ipc_create_para.name, DEVMM_MAX_NAME_SIZE);
         return DRV_ERROR_INVALID_VALUE;
@@ -2046,12 +2100,26 @@ bool svm_support_get_user_malloc_attr(uint32_t dev_id)
     return true;
 }
 
+bool svm_support_mem_register_query_and_get_attr(uint32_t dev_id)
+{
+    (void)dev_id;
+    if (g_register_query_and_get_attr == false) {
+        svm_mem_register_record_enable();
+        g_register_query_and_get_attr = true;
+        DEVMM_RUN_INFO("Support query and get attr of mem register.\n");
+    }
+ 
+    return true;
+}
+
 STATIC INLINE DVresult devmm_get_host_memory_attribute(struct devmm_virt_com_heap *heap,
-    struct devmm_virt_heap_mgmt *p_heap_mgmt, struct DVattribute *attr)
+    struct devmm_virt_heap_mgmt *p_heap_mgmt, struct DVattribute *attr, DVdeviceptr vptr)
 {
     if ((heap == NULL) || (heap->heap_type == DEVMM_HEAP_PINNED_HOST)) {
-        if (g_get_user_malloc_attr) {
-            attr->memType = (heap == NULL) ? DV_MEM_USER_MALLOC : DV_MEM_LOCK_HOST;
+        if (heap == NULL) {
+            bool user_register = svm_mem_register_record_is_exist(vptr, HOST_MEM_REGISTER);
+            attr->memType = g_get_user_malloc_attr ? DV_MEM_USER_MALLOC : DV_MEM_LOCK_HOST;
+            attr->memType = user_register ? DV_MEM_USER_REGISTER : attr->memType;
         } else {
             attr->memType = DV_MEM_LOCK_HOST;
         }
@@ -2144,7 +2212,7 @@ DVresult drvMemGetAttribute(DVdeviceptr vptr, struct DVattribute *attr)
     }
 
     if (devmm_heap_is_host_attribute(heap) == true) {
-        return devmm_get_host_memory_attribute(heap, p_heap_mgmt, attr);
+        return devmm_get_host_memory_attribute(heap, p_heap_mgmt, attr, vptr);
     }
 
     if (heap->heap_sub_type == SUB_SVM_TYPE) {
@@ -2775,7 +2843,7 @@ static int devmm_prepare_close_device(UINT32 devid)
     return (int)devmm_svm_ioctl(g_devmm_mem_dev, DEVMM_SVM_PREPARE_CLOSE_DEVICE, &arg);
 }
 
-drvError_t drvMemDeviceCloseInner(uint32_t devid, halDevCloseIn *in)
+static drvError_t _drvMemDeviceCloseInner(uint32_t devid, halDevCloseIn *in)
 {
     (void)in;
     struct devmm_virt_heap_mgmt *p_heap_mgmt = NULL;
@@ -2820,6 +2888,7 @@ drvError_t drvMemDeviceCloseInner(uint32_t devid, halDevCloseIn *in)
     devmm_heap_close(p_heap_mgmt, DEVMM_HEAP_CHUNK_PAGE, list_type, SUB_DEVICE_TYPE);
 
     devmm_record_recycle(devid);
+    svm_mem_register_records_del(devid);
     devmm_del_mem_advise_record(true, 0, 0, devid);
     devmm_reset_dev_reserve_addr(devid);
     devmm_reset_event_devpid(devid);
@@ -2827,6 +2896,15 @@ drvError_t drvMemDeviceCloseInner(uint32_t devid, halDevCloseIn *in)
     svm_da_del_dev(devid);
 
     return (int)DRV_ERROR_NONE;
+}
+
+drvError_t drvMemDeviceCloseInner(uint32_t devid, halDevCloseIn *in)
+{
+    drvError_t ret;
+    devmm_occupy_pipeline();
+    ret = _drvMemDeviceCloseInner(devid, in);
+    devmm_release_pipeline();
+    return ret;
 }
 
 int drvMemDeviceClose(uint32_t devid)
@@ -2868,6 +2946,7 @@ drvError_t drvMemDeviceCloseUserRes(uint32_t devid, halDevCloseIn *in)
 
     devmm_reset_event_devpid(devid);
     svm_uninit_mem_stats_mng(devid);
+    svm_mem_register_records_del(devid);
 
     if (g_pro_snapshot_state == false) {
         devmm_virt_uninit_heap_mgmt();
@@ -2977,8 +3056,7 @@ static drvError_t devmm_remote_map_input_check(uint32_t map_type, uint32_t proc_
         return DRV_ERROR_NOT_SUPPORT;
     }
 
-    if (((map_type == HOST_MEM_MAP_DEV_PCIE_TH) || (map_type == HOST_MEM_MAP_DMA)) &&
-        (access == MEM_REGISTER_READ_ONLY)) {
+    if ((map_type == HOST_MEM_MAP_DEV_PCIE_TH) && (access == MEM_REGISTER_READ_ONLY)) {
         return DRV_ERROR_NOT_SUPPORT;
     }
 
@@ -3092,9 +3170,10 @@ static drvError_t devmm_dev_mem_remote_map(void *src_va, uint64_t size, uint32_t
     return DRV_ERROR_NONE;
 }
 
-drvError_t devmm_register_mem_to_dma(void *src_va, uint64_t size, uint32_t devid)
+drvError_t devmm_register_mem_to_dma(void *src_va, uint64_t size, uint32_t flag, uint32_t devid)
 {
     struct devmm_ioctl_arg arg = {0};
+    uint32_t access = devmm_get_register_access(flag);
     drvError_t ret;
 
     if ((src_va == NULL) || (size == 0) || (size > DEVMM_MAX_MAPPED_RANGE)) {
@@ -3105,6 +3184,10 @@ drvError_t devmm_register_mem_to_dma(void *src_va, uint64_t size, uint32_t devid
     if (devid >= SVM_MAX_AGENT_NUM) {
         DEVMM_DRV_ERR("Devid is invalid. (devid=%u)\n", devid);
         return DRV_ERROR_INVALID_DEVICE;
+    }
+
+    if (access == MEM_REGISTER_READ_ONLY) {
+        return DRV_ERROR_NOT_SUPPORT;
     }
 
 #ifndef EMU_ST
@@ -3171,18 +3254,186 @@ static drvError_t devmm_remote_map(void *src_ptr, UINT64 size, UINT32 flag, UINT
     return remote_map_policy[map_type](src_ptr, size, flag, device_id, dst_ptr);
 }
 
+struct devmm_record_host_register_data {
+    void *ptr;
+    uint64_t size;
+    uint32_t flag;
+    uint32_t devid;
+};
+
+#ifndef EMU_ST
+static int devmm_host_register_record_restore(uint64_t key1, uint64_t key2, uint32_t devid, void *data)
+{
+    struct devmm_record_host_register_data *register_data = data;
+    void *dst_ptr = NULL;
+    uint32_t map_type = devmm_get_register_map_type(register_data->flag);
+    int ret;
+
+    if (map_type != DEV_SVM_MAP_HOST) {
+        DEVMM_DRV_DEBUG_ARG("Not restore. (map_type=%u)\n", map_type);
+        return DRV_ERROR_NONE;
+    }
+
+    DEVMM_RUN_INFO("Host register restore. (va=0x%llx; key2=%llu; size=%llu; flag=0x%x; devid=%d)\n",
+        key1, key2, register_data->size, register_data->flag, devid);
+    ret = devmm_remote_map((void *)key1, register_data->size, register_data->flag, register_data->devid, &dst_ptr);
+    if (ret != DRV_ERROR_NONE) {
+        return ret;
+    }
+    (void)svm_mem_register_record_add(register_data->devid, key1, register_data->size, map_type, (DVdeviceptr)(uintptr_t)dst_ptr);
+ 
+    return DRV_ERROR_NONE;
+}
+#endif
+
+static int devmm_host_register_record_data_get(void *ptr, uint32_t devid,
+    struct devmm_record_host_register_data *register_data)
+{
+    uint64_t data_len = sizeof(struct devmm_record_host_register_data);
+    struct devmm_record_data data = {0};
+    drvError_t ret;
+
+    data.key1 = (uint64_t)(uintptr_t)ptr;
+    data.key2 = DEVMM_RECORD_KEY_INVALID;
+    data.data_len = data_len;
+    data.data = (void *)&register_data;
+    ret = devmm_record_get(DEVMM_FEATURE_HOST_REGISTER, devid, DEVMM_KEY_TYPE1, &data);
+    if (ret != 0) {
+        return ret;
+    }
+    return DRV_ERROR_NONE;
+}
+
+static drvError_t devmm_host_register_record_data_create(void *ptr, size_t size, uint32_t flag, uint32_t devid)
+{
+    uint64_t data_len = sizeof(struct devmm_record_host_register_data);
+    struct devmm_record_host_register_data register_data = {0};
+    uint32_t map_type = devmm_get_register_map_type(flag);
+    struct devmm_record_data data = {0};
+    drvError_t ret;
+
+    if (map_type != DEV_SVM_MAP_HOST) {
+        DEVMM_DRV_DEBUG_ARG("Not restore. (map_type=%u)\n", map_type);
+        return DRV_ERROR_NONE;
+    }
+
+    register_data.ptr = ptr;
+    register_data.size = size;
+    register_data.flag = flag;
+    register_data.devid = devid;
+
+    data.key1 = (uint64_t)(uintptr_t)ptr;
+    data.key2 = DEVMM_RECORD_KEY_INVALID;
+    data.data_len = data_len;
+    data.data = (void *)&register_data;
+    ret = devmm_record_create_and_get(DEVMM_FEATURE_HOST_REGISTER, devid, DEVMM_KEY_TYPE1, DEVMM_NODE_INITED, &data);
+    if (ret != DRV_ERROR_NONE) {
+        DEVMM_DRV_ERR("Record get fail. (ret=%d; ptr=0x%llx; size=%llu; flag=0x%x; devid=%d)\n",
+            ret, (uint64_t)(uintptr_t)ptr, (uint64_t)size, flag, devid);
+        return ret;
+    }
+    return DRV_ERROR_NONE;
+}
+
+static void devmm_host_register_record_data_destroy(void *ptr, uint32_t devid)
+{
+    struct devmm_record_host_register_data register_data;
+    uint64_t va = (uint64_t)(uintptr_t)ptr;
+    uint32_t map_type;
+    drvError_t ret;
+
+    ret = devmm_host_register_record_data_get(ptr, devid, &register_data);
+    if (ret != 0) {
+        DEVMM_DRV_DEBUG_ARG("Not restore. (ptr=0x%llx)\n", va);
+        return;
+    }
+
+    map_type = devmm_get_register_map_type(register_data.flag);
+    if (map_type != DEV_SVM_MAP_HOST) {
+        (void)devmm_record_put(DEVMM_FEATURE_HOST_REGISTER, devid, DEVMM_KEY_TYPE1, va, DEVMM_NODE_UNINITED);
+        DEVMM_DRV_DEBUG_ARG("Not restore. (map_type=%u)\n", map_type);
+        return;
+    }
+
+    /* The second put is for create */
+    devmm_record_put(DEVMM_FEATURE_HOST_REGISTER, devid, DEVMM_KEY_TYPE1, va, DEVMM_NODE_UNINITED);
+    ret = devmm_record_put(DEVMM_FEATURE_HOST_REGISTER, devid, DEVMM_KEY_TYPE1, va, DEVMM_NODE_UNINITED);
+    if (ret != DRV_ERROR_NONE) {
+        DEVMM_DRV_WARN("Record put warn. (ret=%d; va=0x%llx)\n", ret, va);
+    }
+}
+
 drvError_t halHostRegister(void *src_ptr, UINT64 size, UINT32 flag, UINT32 devid, void **dst_ptr)
 {
     uint32_t map_type = devmm_get_register_map_type(flag);
+    drvError_t ret;
+
     if (map_type >= HOST_REGISTER_MAX_TPYE) {
         return DRV_ERROR_NOT_SUPPORT;
     }
 
     if (map_type == HOST_MEM_MAP_DMA) {
-        return devmm_register_mem_to_dma(src_ptr, size, devid);
+        ret = devmm_register_mem_to_dma(src_ptr, size, flag, devid);
     } else {
-        return devmm_remote_map(src_ptr, size, flag, devid, dst_ptr);
+        ret = devmm_remote_map(src_ptr, size, flag, devid, dst_ptr);
     }
+
+    if (ret == DRV_ERROR_NONE) {
+        DVdeviceptr tmp_dst;
+        tmp_dst = ((map_type == HOST_MEM_MAP_DMA) || (dst_ptr == NULL)) ? 0 : *((DVdeviceptr *)(uintptr_t)dst_ptr);
+        ret = svm_mem_register_record_add(devid, (DVdeviceptr)(uintptr_t)src_ptr, size, map_type, tmp_dst);
+        if (ret != DRV_ERROR_NONE) {
+            DEVMM_DRV_ERR("Register record add failed. (map_type=%u; src_ptr=0x%llx; size=%lu; devid=%u; ret=%u)\n",
+                map_type, src_ptr, size, devid, ret);
+            goto mem_unregister;
+        }
+        ret = devmm_host_register_record_data_create(src_ptr, size, flag, devid);
+        if (ret != 0) {
+            DEVMM_DRV_ERR("Create host register record failed. (src_ptr=0x%llx; size=%lu; flag=0x%x; devid=%u; ret=%u)\n",
+                src_ptr, size, flag, devid, ret);
+            goto del_record;
+        }
+    }
+    return ret;
+
+del_record:
+    svm_mem_register_record_del(devid, (DVdeviceptr)(uintptr_t)src_ptr, map_type);
+mem_unregister:
+    if (map_type == HOST_MEM_MAP_DMA) {
+        (void)devmm_unregister_mem_to_dma(src_ptr, devid);
+    } else {
+        (void)devmm_remote_unmap(src_ptr, devid, flag);
+    }
+    return ret;
+}
+
+drvError_t halMemHostGetDevPointer(void *src_ptr, uint32_t devid, void **dst_ptr)
+{
+    uint32_t map_type;
+    drvError_t ret;
+ 
+    if ((src_ptr == NULL) || (dst_ptr == NULL)) {
+        DEVMM_DRV_ERR("Para is invalid. (src_is_null=%d; dst_is_null=%d)\n", (src_ptr == NULL), (dst_ptr == NULL));
+        return DRV_ERROR_PARA_ERROR;
+    }
+ 
+    if (devid >= DEVMM_MAX_LOGIC_DEVICE_NUM) {
+        DEVMM_DRV_ERR("Devid is invalid. (devid=%u)\n", devid);
+        return DRV_ERROR_INVALID_DEVICE;
+    }
+ 
+    if (g_register_query_and_get_attr == false) {
+        DEVMM_RUN_INFO("Not support query.\n");
+        return DRV_ERROR_NOT_SUPPORT;
+    }
+ 
+    ret = svm_mem_register_record_query((DVdeviceptr)(uintptr_t)src_ptr, devid, HOST_MEM_REGISTER, &map_type,
+        (DVdeviceptr *)(uintptr_t)dst_ptr);
+    if ((ret != DRV_ERROR_NONE) || (map_type == HOST_MEM_MAP_DMA)) {
+        DEVMM_DRV_ERR("Get dev pointer failed. (src_ptr=0x%llx; devid=%u; ret=%u)\n", src_ptr, devid, ret);
+        return DRV_ERROR_NOT_EXIST;
+    }
+    return DRV_ERROR_NONE;
 }
 
 static drvError_t devmm_remote_unmap_input_check(uint32_t map_type, uint32_t proc_type, uint32_t devid)
@@ -3296,21 +3547,46 @@ static drvError_t devmm_remote_unmap(void *src_ptr, UINT32 devid, UINT32 flag)
 drvError_t halHostUnregisterEx(void *src_ptr, UINT32 devid, UINT32 flag)
 {
     uint32_t map_type = devmm_get_register_map_type(flag);
+    drvError_t ret;
+ 
     if (map_type >= HOST_REGISTER_MAX_TPYE) {
         return DRV_ERROR_NOT_SUPPORT;
     }
-
+ 
     if (map_type == HOST_MEM_MAP_DMA) {
-        return devmm_unregister_mem_to_dma(src_ptr, devid);
+        ret = devmm_unregister_mem_to_dma(src_ptr, devid);
     } else {
-        return devmm_remote_unmap(src_ptr, devid, flag);
+        ret = devmm_remote_unmap(src_ptr, devid, flag);
     }
+ 
+    if (ret == DRV_ERROR_NONE) {
+        devmm_host_register_record_data_destroy(src_ptr, devid);
+        svm_mem_register_record_del(devid, (DVdeviceptr)(uintptr_t)src_ptr, map_type);
+    }
+ 
+    return ret;
 }
 
 drvError_t halHostUnregister(void *src_ptr, UINT32 devid)
 {
-    /* flag = HOST_MEM_MAP_DEV is tmp flag, real flag will get in kernel */
-    return halHostUnregisterEx(src_ptr, devid, HOST_MEM_MAP_DEV);
+    enum mem_register_src_side side;
+    uint32_t map_type;
+    drvError_t ret;
+
+    if (g_register_query_and_get_attr == false) {
+        /* flag = HOST_MEM_MAP_DEV is tmp flag, real flag will get in kernel */
+        map_type = HOST_MEM_MAP_DEV;
+        return halHostUnregisterEx(src_ptr, devid, map_type);
+    } 
+
+    for (side = HOST_MEM_REGISTER; side < MEM_REGISTER_MAX_SIDE; side++) {
+        ret = svm_mem_register_record_query((DVdeviceptr)(uintptr_t)src_ptr, devid, side, &map_type, NULL);
+        if (ret == DRV_ERROR_NONE) {
+            return halHostUnregisterEx(src_ptr, devid, map_type);
+        }
+    }
+
+    return DRV_ERROR_NOT_EXIST;
 }
 
 static inline bool devmm_is_advise_ts(uint64_t flag)
@@ -3340,7 +3616,7 @@ static inline void devmm_phy_page_type_set_advise(uint32_t phy_page_type,
 {
     *advise |= (phy_page_type != 0) ? DV_ADVISE_HUGEPAGE : 0;
 }
- 
+
 static DVresult devmm_host_set_advise(uint32_t devid, uint32_t virt_mem_type, uint64_t flag,
     uint32_t phy_page_type, DVmem_advise *advise)
 {
@@ -3368,7 +3644,7 @@ static DVresult devmm_host_set_advise(uint32_t devid, uint32_t virt_mem_type, ui
     if (virt_mem_type == MEM_HOST_UVA_VAL) {
         *advise |= (DV_ADVISE_HOST_UVA | DV_ADVISE_DDR | DV_ADVISE_HUGEPAGE);
     }
-    
+
     devmm_phy_page_type_set_advise(phy_page_type, advise);
     return DRV_ERROR_NONE;
 }
@@ -3656,7 +3932,15 @@ static drvError_t devmm_get_sub_mem_type(uint32_t devid, uint64_t flag,
             DEVMM_DRV_ERR("Invalid flag, readonly and dev_readonly only support one type. \n");
             return DRV_ERROR_PARA_ERROR;
         }
-    } else if (virt_mem_type == MEM_HOST_VAL || virt_mem_type == MEM_HOST_UVA_VAL) {
+    } else if (virt_mem_type == MEM_HOST_VAL) {
+        *sub_mem_type = SUB_HOST_TYPE;
+    } else if (virt_mem_type == MEM_HOST_UVA_VAL) {
+        if ((flag & MEM_CONTIGUOUS_PHY) || (flag & MEM_ADVISE_P2P) ||
+            (flag & MEM_ADVISE_BAR) || (flag & MEM_DEV_CP_ONLY) ||
+            (flag & MEM_PAGE_HUGE) || (flag & MEM_PAGE_GIANT)) {
+            return DRV_ERROR_NOT_SUPPORT;
+        }
+
         *sub_mem_type = SUB_HOST_TYPE;
     } else if (virt_mem_type == MEM_SVM_VAL) {
         if (devmm_get_host_mem_alloc_mode() == SVM_HOST_MEM_ALLOCED_BY_MALLOC) {
@@ -3729,8 +4013,14 @@ drvError_t halMemFreeInner(void *pp)
 }
 
 drvError_t halMemFree(void *pp)
-{
-    return halMemFreeInner(pp);
+ {
+    drvError_t ret;
+
+    devmm_use_pipeline();
+    ret = halMemFreeInner(pp);
+    devmm_unuse_pipeline();
+
+    return ret;
 }
 
 drvError_t drvDeviceGetTransWay(void *src, void *dest, uint8_t *trans_type)
@@ -3992,6 +4282,10 @@ drvError_t halMemAdvise(DVdeviceptr ptr, size_t count, unsigned int type, DVdevi
 {
     DVmem_advise mem_advise;
     drvError_t ret;
+
+    if ((type == ADVISE_ACCESS_READONLY) || (type == ADVISE_ACCESS_READWRITE)) {
+        return DRV_ERROR_NONE;
+    }
 
     ret = devmm_set_mem_advise(type, &mem_advise);
     if (ret != DRV_ERROR_NONE) {
@@ -4436,7 +4730,8 @@ static drv_mem_handle_t *devmm_vmm_pa_handle_create(const struct drv_mem_prop *p
         (prop->module_id == RUNTIME_MODULE_ID) ? MEM_NORMAL_PAGE_TYPE : page_type;
     handle->pg_type = page_type; 
     handle->phy_mem_type = prop->mem_type;
-    handle->is_shared = false;
+    handle->prop = *prop;
+    handle->support_restore = true;
     handle->ref = 1;
     handle->map_ref = 0;
     return handle;
@@ -5144,7 +5439,7 @@ static int devmm_vmm_map_record_restore(uint64_t key1, uint64_t key2, uint32_t d
     struct devmm_record_vmm_map_data *map_data = data;
     drv_mem_handle_t *handle = map_data->handle;
 
-    if (handle->is_shared) {
+    if (handle->support_restore == false) {
         return 0;
     }
 
@@ -5273,6 +5568,8 @@ drvError_t halMemUnmap(void *ptr)
     DEVMM_DRV_DEBUG_ARG("Unmap. (ptr=0x%llx)\n", (DVdeviceptr)(uintptr_t)ptr);
     ret = halMemRetainAllocationHandle(&handle, ptr);
     if (ret != DRV_ERROR_NONE) {
+        /* The log cannot be modified, because in the failure mode library. */
+ 	    DEVMM_DRV_ERR("Addr can not unmap. (ret=%d; ptr=0x%llx)\n", ret, ptr);
         return DRV_ERROR_PARA_ERROR;
     }
 
@@ -5594,7 +5891,7 @@ static drvError_t devmm_export_to_share_handle(drv_mem_handle_t *handle, drv_mem
         return ret;
     }
 
-    handle->is_shared = true;
+    handle->support_restore = true;
     share_handle->handle_type = handle_type;
     share_handle->sdid = handle->sdid;
     share_handle->devid = handle->devid;
@@ -5793,6 +6090,7 @@ static drvError_t devmm_import_from_share_handle(drv_mem_handle_type handle_type
     drv_mem_handle_t *tmp_handle = NULL;
     struct devmm_ioctl_arg arg = {0};
     uint64_t shareable_handle;
+    struct drv_mem_prop prop = {0};
     drvError_t ret;
 
     ret = devmm_mem_import_para_check(handle_type, share_handle, devid, handle);
@@ -5839,13 +6137,19 @@ static drvError_t devmm_import_from_share_handle(drv_mem_handle_type handle_type
     }
 
     /* share: id side and devid is belong to import dev */
+    prop.devid = devid;
+    prop.module_id = arg.data.mem_import_para.module_id;
+    prop.pg_type = arg.data.mem_import_para.pg_type;
+    prop.side = arg.data.mem_import_para.side;
+    prop.mem_type = arg.data.mem_import_para.mem_type;
+    tmp_handle->prop = prop;
     tmp_handle->id = arg.data.mem_import_para.id;
     tmp_handle->side = arg.data.mem_import_para.side;
     tmp_handle->devid = devid;
     tmp_handle->pg_num = arg.data.mem_import_para.pg_num;
     tmp_handle->pg_type = arg.data.mem_import_para.pg_type;
     tmp_handle->module_id = arg.data.mem_import_para.module_id;
-    tmp_handle->is_shared = true;
+    tmp_handle->support_restore = false;
     tmp_handle->ref = 1;
     tmp_handle->map_ref = 0;
 
@@ -6150,11 +6454,6 @@ drvError_t halMemGetAddressRange(DVdeviceptr ptr, DVdeviceptr *pbase, size_t *ps
         return DRV_ERROR_INVALID_VALUE;
     }
 
-    if (devmm_va_is_in_svm_range(ptr) == false) {
-        DEVMM_DRV_ERR("Invalid argument. (ptr=0x%llx)\n", ptr);
-        return DRV_ERROR_INVALID_VALUE;
-    }
-
     devmm_get_svm_va_info(ptr, &mem_info);
     if (mem_info.start == 0) {
         DEVMM_DRV_ERR("ptr is not allocated. (ptr=0x%llx)\n", ptr);
@@ -6172,10 +6471,40 @@ drvError_t halMemGetAddressRange(DVdeviceptr ptr, DVdeviceptr *pbase, size_t *ps
     return DRV_ERROR_NONE;
 }
 
+drvError_t halMemGetAllocationPropertiesFromHandle(struct drv_mem_prop *prop, drv_mem_handle_t *handle)
+{
+    uint64_t ref;
+
+    if ((handle == NULL) || (prop == NULL)) {
+        DEVMM_DRV_ERR("Input invalid. (handle=%u; prop=%u)\n", (handle == NULL), (prop == NULL));
+        return DRV_ERROR_INVALID_VALUE;
+    }
+
+    if (handle->devid >= DEVMM_MAX_LOGIC_DEVICE_NUM) {
+        DEVMM_DRV_ERR("Handle is invalid. (devid=%u)\n", handle->devid);
+        return DRV_ERROR_INVALID_VALUE;
+    }
+
+    (void)pthread_mutex_lock(&g_vmm_handle_lock[handle->devid]);
+    ref = devmm_vmm_handle_ref_read(handle);
+    if ((ref == 0) || (ref > UINT32_MAX)) {
+        DEVMM_DRV_ERR("Handle is invalid. (ref=%llu)\n", ref);
+        (void)pthread_mutex_unlock(&g_vmm_handle_lock[handle->devid]);
+        return DRV_ERROR_INVALID_VALUE;
+    }
+
+    *prop = handle->prop;
+    (void)pthread_mutex_unlock(&g_vmm_handle_lock[handle->devid]);
+    return DRV_ERROR_NONE;
+}
+
 static void devmm_restore_func_register(void)
 {
     devmm_record_restore_func_register(DEVMM_FEATURE_VMM_CREATE, devmm_vmm_create_record_restore);
     devmm_record_restore_func_register(DEVMM_FEATURE_VMM_MAP, devmm_vmm_map_record_restore);
+#ifndef EMU_ST
+    devmm_record_restore_func_register(DEVMM_FEATURE_HOST_REGISTER, devmm_host_register_record_restore);
+#endif
 }
 
 static void __attribute__((constructor)) devmm_svm_pre_init(void)

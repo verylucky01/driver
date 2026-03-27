@@ -404,7 +404,7 @@ STATIC int dmanage_get_eth_name(unsigned int dev_id, struct dmanager_card_info c
         DEVDRV_DRV_ERR("eth name buf size[%u] err, devid(%u).\n", buf_size, dev_id);
         return DRV_ERROR_INVALID_VALUE;
     }
-/* 910/910B/910_A3 need to trans eth_id for AI Server, in 910_95 eth_id/port_id = card_id (from user) */
+/* 910/910B/910_A3 need to trans eth_id for AI Server, in 950 eth_id/port_id = card_id (from user) */
 #ifdef CFG_FEATURE_TRANS_ETH_ID
     if (drvDeviceGetEthIdByIndex(dev_id, card_info.card_id, (uint32_t *)&ethid)) {
         DEVDRV_DRV_ERR("devid %d card_id %d transfer ethid(%d) fail.\n", dev_id, card_info.card_id, ethid);

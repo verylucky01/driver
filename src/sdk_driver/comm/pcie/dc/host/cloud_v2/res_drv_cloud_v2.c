@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,12 +11,12 @@
  * GNU General Public License for more details.
  */
 
+#include "ka_driver_pub.h"
+#include "ka_barrier_pub.h"
 #include "res_drv.h"
 #include "devdrv_util.h"
 #include "devdrv_ctrl.h"
 #include "res_drv_cloud_v2.h"
-#include "ka_driver_pub.h"
-#include "ka_barrier_pub.h"
 
 #ifndef DRV_UT
 
@@ -925,7 +925,12 @@ STATIC void devdrv_cloud_v2_init_vf_dma_info(struct devdrv_pci_ctrl *pci_ctrl)
     pci_ctrl->res.dma_res.dma_chan_start_id = DMA_CHAN_REMOTE_USED_START_INDEX;
     pci_ctrl->res.dma_res.chan_start_id = pci_ctrl->res.dma_res.dma_chan_start_id;
     pci_ctrl->res.dma_res.pf_num = 0;
-    pci_ctrl->res.dma_res.vf_id = pci_ctrl->shr_para->vf_id;
+    if (pci_ctrl->connect_protocol == CONNECT_PROTOCOL_HCCS) {
+        /* HCCS can't use vf 1 */
+        pci_ctrl->res.dma_res.vf_id = pci_ctrl->shr_para->vf_id + 1;
+    } else {
+        pci_ctrl->res.dma_res.vf_id = pci_ctrl->shr_para->vf_id;
+    }
     pci_ctrl->res.dma_res.dma_addr = pci_ctrl->io_base + DEVDRV_VF_DMA_OFFSET;
     pci_ctrl->res.dma_res.dma_chan_addr = pci_ctrl->res.dma_res.dma_addr + DEVDRV_IEP_DMA_CHAN_OFFSET;
     pci_ctrl->res.dma_res.sq_depth = DEVDRV_MAX_DMA_CH_SQ_DEPTH;
@@ -1032,7 +1037,7 @@ STATIC int devdrv_cloud_v2_get_vf_msg_chan_cnt(void)
 /* cloud v2 8P1DIE * 2, has 2 node(8p system), host side number 0-7 --- node 0, 8-15 --- node 1
    cloud v2 8P1DIE, has 1 node(8p system), host side number 0-7 --- node 0
    cloud v2 8P2DIE, has 1 node(8p system), host side number 0-15 --- node 0 */
-STATIC int devdrv_get_cloud_v2_devid_by_slotid(struct devdrv_shr_para __iomem *para)
+STATIC int devdrv_get_cloud_v2_devid_by_slotid(struct devdrv_shr_para __ka_mm_iomem *para)
 {
     int dev_id = -1;
     struct devdrv_ctrl *p_ctrls = get_devdrv_ctrl();
@@ -1349,7 +1354,7 @@ STATIC int devdrv_cloud_v2_get_p2p_addr(struct devdrv_pci_ctrl *pci_ctrl, u32 re
 STATIC unsigned devdrv_cloud_v2_get_server_id(struct devdrv_pci_ctrl *pci_ctrl)
 {
     devdrv_hw_info_t *hw_data = NULL;
-    void __iomem *hw_info_addr = pci_ctrl->io_base + DEVDRV_IO_LOAD_SRAM_OFFSET + DEVDRV_CLOUD_V2_HW_INFO_SRAM_OFFSET;
+    void __ka_mm_iomem *hw_info_addr = pci_ctrl->io_base + DEVDRV_IO_LOAD_SRAM_OFFSET + DEVDRV_CLOUD_V2_HW_INFO_SRAM_OFFSET;
 
     hw_data = (devdrv_hw_info_t*)hw_info_addr;
     g_hw_info.server_id = hw_data->server_id;
@@ -1360,7 +1365,7 @@ STATIC unsigned devdrv_cloud_v2_get_server_id(struct devdrv_pci_ctrl *pci_ctrl)
 STATIC unsigned devdrv_cloud_v2_get_max_server_num(struct devdrv_pci_ctrl *pci_ctrl)
 {
     devdrv_hw_info_t *hw_data = NULL;
-    void __iomem *hw_info_addr = pci_ctrl->io_base + DEVDRV_IO_LOAD_SRAM_OFFSET + DEVDRV_CLOUD_V2_HW_INFO_SRAM_OFFSET;
+    void __ka_mm_iomem *hw_info_addr = pci_ctrl->io_base + DEVDRV_IO_LOAD_SRAM_OFFSET + DEVDRV_CLOUD_V2_HW_INFO_SRAM_OFFSET;
 
     hw_data = (devdrv_hw_info_t*)hw_info_addr;
     g_hw_info.scale_type = hw_data->scale_type;
@@ -1370,7 +1375,7 @@ STATIC unsigned devdrv_cloud_v2_get_max_server_num(struct devdrv_pci_ctrl *pci_c
 
 STATIC void devdrv_cloud_v2_init_virt_info(struct devdrv_pci_ctrl *pci_ctrl)
 {
-    struct devdrv_virt_para __iomem *virt_para;
+    struct devdrv_virt_para __ka_mm_iomem *virt_para;
     int numa_node;
     unsigned int host_flag;
     int ret;
@@ -1479,12 +1484,12 @@ STATIC void devdrv_cloud_v2_init_vf_msg_cnt(struct devdrv_pci_ctrl *pci_ctrl)
 
 STATIC int devdrv_init_hw_info(struct devdrv_pci_ctrl *pci_ctrl)
 {
-    void __iomem *hw_info_addr = pci_ctrl->io_base + DEVDRV_IO_LOAD_SRAM_OFFSET + DEVDRV_CLOUD_V2_HW_INFO_SRAM_OFFSET;
+    void __ka_mm_iomem *hw_info_addr = pci_ctrl->io_base + DEVDRV_IO_LOAD_SRAM_OFFSET + DEVDRV_CLOUD_V2_HW_INFO_SRAM_OFFSET;
     devdrv_hw_info_t *hw_data = NULL;
     int retry_times = 0;
 
 retry:
-    hw_data = (devdrv_hw_info_t __iomem *)hw_info_addr;
+    hw_data = (devdrv_hw_info_t __ka_mm_iomem *)hw_info_addr;
     g_hw_info.chip_id = hw_data->chip_id;
     g_hw_info.multi_chip = hw_data->multi_chip;
     g_hw_info.multi_die = hw_data->multi_die;

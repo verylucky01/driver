@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -19,7 +19,7 @@ int devdrv_sync_msg_send_proc(void *msg_chan, void *data, u32 in_data_len, u32 o
     struct devdrv_comm_dev_ops *dev_ops = devdrv_add_ops_ref();
     if (dev_ops == NULL) {
         devdrv_err("Device sync send msg fail.\n");
-        return -EINVAL;
+        return -ENODEV;
     }
     ret = dev_ops->ops.sync_msg_send(msg_chan, data, in_data_len, out_data_len, real_out_len);
     devdrv_sub_ops_ref(dev_ops);
@@ -32,7 +32,7 @@ int devdrv_get_msg_chan_devid_proc(void *msg_chan)
     struct devdrv_comm_dev_ops *dev_ops = devdrv_add_ops_ref();
     if (dev_ops == NULL) {
         devdrv_err("Get msg chan dev_id fail.\n");
-        return -EINVAL;
+        return -ENODEV;
     }
 
     index_id = dev_ops->ops.get_msg_chan_devid(msg_chan);
@@ -46,7 +46,7 @@ int devdrv_set_msg_chan_priv_proc(void *msg_chan, void *priv)
     struct devdrv_comm_dev_ops *dev_ops = devdrv_add_ops_ref();
     if (dev_ops == NULL) {
         devdrv_err("Set msg chan priv fail.\n");
-        return -EINVAL;
+        return -ENODEV;
     }
     ret = dev_ops->ops.set_msg_chan_priv(msg_chan, priv);
     devdrv_sub_ops_ref(dev_ops);

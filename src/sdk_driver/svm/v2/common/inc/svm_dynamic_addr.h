@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -20,6 +20,9 @@
 
 struct devmm_svm_process;
 struct devmm_svm_heap;
+
+#define DEVMM_DA_STATUS_NONE        0U
+#define DEVMM_DA_STATUS_UNMAPING    1U
 
 struct svm_da_info {
     ka_rw_semaphore_t rwsem; /* for safety access vma */
@@ -49,6 +52,7 @@ int svm_da_for_each_addr(struct devmm_svm_process *svm_proc, bool is_occupy,
 
 void svm_set_da_heap(struct devmm_svm_process *svm_proc, u32 heap_idx, struct devmm_svm_heap *heap);
 struct devmm_svm_heap *svm_get_da_heap_by_idx(struct devmm_svm_process *svm_proc, u32 heap_idx);
-
+void svm_set_da_status(struct devmm_svm_process *svm_proc, u64 va, u64 size, u32 status);
+bool svm_is_da_unmap(struct devmm_svm_process *svm_proc, u64 va, u64 size);
 #endif
 

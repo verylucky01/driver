@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,7 +14,8 @@
 #ifndef SOFT_FAULT_DEFINE_H
 #define SOFT_FAULT_DEFINE_H
 
-#include <linux/types.h>
+#include "ka_list_pub.h"
+#include "ka_task_pub.h"
 
 #include "dms_define.h"
 #include "dms_template.h"
@@ -25,7 +26,6 @@
 #include "dms_sensor_type.h"
 #include "dms_define.h"
 #include "soft_fault_config.h"
-#include "ka_task_pub.h"
 
 #define MODULE_SOFT "drv_soft_fault"
 #define soft_drv_err(fmt, ...)                                                                                 \
@@ -128,14 +128,14 @@ struct soft_fault {
 
 struct soft_error_list {
     struct soft_fault error;
-    struct list_head list;
+    ka_list_head_t list;
 };
 
 struct soft_event {
     unsigned int event_status;
     unsigned int error_num;
     struct soft_error_list error_list; /* event list */
-    struct mutex mutex;
+    ka_mutex_t mutex;
 };
 
 struct soft_dev {
@@ -147,8 +147,8 @@ struct soft_dev {
     struct soft_event sensor_event_queue[SF_SUB_ID_MAX]; /* sensor event queue */
     int sensor_obj_registered[SF_SUB_ID_MAX]; /* registered status of corresponding sensor obj and event */
     struct dms_node dev_node;
-    struct mutex mutex;
-    struct list_head list;
+    ka_mutex_t mutex;
+    ka_list_head_t list;
 };
 
 struct soft_dev_client {
@@ -156,14 +156,14 @@ struct soft_dev_client {
     unsigned int user_id;
     unsigned int registered;
     unsigned int node_num; /* max 8 node */
-    struct mutex mutex;
-    struct list_head head;
+    ka_mutex_t mutex;
+    ka_list_head_t head;
 };
 
 struct drv_soft_ctrl {
     unsigned int user_num[ASCEND_DEV_MAX_NUM];
     struct soft_dev_client *s_dev_t[ASCEND_DEV_MAX_NUM][SF_USER_MAX];
-    struct mutex mutex[ASCEND_DEV_MAX_NUM];
+    ka_mutex_t mutex[ASCEND_DEV_MAX_NUM];
 };
 
 struct drv_soft_ctrl *soft_get_ctrl(void);

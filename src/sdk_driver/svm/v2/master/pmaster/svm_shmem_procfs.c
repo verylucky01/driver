@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -25,7 +25,7 @@ static ka_proc_dir_entry_t *g_svm_shmem_top_entry = NULL;
 static int devmm_ipc_procfs_sum_show(ka_seq_file_t *seq, void *offset)
 {
 #ifndef EMU_ST
-    struct devmm_ipc_node *node = (struct devmm_ipc_node *)seq->private;
+    struct devmm_ipc_node *node = (struct devmm_ipc_node *)ka_fs_get_seq_file_private(seq);
     struct ipc_node_wlist *wlist = NULL;
     u32 stamp = (u32)ka_jiffies;
     int i = 0;
@@ -51,22 +51,13 @@ static int devmm_ipc_procfs_ops_open(ka_inode_t *inode, ka_file_t *file)
     return ka_fs_single_open(file, devmm_ipc_procfs_sum_show, ka_base_pde_data(inode));
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 5, 0)
-static const ka_file_operations_t devmm_ipc_procfs_ops = {
-    .owner = KA_THIS_MODULE,
-    .open    = devmm_ipc_procfs_ops_open,
-    .read    = ka_fs_seq_read,
-    .llseek  = ka_fs_seq_lseek,
-    .release = ka_fs_single_release,
-};
-#else
 static const ka_procfs_ops_t devmm_ipc_procfs_ops = {
-    .proc_open    = devmm_ipc_procfs_ops_open,
-    .proc_read    = ka_fs_seq_read,
-    .proc_lseek   = ka_fs_seq_lseek,
-    .proc_release = ka_fs_single_release,
+    ka_fs_init_pf_owner(KA_THIS_MODULE) \
+    ka_fs_init_pf_open(devmm_ipc_procfs_ops_open) \
+    ka_fs_init_pf_read(ka_fs_seq_read) \
+    ka_fs_init_pf_lseek(ka_fs_seq_lseek) \
+    ka_fs_init_pf_release(ka_fs_single_release) \
 };
-#endif
 
 void devmm_ipc_procfs_add_node(struct devmm_ipc_node *node)
 {

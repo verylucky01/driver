@@ -19,8 +19,18 @@
 #include "dp_proc_mng_ioctl.h"
 #include "dp_proc_mng.h"
 #include "dp_adapt.h"
+#include "dpa/dpa_dp_proc_mng.h"
 
 static THREAD int g_dp_proc_mng_fd = -1;
+THREAD volatile uint64_t g_svm_module_used_size[MEM_STATS_DEVICE_CNT][MEM_STATS_MAX_MODULE_ID];
+void dp_proc_mng_module_used_size_update(uint32_t devid, uint32_t module_id, uint64_t size)
+{
+    if ((devid >= MEM_STATS_DEVICE_CNT) || (module_id >= MEM_STATS_MAX_MODULE_ID)) {
+        return;
+    }
+
+    g_svm_module_used_size[devid][module_id] = size;
+}
 
 int dp_proc_mng_get_fd(uint32_t dev_id)
 {
@@ -317,6 +327,15 @@ drvError_t dp_proc_mng_update_mbuff_and_process_mem_stats(struct module_mem_info
     return DRV_ERROR_NONE;
 }
 #endif
+
+uint64_t dp_proc_mng_get_module_used_size(uint32_t devid, uint32_t module_id)
+{
+    if ((devid >= MEM_STATS_DEVICE_CNT) || (module_id >= MEM_STATS_MAX_MODULE_ID)) {
+        return 0;
+    }
+
+    return g_svm_module_used_size[devid][module_id];
+}
 
 drvError_t dp_proc_mng_get_dev_info(uint32_t *dev_num, uint32_t *ids)
 {

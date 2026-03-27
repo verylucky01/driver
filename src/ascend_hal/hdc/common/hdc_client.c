@@ -82,7 +82,7 @@ hdcError_t drvHdcClientCreate(HDC_CLIENT *client, signed int maxSessionNum, sign
     pHead = (struct hdc_client_head *)drv_hdc_zalloc(size);
     if (pHead == NULL) {
         HDC_LOG_ERR("Call malloc failed.\n");
-        return DRV_ERROR_MALLOC_FAIL;
+        return DRV_ERROR_OUT_OF_MEMORY;
     }
 
     /* initialization */
@@ -317,9 +317,12 @@ hdcError_t halHdcSessionConnectEx(int peer_node, int peer_devid, int peer_pid, H
     if (g_hdcConfig.trans_type == HDC_TRANS_USE_PCIE) {
         if (g_hdcConfig.h2d_type == HDC_TRANS_USE_UB) {
             ret = hdc_ub_connect(peer_devid, pHead, peer_pid, &p_client_session->session);
-        } else {
+        } else if (g_hdcConfig.h2d_type == HDC_TRANS_USE_PCIE) {
             ret = hdc_pcie_connect(g_hdcConfig.pcie_handle, peer_devid, pHead->serviceType, pHead->flag, peer_pid,
                 &p_client_session->session);
+        } else {
+            HDC_LOG_ERR("Variable h2d_type is invalid. (h2d_type=%#x)\n", g_hdcConfig.h2d_type);
+            ret = DRV_ERROR_INVALID_HANDLE;
         }
         if (ret != 0) {
             drv_hdc_client_free_session(pHead, p_client_session);
@@ -433,8 +436,11 @@ hdcError_t drv_hdc_client_session_close(HDC_SESSION session, int close_state, in
     if (g_hdcConfig.trans_type == HDC_TRANS_USE_PCIE) {
         if (g_hdcConfig.h2d_type == HDC_TRANS_USE_UB) {
             ret = hdc_ub_session_close((unsigned int)p_client_session->devid, &p_client_session->session, close_state, flag);
-        } else {
+        } else if (g_hdcConfig.h2d_type == HDC_TRANS_USE_PCIE) {
             ret = hdc_pcie_close(g_hdcConfig.pcie_handle, (unsigned int)p_client_session->devid, &p_client_session->session);
+        } else {
+            HDC_LOG_ERR("Variable h2d_type is invalid. (h2d_type=%#x)\n", g_hdcConfig.h2d_type);
+            ret = DRV_ERROR_INVALID_HANDLE;
         }
         if (ret != 0) {
             HDC_LOG_WARN("Close device not success. (device=%d; errno=%d)\n", (signed int)(p_client_session->devid), ret);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,24 +11,7 @@
  * GNU General Public License for more details.
  */
 
-#include <asm/io.h>
-#include <linux/delay.h>
-#include <linux/irq.h>
-#include <linux/module.h>
-#include <linux/platform_device.h>
-#include <linux/slab.h>
-#include <linux/fs.h>
-#include <linux/errno.h>
-#include <linux/workqueue.h>
-#include <linux/idr.h>
-#include <linux/list.h>
-#include <linux/workqueue.h>
-#include <linux/kthread.h>
-#include <linux/smp.h>
-#include <linux/version.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)
-#include "pbl/pbl_kernel_adapt.h"
-#else
+#ifndef CFG_EDGE_HOST
 #include <linux/profile.h>
 #endif
 
@@ -45,7 +28,7 @@
 #include "urd_notifier.h"
 #include "urd_init.h"
 #include "pbl/pbl_davinci_api.h"
-#if (!defined CFG_HOST_ENV) && (defined CFG_FEATURE_OS_INIT_EVENT)
+#if (!defined CFG_EDGE_HOST) && (defined CFG_FEATURE_OS_INIT_EVENT)
 #include "os_reset.h"
 #endif
 #include "drv_kernel_soft.h"
@@ -56,10 +39,16 @@
 #include "ka_memory_pub.h"
 #include "ka_task_pub.h"
 #include "ka_kernel_def_pub.h"
+#include "ka_pci_pub.h"
+#include "ka_common_pub.h"
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)
+#include "pbl/pbl_kernel_adapt.h"
+#endif
 
 #define EVENT_EXIST 1
-#ifdef CFG_HOST_ENV
-STATIC const struct pci_device_id soft_fault_driver_tbl[] = {
+#ifdef CFG_EDGE_HOST
+STATIC const ka_pci_device_id_t soft_fault_driver_tbl[] = {
     { KA_PCI_VDEVICE(HUAWEI, 0xd100), 0 },
     { KA_PCI_VDEVICE(HUAWEI, 0xd105), 0 },
     { KA_PCI_VDEVICE(HUAWEI, PCI_DEVICE_CLOUD), 0 },
@@ -75,8 +64,10 @@ STATIC const struct pci_device_id soft_fault_driver_tbl[] = {
     { DEVDRV_DIVERSITY_PCIE_VENDOR_ID, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
     { 0x20C6, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
     { 0x203F, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+    { 0x20E9, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
     { 0x20C6, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
     { 0x203F, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+    { 0x20E9, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
     {}
 };
 KA_MODULE_DEVICE_TABLE(pci, soft_fault_driver_tbl);
@@ -499,7 +490,7 @@ KA_EXPORT_SYMBOL(soft_free_one_node);
 
 STATIC int soft_h2d_event(void *data)
 {
-#if (!defined CFG_HOST_ENV) && (defined CFG_FEATURE_OS_INIT_EVENT) /* device side */
+#if (!defined CFG_EDGE_HOST) && (defined CFG_FEATURE_OS_INIT_EVENT) /* device side */
     int ret;
     u32 dev_id;
     dev_id = *(u32 *)data;
@@ -513,7 +504,7 @@ STATIC int soft_h2d_event(void *data)
     return 0;
 }
 
-STATIC int soft_notifier(struct notifier_block *nb, unsigned long mode, void *data)
+STATIC int soft_notifier(ka_notifier_block_t *nb, unsigned long mode, void *data)
 {
     int ret = 0;
 
@@ -532,7 +523,7 @@ STATIC int soft_notifier(struct notifier_block *nb, unsigned long mode, void *da
     return 0;
 }
 
-STATIC struct notifier_block g_soft_notifier = {
+STATIC ka_notifier_block_t g_soft_notifier = {
     .notifier_call = soft_notifier,
 };
 
@@ -545,9 +536,9 @@ STATIC void soft_fault_release_prepare(ka_pid_t owner_pid)
     return;
 }
 
-STATIC int soft_exit_notifier(struct notifier_block *nb, unsigned long mode, void *data)
+STATIC int soft_exit_notifier(ka_notifier_block_t *nb, unsigned long mode, void *data)
 {
-    struct task_struct *task = (struct task_struct *)data;
+    ka_task_struct_t *task = (ka_task_struct_t *)data;
     (void)nb;
     (void)mode;
     /* This code ensures that soft_fault resource can be released when the process exit abnormally */
@@ -565,18 +556,18 @@ STATIC int soft_exit_notifier(struct notifier_block *nb, unsigned long mode, voi
     return 0;
 }
 
-STATIC struct notifier_block g_soft_exit_notifier = {
+STATIC ka_notifier_block_t g_soft_exit_notifier = {
     .notifier_call = soft_exit_notifier,
 };
 
-STATIC int soft_urd_notifier(struct notifier_block *nb, unsigned long mode, void *data)
+STATIC int soft_urd_notifier(ka_notifier_block_t *nb, unsigned long mode, void *data)
 {
     (void)nb;
     (void)data;
     switch (mode) {
         case URD_NOTIFIER_RELEASE_PREPARE:
             /* This code ensures that soft_fault resource can be released when the process exit normally */
-            soft_fault_release_prepare(current->tgid);
+            soft_fault_release_prepare(ka_task_get_current_tgid());
             break;
         default:
             break;
@@ -585,7 +576,7 @@ STATIC int soft_urd_notifier(struct notifier_block *nb, unsigned long mode, void
     return 0;
 }
 
-STATIC struct notifier_block g_soft_urd_notifier = {
+STATIC ka_notifier_block_t g_soft_urd_notifier = {
     .notifier_call = soft_urd_notifier,
 };
 
@@ -689,15 +680,16 @@ int soft_init(void)
         goto SOFT_CTRL_FAIL;
     }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)) && defined(CFG_HOST_ENV)
-    (void)g_soft_exit_notifier;
-#else
+#ifdef CFG_EDGE_HOST
     ret = ka_dfx_profile_event_register(KA_PROFILE_TASK_EXIT, &g_soft_exit_notifier);
+#else
+    /* Use the native kernel interfaces on the device */
+    ret = profile_event_register(PROFILE_TASK_EXIT, &g_soft_exit_notifier);
+#endif
     if (ret != 0) {
         soft_drv_err("register profile notifier failed. (ret=%d)\n", ret);
         goto SOFT_CTRL_FAIL;
     }
-#endif
 
     /* Register callback to the URD. When a process exits, the DMS node,
      * sensor, and aggregated fault data related to the process need
@@ -720,10 +712,11 @@ int soft_init(void)
 DMS_REGISTER_FAIL:
     (void)urd_unregister_notifier(&g_soft_urd_notifier);
 URD_REGISTER_FAIL:
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)
-    (void)g_soft_exit_notifier;
-#else
+#ifdef CFG_EDGE_HOST
     (void)ka_dfx_profile_event_unregister(KA_PROFILE_TASK_EXIT, &g_soft_exit_notifier);
+#else
+    /* Use the native kernel interfaces on the device */
+    (void)profile_event_unregister(PROFILE_TASK_EXIT, &g_soft_exit_notifier);
 #endif
 SOFT_CTRL_FAIL:
     soft_ctrl_exit();
@@ -735,17 +728,18 @@ DECLAER_FEATURE_AUTO_INIT(soft_init, FEATURE_LOADER_STAGE_5);
 void soft_exit(void)
 {
     (void)dms_unregister_notifier(&g_soft_notifier);
-#if (!defined CFG_HOST_ENV) && (defined CFG_FEATURE_OS_INIT_EVENT) /* device side */
+#if (!defined CFG_EDGE_HOST) && (defined CFG_FEATURE_OS_INIT_EVENT) /* device side */
     os_dev_unregister();
 #endif
 #ifdef CFG_FEATURE_DRV_KERNEL_SOFT_EVENT
     drv_kernel_soft_fault_unregister();
 #endif
     (void)urd_unregister_notifier(&g_soft_urd_notifier);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)
-    (void)g_soft_exit_notifier;
-#else
+#ifdef CFG_EDGE_HOST
     (void)ka_dfx_profile_event_unregister(KA_PROFILE_TASK_EXIT, &g_soft_exit_notifier);
+#else
+    /* Use the native kernel interfaces on the device */
+    (void)profile_event_unregister(PROFILE_TASK_EXIT, &g_soft_exit_notifier);
 #endif
     soft_dev_exit();
     soft_ctrl_exit();

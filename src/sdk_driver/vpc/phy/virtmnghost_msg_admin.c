@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,13 +11,13 @@
  * GNU General Public License for more details.
  */
 
+#include "ka_task_pub.h"
+#include "ka_kernel_def_pub.h"
 #include "virtmnghost_msg_admin.h"
 #include "virtmng_msg_admin.h"
 #include "vmng_kernel_interface.h"
 #include "virtmng_msg_common.h"
 #include "virtmng_public_def.h"
-#include "ka_task_pub.h"
-#include "ka_kernel_def_pub.h"
 
 static vmngh_admin_func g_vmngh_msg_admin_func_ops[] = {
     NULL,

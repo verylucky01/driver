@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,6 +13,7 @@
 
 #ifndef DEVMM_CHANNEL_H
 #define DEVMM_CHANNEL_H
+
 #include "svm_ioctl.h"
 #include "drv_type.h"
 
@@ -58,6 +59,9 @@ enum {
     DEVMM_CHAN_SVM_MEM_REPAIR_H2D_ID = 35,
     DEVMM_CHAN_NO_SVM_MEM_REPAIR_H2D_ID = 36,
     DEVMM_CHAN_GET_BLK_INFO_H2D_ID = 37,
+    DEVMM_CHAN_SOMA_CREATE_POOL_H2D_ID = 38,
+    DEVMM_CHAN_SOMA_DESTROY_POOL_H2D_ID = 39,
+    DEVMM_CHAN_SOMA_TRIM_POOL_H2D_ID = 40,
     DEVMM_CHAN_MAX_ID
 };
 
@@ -559,5 +563,4 @@ enum devmm_ipc_pod_msg_cmd {
     DEVMM_GET_BLK_INFO,
     DEVMM_IPC_POD_MSG_MAX
 };
-
 #endif /* __DEVMM_CHANNEL_H__ */

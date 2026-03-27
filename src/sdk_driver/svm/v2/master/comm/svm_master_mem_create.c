@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -294,7 +294,7 @@ static int devmm_host_numa_id_check(u32 side, u32 host_numa_id)
         return 0;
     }
 
-    if ((host_numa_id != -1) && ((host_numa_id >= SVM_MASTER_NUMA_MAX) || (!node_online(host_numa_id)))) {
+    if ((host_numa_id != -1) && ((host_numa_id >= SVM_MASTER_NUMA_MAX) || (!ka_mm_node_online(host_numa_id)))) {
         devmm_drv_err("Invalid numa id. (side=%u; numa=%u; numa_max=%u)\n",
             side, host_numa_id, SVM_MASTER_NUMA_MAX);
         return -EINVAL;

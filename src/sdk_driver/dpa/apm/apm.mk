@@ -7,7 +7,7 @@
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 # ------------------------------------------------------------------------------------------------------------
-asdrv_dpa-objs += apm/apm_init.o apm/apm_fops.o apm/apm_proc_fs.o
+asdrv_dpa-objs += apm/apm_init.o apm/apm_fops.o apm/apm_proc_fs.o apm/apm_kern_log.o
 asdrv_dpa-objs += apm/msg/apm_msg.o
 asdrv_dpa-objs += apm/task_group/apm_master_domain.o apm/task_group/apm_master.o apm/task_group/apm_slave_domain.o apm/task_group/apm_slave.o apm/task_group/apm_task_exit.o
 asdrv_dpa-objs += apm/res_map/apm_res_map.o apm/res_map/apm_res_map_ctx.o apm/res_map/apm_res_map_ops.o
@@ -37,8 +37,15 @@ EXTRA_CFLAGS += -I$(DRIVER_SRC_DPA_BASE_DIR)/apm/task_group/proxy_adapt/host
 EXTRA_CFLAGS += -I$(DRIVER_SRC_DPA_BASE_DIR)/apm/res_map/proxy_adapt/host
 EXTRA_CFLAGS += -I$(DRIVER_SRC_DPA_BASE_DIR)/apm/slave_ssid/adapt/host
 
+EXTRA_CFLAGS += -DCFG_FEATURE_SHARE_LOG
 EXTRA_CFLAGS += -DDRV_HOST
 #Print info and warning logs to memory, not to printk
 EXTRA_CFLAGS += -DCFG_FEATURE_HOST_LOG
 EXTRA_CFLAGS += -isystem $(shell $(CC) -print-file-name=include)
 EXTRA_CFLAGS += -Iinclude/linux
+
+ifneq ($(filter $(PRODUCT), ascend950),)
+    EXTRA_CFLAGS += -DCFG_FEATURE_KA_ALLOC_INTERFACE
+endif
+
+ccflags-y += -fno-common -fstack-protector-all -funsigned-char -pipe -s -Wall -Wcast-align -Wdate-time -Werror -Wfloat-equal -Wformat -Wstack-usage=2048 -Wstrict-prototypes -Wtrampolines -Wundef -Wunused -Wvla

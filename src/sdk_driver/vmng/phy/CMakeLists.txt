@@ -9,7 +9,7 @@
 # ------------------------------------------------------------------------------------------------------------
 add_subdirectory(vascend_drv_stub)
 
-set(asdrv_vmng_depends drv_seclib_host asdrv_pbl drv_pcie_host drv_vascend_stub asdrv_vpc ascend_kernel_open_adapt)
+set(asdrv_vmng_depends drv_seclib_host asdrv_pbl drv_pcie_host asdrv_vascend_adapt asdrv_vpc ascend_kernel_open_adapt)
 
 add_host_ko(LOCAL_MODULE asdrv_vmng
             KO_SRC_FOLDER ${CMAKE_CURRENT_SOURCE_DIR}

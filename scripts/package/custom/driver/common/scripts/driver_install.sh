@@ -452,6 +452,37 @@ uninstall_livepatch() {
     return 1
 }
 
+remove_white_proc_cfg_uninstall() {
+    local config_file="/etc/custom_process.cfg"
+    local is_a2_driver
+    local is_a3_driver
+
+    if [[ "${uninstall}" = "n" ]]; then
+        log "[INFO]Only uninstall need remove white_proc_config"
+        return
+    fi
+
+    is_a2_driver=$(echo $device_bdf | grep d802)
+    is_a3_driver=$(echo $device_bdf | grep d803)
+
+    if [[ -z "$is_a2_driver" && -z "$is_a3_driver" ]]; then
+        log "[INFO]This type driver need not remove white process config"
+        return
+    fi
+
+    if [[ -f "$config_file" ]]; then
+        rm -f "$config_file"
+        log "[INFO]Remove $config_file"
+    else
+        log "[INFO]This config($config_file) does not exist!"
+        return
+    fi
+
+    if [[ -f "$config_file" ]]; then
+        log "[WARNING]Remove $config_file fail"
+    fi
+}
+
 livepatch_audit_log_record() {
     local newest_livepatch_version="$1" return_code=$2
     local log_opt="Uninstall" log_level="MAJOR" result="" livepatch_name="Ascend-driver_sph-${newest_livepatch_version}"
@@ -632,6 +663,7 @@ uninstallRun() {
 
             logOperation "${operation}" "${start_time}" "${runfilename}" "${LOG_RESULT_SUCCESS}" "${installType}" "${all_parma}"
             uninstallationCompletionMessage
+            remove_white_proc_cfg_uninstall
             exitLog 0
         fi
     fi

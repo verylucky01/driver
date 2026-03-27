@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -36,15 +36,17 @@ STATIC int rx_msg_common_msg_process(void *msg_chan, void *data, u32 in_data_len
     u32 cost_time;
 
     if (chan == NULL) {
-        devdrv_err("Input parameter is invalid.\n");
+        if (devdrv_is_dev_hot_reset() != true) {
+            devdrv_err("Input parameter msg_chan is null.\n");
+        }
         return -EINVAL;
     }
     if (data == NULL) {
-        devdrv_err("Input parameter is invalid. (dev_id=%u)\n", chan->msg_dev->pci_ctrl->dev_id);
+        devdrv_err("Input parameter data is null. (dev_id=%u)\n", chan->msg_dev->pci_ctrl->dev_id);
         return -EINVAL;
     }
     if (real_out_len == NULL) {
-        devdrv_err("Input parameter is invalid. (dev_id=%u)\n", chan->msg_dev->pci_ctrl->dev_id);
+        devdrv_err("Input parameter real_out_len is null. (dev_id=%u)\n", chan->msg_dev->pci_ctrl->dev_id);
         return -EINVAL;
     }
 

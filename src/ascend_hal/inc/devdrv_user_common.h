@@ -1018,6 +1018,7 @@ enum devdrv_dev_resource_type {
     DEVDRV_MAX_MEM_INFO_TYPE = DEVDRV_DEV_DDR_FREE,
     DEVDRV_DEV_PROCESS_PID,
     DEVDRV_DEV_PROCESS_MEM,
+    DEVDRV_DEV_PROCESS_CONTAINER_PID,
     DEVDRV_DEV_INFO_TYPE_MAX,
 };
 
@@ -1031,7 +1032,7 @@ struct devdrv_resource_info {
     char buf[DEVDRV_MAX_PAYLOAD_LEN];
 };
 
-#define DEVDRV_MAX_CHIP_NUM 16
+#define DEVDRV_MAX_CHIP_NUM 64
 struct devdrv_chip_list {
     int count;
     int chip_list[VDAVINCI_VDEV_OFFSET];

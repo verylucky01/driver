@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,9 +14,9 @@
 #ifndef __DEVDRV_ADMIN_MSG_H_
 #define __DEVDRV_ADMIN_MSG_H_
 
+#include "ka_memory_pub.h"
 #include "comm_kernel_interface.h"
 #include "comm_cmd_msg.h"
-#include "ka_memory_pub.h"
 
 #if defined(CFG_PLATFORM_ESL) || defined(CFG_PLATFORM_FPGA)
 #define DEVDRV_P2P_SUPPORT_MAX_DEVNUM 4U

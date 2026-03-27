@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -16,6 +16,7 @@
 #include "ka_memory_pub.h"
 #include "ka_kernel_def_pub.h"
 
+#include "pbl/pbl_uda.h"
 #include "pbl/pbl_soc_res.h"
 #include "trs_id.h"
 
@@ -123,7 +124,7 @@ static int trs_chan_ts_inst_hw_cq_ctx_init(struct trs_chan_ts_inst *ts_inst)
     }
     ret = trs_id_get_max_id(inst, TRS_RSV_HW_CQ_ID, &rsv_hw_cq_max_id);
     if (ret == 0) { /* Probably no RSV HW CQ */
-        ts_inst->cq_max_id = max_t(u32, ts_inst->cq_max_id, rsv_hw_cq_max_id);
+        ts_inst->cq_max_id = ka_base_max_t(u32, ts_inst->cq_max_id, rsv_hw_cq_max_id);
     }
 
     ts_inst->hw_cq_ctx = trs_vzalloc(sizeof(struct trs_chan_hw_cq_ctx) * ts_inst->cq_max_id);
@@ -133,7 +134,8 @@ static int trs_chan_ts_inst_hw_cq_ctx_init(struct trs_chan_ts_inst *ts_inst)
     }
 
     for (cq_id = 0; cq_id < ts_inst->cq_max_id; cq_id++) {
-        ts_inst->hw_cq_ctx[cq_id].irq_index = U32_MAX;
+        ts_inst->hw_cq_ctx[cq_id].irq_index = KA_U32_MAX;
+        ts_inst->hw_cq_ctx[cq_id].valid = false;
     }
     return 0;
 }
@@ -159,7 +161,7 @@ static int trs_chan_ts_inst_hw_sq_ctx_init(struct trs_chan_ts_inst *ts_inst)
     }
     ret = trs_id_get_max_id(inst, TRS_RSV_HW_SQ_ID, &rsv_hw_sq_max_id);
     if (ret == 0) {  /* Probably no RSV HW SQ */
-        ts_inst->sq_max_id = max_t(u32, ts_inst->sq_max_id, rsv_hw_sq_max_id);
+        ts_inst->sq_max_id = ka_base_max_t(u32, ts_inst->sq_max_id, rsv_hw_sq_max_id);
     }
 
     ts_inst->hw_sq_ctx = trs_vzalloc(sizeof(struct trs_chan_hw_sq_ctx) * ts_inst->sq_max_id);
@@ -301,7 +303,20 @@ static void trs_chan_ts_inst_maint_sqcq_ctx_uninit(struct trs_chan_ts_inst *ts_i
     trs_chan_ts_inst_maint_sq_ctx_uninit(ts_inst);
 }
 
-static int trs_chan_ts_inst_create(struct trs_id_inst *inst, int hw_type, struct trs_chan_adapt_ops *ops)
+static void trs_chan_cq_guard_work_sched(ka_work_struct_t *p_work)
+{
+    struct trs_chan_guard_work *guard_work = ka_container_of(p_work, struct trs_chan_guard_work, cq_guard_work.work);
+    struct trs_chan_ts_inst *ts_inst = guard_work->ts_inst;
+
+    trs_debug("Sched cq guard work. (devid=%u; cq_max_id=%u)\n", ts_inst->inst.devid, ts_inst->cq_max_id);
+    trs_chan_cq_guard_work_proc(ts_inst);
+    if (ts_inst->guard_work.work_magic == TRS_CHAN_GUARD_WORK_MAGIC) {
+        ka_task_schedule_delayed_work(&ts_inst->guard_work.cq_guard_work,
+            ka_system_msecs_to_jiffies(TRS_CHAN_GUARD_WORK_DELAY_MS));
+    }
+}
+
+static int trs_chan_ts_inst_create(struct trs_id_inst *inst, int hw_type, int location, struct trs_chan_adapt_ops *ops)
 {
     u32 ts_inst_id = trs_id_inst_to_ts_inst(inst);
     struct trs_chan_ts_inst *ts_inst = NULL;
@@ -319,10 +334,11 @@ static int trs_chan_ts_inst_create(struct trs_id_inst *inst, int hw_type, struct
     }
 
     ts_inst->hw_type = hw_type;
+    ts_inst->location = location;
     ts_inst->inst = *inst;
     ts_inst->ops = *ops;
     kref_safe_init(&ts_inst->ref);
-    ka_task_spin_lock_init(&ts_inst->lock);
+    ka_task_mutex_init(&ts_inst->mutex);
 
     ret = trs_chan_ts_inst_hw_sqcq_ctx_init(ts_inst);
     if (ret != 0) {
@@ -353,10 +369,18 @@ static int trs_chan_ts_inst_create(struct trs_id_inst *inst, int hw_type, struct
         trs_info("Not support maint irq. (devid=%u; tsid=%u)\n", inst->devid, inst->tsid);
     }
 
+    if ((ts_inst->location == UDA_NEAR) || (ts_inst->location == UDA_REMOTE)) {
+        KA_TASK_INIT_DELAYED_WORK(&ts_inst->guard_work.cq_guard_work, trs_chan_cq_guard_work_sched);
+        ts_inst->guard_work.work_magic = TRS_CHAN_GUARD_WORK_MAGIC;
+        ts_inst->guard_work.ts_inst = ts_inst;
+        ka_task_schedule_delayed_work(&ts_inst->guard_work.cq_guard_work, 0);
+        trs_info("Create guard work. (devid=%u; tsid=%u)\n", inst->devid, inst->tsid);
+    }
+
     chan_proc_fs_add_ts_inst(ts_inst);
     chan_ts_inst[ts_inst_id] = ts_inst;
 
-    trs_debug("Ts inst create success. (devid=%u; tsid=%u)\n", inst->devid, inst->tsid);
+    trs_info("Ts inst create success. (devid=%u; tsid=%u)\n", inst->devid, inst->tsid);
 
     return 0;
 }
@@ -368,6 +392,14 @@ static void trs_chan_ts_inst_release(struct kref_safe *kref)
     trs_info("Ts inst release success. (devid=%u; tsid=%u)\n", ts_inst->inst.devid, ts_inst->inst.tsid);
 
     chan_proc_fs_del_ts_inst(ts_inst);
+    if (((ts_inst->location == UDA_NEAR) || (ts_inst->location == UDA_REMOTE)) &&
+        (ts_inst->guard_work.cq_guard_work.work.func != NULL) &&
+        (ts_inst->guard_work.work_magic == TRS_CHAN_GUARD_WORK_MAGIC)) {
+        ka_task_cancel_delayed_work_sync(&ts_inst->guard_work.cq_guard_work);
+        ts_inst->guard_work.ts_inst = NULL;
+        ts_inst->guard_work.work_magic = 0;
+        trs_info("Destroy guard work. (devid=%u; tsid=%u)\n", ts_inst->inst.devid, ts_inst->inst.tsid);
+    }
     trs_chan_ts_inst_irq_sw_res_uninit(ts_inst->maint_irq);
     trs_chan_ts_inst_irq_sw_res_uninit(ts_inst->normal_irq);
     trs_chan_ts_inst_maint_sqcq_ctx_uninit(ts_inst);
@@ -414,7 +446,7 @@ static int trs_chan_check_ts_inst_ops(struct trs_chan_adapt_ops *ops)
     return 0;
 }
 
-int trs_chan_ts_inst_register(struct trs_id_inst *inst, int hw_type, struct trs_chan_adapt_ops *ops)
+int trs_chan_ts_inst_register(struct trs_id_inst *inst, int hw_type, int location, struct trs_chan_adapt_ops *ops)
 {
     int ret;
 
@@ -430,7 +462,7 @@ int trs_chan_ts_inst_register(struct trs_id_inst *inst, int hw_type, struct trs_
     }
 
     ka_task_mutex_lock(&chan_ts_inst_mutex);
-    ret = trs_chan_ts_inst_create(inst, hw_type, ops);
+    ret = trs_chan_ts_inst_create(inst, hw_type, location, ops);
     ka_task_mutex_unlock(&chan_ts_inst_mutex);
 
     return ret;

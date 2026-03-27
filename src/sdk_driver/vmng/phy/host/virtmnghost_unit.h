@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,14 +14,12 @@
 #ifndef VIRTMNGHOST_UNIT_H
 #define VIRTMNGHOST_UNIT_H
 
+#include "ka_task_pub.h"
+#include "ka_memory_pub.h"
+#include "ka_kernel_def_pub.h"
 #include "vmng_kernel_interface.h"
 #include "ascend_dev_num.h"
 #include "hw_vdavinci.h"
-#include "ka_task_pub.h"
-#include "ka_common_pub.h"
-#include "ka_memory_pub.h"
-#include "ka_base_pub.h"
-#include "ka_kernel_def_pub.h"
 
 #define VMNGA_VD_DEV_ALIVE_NOK 0
 #define VMNGA_VD_DEV_ALIVE_OK 1

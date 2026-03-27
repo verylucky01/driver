@@ -326,20 +326,30 @@ int check_upgrade_component_type_and_state(int device_id, unsigned char *upgrade
     return 0;
 }
 
-static int send_pach_to_device(int device_id, const char *file_name, char *dst_compoent_name)
+#define DSMI_SEND_PATCH_RETRY_TIMES 30
+static int send_patch_to_device(int device_id, const char *file_name, char *dst_compoent_name)
 {
+    unsigned int retry = 0;
     int ret;
- 
+
     // path unity change to UPGRADE_DST_PATH
     ret = find_file_name(device_id, file_name, dst_compoent_name);
     if (ret != 0) {
         dev_upgrade_err("Find file name fail. (dev_id=%d; ret=%x; file_name=%s)\n", device_id, ret, file_name);
         return ret;
     }
- 
-    ret = drvHdcSendFileEx(0xFF, 0, device_id, file_name, dst_compoent_name, NULL);
+
+    while (retry < DSMI_SEND_PATCH_RETRY_TIMES) {
+        ret = drvHdcSendFileEx(0xFF, 0, device_id, file_name, dst_compoent_name, NULL);
+        if ((ret != DRV_ERROR_REMOTE_NOT_LISTEN)) {
+            break;
+        }
+        retry++;
+        (void)sleep(1); /* 1s */
+    }
+
     if (ret != 0) {
-        dev_upgrade_err("copy file to device failed. (devid=%d; ret=%x; src=%s; dst=%s)\n",
+        dev_upgrade_err("Copy file to device failed. (devid=%d; ret=%x; src=%s; dst=%s)\n",
                         device_id, ret, file_name, dst_compoent_name);
         return ret;
     }
@@ -357,7 +367,7 @@ int upgrade_trans_patch(int device_id, const char *file_name)
     }
 
     // path unity change to UPGRADE_DST_PATH
-    ret = send_pach_to_device(device_id, file_name, dst_compoent_name);
+    ret = send_patch_to_device(device_id, file_name, dst_compoent_name);
     if (ret != 0) {
         goto exit;
     }
@@ -390,7 +400,7 @@ int upgrade_trans_mami_patch(int device_id, const char *file_name)
 
     if (strcmp(file_name, "NULL") != 0) {
         dev_upgrade_info("Send alone mami patch. (device_id=%d)\n", device_id);
-        ret = send_pach_to_device(device_id, file_name, dst_compoent_name);
+        ret = send_patch_to_device(device_id, file_name, dst_compoent_name);
         if (ret != 0) {
             goto exit;
         }

@@ -14,6 +14,7 @@
 #include "ascend_hal_define.h"
 #include "trs_ioctl.h"
 
+#define TRS_HW_SQE_SIZE   64
 #define TRS_SQCQ_BUFF_LEN 256
 
 #define TRS_SQ_CTRL_BY_TRS_FLAG     0U
@@ -71,6 +72,8 @@ struct sqcq_usr_info {
     pthread_rwlock_t mutex;
     uint32_t flag;
     uint32_t status;
+    uint32_t switch_stream_flag;
+    uint32_t stream_id;
 };
 
 static inline uint64_t align_up(uint64_t value, uint64_t align)
@@ -91,8 +94,6 @@ static inline uint64_t align_down(uint64_t value, uint64_t align)
     return value & ~(align - 1);
 }
 
-int trs_d2d_info_init(uint32_t dev_id);
-void trs_d2d_info_uninit(uint32_t dev_id);
 int trs_hw_info_init(uint32_t dev_id);
 int trs_dev_sq_cq_init(uint32_t dev_id);
 void trs_dev_sq_cq_uninit(uint32_t dev_id, uint32_t close_type);
@@ -106,8 +107,10 @@ uint32_t trs_get_ts_num(uint32_t dev_id);
 int trs_get_sq_send_mode(uint32_t dev_id);
 void trs_dev_ctx_mutex_lock(uint32_t dev_id);
 void trs_dev_ctx_mutex_un_lock(uint32_t dev_id);
-void *trs_getd2d_dev_ctx(uint32_t recv_dev_id, uint32_t send_dev_id);
-void trs_setd2d_dev_ctx(uint32_t recv_dev_id, uint32_t send_dev_id, void *ctx);
+void trs_dev_ctx_stream_mutex_lock(uint32_t dev_id);
+void trs_dev_ctx_stream_mutex_unlock(uint32_t dev_id);
+void *trs_get_d2d_dev_ctx(uint32_t recv_dev_id);
+void trs_set_d2d_dev_ctx(uint32_t recv_dev_id, void *ctx);
 uint32_t trs_get_sq_num(uint32_t dev_id, uint32_t ts_id, drvSqCqType_t type);
 drvError_t trs_local_sqcq_alloc(uint32_t dev_id, struct halSqCqInputInfo *in, struct halSqCqOutputInfo *out);
 drvError_t trs_local_sqcq_free(uint32_t dev_id, struct halSqCqFreeInfo *info);
@@ -121,6 +124,7 @@ drvError_t trs_sq_task_send_check(uint32_t dev_id, struct halTaskSendInfo *info,
 void trs_sq_task_fill(struct halTaskSendInfo *info, struct sqcq_usr_info *sq_info);
 drvError_t trs_sq_task_send(uint32_t dev_id, struct halTaskSendInfo *info, struct sqcq_usr_info *sq_info);
 drvError_t trs_sq_switch_stream_batch(uint32_t dev_id, struct sq_switch_stream_info *info, uint32_t num);
+drvError_t trs_stream_task_fill(uint32_t dev_id, uint32_t stream_id, void *task_addr, void *task_info, uint32_t size);
 drvError_t trs_sq_cq_query(uint32_t dev_id, struct halSqCqQueryInfo *info);
 drvError_t trs_sq_cq_config(uint32_t dev_id, struct halSqCqConfigInfo *info);
 int trs_set_sq_info_head(uint32_t dev_id, uint32_t ts_id, int type, uint32_t sq_id, uint32_t head);
@@ -141,6 +145,11 @@ struct trs_sqcq_mem_ops {
 };
 
 void trs_register_sqcq_mem_ops(struct trs_sqcq_mem_ops *ops);
+
+static inline bool trs_is_sq_init_without_sq_mem(uint32_t flag)
+{
+    return ((flag & TSDRV_FLAG_NO_SQ_MEM) != 0);
+}
 
 static inline bool trs_is_sq_support_send(struct sqcq_usr_info *info)
 {

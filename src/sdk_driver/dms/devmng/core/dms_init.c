@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,29 +11,7 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/io.h>
-#include <linux/kernel.h>
-#include <linux/slab.h>
-#include <linux/uaccess.h>
-#include <linux/mutex.h>
-#include <linux/cdev.h>
-#include <linux/platform_device.h>
-#include <linux/delay.h>
-#include <linux/bitops.h>
-#include <linux/suspend.h>
-#include <linux/notifier.h>
-#include <linux/version.h>
-#include <linux/list.h>
-#include <linux/ioctl.h>
-#include <linux/module.h>
-#include <linux/atomic.h>
-#include <linux/poll.h>
-#include <linux/sort.h>
-#include <linux/vmalloc.h>
-/* The AOS linux kernel version is later than 5.17, but the profile interface of the kernel is still used. */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)) && defined(CFG_FEATURE_KA)
-#include "pbl/pbl_kernel_adapt.h"
-#else
+#ifndef CFG_EDGE_HOST
 #include <linux/profile.h>
 #endif
 
@@ -43,6 +21,7 @@
 #include "ka_errno_pub.h"
 #include "ka_kernel_def_pub.h"
 #include "ka_dfx_pub.h"
+#include "ka_common_pub.h"
 #include "devdrv_user_common.h"
 #include "pbl_mem_alloc_interface.h"
 #include "securec.h"
@@ -58,8 +37,9 @@
 #include "devmng_dms_adapt.h"
 #include "pbl/pbl_davinci_api.h"
 #include "dms_sysfs.h"
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0)
-#include <linux/namei.h>
+/* The AOS linux kernel version is later than 5.17, but the profile interface of the kernel is still used. */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)) && defined(CFG_FEATURE_KA)
+#include "pbl/pbl_kernel_adapt.h"
 #endif
 
 #include "pbl/pbl_feature_loader.h"
@@ -194,10 +174,10 @@ STATIC int cmp(const void *a, const void *b)
 STATIC int get_file_size(size_t *buf_size)
 {
     int ret;
-    struct kstat src_stat;
+    ka_kstat_t src_stat;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0)
-    struct path kernel_path;
+    ka_path_t kernel_path;
 
     ret = ka_fs_kern_path(EVENT_INFO_CONFIG_PATH, KA_LOOKUP_FOLLOW, &kernel_path);
     if (ret != 0) {
@@ -229,7 +209,7 @@ STATIC int read_file_to_buf(size_t file_size, char *config_buf)
 {
     size_t read_size;
     int ret = -EIO;
-    struct file *src_filp = NULL;
+    ka_file_t *src_filp = NULL;
     loff_t offset = 0;
 
     src_filp = ka_fs_filp_open(EVENT_INFO_CONFIG_PATH, KA_O_RDONLY, KA_S_IRUSR);
@@ -309,9 +289,9 @@ undo_acBuf_alloc:
 KA_EXPORT_SYMBOL(get_eventinfo_from_config);
 #endif
 
-STATIC int dms_release_prepare(struct notifier_block *self, unsigned long val, void *data)
+STATIC int dms_release_prepare(ka_notifier_block_t *self, unsigned long val, void *data)
 {
-    struct task_struct *task = (struct task_struct *)data;
+    ka_task_struct_t *task = (ka_task_struct_t *)data;
     (void)self;
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0))
@@ -324,7 +304,7 @@ STATIC int dms_release_prepare(struct notifier_block *self, unsigned long val, v
     return 0;
 }
 
-static struct notifier_block dms_exit_notifier = {
+static ka_notifier_block_t dms_exit_notifier = {
     .notifier_call = dms_release_prepare,
 };
 
@@ -370,15 +350,16 @@ int dms_init(void)
 
     dms_debug("dms_init start.\n");
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)) && defined(CFG_HOST_ENV)
-    (void)dms_exit_notifier;
-#else
+#ifdef CFG_EDGE_HOST
     ret = ka_dfx_profile_event_register(KA_PROFILE_TASK_EXIT, &dms_exit_notifier);
+#else
+    /* Use the native kernel interfaces on the device */
+    ret = profile_event_register(PROFILE_TASK_EXIT, &dms_exit_notifier);
+#endif
     if (ret != 0) {
         dms_err("Register notify fail. (ret=%d)\n", ret);
         return ret;
     }
-#endif
 
 #ifndef CFG_FEATURE_UNSUPPORT_FAULT_MANAGE
     ret = get_eventinfo_from_config();
@@ -411,10 +392,11 @@ int dms_init(void)
     return 0;
 
 register_notify_fail:
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)) && defined(CFG_HOST_ENV)
-    (void)dms_exit_notifier;
-#else
+#ifdef CFG_EDGE_HOST
     (void)ka_dfx_profile_event_unregister(KA_PROFILE_TASK_EXIT, &dms_exit_notifier);
+#else
+    /* Use the native kernel interfaces on the device */
+    (void)profile_event_unregister(PROFILE_TASK_EXIT, &dms_exit_notifier);
 #endif
     return ret;
 }
@@ -432,10 +414,11 @@ void dms_exit(void)
     dms_event_adapt_exit();
     dms_exit_submodule();
     (void)drv_ascend_unregister_notify(DAVINCI_INTF_MODULE_URD);
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)) && defined(CFG_HOST_ENV)
-    (void)dms_exit_notifier;
-#else
+#ifdef CFG_EDGE_HOST
     (void)ka_dfx_profile_event_unregister(KA_PROFILE_TASK_EXIT, &dms_exit_notifier);
+#else
+    /* Use the native kernel interfaces on the device */
+    (void)profile_event_unregister(PROFILE_TASK_EXIT, &dms_exit_notifier);
 #endif
     dms_info("Dms driver exit success.\n");
     return;

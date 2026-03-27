@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -23,7 +23,7 @@
 #define HEART_BEAT_HCCS_DEATH_COUNT 8
 
 int hb_set_heart_beat_count(unsigned int dev_id, unsigned long long count);
-int hb_get_heart_beat_count(unsigned int dev_id, unsigned long long* count);
+int hb_get_heart_beat_count(unsigned int dev_id, unsigned long long* heart_beat_count, unsigned int* hb_read_fail_count);
 
 int hb_report_heart_beat_lost_event(unsigned int dev_id);
 

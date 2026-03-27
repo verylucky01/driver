@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -15,6 +15,9 @@
 #define _KA_COMPILER_H
 
 #define __ka_user __user
+#define __ka_init __init
+#define __ka_exit __exit
+
 #define ka_likely(x)    likely(x)
 #define ka_unlikely(x)  unlikely(x)
 #define KA_READ_ONCE(x)       READ_ONCE(x)

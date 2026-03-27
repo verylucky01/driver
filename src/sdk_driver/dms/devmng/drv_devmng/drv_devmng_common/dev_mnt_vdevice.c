@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,10 +11,8 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/fs.h>
-#include <linux/slab.h>
-#include <linux/utsname.h>
-#include <linux/version.h>
+#include "ka_common_pub.h"
+#include "ka_fs_pub.h"
 
 #include "pbl/pbl_uda.h"
 #include "devdrv_user_common.h"
@@ -80,17 +78,17 @@ const u32 g_vdev_dtype[VDAVINCI_SUPPORT_DIVIDE_AICORE_NUM + 1] = {
 
 STATIC struct dev_mnt_vdev_inform g_vdev_inform;
 STATIC DEV_MNT_VDEV_CB_T *g_mnt_vdev_cb = NULL;
-static struct file_operations dev_mnt_vdev_fops_real = {
-    .owner = KA_THIS_MODULE,
-    .open = NULL,
-    .release = NULL,
-    .unlocked_ioctl = NULL,
-    .mmap = NULL,
+static ka_file_operations_t dev_mnt_vdev_fops_real = {
+    ka_fs_init_f_owner(KA_THIS_MODULE)
+    ka_fs_init_f_open(NULL)
+    ka_fs_init_f_release(NULL)
+    ka_fs_init_f_unlocked_ioctl(NULL)
+    ka_fs_init_f_mmap(NULL)
 };
 
 STATIC void dev_mnt_vdevice_inform_release(void);
 
-void dev_mnt_vdev_set_ops(const struct file_operations *ops)
+void dev_mnt_vdev_set_ops(const ka_file_operations_t *ops)
 {
     dev_mnt_vdev_fops_real.open = ops->open;
     dev_mnt_vdev_fops_real.release = ops->release;
@@ -518,8 +516,7 @@ STATIC int get_device_free_memory_info(u32 phy_id, struct vdev_query_info *query
     int ret, i;
     u32 vdev_num = 0;
     u32 *vdevices = NULL;
-    u64 memory_total;
-    u64 memory_used = 0;
+    u64 memory_total, memory_used = 0;
     struct devdrv_manager_msg_resource_info info_tmp = {0};
 
     info_tmp.info_type = DEVDRV_DEV_HBM_TOTAL;
@@ -656,7 +653,7 @@ STATIC int dev_mnt_get_computing_info(u32 phy_id, struct vdev_query_info *query_
     }
     return 0;
 }
-#ifdef CFG_FEATURE_ASCEND910_95_API_ADAPT_STUB
+#ifdef CFG_FEATURE_ASCEND950_API_ADAPT_STUB
 STATIC int dev_get_devid_by_pfvf_id(u32 phy_id, u32 vfid, u32 *udevid)
 {
     struct uda_mia_dev_para mia_para;
@@ -702,7 +699,7 @@ STATIC int dev_mnt_get_vdevice_info(u32 phy_id, struct vdev_query_info *vdev_inf
 
     (void)memset_s(vm_info, sizeof(struct vmng_soc_resource_enquire), 0, sizeof(struct vmng_soc_resource_enquire));
 #ifdef CFG_FEATURE_SRIOV
-#ifdef CFG_FEATURE_ASCEND910_95_API_ADAPT_STUB
+#ifdef CFG_FEATURE_ASCEND950_API_ADAPT_STUB
     ret = dev_get_devid_by_pfvf_id(phy_id, vdev_info->vfid, &vf_dev_id);
 #else
     ret = devdrv_get_devid_by_pfvf_id(phy_id, vdev_info->vfid, &vf_dev_id);
@@ -751,7 +748,7 @@ STATIC int dev_mnt_get_vdevice_info(u32 phy_id, struct vdev_query_info *vdev_inf
     ka_task_mutex_unlock(&g_mnt_vdev_cb->global_lock);
     if (core_used > core_total) {
         devdrv_drv_err("ai core num error,phyid:%u core_used:%u,total:%d\n", phy_id, core_used, core_total);
-#ifndef CFG_FEATURE_ASCEND910_95_FPGA_STUB
+#ifndef CFG_FEATURE_ASCEND950_FPGA_STUB
         ret = -EINVAL;
         goto VM_INFO_KFREE;
 #endif
@@ -811,7 +808,7 @@ void dev_mnt_vdevice_uninit(void)
 }
 
 int dev_mnt_vdev_register_client(u32 phy_id, u32 vfid,
-    const struct file_operations *ops)
+    const ka_file_operations_t *ops)
 {
     if (ops == NULL || phy_id >= ASCEND_DEV_MAX_NUM || vfid > VDAVINCI_MAX_VFID_NUM) {
         devdrv_drv_err("invalid para phy_id(%u), vfid(%u).\n", phy_id, vfid);
@@ -907,7 +904,7 @@ STATIC int dev_mnt_check_create_para_single(u32 phy_id, struct vdev_create_info 
     if ((core_used + core_need) > core_total) {
         devdrv_drv_err("check aicore num failed, phy_id:%u, core_need:%u, used:%u, total:%u\n",
             phy_id, core_need, core_used, core_total);
-#ifndef CFG_FEATURE_ASCEND910_95_FPGA_STUB
+#ifndef CFG_FEATURE_ASCEND950_FPGA_STUB
         return -EINVAL;
 #endif
     }
@@ -916,7 +913,7 @@ STATIC int dev_mnt_check_create_para_single(u32 phy_id, struct vdev_create_info 
 }
 #endif
 
-STATIC void dev_mnt_vdevice_bind(u32 vdev_id, struct mnt_namespace *ns, u64 container_id)
+STATIC void dev_mnt_vdevice_bind(u32 vdev_id, ka_mnt_namespace_t *ns, u64 container_id)
 {
     struct vdavinci_info *info = NULL;
     u32 offset_id;
@@ -985,7 +982,7 @@ STATIC void dev_mnt_vdevice_unbind(u32 vdev_id)
     ka_task_mutex_unlock(&g_mnt_vdev_cb->vdev[offset_id].lock);
 }
 
-int dev_mnt_vdevice_add_inform(unsigned int vdev_id, vdev_action action, struct mnt_namespace *ns, u64 container_id)
+int dev_mnt_vdevice_add_inform(unsigned int vdev_id, vdev_action action, ka_mnt_namespace_t *ns, u64 container_id)
 {
     struct dev_mnt_vdev_action *new_vdev_action = NULL;
 
@@ -1012,9 +1009,9 @@ int dev_mnt_vdevice_add_inform(unsigned int vdev_id, vdev_action action, struct 
 void dev_mnt_vdevice_inform(void)
 {
     struct dev_mnt_vdev_action *vdev_action = NULL;
-    struct list_head *pos = NULL;
-    struct list_head *n = NULL;
-    struct list_head head;
+    ka_list_head_t *pos = NULL;
+    ka_list_head_t *n = NULL;
+    ka_list_head_t head;
 
     if (ka_list_empty(&g_vdev_inform.vdev_action_head)) {
         return;
@@ -1044,8 +1041,8 @@ void dev_mnt_vdevice_inform(void)
 STATIC void dev_mnt_vdevice_inform_release(void)
 {
     struct dev_mnt_vdev_action *vdev_action = NULL;
-    struct list_head *pos = NULL;
-    struct list_head *n = NULL;
+    ka_list_head_t *pos = NULL;
+    ka_list_head_t *n = NULL;
 
     if (ka_list_empty(&g_vdev_inform.vdev_action_head)) {
         return;
@@ -1161,7 +1158,7 @@ STATIC int dev_check_support_vdev(u32 dev_id)
 }
 #endif
 
-int devdrv_manager_ioctl_create_vdev(struct file *filep, unsigned int cmd, unsigned long arg)
+int devdrv_manager_ioctl_create_vdev(ka_file_t *filep, unsigned int cmd, unsigned long arg)
 {
 #ifdef CFG_FEATURE_VFIO
     struct vdev_create_info vinfo = {0};
@@ -1236,7 +1233,7 @@ int devdrv_manager_ioctl_create_vdev(struct file *filep, unsigned int cmd, unsig
 #endif
 }
 
-#ifdef CFG_FEATURE_ASCEND910_95_API_ADAPT_STUB
+#ifdef CFG_FEATURE_ASCEND950_API_ADAPT_STUB
 static int dev_get_pfvf_id_by_devid(u32 udevid, u32 *pf_id, u32 *vf_id)
 {
     int ret;
@@ -1256,7 +1253,7 @@ static int dev_get_pfvf_id_by_devid(u32 udevid, u32 *pf_id, u32 *vf_id)
  * vdevid = 0xffff, destroy all the vdevice created by devid.
  * vdevid != 0xffff destroy the specified vdevid num vdevice.
  */
-int devdrv_manager_ioctl_destroy_vdev(struct file *filep, unsigned int cmd, unsigned long arg)
+int devdrv_manager_ioctl_destroy_vdev(ka_file_t *filep, unsigned int cmd, unsigned long arg)
 {
 #ifdef CFG_FEATURE_VFIO
     struct devdrv_vdev_id_info vinfo = {0};
@@ -1299,7 +1296,7 @@ int devdrv_manager_ioctl_destroy_vdev(struct file *filep, unsigned int cmd, unsi
         }
 
 #ifdef CFG_FEATURE_SRIOV
-#ifdef CFG_FEATURE_ASCEND910_95_API_ADAPT_STUB
+#ifdef CFG_FEATURE_ASCEND950_API_ADAPT_STUB
         ret = dev_get_pfvf_id_by_devid(vinfo.vdevid, &phy_id, &vfid);
 #else
         ret = devdrv_get_pfvf_id_by_devid(vinfo.vdevid, &phy_id, &vfid);
@@ -1334,7 +1331,7 @@ int devdrv_manager_ioctl_destroy_vdev(struct file *filep, unsigned int cmd, unsi
 #endif
 }
 
-int devdrv_manager_ioctl_get_vdevinfo(struct file *filep, unsigned int cmd, unsigned long arg)
+int devdrv_manager_ioctl_get_vdevinfo(ka_file_t *filep, unsigned int cmd, unsigned long arg)
 {
 #ifdef CFG_FEATURE_VFIO
     u32 phy_id = 0;
@@ -1348,7 +1345,7 @@ int devdrv_manager_ioctl_get_vdevinfo(struct file *filep, unsigned int cmd, unsi
         return -EPERM;
     }
 
-    if (!devdrv_manager_container_is_host_system(current->nsproxy->mnt_ns) && !devdrv_manager_container_is_admin()) {
+    if (!devdrv_manager_container_is_host_system(ka_task_get_current_mnt_ns()) && !devdrv_manager_container_is_admin()) {
         devdrv_drv_err("check permission failed.\n");
         ret = -EPERM;
         goto EXIT;
@@ -1425,7 +1422,8 @@ int devdrv_manager_get_vdev_resource_info(struct devdrv_resource_info *dinfo)
         return -EINVAL;
     }
 
-    if ((dinfo->resource_type == DEVDRV_DEV_PROCESS_PID) || (dinfo->resource_type == DEVDRV_DEV_PROCESS_MEM)) {
+    if ((dinfo->resource_type == DEVDRV_DEV_PROCESS_PID) || (dinfo->resource_type == DEVDRV_DEV_PROCESS_MEM) ||
+        (dinfo->resource_type == DEVDRV_DEV_PROCESS_CONTAINER_PID)) {
         return -EOPNOTSUPP;
     }
 

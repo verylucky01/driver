@@ -52,6 +52,25 @@ int dcmi_reset_device(int card_id, int device_id)
     return dcmi_set_device_reset(card_id, device_id, OUTBAND_CHANNEL);
 }
 
+STATIC int dcmi_call_dsmi_hot_reset(int device_logic_id)
+{
+    int ret;
+
+#ifndef _WIN32
+    ret = dsmi_hot_reset_atomic(device_logic_id, DSMI_SUBCMD_HOTRESET_ASSEMBLE);
+    if (ret != DSMI_OK) {
+        gplog(LOG_ERR, "call dsmi_hot_reset_atomic failed. err is %d.", ret);
+    }
+#else
+    ret = dsmi_hot_reset_soc(device_logic_id);
+    if (ret != DSMI_OK) {
+        gplog(LOG_ERR, "call dsmi_hot_reset_soc failed. err is %d.", ret);
+    }
+#endif
+
+    return dcmi_convert_error_code(ret);
+}
+
 STATIC int dcmi_reset_device_inband_param_check(int card_id, int device_id, enum dcmi_unit_type *device_type)
 {
     int err;
@@ -105,19 +124,10 @@ int dcmi_reset_device_inband(int card_id, int device_id)
             return err;
         }
         dcmi_npu_msn_env_clean(card_id);
-#ifndef _WIN32
-        err = dsmi_hot_reset_atomic(device_logic_id, DSMI_SUBCMD_HOTRESET_ASSEMBLE);
-        if (err != DSMI_OK) {
-            gplog(LOG_OP, "call dsmi_hot_reset_atomic failed.%d.", err);
-            return dcmi_convert_error_code(err);
+        err = dcmi_call_dsmi_hot_reset(device_logic_id);
+        if (err != DCMI_OK) {
+            return err;
         }
-#else
-        err = dsmi_hot_reset_soc(device_logic_id);
-        if (err != DSMI_OK) {
-            gplog(LOG_OP, "call dsmi_hot_reset_soc failed.%d.", err);
-            return dcmi_convert_error_code(err);
-        }
-#endif
         gplog(LOG_OP, "reset device inband success. card_id=%d, device_id=%d", card_id, device_id);
         return DCMI_OK;
     } else {
@@ -206,7 +216,8 @@ int dcmi_check_device_reset_permission(const enum dcmi_reset_channel channel_typ
             (!dcmi_board_chip_type_is_ascend_310p()) &&
             (!dcmi_board_chip_type_is_ascend_910b()) &&
             (!dcmi_board_chip_type_is_ascend_910()) &&
-            (!dcmi_board_chip_type_is_ascend_910_93())) {
+            (!dcmi_board_chip_type_is_ascend_910_93()) &&
+            (!dcmi_board_chip_type_is_ascend_910_95())) {
             gplog(LOG_OP, "Operation not permitted, this device can't call this api on virtual machine or container.");
             return DCMI_ERR_CODE_OPER_NOT_PERMITTED;
         }
@@ -214,10 +225,11 @@ int dcmi_check_device_reset_permission(const enum dcmi_reset_channel channel_typ
 
     /* 910B 支持物理机 + 特权容器 */
     if (dcmi_check_run_in_docker() &&
-        (dcmi_board_chip_type_is_ascend_910b() || dcmi_board_chip_type_is_ascend_910_93())) {
-        ret = dcmi_check_a2_a3_device_reset_docker_permission();
+        (dcmi_board_chip_type_is_ascend_910b() || dcmi_board_chip_type_is_ascend_910_93() ||
+        dcmi_board_chip_type_is_ascend_910_95())) {
+        ret = dcmi_check_a2_a3_a5_device_reset_docker_permission();
         if (ret != DCMI_OK) {
-            gplog(LOG_ERR, "call dcmi_check_a2_a3_device_reset_docker_permission failed. err is %d.", ret);
+            gplog(LOG_ERR, "call dcmi_check_a2_a3_a5_device_reset_docker_permission failed. err is %d.", ret);
             return ret;
         }
     }
@@ -275,6 +287,25 @@ int dcmi_check_device_reset_vnpu_mode(int card_id)
     return DCMI_ERR_CODE_INNER_ERR;
 }
 
+static int execute_npu_reset(int card_id, int device_id, enum dcmi_reset_channel channel_type)
+{
+    int err;
+
+    switch (channel_type) {
+        case INBAND_CHANNEL:
+            err = dcmi_set_npu_device_reset_inband(card_id, device_id);
+            break;
+        case OUTBAND_CHANNEL:
+            err = dcmi_set_npu_device_reset_outband(card_id, device_id);
+            break;
+        default:
+            gplog(LOG_ERR, "channel_type %d is error.", channel_type);
+            return DCMI_ERR_CODE_NOT_SUPPORT;
+    }
+
+    return err;
+}
+
 int dcmi_set_device_reset(int card_id, int device_id, enum dcmi_reset_channel channel_type)
 {
     int err;
@@ -290,7 +321,8 @@ int dcmi_set_device_reset(int card_id, int device_id, enum dcmi_reset_channel ch
         return DCMI_ERR_CODE_INVALID_PARAMETER;
     }
 
-    if (card_id != ALL_DEVICE_RESET_CARD_ID || !dcmi_board_chip_type_is_ascend_910_93()) {
+    if (card_id != ALL_DEVICE_RESET_CARD_ID || 
+        !(dcmi_board_chip_type_is_ascend_910_93() || dcmi_board_chip_type_is_ascend_910_95_card())) {
         err = dcmi_get_device_type(card_id, device_id, &device_type);
         if (err != DCMI_OK) {
             gplog(LOG_ERR, "dcmi_get_device_type failed. err is %d.", err);
@@ -304,23 +336,12 @@ int dcmi_set_device_reset(int card_id, int device_id, enum dcmi_reset_channel ch
         return DCMI_ERR_CODE_NOT_SUPPORT;
     }
 
-    if (device_type == NPU_TYPE) {
-        switch (channel_type) {
-            case INBAND_CHANNEL:
-                err = dcmi_set_npu_device_reset_inband(card_id, device_id);
-                break;
-            case OUTBAND_CHANNEL:
-                err = dcmi_set_npu_device_reset_outband(card_id, device_id);
-                break;
-            default:
-                gplog(LOG_ERR, "channel_type %d is error.", channel_type);
-                return DCMI_ERR_CODE_NOT_SUPPORT;
-        }
-    } else {
+    if (device_type != NPU_TYPE) {
         gplog(LOG_OP, "device_type %d is not support.", device_type);
         return DCMI_ERR_CODE_NOT_SUPPORT;
     }
 
+    err = execute_npu_reset(card_id, device_id, channel_type);
     if (err != DCMI_OK) {
         gplog(LOG_OP, "reset failed. card_id=%d, device_id=%d, channel_type=%d, err=%d", card_id, device_id,
             channel_type, err);
@@ -581,6 +602,43 @@ int dcmi_check_device_cpld_version(int card_id)
     return ret;
 }
 
+int dcmi_pre_reset_brother_card_set_flag(int master_logic_id, int slaver_logic_id,
+                                        int brother_master_logic_id, int brother_slave_logic_id, int brother_card_id) 
+{
+    int ret;
+    ret = dsmi_hot_reset_atomic(master_logic_id, DSMI_SUBCMD_HOTRESET_SETFLAG);
+    if (ret != DSMI_OK) {
+        gplog(LOG_ERR, "call dsmi_hot_reset_atomic failed. err is %d.master_logic_id=%d", ret, master_logic_id);
+        return dcmi_convert_error_code(ret);
+    }
+    ret = dsmi_hot_reset_atomic(slaver_logic_id, DSMI_SUBCMD_HOTRESET_SETFLAG);
+    if (ret != DSMI_OK) {
+        (void)dsmi_hot_reset_atomic(master_logic_id, DSMI_SUBCMD_HOTRESET_CLEARFLAG);
+        gplog(LOG_ERR, "call dsmi_hot_reset_atomic failed. err is %d.slaver_logic_id=%d", ret, slaver_logic_id);
+        return dcmi_convert_error_code(ret);
+    }
+    if (brother_card_id != -1) {
+        ret = dsmi_hot_reset_atomic(brother_master_logic_id, DSMI_SUBCMD_HOTRESET_SETFLAG);
+        if (ret != DSMI_OK) {
+            (void)dsmi_hot_reset_atomic(master_logic_id, DSMI_SUBCMD_HOTRESET_CLEARFLAG);
+            (void)dsmi_hot_reset_atomic(slaver_logic_id, DSMI_SUBCMD_HOTRESET_CLEARFLAG);
+            gplog(LOG_ERR, "call dsmi_hot_reset_atomic failed. err is %d.brother_master_logic_id=%d",
+                ret, brother_master_logic_id);
+                return dcmi_convert_error_code(ret);
+            }
+            ret = dsmi_hot_reset_atomic(brother_slave_logic_id, DSMI_SUBCMD_HOTRESET_SETFLAG);
+            if (ret != DSMI_OK) {
+                (void)dsmi_hot_reset_atomic(master_logic_id, DSMI_SUBCMD_HOTRESET_CLEARFLAG);
+                (void)dsmi_hot_reset_atomic(slaver_logic_id, DSMI_SUBCMD_HOTRESET_CLEARFLAG);
+                (void)dsmi_hot_reset_atomic(brother_master_logic_id, DSMI_SUBCMD_HOTRESET_CLEARFLAG);
+                gplog(LOG_ERR, "call dsmi_hot_reset_atomic failed. err is %d.brother_slave_logic_id=%d",
+                    ret, brother_slave_logic_id);
+                return dcmi_convert_error_code(ret);
+        }
+    }
+    return dcmi_convert_error_code(ret);
+}
+
 int dcmi_pre_reset_brother_card_outbind(int card_id, int brother_card_id)
 {
     int ret ;
@@ -596,51 +654,29 @@ int dcmi_pre_reset_brother_card_outbind(int card_id, int brother_card_id)
         gplog(LOG_ERR, "get_logicid failed. err is %d. card_id =%d, brother_card_id=%d", ret, card_id, brother_card_id);
         return DCMI_ERR_CODE_INNER_ERR;
     }
- /* 依次判断4个device是否可以复位 */
-    ret = dsmi_hot_reset_atomic(master_logic_id, DSMI_SUBCMD_HOTRESET_SETFLAG);
-    if (ret != DSMI_OK) {
-        gplog(LOG_ERR, "call dsmi_hot_reset_atomic failed. err is %d.master_logic_id =%d", ret, master_logic_id);
-        return dcmi_convert_error_code(ret);
+
+    /* 依次判断4个device是否可以复位 */
+    ret = dcmi_pre_reset_brother_card_set_flag(master_logic_id, slaver_logic_id,
+                                                brother_master_logic_id, brother_slave_logic_id,brother_card_id);
+    if (ret != DCMI_OK) {
+        return ret;
     }
-    ret = dsmi_hot_reset_atomic(slaver_logic_id, DSMI_SUBCMD_HOTRESET_SETFLAG);
-    if (ret != DSMI_OK) {
-        dsmi_hot_reset_atomic(master_logic_id, DSMI_SUBCMD_HOTRESET_CLEARFLAG);
-        gplog(LOG_ERR, "call dsmi_hot_reset_atomic failed. err is %d.slaver_logic_id =%d", ret, slaver_logic_id);
-        return dcmi_convert_error_code(ret);
-    }
-    if (brother_card_id != -1) {
-        ret = dsmi_hot_reset_atomic(brother_master_logic_id, DSMI_SUBCMD_HOTRESET_SETFLAG);
-        if (ret != DSMI_OK) {
-            dsmi_hot_reset_atomic(master_logic_id, DSMI_SUBCMD_HOTRESET_CLEARFLAG);
-            dsmi_hot_reset_atomic(slaver_logic_id, DSMI_SUBCMD_HOTRESET_CLEARFLAG);
-            gplog(LOG_ERR, "call dsmi_hot_reset_atomic failed. err is %d.brother_master_logic_id =%d", ret, brother_master_logic_id);
-            return dcmi_convert_error_code(ret);
-        }
-        ret = dsmi_hot_reset_atomic(brother_slave_logic_id, DSMI_SUBCMD_HOTRESET_SETFLAG);
-        if (ret != DSMI_OK) {
-            dsmi_hot_reset_atomic(master_logic_id, DSMI_SUBCMD_HOTRESET_CLEARFLAG);
-            dsmi_hot_reset_atomic(slaver_logic_id, DSMI_SUBCMD_HOTRESET_CLEARFLAG);
-            dsmi_hot_reset_atomic(brother_master_logic_id, DSMI_SUBCMD_HOTRESET_CLEARFLAG);
-            gplog(LOG_ERR, "call dsmi_hot_reset_atomic failed. err is %d.brother_slave_logic_id =%d", ret, brother_slave_logic_id);
-            return dcmi_convert_error_code(ret);
-        }
-    }
+
     dcmi_npu_msn_env_clean(card_id);
-    dsmi_hot_reset_atomic(master_logic_id, DSMI_SUBCMD_HOTRESET_UNBIND);
-    dsmi_hot_reset_atomic(slaver_logic_id, DSMI_SUBCMD_HOTRESET_UNBIND);
+    (void)dsmi_hot_reset_atomic(master_logic_id, DSMI_SUBCMD_HOTRESET_UNBIND);
+    (void)dsmi_hot_reset_atomic(slaver_logic_id, DSMI_SUBCMD_HOTRESET_UNBIND);
     if (brother_card_id != -1) {
         dcmi_npu_msn_env_clean(brother_card_id);
-        dsmi_hot_reset_atomic(brother_master_logic_id, DSMI_SUBCMD_HOTRESET_UNBIND);
-        dsmi_hot_reset_atomic(brother_slave_logic_id, DSMI_SUBCMD_HOTRESET_UNBIND);
+        (void)dsmi_hot_reset_atomic(brother_master_logic_id, DSMI_SUBCMD_HOTRESET_UNBIND);
+        (void)dsmi_hot_reset_atomic(brother_slave_logic_id, DSMI_SUBCMD_HOTRESET_UNBIND);
     }
-    dsmi_hot_reset_atomic(slaver_logic_id, DSMI_SUBCMD_HOTRESET_REMOVE);
-    dsmi_hot_reset_atomic(master_logic_id, DSMI_SUBCMD_HOTRESET_REMOVE);
+    (void)dsmi_hot_reset_atomic(slaver_logic_id, DSMI_SUBCMD_HOTRESET_REMOVE);
+    (void)dsmi_hot_reset_atomic(master_logic_id, DSMI_SUBCMD_HOTRESET_REMOVE);
     if (brother_card_id != -1) {
-        dsmi_hot_reset_atomic(brother_slave_logic_id, DSMI_SUBCMD_HOTRESET_REMOVE);
-        dsmi_hot_reset_atomic(brother_master_logic_id, DSMI_SUBCMD_HOTRESET_REMOVE);
+        (void)dsmi_hot_reset_atomic(brother_slave_logic_id, DSMI_SUBCMD_HOTRESET_REMOVE);
+        (void)dsmi_hot_reset_atomic(brother_master_logic_id, DSMI_SUBCMD_HOTRESET_REMOVE);
     }
     return 0;
-
 }
 
 int dcmi_pre_reset_device(int card_id, int brother_card_id, int id)
@@ -927,7 +963,6 @@ void dcmi_npu_msn_env_clean(int cardId)
 {
     int ret, logicId = 0;
     char clean_cmd[MAX_LINE_LENGTH] = {0};
-    dcmi_get_device_logic_id(&logicId, cardId, 0);
     if (cardId == -1) {
         // kill 所有 msn日志传输进程
         ret = sprintf_s(clean_cmd, MAX_LINE_LENGTH,
@@ -1080,7 +1115,7 @@ int dcmi_get_pid_and_proc_name(char *buffer, char *process_name, int *pid, int *
             ret = memcpy_s(process_name, sizeof(char) * tmp_copy_len, token, sizeof(char) * tmp_copy_len);
             if (ret != 0) {
                 gplog(LOG_ERR, "call memcpy_s failed, err is %d.", ret);
-                return ret;
+                return DCMI_ERR_CODE_MEM_OPERATE_FAIL;
             }
             process_name[tmp_copy_len] = '\0';
         } else if (para_index == WHITE_PROC_PID_OFFSET) {
@@ -1132,7 +1167,7 @@ STATIC int dcmi_check_is_valid_string(char *buffer, int *pid, int buffer_size, b
         return ret;
     }
     if (!found_flag) {
-        gplog(LOG_INFO, "Can't match this pid and process_name");
+        gplog(LOG_INFO, "Can't match this pid %d and process_name", tmp_pid);
         return DCMI_OK;
     }
 
@@ -1142,32 +1177,68 @@ STATIC int dcmi_check_is_valid_string(char *buffer, int *pid, int buffer_size, b
     return DCMI_OK;
 }
 
-int dcmi_kill_white_process(int pid)
+int dcmi_check_if_occupy_proc_exist(OCCUPIED_PROC_INFO *info, bool *need_kill)
 {
+    int i;
     int ret;
-    int try_cnt = 0;
+    bool tmp_flag = false;
 
-    while (try_cnt < KILL_MAX_TRY_CNT) {
-        ret = kill(pid, SIGKILL);
-        if (ret != DCMI_OK) {
-            gplog(LOG_INFO, "Failed to kill process(%d), try_cnt = %d", pid, try_cnt);
+    for (i = 0;i < info->pid_cnt; i++) {
+        if (info->state[i] == PROC_STATE_DEAD) {
+            continue;
+        }
+        ret = kill(info->pid[i], 0);
+        if (ret == -1) {
+            info->state[i] = PROC_STATE_DEAD;
+            gplog(LOG_INFO, "PID %d Has been successfully terminated", info->pid[i]);
+            continue;
+        } else if (ret == 0) {
+            gplog(LOG_INFO, "PID %d is still alive", info->pid[i]);
+            tmp_flag = true;
+        } else {
+            gplog(LOG_ERR, "Failed to send the zero signal to the process(%d)", info->pid[i]);
             return DCMI_ERR_CODE_INNER_ERR;
         }
+    }
 
+    *need_kill = tmp_flag;
+    return DCMI_OK;
+}
+
+int dcmi_kill_all_occupy_npu_proc(OCCUPIED_PROC_INFO *info)
+{
+    int i;
+    int try_cnt = 0;
+    int ret;
+    bool need_kill = true;
+    while (try_cnt < KILL_MAX_TRY_CNT && need_kill) {
+        for (i = 0; i < info->pid_cnt; i++) {
+            if (info->state[i] == PROC_STATE_DEAD) {
+                continue;
+            }
+
+            ret = kill(info->pid[i], 0);
+            if (ret != 0) {
+                info->state[i] = PROC_STATE_DEAD;
+                gplog(LOG_INFO, "this process is dead! pid = %d", info->pid[i]);
+                continue;
+            }
+
+            ret = kill(info->pid[i], SIGKILL);
+            if (ret != 0) {
+                gplog(LOG_INFO, "Failed to kill process(%d), try_cnt = %d", info->pid[i], try_cnt);
+                return DCMI_ERR_CODE_INNER_ERR;
+            }
+        }
         sleep(WHITE_PROC_KILL_WAIT_TIME);
-        ret = kill(pid, 0);
-        if (ret == -1) {
-            gplog(LOG_INFO, "PID %d Has been successfully terminated", pid);
-            return DCMI_OK;
-        } else if (ret == 0) {
-            gplog(LOG_INFO, "PID %d is still alive", pid);
-        } else {
-            gplog(LOG_ERR, "Failed to send the zero signal to the process(%d)", pid);
-            return DCMI_ERR_CODE_INNER_ERR;
+
+        ret = dcmi_check_if_occupy_proc_exist(info, &need_kill);
+        if (ret != DCMI_OK) {
+            gplog(LOG_ERR, "call dcmi_check_if_occupy_proc_exist fail! ret = %d", ret);
+            return ret;
         }
         try_cnt++;
     }
-
     return DCMI_OK;
 }
 
@@ -1303,8 +1374,8 @@ bool dcmi_check_is_in_white_proc(WHITE_PROC_INFO proc_info, int pid)
     return FALSE;
 }
 
-int dcmi_kill_current_device_proc(WHITE_PROC_INFO proc_info,
-                                  int card_id, int device_id)
+int dcmi_get_current_device_proc(WHITE_PROC_INFO proc_info,
+                                  int card_id, int device_id, OCCUPIED_PROC_INFO *info)
 {
     int ret;
     int pid = -1;
@@ -1331,29 +1402,33 @@ int dcmi_kill_current_device_proc(WHITE_PROC_INFO proc_info,
         return ret;
     }
 
+    if (proc_num == 0) {
+        gplog(LOG_INFO, "this device is not occupying. card_id = %d, device_id = %d", card_id, device_id);
+    }
+
     for (proc_index = 0; proc_index < proc_num; proc_index++) {
         pid = chip_proc_info[proc_index].proc_id;
+        gplog(LOG_INFO, "this process is occupying npu. pid = %d", pid);
         is_white_proc_flag = dcmi_check_is_in_white_proc(proc_info, pid);
         if (is_white_proc_flag == TRUE) {
-            ret = dcmi_kill_white_process(pid);
-            if (ret != DCMI_OK) {
-                gplog(LOG_ERR, "call dcmi_kill_white_process failed, err is %d.", ret);
-            }
+            info->pid[info->pid_cnt] = pid;
+            info->state[info->pid_cnt] = PROC_STATE_ALIVE;
+            info->pid_cnt++;
         }
     }
 
     return DCMI_OK;
 }
 
-int dcmi_kill_current_card_proc(WHITE_PROC_INFO proc_info, int card_id, int chip_count)
+int dcmi_get_current_card_proc(WHITE_PROC_INFO proc_info, int card_id, int chip_count, OCCUPIED_PROC_INFO *info)
 {
     int ret;
     int chip_index;
 
     for (chip_index = 0; chip_index < chip_count; chip_index++) {
-        ret = dcmi_kill_current_device_proc(proc_info, card_id, chip_index);
+        ret = dcmi_get_current_device_proc(proc_info, card_id, chip_index, info);
         if (ret != DCMI_OK) {
-            gplog(LOG_ERR, "dcmi_kill_current_device_proc failed. err is %d", ret);
+            gplog(LOG_ERR, "dcmi_get_current_device_proc failed. err is %d", ret);
             return ret;
         }
     }
@@ -1371,6 +1446,7 @@ int dcmi_kill_occupy_npu_proc(WHITE_PROC_INFO proc_info)
     int card_index;
     int card_num;
     int card_id_list[MAX_CARD_NUM] = {0};
+    OCCUPIED_PROC_INFO info = {0};
 
     // 获取当前所有卡的信息和die数量
     ret = dcmi_get_card_list(&card_num, card_id_list, MAX_CARD_NUM);
@@ -1387,11 +1463,21 @@ int dcmi_kill_occupy_npu_proc(WHITE_PROC_INFO proc_info)
             gplog(LOG_ERR, "dcmi_get_device_id_in_card failed. err is %d", ret);
             return ret;
         }
-        ret = dcmi_kill_current_card_proc(proc_info, card_id, chip_count);
+        ret = dcmi_get_current_card_proc(proc_info, card_id, chip_count, &info);
         if (ret != DCMI_OK) {
-            gplog(LOG_ERR, "dcmi_kill_current_device_proc failed. err is %d", ret);
+            gplog(LOG_ERR, "dcmi_get_current_card_proc failed. err is %d", ret);
             return ret;
         }
+    }
+
+    if (info.pid_cnt == 0) {
+        gplog(LOG_INFO, "no process need kill");
+    }
+
+    ret = dcmi_kill_all_occupy_npu_proc(&info);
+    if (ret != DCMI_OK) {
+        gplog(LOG_ERR, "dcmi_kill_all_occupy_npu_proc failed. err is %d", ret);
+        return ret;
     }
 
     return DCMI_OK;
@@ -1416,16 +1502,11 @@ int dcmi_clear_running_proc()
     return DCMI_OK;
 }
 
-int dcmi_reset_brother_card(int card_id, int device_id, int device_logic_id)
+int dcmi_reset_brother_card(int card_id, int brother_card_id)
 {
     int ret ;
-    int brother_card_id;
     int master_logic_id, slaver_logic_id, brother_master_logic_id, brother_slave_logic_id;
-    ret = dcmi_get_netdev_brother_device(card_id, device_id, &brother_card_id);
-    if (ret != 0) {
-        gplog(LOG_ERR, "get_net_dev_brother_device failed. err is %d.", ret);
-        return ret;
-    }
+
     ret = dcmi_get_device_logic_id(&master_logic_id, card_id, 0);
     ret |= dcmi_get_device_logic_id(&slaver_logic_id, card_id, 1);
     if (brother_card_id != -1) {
@@ -1436,64 +1517,43 @@ int dcmi_reset_brother_card(int card_id, int device_id, int device_logic_id)
         gplog(LOG_ERR, "get_logicid failed. err is %d. card_id=%d, brother_card_id=%d", ret, card_id, brother_card_id);
         return DCMI_ERR_CODE_INNER_ERR;
     }
+
     /* 依次判断4个device是否可以复位 */
-    ret = dsmi_hot_reset_atomic(master_logic_id, DSMI_SUBCMD_HOTRESET_SETFLAG);
-    if (ret != DSMI_OK) {
-        gplog(LOG_ERR, "call dsmi_hot_reset_atomic failed. err is %d.master_logic_id =%d", ret, master_logic_id);
-        return dcmi_convert_error_code(ret);
+    ret = dcmi_pre_reset_brother_card_set_flag(master_logic_id, slaver_logic_id,
+                                                brother_master_logic_id, brother_slave_logic_id, brother_card_id);
+    if (ret != DCMI_OK) {
+        return ret;
     }
-    ret = dsmi_hot_reset_atomic(slaver_logic_id, DSMI_SUBCMD_HOTRESET_SETFLAG);
-    if (ret != DSMI_OK) {
-        dsmi_hot_reset_atomic(master_logic_id, DSMI_SUBCMD_HOTRESET_CLEARFLAG);
-        gplog(LOG_ERR, "call dsmi_hot_reset_atomic failed. err is %d.slaver_logic_id =%d", ret, slaver_logic_id);
-        return dcmi_convert_error_code(ret);
-    }
-    if (brother_card_id != -1) {
-        ret = dsmi_hot_reset_atomic(brother_master_logic_id, DSMI_SUBCMD_HOTRESET_SETFLAG);
-        if (ret != DSMI_OK) {
-            dsmi_hot_reset_atomic(master_logic_id, DSMI_SUBCMD_HOTRESET_CLEARFLAG);
-            dsmi_hot_reset_atomic(slaver_logic_id, DSMI_SUBCMD_HOTRESET_CLEARFLAG);
-            gplog(LOG_ERR, "call dsmi_hot_reset_atomic failed. err is %d.brother_master_logic_id =%d", ret, brother_master_logic_id);
-            return dcmi_convert_error_code(ret);
-        }
-        ret = dsmi_hot_reset_atomic(brother_slave_logic_id, DSMI_SUBCMD_HOTRESET_SETFLAG);
-        if (ret != DSMI_OK) {
-            dsmi_hot_reset_atomic(master_logic_id, DSMI_SUBCMD_HOTRESET_CLEARFLAG);
-            dsmi_hot_reset_atomic(slaver_logic_id, DSMI_SUBCMD_HOTRESET_CLEARFLAG);
-            dsmi_hot_reset_atomic(brother_master_logic_id, DSMI_SUBCMD_HOTRESET_CLEARFLAG);
-            gplog(LOG_ERR, "call dsmi_hot_reset_atomic failed. err is %d.brother_slave_logic_id =%d", ret, brother_slave_logic_id);
-            return dcmi_convert_error_code(ret);
-        }
-    }
+
     dcmi_npu_msn_env_clean(card_id);
-    dsmi_hot_reset_atomic(master_logic_id, DSMI_SUBCMD_HOTRESET_UNBIND);
-    dsmi_hot_reset_atomic(slaver_logic_id, DSMI_SUBCMD_HOTRESET_UNBIND);
+    (void)dsmi_hot_reset_atomic(master_logic_id, DSMI_SUBCMD_HOTRESET_UNBIND);
+    (void)dsmi_hot_reset_atomic(slaver_logic_id, DSMI_SUBCMD_HOTRESET_UNBIND);
     if (brother_card_id != -1) {
         dcmi_npu_msn_env_clean(brother_card_id);
-        dsmi_hot_reset_atomic(brother_master_logic_id, DSMI_SUBCMD_HOTRESET_UNBIND);
-        dsmi_hot_reset_atomic(brother_slave_logic_id, DSMI_SUBCMD_HOTRESET_UNBIND);
+        (void)dsmi_hot_reset_atomic(brother_master_logic_id, DSMI_SUBCMD_HOTRESET_UNBIND);
+        (void)dsmi_hot_reset_atomic(brother_slave_logic_id, DSMI_SUBCMD_HOTRESET_UNBIND);
     }
-    dsmi_hot_reset_atomic(slaver_logic_id, DSMI_SUBCMD_HOTRESET_REMOVE);
+    (void)dsmi_hot_reset_atomic(slaver_logic_id, DSMI_SUBCMD_HOTRESET_REMOVE);
     if (brother_card_id != -1) {
-        dsmi_hot_reset_atomic(brother_slave_logic_id, DSMI_SUBCMD_HOTRESET_REMOVE);
+        (void)dsmi_hot_reset_atomic(brother_slave_logic_id, DSMI_SUBCMD_HOTRESET_REMOVE);
     }
-    dsmi_hot_reset_atomic(master_logic_id, DSMI_SUBCMD_HOTRESET_RESET);
+    (void)dsmi_hot_reset_atomic(master_logic_id, DSMI_SUBCMD_HOTRESET_RESET);
 
     if (brother_card_id != -1) {
-        dsmi_hot_reset_atomic(brother_master_logic_id, DSMI_SUBCMD_HOTRESET_RESET);
+        (void)dsmi_hot_reset_atomic(brother_master_logic_id, DSMI_SUBCMD_HOTRESET_RESET);
     }
     /* 兄弟卡复位多增加2秒 */
     sleep(2);
-    dsmi_hot_reset_atomic(master_logic_id, DSMI_SUBCMD_HOTRESET_REMOVE);
+    (void)dsmi_hot_reset_atomic(master_logic_id, DSMI_SUBCMD_HOTRESET_REMOVE);
     if (brother_card_id != -1) {
-        dsmi_hot_reset_atomic(brother_master_logic_id, DSMI_SUBCMD_HOTRESET_REMOVE);
+        (void)dsmi_hot_reset_atomic(brother_master_logic_id, DSMI_SUBCMD_HOTRESET_REMOVE);
     }
 
-    dsmi_hot_reset_atomic(slaver_logic_id, DSMI_SUBCMD_HOTRESET_RESCAN);
-    dsmi_hot_reset_atomic(master_logic_id, DSMI_SUBCMD_HOTRESET_RESCAN);
+    (void)dsmi_hot_reset_atomic(slaver_logic_id, DSMI_SUBCMD_HOTRESET_RESCAN);
+    (void)dsmi_hot_reset_atomic(master_logic_id, DSMI_SUBCMD_HOTRESET_RESCAN);
     if (brother_card_id != -1) {
-        dsmi_hot_reset_atomic(brother_slave_logic_id, DSMI_SUBCMD_HOTRESET_RESCAN);
-        dsmi_hot_reset_atomic(brother_master_logic_id, DSMI_SUBCMD_HOTRESET_RESCAN);
+        (void)dsmi_hot_reset_atomic(brother_slave_logic_id, DSMI_SUBCMD_HOTRESET_RESCAN);
+        (void)dsmi_hot_reset_atomic(brother_master_logic_id, DSMI_SUBCMD_HOTRESET_RESCAN);
     }
     return 0;
 }
@@ -1526,7 +1586,7 @@ STATIC int dcmi_get_hccs_status_inband(int card_id, int device_id, int *hccs_sta
             return DCMI_ERR_CODE_INVALID_PARAMETER;
         }
 
-        if (!(dcmi_board_chip_type_is_ascend_910_93() &&
+        if (!((dcmi_board_chip_type_is_ascend_910_93() || dcmi_board_chip_type_is_ascend_910_95()) &&
             (dcmi_is_in_phy_machine_root() || dcmi_check_run_in_privileged_docker()))) {
             gplog(LOG_ERR, "This card_id is not supported in this scenario.");
             return DCMI_ERR_CODE_INVALID_PARAMETER;
@@ -1680,7 +1740,7 @@ int dcmi_reset_smp_card(int card_id, int device_id)
 
 int dcmi_set_npu_device_reset_inband(int card_id, int device_id)
 {
-    int ret, device_logic_id = 0, hccs_status = HCCS_OFF;
+    int ret, device_logic_id = 0, brother_card_id = 0, hccs_status = HCCS_OFF;
 
     if (dcmi_board_type_is_card() != TRUE && dcmi_board_type_is_server() != TRUE &&
         dcmi_board_type_is_model() != TRUE) {
@@ -1707,7 +1767,8 @@ int dcmi_set_npu_device_reset_inband(int card_id, int device_id)
         return hccs_reset_all();
     }
 
-    if (dcmi_board_chip_type_is_ascend_910_93() || dcmi_board_chip_type_is_ascend_910b()) {
+    if (dcmi_board_chip_type_is_ascend_910_93() || dcmi_board_chip_type_is_ascend_910b() ||
+        dcmi_board_chip_type_is_ascend_910_95()) {
         ret = dcmi_clear_running_proc();
         if (ret != 0) {
             gplog(LOG_ERR, "call dcmi_clear_running_proc failed, card_id=%d. err is %d.", card_id, ret);
@@ -1716,30 +1777,21 @@ int dcmi_set_npu_device_reset_inband(int card_id, int device_id)
     }
 
     if (dcmi_board_chip_type_is_ascend_910_93()) {
-        return dcmi_reset_brother_card(card_id, device_id, device_logic_id);
+        ret = dcmi_get_netdev_brother_device(card_id, device_id, &brother_card_id);
+        if (ret != 0) {
+            gplog(LOG_ERR, "dcmi_get_netdev_brother_device failed. err is %d.", ret);
+            return ret;
+        }
+        return dcmi_reset_brother_card(card_id, brother_card_id);
     }
-
-    if (dcmi_board_chip_type_is_ascend_910()) {
-        return dcmi_reset_smp_card(card_id, device_id);
-    }
-
     dcmi_npu_msn_env_clean(card_id);
-#ifndef _WIN32
-    ret = dsmi_hot_reset_atomic(device_logic_id, DSMI_SUBCMD_HOTRESET_ASSEMBLE);
-    if (ret != DSMI_OK) {
-        gplog(LOG_ERR, "call dsmi_hot_reset_atomic failed. err is %d.", ret);
-    }
-#else
-    ret = dsmi_hot_reset_soc(device_logic_id);
-    if (ret != DSMI_OK) {
-        gplog(LOG_ERR, "call dsmi_hot_reset_soc failed. err is %d.", ret);
-    }
-#endif
-    else {
+
+    ret = dcmi_call_dsmi_hot_reset(device_logic_id);
+    if (ret == DCMI_OK) {
         gplog(LOG_OP, "Resetting npu successfully by inband. card_id=%d, device_id=%d.", card_id, device_id);
     }
 
-    return dcmi_convert_error_code(ret);
+    return ret;
 }
 
 int dcmi_get_npu_device_outband_id(int card_id, int device_id, int *outband_id)

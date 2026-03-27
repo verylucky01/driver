@@ -21,17 +21,7 @@
 
 #define NSEC_PER_SEC                                1000000000
 
-THREAD volatile uint64_t g_svm_module_used_size[MEM_STATS_DEVICE_CNT][MEM_STATS_MAX_MODULE_ID];
 static THREAD uint32_t g_timestamp_mode = 1; /* Default is cpu_cycle_count */
-
-void dp_proc_mng_module_used_size_update(uint32_t devid, uint32_t module_id, uint64_t size)
-{
-    if ((devid >= MEM_STATS_DEVICE_CNT) || (module_id >= MEM_STATS_MAX_MODULE_ID)) {
-        return;
-    }
-
-    g_svm_module_used_size[devid][module_id] = size;
-}
 
 #if defined(__x86_64__)
 static uint64_t get_rdtsc(void)
@@ -112,7 +102,7 @@ int dp_proc_mng_mem_stats_sample(struct module_mem_info *mem_info, uint32_t num,
 
     for (module_id = 0; module_id < MEM_STATS_MAX_MODULE_ID; ++module_id) {
         mem_info[module_id].module_id = module_id;
-        mem_info[module_id].total_size = g_svm_module_used_size[devid][module_id];
+        mem_info[module_id].total_size = dp_proc_mng_get_module_used_size(devid, module_id);
     }
 
     ret = dp_proc_mng_update_mbuff_and_process_mem_stats(mem_info, devid);
@@ -142,7 +132,7 @@ int dp_proc_mng_prof_sample_fun(struct prof_sample_para *para)
     for (mem_module_id = 0; mem_module_id < MEM_STATS_MAX_MODULE_ID; ++mem_module_id) {
         mem_info[mem_module_id].module_id = mem_module_id;
         mem_info[mem_module_id].timestamp = timestamp;
-        mem_info[mem_module_id].total_size = g_svm_module_used_size[dev_id][mem_module_id];
+        mem_info[mem_module_id].total_size = dp_proc_mng_get_module_used_size(dev_id, mem_module_id);
     }
 
 #ifndef DRV_HOST

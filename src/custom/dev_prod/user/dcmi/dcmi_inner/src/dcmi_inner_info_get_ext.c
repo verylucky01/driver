@@ -252,6 +252,45 @@ int dcmi_get_npu_device_elable_info(int card_id, int device_id, struct dcmi_elab
     return DCMI_OK;
 }
 
+int dcmi_ao_get_npu_device_elabel_info(int card_id, int device_id, struct dcmi_elabel_info *elabel_info)
+{
+    int err;
+
+    if (elabel_info == NULL) {
+        gplog(LOG_ERR, "elabel_info is invalid.");
+        return DCMI_ERR_CODE_INVALID_PARAMETER;
+    }
+
+    err = dcmi_ao_get_elabel_info(card_id, device_id, ELABEL_ITEM_ID_910_95_BOARD_PRODUCT_NAME,
+         elabel_info->product_name, MAX_LENTH);
+    if (err != DCMI_OK || strlen(elabel_info->product_name) == 0) {
+        gplog(LOG_ERR, "dcmi_ao_get_elabel_info product name failed.err is %d.", err);
+        dcmi_set_default_elabel_str(elabel_info->product_name, sizeof(elabel_info->product_name));
+    }
+
+    err = dcmi_ao_get_elabel_info(card_id, device_id, ELABEL_ITEM_ID_910_95_BOARD_MODEL, elabel_info->model, MAX_LENTH);
+    if (err != DCMI_OK || strlen(elabel_info->model) == 0) {
+        gplog(LOG_ERR, "dcmi_ao_get_elabel_info model failed.err is %d.", err);
+        dcmi_set_default_elabel_str(elabel_info->model, sizeof(elabel_info->model));
+    }
+
+    err = dcmi_ao_get_elabel_info(card_id, device_id, ELABEL_ITEM_ID_910_95_BOARD_MANUFACTURER,
+          elabel_info->manufacturer, MAX_LENTH);
+    if (err != DCMI_OK || strlen(elabel_info->manufacturer) == 0) {
+        gplog(LOG_ERR, "dcmi_ao_get_elabel_info manufacturer failed.err is %d.", err);
+        dcmi_set_default_elabel_str(elabel_info->manufacturer, sizeof(elabel_info->manufacturer));
+    }
+
+    err = dcmi_ao_get_elabel_info(card_id, device_id, ELABEL_ITEM_ID_910_95_BOARD_SERIAL_NUMBER,
+          elabel_info->serial_number, MAX_LENTH);
+    if (err != DCMI_OK || strlen(elabel_info->serial_number) == 0) {
+        gplog(LOG_ERR, "dcmi_ao_get_elabel_info serial_number failed.err is %d.", err);
+        dcmi_set_default_elabel_str(elabel_info->serial_number, sizeof(elabel_info->serial_number));
+    }
+
+    return DCMI_OK;
+}
+
 int dcmi_get_npu_device_share_enable(int card_id, int device_id, int *enable_flag)
 {
     int err;
@@ -860,4 +899,25 @@ int dcmi_get_custom_op_secverify_mode(int card_id, int device_id, unsigned int *
     }
 
     return DCMI_OK;
+}
+
+int dcmi_get_npu_ub_port_link_status_info(int card_id, int device_id, struct dcmi_ub_port_link_status *ub_status)
+{
+    int ret;
+    int device_logic_id = 0;
+    unsigned int out_size = sizeof(struct dcmi_ub_port_link_status);
+
+    ret = dcmi_get_device_logic_id(&device_logic_id, card_id, device_id);
+    if (ret != DCMI_OK) {
+        gplog(LOG_ERR, "call dcmi_get_device_logic_id failed. err is %d.", ret);
+        return ret;
+    }
+
+    ret = dsmi_get_device_info(device_logic_id, DSMI_MAIN_CMD_UB, DSMI_UB_INFO_SUB_CMD_PORT_STATUS, 
+        (void *)ub_status, &out_size);
+    if ((ret != DSMI_OK) && (ret != DSMI_ERR_NOT_SUPPORT)) {
+        gplog(LOG_ERR, "call dsmi_get_device_info failed. err is %d.", ret);
+    }
+
+    return dcmi_convert_error_code(ret);
 }

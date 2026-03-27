@@ -70,7 +70,7 @@
 
 **约束说明<a name="zh-cn_topic_0000001251307175_zh-cn_topic_0000001178054648_zh-cn_topic_0000001148439041_toc533412082"></a>**
 
-带外标卡复位功能依赖ipmitool软件，需要提前下载并加载驱动。详细操作请参见[准备ipmitool软件](faq.md#准备ipmitool软件)章节。
+带外标卡复位功能依赖ipmitool软件，需要提前下载并加载驱动。详细操作请参见[准备ipmitool软件](准备ipmitool软件.md)章节。
 
 该接口在后续版本将会删除，推荐使用[dcmi\_set\_device\_pre\_reset](dcmi_set_device_pre_reset.md)。
 
@@ -158,7 +158,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001251307175_zh-cn_topic_0000001178054648_zh-cn_topic_0000001148439041_toc533412083"></a>**
 
-```c
+```
 … 
 int ret = 0;
 int card_id = 0;
@@ -170,3 +170,4 @@ if (ret != 0) {
 }
 …
 ```
+

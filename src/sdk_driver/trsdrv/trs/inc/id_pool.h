@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,6 +14,7 @@
 #define ID_POOL_H
 
 #include <linux/types.h>
+#include "ka_compiler_pub.h"
 
 #include "trs_pub_def.h"
 
@@ -34,10 +35,10 @@ struct id_pool_attr {
 
 int id_pool_get_total_num(struct id_pool_inst *inst, int type, u32 *id_total_num);
 
-int id_pool_alloc(struct id_pool_inst *inst, int type, u32 *id, u32 *num);
+int id_pool_alloc(struct id_pool_inst *inst, int type, u32 *id, u32 num);
 void id_pool_free(struct id_pool_inst *inst, int type, u32 *id, u32 num);
 
-int id_pool_alloc_by_range(struct id_pool_inst *inst, int type, u32 start, u32 end, u32 *id);
+int id_pool_alloc_by_range(struct id_pool_inst *inst, int type, u32 start, u32 end, u32 *id, u32 num);
 
 int id_pool_register(struct id_pool_inst *inst, int type, struct id_pool_attr *attr);
 void id_pool_unregister(struct id_pool_inst *inst, int type, struct id_pool_attr *attr);
@@ -64,8 +65,8 @@ static inline void id_pool_attr_pack(struct id_pool_attr *attr, bool tunable, u3
     attr->id_total_num = id_total_num;
 }
 
-int __init init_id_pool(void);
-void __exit exit_id_pool(void);
+int __ka_init init_id_pool(void);
+void __ka_exit exit_id_pool(void);
 
 int id_pool_setup_init(void);
 void id_pool_setup_uninit(void);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,21 +14,17 @@
 #ifndef __DMS_KERNEL_VERSION_ADAPT_H__
 #define __DMS_KERNEL_VERSION_ADAPT_H__
 
-#include <linux/version.h>
-
 #include "kernel_version_adapt.h"
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0)
-#include <linux/time.h>
-#include <linux/time64.h>
-#include <linux/timekeeping.h>
+#include "ka_system_pub.h"
 
-static inline void do_gettimeofday(struct timeval *tv)
+static inline void do_gettimeofday(ka_timeval_t *tv)
 {
-    struct timespec64 ts;
-    ktime_get_real_ts64(&ts);
+    ka_timespec64_t ts;
+    ka_system_ktime_get_real_ts64(&ts);
     tv->tv_sec = ts.tv_sec;
-    tv->tv_usec = ts.tv_nsec / NSEC_PER_USEC;
+    tv->tv_usec = ts.tv_nsec / KA_NSEC_PER_USEC;
 }
 
 #endif

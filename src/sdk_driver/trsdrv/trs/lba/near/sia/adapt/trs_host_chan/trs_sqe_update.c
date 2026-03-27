@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -41,14 +41,14 @@ int devdrv_dma_link_free(struct devdrv_dma_prepare *dma_prepare)
     return -1;
 }
 
-dma_addr_t hal_kernel_devdrv_dma_map_page(ka_device_t *dev, ka_page_t *page,
-    size_t offset, size_t size, enum dma_data_direction dir)
+ka_dma_addr_t hal_kernel_devdrv_dma_map_page(ka_device_t *dev, ka_page_t *page,
+    size_t offset, size_t size, ka_dma_data_direction_t dir)
 {
-    return (dma_addr_t)NULL;
+    return (ka_dma_addr_t)NULL;
 }
 
-void hal_kernel_devdrv_dma_unmap_page(ka_device_t *dev, dma_addr_t addr, size_t size,
-    enum dma_data_direction dir)
+void hal_kernel_devdrv_dma_unmap_page(ka_device_t *dev, ka_dma_addr_t addr, size_t size,
+    ka_dma_data_direction_t dir)
 {
 }
 #endif
@@ -69,7 +69,7 @@ static KA_TASK_DEFINE_RWLOCK(trs_rb_desc_lock);
 
 struct trs_security_src_info {
     ka_page_t *src_pages;
-    dma_addr_t dma_addr;
+    ka_dma_addr_t dma_addr;
     u32 size;
     bool is_src_secure;
 };
@@ -125,12 +125,12 @@ static void trs_rb_info_put(struct trs_rb_info *rb_info)
     kref_safe_put(&rb_info->ref, trs_rb_info_release);
 }
 
-static bool trs_rb_root_is_empty(struct rb_root *root) {
+static bool trs_rb_root_is_empty(ka_rb_root_t *root) {
     return KA_BASE_RB_EMPTY_ROOT(root);
 }
 
 typedef u64 (*rb_handle_func)(ka_rb_node_t *node);
-static int trs_rb_insert(struct rb_root *root, ka_rb_node_t *node, rb_handle_func get_handle)
+static int trs_rb_insert(ka_rb_root_t *root, ka_rb_node_t *node, rb_handle_func get_handle)
 {
     ka_rb_node_t **cur_node = &root->rb_node;
     ka_rb_node_t *parent = NULL;
@@ -176,7 +176,7 @@ static ka_rb_node_t *trs_rb_search(ka_rb_root_t *root, u64 handle, rb_handle_fun
     return NULL;
 }
 
-static int trs_rb_erase(struct rb_root *root, ka_rb_node_t *node)
+static int trs_rb_erase(ka_rb_root_t *root, ka_rb_node_t *node)
 {
     int ret = -ENODEV;
 
@@ -239,7 +239,7 @@ static int trs_dma_desc_node_create(u32 devid, struct trs_dma_desc_addr_info *ad
         return -ENXIO;
     }
 
-    node = trs_vmalloc(sizeof(struct trs_dma_desc_node), KA_GFP_KERNEL | __KA_GFP_ACCOUNT, PAGE_KERNEL);
+    node = trs_vmalloc(sizeof(struct trs_dma_desc_node), KA_GFP_KERNEL | __KA_GFP_ACCOUNT, KA_PAGE_KERNEL);
     if (node == NULL) {
         trs_rb_info_put(rb_info);
         trs_err("Vzalloc failed.\n");
@@ -369,8 +369,8 @@ static int trs_check_alloc_src_security_dma_addr(u32 devid, struct trs_dma_desc_
         return -EFAULT;
     }
 
-    src_info->dma_addr = hal_kernel_devdrv_dma_map_page(dev, tmp_pages, 0, addr_info->size, DMA_BIDIRECTIONAL);
-    if (dma_mapping_error(dev, src_info->dma_addr)) {
+    src_info->dma_addr = hal_kernel_devdrv_dma_map_page(dev, tmp_pages, 0, addr_info->size, KA_DMA_BIDIRECTIONAL);
+    if (ka_mm_dma_mapping_error(dev, src_info->dma_addr)) {
         __ka_mm_free_pages(tmp_pages, ka_mm_get_order(addr_info->size));
         trs_err("Dma map va failed. (size=%u)\n", addr_info->size);
         return -ENOMEM;
@@ -392,7 +392,7 @@ static void trs_check_free_src_security_dma_addr(u32 devid, struct trs_security_
 
     dev = hal_kernel_devdrv_get_pci_dev_by_devid(devid);
     if (dev != NULL) {
-        hal_kernel_devdrv_dma_unmap_page(dev, src_info->dma_addr, src_info->size, DMA_BIDIRECTIONAL);
+        hal_kernel_devdrv_dma_unmap_page(dev, src_info->dma_addr, src_info->size, KA_DMA_BIDIRECTIONAL);
     }
 
     if (src_info->src_pages != NULL) {
@@ -506,7 +506,7 @@ static struct trs_dma_desc_node *trs_dma_desc_node_del_one_by_sqid(u32 devid, u3
 
     trs_rb_get_root_index(sqid, &root_index);
     ka_task_spin_lock_bh(&rb_info->spinlock);
-    rbtree_postorder_for_each_entry_safe(pos, tmp, &rb_info->root[root_index], desc_node) {
+    ka_base_rbtree_postorder_for_each_entry_safe(pos, tmp, &rb_info->root[root_index], desc_node) {
         if (pos->sqid == sqid) {
             (void)trs_rb_erase(&rb_info->root[root_index], &pos->desc_node);
             rb_info->rb_cnt--;
@@ -555,7 +555,7 @@ static struct trs_dma_desc_node *trs_dma_desc_node_del_one_from_root(struct trs_
     struct trs_dma_desc_node *tmp = NULL;
 
     ka_task_spin_lock_bh(&rb_info->spinlock);
-    rbtree_postorder_for_each_entry_safe(pos, tmp, &rb_info->root[root_index], desc_node) {
+    ka_base_rbtree_postorder_for_each_entry_safe(pos, tmp, &rb_info->root[root_index], desc_node) {
         if (pos != NULL) {
             (void)trs_rb_erase(&rb_info->root[root_index], &pos->desc_node);
             rb_info->rb_cnt--;
@@ -616,7 +616,7 @@ int trs_sqe_update_init(u32 devid)
     }
 
     for (root_index = 0; root_index < TRS_DMA_NODE_RB_ROOT_NUM; root_index++) {
-        rb_info->root[root_index] = RB_ROOT;
+        rb_info->root[root_index] = KA_RB_ROOT;
     }
 
     rb_info->udevid = devid;

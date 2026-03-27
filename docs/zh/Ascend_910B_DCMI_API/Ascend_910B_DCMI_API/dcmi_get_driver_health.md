@@ -143,10 +143,11 @@
 
 **调用示例<a name="zh-cn_topic_0000001206147250_zh-cn_topic_0000001178373152_zh-cn_topic_0000001147843629_toc533412083"></a>**
 
-```c
+```
 … 
 int ret = 0;
 unsigned int health; 
 ret = dcmi_get_driver_health(&health); 
 …
 ```
+

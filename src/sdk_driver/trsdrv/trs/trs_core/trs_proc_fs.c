@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -20,6 +20,7 @@
 #include "ka_task_pub.h"
 #include "ka_kernel_def_pub.h"
 #include "ka_common_pub.h"
+#include "ka_compiler_pub.h"
 
 #include "securec.h"
 #include "trs_chan.h"
@@ -32,7 +33,7 @@
 
 #define PROC_FS_NAME_LEN 32
 #define PROC_FS_MODE 0444
-#define BUFF_LEN 512
+#define BUFF_LEN 1000
 
 static ka_proc_dir_entry_t *top_entry = NULL;
 static ka_proc_dir_entry_t *ts_inst_entry = NULL;
@@ -45,7 +46,7 @@ static char *res_name[TRS_CORE_MAX_ID_TYPE] = {
 #ifdef CFG_FEATURE_TRACE_EVENT_FUNC
 static int proc_trace_show(ka_seq_file_t *seq, void *offset)
 {
-    struct trs_core_ts_inst *ts_inst = (struct trs_core_ts_inst *)(uintptr_t)seq->private;
+    struct trs_core_ts_inst *ts_inst = (struct trs_core_ts_inst *)(uintptr_t)ka_fs_get_seq_file_private(seq);
 
     ka_fs_seq_printf(seq, "%d\n", ts_inst->trace_enable);
     return 0;
@@ -53,21 +54,13 @@ static int proc_trace_show(ka_seq_file_t *seq, void *offset)
 
 STATIC int proc_trace_ops_open(ka_inode_t *inode, ka_file_t *file)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)
-    return ka_fs_single_open(file, proc_trace_show, pde_data(inode));
-#else
-    return ka_fs_single_open(file, proc_trace_show, PDE_DATA(inode));
-#endif
+    return ka_fs_single_open(file, proc_trace_show, ka_base_pde_data(inode));
 }
 
-STATIC ssize_t proc_trace_ops_write(ka_file_t *filp, const char __user *ubuf, size_t count, loff_t *ppos)
+STATIC ssize_t proc_trace_ops_write(ka_file_t *filp, const char __ka_user *ubuf, size_t count, loff_t *ppos)
 {
     ka_inode_t *inode = ka_fs_file_inode(filp);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)
-    struct trs_core_ts_inst *ts_inst = (struct trs_core_ts_inst *)(uintptr_t)pde_data(inode);
-#else
-    struct trs_core_ts_inst *ts_inst = (struct trs_core_ts_inst *)(uintptr_t)PDE_DATA(inode);
-#endif
+    struct trs_core_ts_inst *ts_inst = (struct trs_core_ts_inst *)(uintptr_t)ka_base_pde_data(inode);
     char ch[2] = {0}; /* 2 bytes long */
     long val;
 
@@ -84,32 +77,21 @@ STATIC ssize_t proc_trace_ops_write(ka_file_t *filp, const char __user *ubuf, si
     }
 
     ch[count - 1] = '\0';
-    if (kstrtol(ch, 10, &val)) {
+    if (ka_base_kstrtol(ch, 10, &val)) {
         return -EFAULT;
     }
     ts_inst->trace_enable = (val == 0) ? false : true;
     return (ssize_t)count;
 }
 
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 5, 0)
-static const ka_file_operations_t proc_trace_ops = {
-    .owner = KA_THIS_MODULE,
-    .open = proc_trace_ops_open,
-    .read = ka_fs_seq_read,
-    .write = proc_trace_ops_write,
-    .llseek  = ka_fs_seq_lseek,
-    .release = ka_fs_single_release,
-};
-#else
 static const ka_procfs_ops_t proc_trace_ops = {
-    .proc_open    = proc_trace_ops_open,
-    .proc_read    = ka_fs_seq_read,
-    .proc_write   = proc_trace_ops_write,
-    .proc_lseek   = ka_fs_seq_lseek,
-    .proc_release = ka_fs_single_release,
+    ka_fs_init_pf_owner(KA_THIS_MODULE) \
+    ka_fs_init_pf_open(proc_trace_ops_open) \
+    ka_fs_init_pf_read(ka_fs_seq_read) \
+    ka_fs_init_pf_write(proc_trace_ops_write) \
+    ka_fs_init_pf_lseek(ka_fs_seq_lseek) \
+    ka_fs_init_pf_release(ka_fs_single_release) \
 };
-#endif
 #endif
 
 static void trs_proc_show(struct trs_proc_ctx *proc_ctx, ka_seq_file_t *seq)
@@ -173,7 +155,7 @@ static void ts_inst_res_show(struct trs_core_ts_inst *ts_inst, ka_seq_file_t *se
 
 static int ts_inst_info_show(ka_seq_file_t *seq, void *offset)
 {
-    struct trs_core_ts_inst *ts_inst = (struct trs_core_ts_inst *)seq->private;
+    struct trs_core_ts_inst *ts_inst = (struct trs_core_ts_inst *)ka_fs_get_seq_file_private(seq);
 
     ka_fs_seq_printf(seq, "devid %d tsid %d hw_type %d(0:tscpu, 1:stars) support_proc_num %u(0:no_limit) ref %u\n",
         ts_inst->inst.devid, ts_inst->inst.tsid, ts_inst->hw_type, ts_inst->support_proc_num,
@@ -188,11 +170,7 @@ static int ts_inst_info_show(ka_seq_file_t *seq, void *offset)
 
 STATIC int ts_inst_sum_open(ka_inode_t *inode, ka_file_t *file)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)
-    return ka_fs_single_open(file, ts_inst_info_show, pde_data(inode));
-#else
-    return ka_fs_single_open(file, ts_inst_info_show, PDE_DATA(inode));
-#endif
+    return ka_fs_single_open(file, ts_inst_info_show, ka_base_pde_data(inode));
 }
 
 static void trs_chan_show(struct trs_core_ts_inst *ts_inst, ka_seq_file_t *seq, int chan_id)
@@ -424,7 +402,7 @@ static int res_detail_show(struct trs_res_mng *res_mng, int pid, ka_seq_file_t *
 
 static int ts_inst_res_detail_show(ka_seq_file_t *seq, void *offset)
 {
-    struct trs_res_mng *res_mng = (struct trs_res_mng *)seq->private;
+    struct trs_res_mng *res_mng = (struct trs_res_mng *)ka_fs_get_seq_file_private(seq);
 
     if (res_mng->res_type == TRS_CB_CQ) {
         ts_inst_cb_phy_sqcq_show(res_mng->ts_inst, seq);
@@ -441,11 +419,7 @@ static int ts_inst_res_detail_show(ka_seq_file_t *seq, void *offset)
 
 STATIC int ts_inst_res_detail_open(ka_inode_t *inode, ka_file_t *file)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)
-    return ka_fs_single_open(file, ts_inst_res_detail_show, pde_data(inode));
-#else
-    return ka_fs_single_open(file, ts_inst_res_detail_show, PDE_DATA(inode));
-#endif
+    return ka_fs_single_open(file, ts_inst_res_detail_show, ka_base_pde_data(inode));
 }
 
 static void proc_res_show(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst *ts_inst, ka_seq_file_t *seq)
@@ -482,7 +456,7 @@ static void proc_logic_cq_show(struct trs_proc_ctx *proc_ctx, u32 tsid, ka_seq_f
 
 static int proc_sum_show(ka_seq_file_t *seq, void *offset)
 {
-    struct trs_proc_ctx *proc_ctx = (struct trs_proc_ctx *)seq->private;
+    struct trs_proc_ctx *proc_ctx = (struct trs_proc_ctx *)ka_fs_get_seq_file_private(seq);
     u32 i;
 
     trs_proc_show(proc_ctx, seq);
@@ -501,59 +475,32 @@ static int proc_sum_show(ka_seq_file_t *seq, void *offset)
 
 STATIC int proc_sum_open(ka_inode_t *inode, ka_file_t *file)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)
-    return ka_fs_single_open(file, proc_sum_show, pde_data(inode));
-#else
-    return ka_fs_single_open(file, proc_sum_show, PDE_DATA(inode));
-#endif
+    return ka_fs_single_open(file, proc_sum_show, ka_base_pde_data(inode));
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 5, 0)
-static const ka_file_operations_t ts_inst_sum_ops = {
-    .owner = KA_THIS_MODULE,
-    .open    = ts_inst_sum_open,
-    .read    = ka_fs_seq_read,
-    .llseek  = ka_fs_seq_lseek,
-    .release = ka_fs_single_release,
-};
-
-static const ka_file_operations_t ts_inst_res_detail_ops = {
-    .owner = KA_THIS_MODULE,
-    .open    = ts_inst_res_detail_open,
-    .read    = ka_fs_seq_read,
-    .llseek  = ka_fs_seq_lseek,
-    .release = ka_fs_single_release,
-};
-
-static const ka_file_operations_t proc_sum_ops = {
-    .owner = KA_THIS_MODULE,
-    .open    = proc_sum_open,
-    .read    = ka_fs_seq_read,
-    .llseek  = ka_fs_seq_lseek,
-    .release = ka_fs_single_release,
-};
-#else
 static const ka_procfs_ops_t ts_inst_sum_ops = {
-    .proc_open    = ts_inst_sum_open,
-    .proc_read    = ka_fs_seq_read,
-    .proc_lseek   = ka_fs_seq_lseek,
-    .proc_release = ka_fs_single_release,
+    ka_fs_init_pf_owner(KA_THIS_MODULE) \
+    ka_fs_init_pf_open(ts_inst_sum_open) \
+    ka_fs_init_pf_read(ka_fs_seq_read) \
+    ka_fs_init_pf_lseek(ka_fs_seq_lseek) \
+    ka_fs_init_pf_release(ka_fs_single_release) \
 };
 
 static const ka_procfs_ops_t ts_inst_res_detail_ops = {
-    .proc_open    = ts_inst_res_detail_open,
-    .proc_read    = ka_fs_seq_read,
-    .proc_lseek   = ka_fs_seq_lseek,
-    .proc_release = ka_fs_single_release,
+    ka_fs_init_pf_owner(KA_THIS_MODULE) \
+    ka_fs_init_pf_open(ts_inst_res_detail_open) \
+    ka_fs_init_pf_read(ka_fs_seq_read) \
+    ka_fs_init_pf_lseek(ka_fs_seq_lseek) \
+    ka_fs_init_pf_release(ka_fs_single_release) \
 };
 
 static const ka_procfs_ops_t proc_sum_ops = {
-    .proc_open    = proc_sum_open,
-    .proc_read    = ka_fs_seq_read,
-    .proc_lseek   = ka_fs_seq_lseek,
-    .proc_release = ka_fs_single_release,
+    ka_fs_init_pf_owner(KA_THIS_MODULE) \
+    ka_fs_init_pf_open(proc_sum_open) \
+    ka_fs_init_pf_read(ka_fs_seq_read) \
+    ka_fs_init_pf_lseek(ka_fs_seq_lseek) \
+    ka_fs_init_pf_release(ka_fs_single_release) \
 };
-#endif
 
 static void proc_fs_format_ts_inst_dir_name(struct trs_core_ts_inst *ts_inst, char *name, int len)
 {
@@ -569,7 +516,7 @@ static ka_proc_dir_entry_t *proc_fs_mk_ts_inst_dir(struct trs_core_ts_inst *ts_i
     char name[PROC_FS_NAME_LEN];
 
     proc_fs_format_ts_inst_dir_name(ts_inst, name, PROC_FS_NAME_LEN);
-    return proc_mkdir((const char *)name, parent);
+    return ka_fs_proc_mkdir((const char *)name, parent);
 }
 
 static void proc_fs_rm_ts_inst_dir(struct trs_core_ts_inst *ts_inst, ka_proc_dir_entry_t *parent)
@@ -593,13 +540,13 @@ void proc_fs_add_ts_inst(struct trs_core_ts_inst *ts_inst)
     }
 
 #ifdef CFG_FEATURE_TRACE_EVENT_FUNC
-    (void)proc_create_data("trace_enable", PROC_FS_MODE, ts_inst->entry, &proc_trace_ops, ts_inst);
+    (void)ka_fs_proc_create_data("trace_enable", PROC_FS_MODE, ts_inst->entry, &proc_trace_ops, ts_inst);
 #endif
-    (void)proc_create_data("summary", PROC_FS_MODE, ts_inst->entry, &ts_inst_sum_ops, ts_inst);
+    (void)ka_fs_proc_create_data("summary", PROC_FS_MODE, ts_inst->entry, &ts_inst_sum_ops, ts_inst);
 
     for (i = 0; i < TRS_CORE_MAX_ID_TYPE; i++) {
         struct trs_res_mng *res_mng = &ts_inst->res_mng[i];
-        (void)proc_create_data(res_name[i], PROC_FS_MODE, ts_inst->entry, &ts_inst_res_detail_ops, res_mng);
+        (void)ka_fs_proc_create_data(res_name[i], PROC_FS_MODE, ts_inst->entry, &ts_inst_res_detail_ops, res_mng);
     }
 }
 
@@ -643,7 +590,7 @@ void proc_fs_add_pid(struct trs_proc_ctx *proc_ctx)
         return;
     }
 
-    (void)proc_create_data("summary", PROC_FS_MODE, proc_ctx->entry, &proc_sum_ops, proc_ctx);
+    (void)ka_fs_proc_create_data("summary", PROC_FS_MODE, proc_ctx->entry, &proc_sum_ops, proc_ctx);
 }
 
 void proc_fs_del_pid(struct trs_proc_ctx *proc_ctx)

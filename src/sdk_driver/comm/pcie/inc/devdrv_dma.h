@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,12 +14,12 @@
 #ifndef _DMA_COMMON_H_
 #define _DMA_COMMON_H_
 
-#include "dma_adapt.h"
-#include "comm_kernel_interface.h"
 #include "ka_task_pub.h"
 #include "ka_base_pub.h"
 #include "ka_memory_pub.h"
 #include "ka_system_pub.h"
+#include "dma_adapt.h"
+#include "comm_kernel_interface.h"
 
 #define DMA_DONE_BUDGET 64
 
@@ -150,7 +150,7 @@ struct devdrv_sync_dma_stat {
 #define DEVDRV_IRQ_IS_UNINIT  0
 struct devdrv_dma_channel {
     ka_device_t *dev;
-    void __iomem *io_base; /* the base address of DMA channel */
+    void __ka_mm_iomem *io_base; /* the base address of DMA channel */
     u32 func_id;
     u32 chan_id; /* the actual index of DMA channel in DMA controller */
     u32 flag;    /* bit0: SQ and CQ side, remote or local;
@@ -242,8 +242,8 @@ struct devdrv_dma_dev {
     u32 func_id;
     struct devdrv_pci_ctrl *pci_ctrl;
     ka_device_t *dev;
-    void __iomem *io_base;
-    void __iomem *dma_chan_base;
+    void __ka_mm_iomem *io_base;
+    void __ka_mm_iomem *dma_chan_base;
     void *drvdata;
     u32 dma_pf_num;
     u32 dma_vf_en;
@@ -273,8 +273,8 @@ struct devdrv_dma_dev {
 };
 
 struct devdrv_dma_res {
-    void __iomem *dma_addr;
-    void __iomem *dma_chan_addr;
+    void __ka_mm_iomem *dma_addr;
+    void __ka_mm_iomem *dma_chan_addr;
     u32 dma_chan_start_id;       /* first dma channel in device hardware */
     u32 chan_start_id;
     u32 use_chan[DEVDRV_DMA_MAX_CHAN_NUM];
@@ -294,8 +294,8 @@ struct devdrv_dma_func_para {
     u32 dma_vf_en;
     u32 dma_vf_num;
     ka_device_t *dev;
-    void __iomem *io_base;
-    void __iomem *dma_chan_base;
+    void __ka_mm_iomem *io_base;
+    void __ka_mm_iomem *dma_chan_base;
     void *drvdata;
     u32 dma_chan_begin; /* first remote dma channel in device hardware */
     u32 chan_begin;
@@ -325,7 +325,7 @@ void devdrv_dma_copy_para_info_init(struct devdrv_dma_copy_para *para, int pava_
     struct devdrv_asyn_dma_para_info *asyn_info);
 int devdrv_peh_dma_node_addr_check(struct devdrv_dma_node *dma_node);
 
-void devdrv_dma_config_axim_aruser_mode(void __iomem *io_base);
+void devdrv_dma_config_axim_aruser_mode(void __ka_mm_iomem *io_base);
 struct devdrv_dma_dev *devdrv_dma_init(struct devdrv_dma_func_para *para_in, u32 sq_cq_side, u32 func_id);
 void devdrv_dma_exit(struct devdrv_dma_dev *dma_dev, u32 sriov_flag);
 void devdrv_dma_stop_business(unsigned long data);
@@ -333,7 +333,7 @@ void devdrv_dma_stop_business(unsigned long data);
 /* these functions is both used in host and device */
 struct devdrv_dma_dev *devdrv_get_dma_dev(u32 dev_id);
 void devdrv_dfx_dma_report_to_bbox(struct devdrv_dma_channel *dma_chan, u32 queue_init_sts);
-void devdrv_dma_check_sram_init_status(const void __iomem *io_base, unsigned long timeout);
+void devdrv_dma_check_sram_init_status(const void __ka_mm_iomem *io_base, unsigned long timeout);
 int devdrv_register_irq_func(void *drvdata, int vector_index, ka_irqreturn_t (*callback_func)(int, void *), void *para,
                              const char *name);
 int devdrv_unregister_irq_func(void *drvdata, int vector_index, void *para);

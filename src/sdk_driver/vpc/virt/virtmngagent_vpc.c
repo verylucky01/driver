@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,12 +11,12 @@
  * GNU General Public License for more details.
  */
 
+#include "ka_kernel_def_pub.h"
 #include "vmng_kernel_interface.h"
 #include "virtmngagent_msg.h"
 #include "virtmng_public_def.h"
 #include "virtmng_msg_pub.h"
 #include "virtmngagent_vpc.h"
-#include "ka_kernel_def_pub.h"
 
 int vmnga_msg_cluster_recv_vpc(void *msg_chan_in, struct vmng_msg_chan_rx_proc_info *proc_info)
 {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,7 +14,6 @@
 #ifndef EVENT_ESCHED_SYSFS_H
 #define EVENT_ESCHED_SYSFS_H
 
-#include <linux/device.h>
 #include "esched_fops.h"
 
 #define MAX_LENTH 256
@@ -39,8 +38,8 @@ void sched_sysfs_record_sample_data(struct sched_numa_node *node);
 void sched_sysfs_clear_sample_data(struct sched_numa_node *node);
 
 
-void sched_sysfs_init(struct device *dev);
-void sched_sysfs_uninit(struct device *dev);
+void sched_sysfs_init(ka_device_t *dev);
+void sched_sysfs_uninit(ka_device_t *dev);
 
 
 unsigned int sched_sysfs_record_num_data(void);

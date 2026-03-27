@@ -161,4 +161,12 @@ struct dms_ub_bus_inst_eid {
 };
 drvError_t dms_get_ub_bus_inst_eid(unsigned int dev_id, struct dms_ub_bus_inst_eid *bus_inst_eid);
 
+struct dms_ubdev_id_info {
+    unsigned short device_id;
+    unsigned short vendor_id;
+    unsigned short module_vendor_id;
+    unsigned short module_id;
+};
+drvError_t dms_get_ub_dev_id_info(unsigned int dev_id, struct dms_ubdev_id_info *id_info);
+
 #endif /* __DMS_MISC_INTERFACE_H */

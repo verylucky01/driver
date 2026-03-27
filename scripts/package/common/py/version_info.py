@@ -386,5 +386,10 @@ class VersionInfoFile(NamedTuple):
         if not os.path.exists(target_dir):
             os.makedirs(target_dir)
 
+        if os.path.exists(target_path):
+            os.chmod(target_path, 0o644)
+
         with open(target_path, 'w') as file:
             file.write(content)
+
+        os.chmod(target_path, 0o444)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -22,7 +22,7 @@
 
 static KA_TASK_DEFINE_RWLOCK(mng_rwlock);
 static struct devmm_dev_res_mng *dev_res_mng[SVM_DEV_INST_MAX_NUM];
-
+   
 void devmm_init_task_dev_res_info(struct devmm_task_dev_res_info *info)
 {
     KA_INIT_LIST_HEAD(&info->head);

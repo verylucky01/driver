@@ -3,6 +3,8 @@
 #ifndef ESCHED_KERNEL_INTERFACE_CMD_H
 #define ESCHED_KERNEL_INTERFACE_CMD_H
 
+#include "hal_pkg/esched_pkg.h"
+
 #define SCHED_MAX_DEFAULT_GRP_NUM 32U
 #define SCHED_MAX_EX_GRP_NUM  32
 #define SCHED_MAX_GRP_NUM (SCHED_MAX_DEFAULT_GRP_NUM + SCHED_MAX_EX_GRP_NUM)
@@ -76,6 +78,26 @@ struct sched_subscribed_event {
     unsigned long long subscribe_timestamp;
 };
 
+struct sync_msg_info {
+    unsigned int dev_id : 6;
+    unsigned int pid : 22;
+    unsigned int dst_engine : 4;
+
+    unsigned int gid : 6;
+    unsigned int tid : 8;
+    unsigned int event_id : 6;
+    unsigned int subevent_id : 12;
+};
+
+struct sched_trace_input {
+    unsigned int dev_id;
+    unsigned int dst_pid;
+    unsigned int dst_gid;
+    unsigned int dst_engine;
+    unsigned int event_id;
+    unsigned int subevent_id;
+    struct sync_msg_info msg;
+};
 
 struct sched_sync_event_trace {
     unsigned int gid;

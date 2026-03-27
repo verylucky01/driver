@@ -93,9 +93,10 @@ enum ReportArgType {
     REPORT_ARGS_REPORT_TYPE = 't',
     REPORT_ARGS_REPORT_FORCE = 'f',
     REPORT_ARGS_REPORT_HELP = 'h',
+    REPORT_ARGS_OUTPUT = 'o',
 };
 
-#define REPORT_OPT "t:afhd:"
+#define REPORT_OPT "t:afhd:o:"
 
 STATIC mmStructOption g_reportOptions[] = {
     {"docker",          MMPA_NO_ARGUMENT,       NULL, REPORT_ARGS_DOCKER},
@@ -120,6 +121,7 @@ STATIC mmStructOption g_reportOptions[] = {
     {"bbox_num",        MMPA_REQUIRED_ARGUMENT, NULL, REPORT_ARGS_BBOX_NUM},
     {"slogd_log_num",   MMPA_REQUIRED_ARGUMENT, NULL, REPORT_ARGS_SLOGD_LOG_NUM},
     {"app_dir_num",     MMPA_REQUIRED_ARGUMENT, NULL, REPORT_ARGS_DEVICE_APP_DIR_NUM},
+    {"output",          MMPA_REQUIRED_ARGUMENT, NULL, REPORT_ARGS_OUTPUT},
     {NULL,              0,                      NULL, 0}
 };
 
@@ -185,6 +187,7 @@ STATIC void MsnPrintConfigHelp(void)
         "\tmsnpureport config --set --aic_switch 1 --coreid 0xFFFF -d 0  Enable device 0 all ai vector core\n"
         "\tmsnpureport config --set --log --global info -d 0             Set device 0 global log level to info\n"
         "\tmsnpureport config --set --log --module FMK:debug -d 1        Set device 1 FMK module log level to debug\n"
+        "Note: Only root user is allowed to execute this command with '--set'\n"
         "Options:\n"
         "    --docker                     Docker flag, msnpureport in docker must be explicitly used with this flag\n"
         "    -d, --device                 Device ID, default is 0\n"
@@ -650,6 +653,7 @@ STATIC void MsnPrintReportHelp(void)
         printf("\tmsnpureport report --permanent   Continuously export device slog\n");
     }
     printf(
+        "Note: Only root user is allowed to execute this command.\n"
         "Options:\n"
         "    --docker             Docker flag, msnpureport in docker must be explicitly used with this flag\n"
         "    -d, --device         Device ID\n"
@@ -664,13 +668,18 @@ STATIC void MsnPrintReportHelp(void)
         "    -f, --force          Export all log and file, device event information in the bbox, "
             "historical maintenance and measurement information in the bbox\n"
         "    -t, --type           Export type: 0(all log and file, default is 0), 1(slog, message and system_info), "
+    #ifdef UB_SUPPORT
+            "2(bbox, current register), 3(stackcore), 4(vmcore), 5(module log), 6(ub)\n"
+    #else
             "2(bbox, current register), 3(stackcore), 4(vmcore), 5(module log)\n"
+    #endif
     );
     if (!MsnIsPoolEnv()) {
         printf(
             "\nContinuously exporting device logs:\n"
             "    --permanent          Continuously Exporting Device log flag, "
             "the following options must be entered after this flag\n"
+            "    -o, --output         Set output path, must be relative path\n"
         );
         for (int32_t i = (int32_t)REPORT_ARGS_SYS_LOG_NUM; i <= (int32_t)REPORT_ARGS_DEVICE_APP_DIR_NUM; i++) {
             printf("%s, range [%d-%d], default %d\n", g_permanentHelpMsg[i], PERMANENT_ARGS_RANGE[i][MIN_INDEX],
@@ -691,23 +700,11 @@ STATIC int32_t MsnSetReportType(ArgInfo *argInfo, const char *arg)
     return EN_OK;
 }
 
-STATIC int32_t MsnReportPermanentCmd(int32_t opt, ArgInfo *argInfo, int32_t optionIndex)
+STATIC int32_t MsnReportParamCmd(int32_t opt, ArgInfo *argInfo, int32_t optionIndex)
 {
-    if (opt == (int32_t)REPORT_ARGS_PERMANENT) {
-        if (argInfo->subCmd != REPORT_DEFAULT) {
-            MSNPU_PRINT_ERROR("-a,-f,-t cannot be used together with --permanent.");
-            return EN_INVALID_PARAM;
-        }
-        if (argInfo->cmdType == REPORT_PERMANENT) {
-            MSNPU_PRINT_ERROR("Input --permanent repeatedly.");
-            return EN_ERROR;
-        }
-        argInfo->cmdType = REPORT_PERMANENT;
-        return EN_OK;
-    }
 
     FileAgeingParam *param = (FileAgeingParam *)argInfo->value;
-    uint32_t *paramValue[REPORT_ARGS_DEVICE_APP_DIR_NUM + 1] = {
+    uint32_t *paramValue[REPORT_ARGS_OUTPUT + 1] = {
         [REPORT_ARGS_SYS_LOG_NUM] = &param->sysLogFileNum,
         [REPORT_ARGS_SYS_LOG_SIZE] = &param->sysLogFileSize,
         [REPORT_ARGS_FW_LOG_NUM] = &param->firmwareLogFileNum,
@@ -724,8 +721,25 @@ STATIC int32_t MsnReportPermanentCmd(int32_t opt, ArgInfo *argInfo, int32_t opti
     };
 
     if (argInfo->cmdType != REPORT_PERMANENT) {
+        if (opt == REPORT_ARGS_OUTPUT && optionIndex == 0) {
+            MSNPU_PRINT_ERROR("Must input --permanent before input -o.");
+        } else {
         MSNPU_PRINT_ERROR("Must input --permanent before input --%s.", g_reportOptions[optionIndex].name);
+        }
         return EN_ERROR;
+    }
+    if (opt == REPORT_ARGS_OUTPUT) {
+        if (param->outputFileName[0] != '\0') {
+            MSNPU_PRINT_ERROR("Repeatedly input --%s.", g_reportOptions[optionIndex].name);
+            return EN_ERROR;
+        }
+        if (strlen(mmGetOptArg()) >= MMPA_MAX_PATH) {
+            MSNPU_PRINT_ERROR("Output path too long.");
+            return EN_ERROR;
+        }
+        errno_t err = strcpy_s(param->outputFileName, MAX_VALUE_STR_LEN, mmGetOptArg());
+        ONE_ACT_ERR_LOG(err != EOK, return EN_ERROR, "strcpy_s failed for output path.");
+        return EN_OK;
     }
     if (*paramValue[opt] != 0) {
         MSNPU_PRINT_ERROR("Repeatedly input --%s.", g_reportOptions[optionIndex].name);
@@ -740,6 +754,22 @@ STATIC int32_t MsnReportPermanentCmd(int32_t opt, ArgInfo *argInfo, int32_t opti
 
     *paramValue[opt] = (uint32_t)value;
     return EN_OK;
+}
+STATIC int32_t MsnReportPermanentCmd(int32_t opt, ArgInfo *argInfo, int32_t optionIndex)
+{
+    if (opt == (int32_t)REPORT_ARGS_PERMANENT) {
+        if (argInfo->subCmd != REPORT_DEFAULT) {
+            MSNPU_PRINT_ERROR("-a,-f,-t cannot be used together with --permanent.");
+            return EN_INVALID_PARAM;
+        }
+        if (argInfo->cmdType == REPORT_PERMANENT) {
+            MSNPU_PRINT_ERROR("Input --permanent repeatedly.");
+            return EN_ERROR;
+        }
+        argInfo->cmdType = REPORT_PERMANENT;
+        return EN_OK;
+    }
+    return MsnReportParamCmd(opt, argInfo, optionIndex);
 }
 
 STATIC int32_t MsnReportLogCmd(int32_t opt, ArgInfo *argInfo)
@@ -905,7 +935,8 @@ STATIC int32_t MsnGetReportOptions(int32_t argc, char **argv, ArgInfo *argInfo)
     int32_t opt = 0;
     int32_t optionIndex = 0;
     while ((opt = mmGetOptLong(argc, argv, REPORT_OPT, g_reportOptions, &optionIndex)) != -1) {
-        if ((opt >= REPORT_ARGS_PERMANENT) && (opt <= REPORT_ARGS_DEVICE_APP_DIR_NUM)) {
+        if (((opt >= REPORT_ARGS_PERMANENT) && (opt <= REPORT_ARGS_DEVICE_APP_DIR_NUM)) ||
+            opt == REPORT_ARGS_OUTPUT) {
             if (MsnReportPermanentCmd(opt, argInfo, optionIndex) != EN_OK) {
                 return EN_INVALID_PARAM;
             }

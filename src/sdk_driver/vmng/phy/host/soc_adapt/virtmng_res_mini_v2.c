@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,6 +11,7 @@
  * GNU General Public License for more details.
  */
 
+#include "vmng_cmd_msg.h"
 #include "virtmnghost_ctrl.h"
 #include "virtmnghost_pci.h"
 #include "vmng_kernel_interface.h"

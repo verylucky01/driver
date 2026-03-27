@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,7 +11,7 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/proc_fs.h>
+
 #include "securec.h"
 #include "kernel_version_adapt.h"
 #include "xsmem_res_dispatch.h"
@@ -19,43 +19,45 @@
 #include "xsmem_framework.h"
 #include "xsmem_proc_fs.h"
 #include "ka_system_pub.h"
+#include "ka_list_pub.h"
+#include "ka_fs_pub.h"
 
 #define PROC_FS_NAME_LEN 32
 #define PROC_FS_MODE 0444
 
-extern struct mutex xsmem_mutex;
-extern struct idr xsmem_idr;
+extern ka_mutex_t xsmem_mutex;
+extern ka_idr_t xsmem_idr;
 
-static struct proc_dir_entry *top_entry = NULL;
-static struct proc_dir_entry *xp_entry = NULL;
-static struct proc_dir_entry *task_entry = NULL;
+static ka_proc_dir_entry_t *top_entry = NULL;
+static ka_proc_dir_entry_t *xp_entry = NULL;
+static ka_proc_dir_entry_t *task_entry = NULL;
 
-static int task_node_show(struct seq_file *seq, void *offset)
+static int task_node_show(ka_seq_file_t *seq, void *offset)
 {
     struct xsm_task_pool_node *node = (struct xsm_task_pool_node *)seq->private;
     struct xsm_pool *xp = node->pool;
     struct xsm_task_block_node *task_blk_node = NULL;
     int num = 0;
 
-    seq_printf(seq, "task id %d pid %d\n", node->task_id, node->task->pid);
-    seq_printf(seq, "block id: offset alloc_size real_size alloc_pid refcnt\n");
+    ka_fs_seq_printf(seq, "task id %d pid %d\n", node->task_id, node->task->pid);
+    ka_fs_seq_printf(seq, "block id: offset alloc_size real_size alloc_pid refcnt\n");
 
-    mutex_lock(&xp->xp_block_mutex);
-    list_for_each_entry(task_blk_node, &node->task_blk_head, node_list) {
+    ka_task_mutex_lock(&xp->xp_block_mutex);
+    ka_list_for_each_entry(task_blk_node, &node->task_blk_head, node_list) {
         struct xsm_block *blk = task_blk_node->blk;
-        seq_printf(seq, "    %-4d:%-8pK %-8lu %-8lu %-4d %-4ld\n", blk->id,
+        ka_fs_seq_printf(seq, "    %-4d:%-8pK %-8lu %-8lu %-4d %-4ld\n", blk->id,
             (void *)(uintptr_t)blk->offset, blk->alloc_size, blk->real_size, blk->pid, blk->refcnt);
         num++;
     }
-    mutex_unlock(&xp->xp_block_mutex);
+    ka_task_mutex_unlock(&xp->xp_block_mutex);
 
-    seq_printf(seq, "total block %d, total alloc size %llu, total real size %llu\n",
+    ka_fs_seq_printf(seq, "total block %d, total alloc size %llu, total real size %llu\n",
         num, node->alloc_size, node->real_alloc_size);
 
     return 0;
 }
 
-STATIC int task_node_open(struct inode *inode, struct file *file)
+STATIC int task_node_open(ka_inode_t *inode, ka_file_t *file)
 {
     return ka_single_open(inode, file, task_node_show);
 }
@@ -70,39 +72,39 @@ static void proc_fs_format_task_dir_name(const struct xsm_task *task, char *name
     }
 }
 
-static struct proc_dir_entry *proc_fs_mk_task_dir(struct xsm_task *task, struct proc_dir_entry *parent)
+static ka_proc_dir_entry_t *proc_fs_mk_task_dir(struct xsm_task *task, ka_proc_dir_entry_t *parent)
 {
     char name[PROC_FS_NAME_LEN];
 
     proc_fs_format_task_dir_name(task, name, PROC_FS_NAME_LEN);
-    return proc_mkdir((const char *)name, parent);
+    return ka_fs_proc_mkdir((const char *)name, parent);
 }
 
-static void proc_fs_rm_task_dir(struct xsm_task *task, struct proc_dir_entry *parent)
+static void proc_fs_rm_task_dir(struct xsm_task *task, ka_proc_dir_entry_t *parent)
 {
     char name[PROC_FS_NAME_LEN];
 
     proc_fs_format_task_dir_name(task, name, PROC_FS_NAME_LEN);
-    (void)remove_proc_subtree((const char *)name, parent);
+    (void)ka_fs_remove_proc_subtree((const char *)name, parent);
 }
 
 void proc_fs_xsmem_pool_add_task(struct xsm_task_pool_node *node)
 {
-    struct proc_dir_entry *entry = NULL;
+    ka_proc_dir_entry_t *entry = NULL;
     struct xsm_pool *xp = node->pool;
     struct xsm_task *task = node->task;
 
     if (xp->entry != NULL) {
         entry = proc_fs_mk_task_dir(task, xp->entry);
         if (entry != NULL) {
-            (void)proc_create_data("block", PROC_FS_MODE, entry, &task_node_ops, node);
+            (void)ka_fs_proc_create_data("block", PROC_FS_MODE, entry, &task_node_ops, node);
         }
     }
 
     if (task->entry != NULL) {
-        entry = proc_mkdir(xp->key, task->entry);
+        entry = ka_fs_proc_mkdir(xp->key, task->entry);
         if (entry != NULL) {
-            (void)proc_create_data("block", PROC_FS_MODE, entry, &task_node_ops, node);
+            (void)ka_fs_proc_create_data("block", PROC_FS_MODE, entry, &task_node_ops, node);
         }
     }
 }
@@ -116,55 +118,55 @@ void proc_fs_xsmem_pool_del_task(struct xsm_task_pool_node *node)
         proc_fs_rm_task_dir(task, xp->entry);
     }
     if (task->entry != NULL) {
-        (void)remove_proc_subtree(xp->key, task->entry);
+        (void)ka_fs_remove_proc_subtree(xp->key, task->entry);
     }
 }
 
 void proc_fs_add_xsmem_pool(struct xsm_pool *xp)
 {
     if (xp_entry != NULL) {
-        xp->entry = proc_mkdir(xp->key, xp_entry);
+        xp->entry = ka_fs_proc_mkdir(xp->key, xp_entry);
     }
 }
 
 void proc_fs_del_xsmem_pool(struct xsm_pool *xp)
 {
     if (xp_entry != NULL) {
-        (void)remove_proc_subtree(xp->key, xp_entry);
+        (void)ka_fs_remove_proc_subtree(xp->key, xp_entry);
     }
 }
 
-static void per_task_info_show(struct seq_file *seq, struct xsm_task *task)
+static void per_task_info_show(ka_seq_file_t *seq, struct xsm_task *task)
 {
     struct xsm_task_pool_node *node = NULL;
     u64 alloc_size = 0, real_alloc_size = 0;
 
-    seq_printf(seq, "pool id(name): alloc_size real_size peak_size\n");
+    ka_fs_seq_printf(seq, "pool id(name): alloc_size real_size peak_size\n");
 
-    list_for_each_entry(node, &task->node_list_head, task_node) {
+    ka_list_for_each_entry(node, &task->node_list_head, task_node) {
         /* can not modify the string format, because udf&aicpu will parse it for dfx. */
-        seq_printf(seq, "%d(%s) %-8llu %-8llu %-8llu\n", node->pool->pool_id, node->pool->key,
+        ka_fs_seq_printf(seq, "%d(%s) %-8llu %-8llu %-8llu\n", node->pool->pool_id, node->pool->key,
                 node->alloc_size, node->real_alloc_size, node->alloc_peak_size);
         alloc_size += node->alloc_size;
         real_alloc_size += node->real_alloc_size;
     }
 
-    seq_printf(seq, "summary: %-8llu %-8llu\n", alloc_size, real_alloc_size);
+    ka_fs_seq_printf(seq, "summary: %-8llu %-8llu\n", alloc_size, real_alloc_size);
 }
 
-static int task_info_show(struct seq_file *seq, void *offset)
+static int task_info_show(ka_seq_file_t *seq, void *offset)
 {
     struct xsm_task *task = (struct xsm_task *)seq->private;
 
-    mutex_lock(&task->mutex);
-    seq_printf(seq, "task pid %d pool cnt %d\n", task->pid, task->attached_pool_count);
+    ka_task_mutex_lock(&task->mutex);
+    ka_fs_seq_printf(seq, "task pid %d pool cnt %d\n", task->pid, task->attached_pool_count);
     per_task_info_show(seq, task);
-    mutex_unlock(&task->mutex);
+    ka_task_mutex_unlock(&task->mutex);
 
     return 0;
 }
 
-STATIC int task_sum_open(struct inode *inode, struct file *file)
+STATIC int task_sum_open(ka_inode_t *inode, ka_file_t *file)
 {
     return ka_single_open(inode, file, task_info_show);
 }
@@ -180,7 +182,7 @@ void proc_fs_add_task(struct xsm_task *task)
 
     task->entry = proc_fs_mk_task_dir(task, task_entry);
     if (task->entry != NULL) {
-        (void)proc_create_data("summary", PROC_FS_MODE, task->entry, &task_sum_ops, task);
+        (void)ka_fs_proc_create_data("summary", PROC_FS_MODE, task->entry, &task_sum_ops, task);
     }
 }
 
@@ -196,34 +198,34 @@ void proc_fs_del_task(struct xsm_task *task)
 static int per_pool_info_show(int id, void *p, void *data)
 {
     struct xsm_pool *xp = p;
-    struct seq_file *seq = data;
+    ka_seq_file_t *seq = data;
 
-    seq_printf(seq, "id:%d\n    key:%s, create_pid %d, refcnt:%d, algo:%s, alloc_size %lu, real_alloc_size %lu, "
-        "alloc_peak_size %lu\n", id, xp->key, xp->create_pid, atomic_read(&xp->refcnt), xp->algo->name,
+    ka_fs_seq_printf(seq, "id:%d\n    key:%s, create_pid %d, refcnt:%d, algo:%s, alloc_size %lu, real_alloc_size %lu, "
+        "alloc_peak_size %lu\n", id, xp->key, xp->create_pid, ka_base_atomic_read(&xp->refcnt), xp->algo->name,
         xp->alloc_size, xp->real_alloc_size, xp->alloc_peak_size);
     if (xp->algo->xsm_pool_show) {
-        mutex_lock(&xp->xp_block_mutex);
+        ka_task_mutex_lock(&xp->xp_block_mutex);
         xp->algo->xsm_pool_show(xp, seq);
-        mutex_unlock(&xp->xp_block_mutex);
+        ka_task_mutex_unlock(&xp->xp_block_mutex);
     }
 
     return 0;
 }
 
-static int pool_info_show(struct seq_file *seq, void *offset)
+static int pool_info_show(ka_seq_file_t *seq, void *offset)
 {
     int ret;
 
-    seq_printf(seq, "pool list:\n");
+    ka_fs_seq_printf(seq, "pool list:\n");
 
-    mutex_lock(&xsmem_mutex);
-    ret = idr_for_each(&xsmem_idr, per_pool_info_show, seq);
-    mutex_unlock(&xsmem_mutex);
+    ka_task_mutex_lock(&xsmem_mutex);
+    ret = ka_base_idr_for_each(&xsmem_idr, per_pool_info_show, seq);
+    ka_task_mutex_unlock(&xsmem_mutex);
 
     return ret;
 }
 
-STATIC int xsmem_pool_sum_open(struct inode *inode, struct file *file)
+STATIC int xsmem_pool_sum_open(ka_inode_t *inode, ka_file_t *file)
 {
     return ka_single_open(inode, file, pool_info_show);
 }
@@ -232,19 +234,19 @@ STATIC_PROCFS_FILE_FUNC_OPS_OPEN(pool_sum_ops, xsmem_pool_sum_open);
 
 void xsmem_proc_fs_init(void)
 {
-    top_entry = proc_mkdir("xsmem", NULL);
+    top_entry = ka_fs_proc_mkdir("xsmem", NULL);
     if (top_entry != NULL) {
-        xp_entry = proc_mkdir("pool", top_entry);
+        xp_entry = ka_fs_proc_mkdir("pool", top_entry);
         if (xp_entry != NULL) {
-            (void)proc_create_data("summary", PROC_FS_MODE, xp_entry, &pool_sum_ops, NULL);
+            (void)ka_fs_proc_create_data("summary", PROC_FS_MODE, xp_entry, &pool_sum_ops, NULL);
         }
-        task_entry = proc_mkdir("task", top_entry);
+        task_entry = ka_fs_proc_mkdir("task", top_entry);
     }
 }
 
 void xsmem_proc_fs_uninit(void)
 {
     if (top_entry != NULL) {
-        (void)remove_proc_subtree("xsmem", NULL);
+        (void)ka_fs_remove_proc_subtree("xsmem", NULL);
     }
 }

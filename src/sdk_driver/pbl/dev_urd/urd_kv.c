@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,20 +10,16 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
-#include <linux/string.h>
-#include <linux/slab.h>
-#include <linux/errno.h>
-#include <linux/list.h>
+#include "ka_common_pub.h"
+#include "ka_task_pub.h"
+#include "ka_memory_pub.h"
+#include "ka_list_pub.h"
+#include "ka_base_pub.h"
 
 #include "urd_kv.h"
 #include "urd_feature.h"
 #include "securec.h"
 #include "urd_define.h"
-#include "ka_task_pub.h"
-#include "ka_memory_pub.h"
-#include "ka_list_pub.h"
-#include "ka_base_pub.h"
 
 struct dms_kv_table g_kv_cb = {0};
 
@@ -60,7 +56,7 @@ static inline unsigned int dms_kv_hash_33(const char* tag)
     return hash;
 }
 
-static inline struct hlist_head* dms_kv_get_table_head(const char* key)
+static inline ka_hlist_head_t* dms_kv_get_table_head(const char* key)
 {
     return &g_kv_cb.table[dms_kv_hash_33(key) % KV_TABLE_SIZE];
 }
@@ -111,9 +107,9 @@ free_node:
 
 static struct dms_kv_node* dms_kv_search(const char* key)
 {
-    struct hlist_head* table_head = NULL;
+    ka_hlist_head_t* table_head = NULL;
     struct dms_kv_node* node = NULL;
-    struct hlist_node* tmp = NULL;
+    ka_hlist_node_t* tmp = NULL;
     table_head = dms_kv_get_table_head(key);
     ka_hlist_for_each_entry_safe(node, tmp, table_head, hnode)
     {
@@ -126,7 +122,7 @@ static struct dms_kv_node* dms_kv_search(const char* key)
 
 static int dms_kv_add(const char* key, void* value, int len)
 {
-    struct hlist_head* table_head = NULL;
+    ka_hlist_head_t* table_head = NULL;
     struct dms_kv_node* node = NULL;
 
     node = dms_kv_new_node(key, ka_base_strlen(key), value, len);
@@ -160,9 +156,9 @@ int dms_kv_del(const char* key)
 }
 int dms_kv_set(const char* key, void* value, int len)
 {
-    struct hlist_head* table_head = NULL;
+    ka_hlist_head_t* table_head = NULL;
     struct dms_kv_node* node = NULL;
-    struct hlist_node* tmp = NULL;
+    ka_hlist_node_t* tmp = NULL;
     int ret;
     CHECK_ARG(key, value, len, -EINVAL);
     ka_task_mutex_lock(&g_kv_cb.lock);
@@ -229,9 +225,9 @@ int dms_kv_get_ex(const char* key, void* value, int len)
 
 void dms_kv_dump(char *buf, ssize_t *offset, key_dump_handle handle)
 {
-    struct hlist_head* table_head = NULL;
+    ka_hlist_head_t* table_head = NULL;
     struct dms_kv_node* node = NULL;
-    struct hlist_node* tmp = NULL;
+    ka_hlist_node_t* tmp = NULL;
     int i;
     ssize_t ret;
     ka_task_mutex_lock(&g_kv_cb.lock);
@@ -253,9 +249,9 @@ void dms_kv_dump(char *buf, ssize_t *offset, key_dump_handle handle)
 int dms_kv_init(void)
 {
     int i;
-    g_kv_cb.table = ka_mm_kzalloc(sizeof(struct hlist_head) * KV_TABLE_SIZE, KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
+    g_kv_cb.table = ka_mm_kzalloc(sizeof(ka_hlist_head_t) * KV_TABLE_SIZE, KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
     if (g_kv_cb.table == NULL) {
-        dms_err("ka_mm_kmalloc failed. (size=%lu)\n", (sizeof(struct hlist_head) * KV_TABLE_SIZE));
+        dms_err("ka_mm_kmalloc failed. (size=%lu)\n", (sizeof(ka_hlist_head_t) * KV_TABLE_SIZE));
         return -ENOMEM;
     }
     for (i = 0; i < KV_TABLE_SIZE; i++) {
@@ -267,9 +263,9 @@ int dms_kv_init(void)
 
 void dms_kv_uninit(void)
 {
-    struct hlist_head* table_head = NULL;
+    ka_hlist_head_t* table_head = NULL;
     struct dms_kv_node* node = NULL;
-    struct hlist_node* tmp = NULL;
+    ka_hlist_node_t* tmp = NULL;
     int i;
     ka_task_mutex_lock(&g_kv_cb.lock);
     for (i = 0; i < KV_TABLE_SIZE; i++) {

@@ -10,11 +10,16 @@ Driver在CANN软件栈的位置参考[昇腾社区](https://www.hiascend.com/can
     <img src="./docs/figures/Driver架构分层图.png" alt="Driver架构分层图" />
 </center>
 
+## 📖模块介绍
+- [RoCE（RDMA over Converged Ethernet）](./src/ascend_hal/roce/README.md)：昇腾 AI 处理器平台中的RoCE模块，用于减少延迟和提高数据传输效率。
+- [SVM (Shared Virtual Memory) ](./src/ascend_hal/svm/README.md)：昇腾 AI 处理器平台中的内存管理模块，用于高效管理设备侧内存。
+
 ## ⚡️快速入门
 若您希望快速体验driver的调用和开发过程，请访问如下文档获取简易教程。
-- [环境部署及编译构建](./docs/zh/build.md)：介绍不同形态驱动包的部署、编译构建。
+- [QUICKSTART](./docs/zh/QUICKSTART.md)：端到端快速上手指南，包括搭建环境、编译部署、源码开发、调试、贡献等过程。
 - [参考用例](./examples/README.md)：介绍设备管理等模块基础用例。
-## 🔍目录结构
+
+## 📝目录结构
 关键目录结构如下：
 
 ```
@@ -29,16 +34,16 @@ Driver在CANN软件栈的位置参考[昇腾社区](https://www.hiascend.com/can
 ├── OAT.xml                                        # 配置脚本，代码仓工具使用，用于检查License是否规范
 ├── README.md
 ├── scripts                                        # 本仓脚本目录
-│   └── package                                    # 构建打包相关脚本
+│   ├── package                                    # 构建打包相关脚本
+│   ├── ut                                         # ut生成cpp覆盖率脚本
 ├── SECURITY.md                                    # 项目安全声明文件
-├── Third_Party_Open_Source_Software_Notice.txt    # 本仓引用的第三方开源软件声明
+├── Third_Party_Open_Source_Software_Notice        # 本仓引用的第三方开源软件声明
 ├── src                                            # Driver包源码
 │   ├── ascend_hal                                 # HAL层源码文件夹
-│   │   ├── ascend_base_hal                        # 昇腾基础公共接口目录
 │   │   ├── bbox                                   # 黑匣子（Black Box，系统临终遗言）
 │   │   ├── buff                                   # 进程间共享内存管理
 │   │   ├── build                                  # ascend_hal动态库编译脚本
-│   │   ├── commlib                                # 公共函数库
+│   │   ├── comm                                   # Communication 主机侧<->设备侧通信层
 │   │   ├── dmc                                    # DMC（Device Maintenance Components）设备维护组件
 │   │   │   ├── device_monitor                     # DSMI消息通路
 │   │   │   ├── dsmi                               # DSMI（Device System Manage Interface）设备系统管理接口
@@ -47,6 +52,7 @@ Driver在CANN软件栈的位置参考[昇腾社区](https://www.hiascend.com/can
 │   │   │   └── verify_tool                        # 设备侧镜像校验工具
 │   │   ├── dms                                    # DMS（Device Manage System）设备管理系统
 │   │   ├── dpa                                    # DPA（Device Public Adapter）设备公共适配层
+│   │   ├── dvpp                                   # DVPP（Digital Vision Pre-Processing）数字视觉预处理模块
 │   │   ├── esched                                 # 事件调度（Event Schedule）
 │   │   ├── hdc                                    # 主机-设备通信（Host-Device Communication）
 │   │   ├── inc                                    # HAL层内部公共头文件目录
@@ -54,13 +60,13 @@ Driver在CANN软件栈的位置参考[昇腾社区](https://www.hiascend.com/can
 │   │   ├── msnpureport                            # 设备侧维测信息导出工具
 │   │   ├── pbl                                    # PBL（Public Base Lib）基础公共库
 │   │   │   ├── uda                                # UDA（Unified Device Access）统一设备接入
-│   │   │   └── urd                                # URD（User Request Distribute）用户请求转发
-│   │   ├── queryfeature                           # 芯片特性查询
+│   │   │   ├── urd                                # URD（User Request Distribute）用户请求转发
+│   │   │   ├── commlib                            # 公共函数库
+│   │   │   └── queryfeature                       # 用于兼容性适配的软件特性查询
 │   │   ├── queue                                  # 消息队列信息管理
 │   │   ├── roce                                   # RoCE（RDMA over Converged Ethernet）
 │   │   ├── svm                                    # 共享虚拟内存（Shared Virtual Memory）
-│   │   ├── trs                                    # 任务资源调度（Task Resource Schedule）
-│   │   └── tsdrv                                  # TS（Task Schedule）驱动外部依赖头文件
+│   │   └── trs                                    # 任务资源调度（Task Resource Schedule）
 │   ├── custom                                     # 定制化特性源码库
 │   │   ├── cmake                                  # CMake编译配置目录
 │   │   ├── dev_prod                               # 设备定制管理目录
@@ -83,27 +89,27 @@ Driver在CANN软件栈的位置参考[昇腾社区](https://www.hiascend.com/can
 │       ├── pbl                                    # PBL（Public Base Lib）基础公共库
 │       ├── platform                               # 芯片资源（中断、预留内存等）存储库
 │       ├── queue                                  # 消息队列信息管理
+|       ├── seclib                                 # 公共安全函数库（Secure Library）
 │       ├── svm                                    # 共享虚拟内存（Shared Virtual Memory）
-│       ├── trs                                    # 任务资源调度（Task Resource Schedule）
-│       ├── trsbase                                # 任务资源调度基础层
 │       ├── ts_agent                               # TS（Task Schedule）代理驱动源码
-│       ├── tsdrv                                  # TS软件sqcq通信、mailbox消息特性
+│       ├── trsdrv                                 # TRS（Task Resource Schedule）软件sqcq通信、mailbox消息特性
+│       │   ├── trs                                # 任务资源调度（Task Resource Schedule）
+│       │   └── trsbase                            # 任务资源调度（Task Resource Schedule）基础层
 │       ├── vascend                                # 昇腾算力切分特性
 │       ├── vmng                                   # 设备虚拟化管理（Virtual Machine Manager）
 │       ├── vnic                                   # VNIC（Virtual Network Interface Card）虚拟网卡
 │       └── vpc                                    # VPC（Virtual Physical Communication）物理机与虚拟机通信
-└── test                                           # 测试代码目录
+└── test                                           # UT用例文件目录
 ```
 
-# 项目路标
-- 具体参考Driver仓SIG信息链接：
-https://gitcode.com/cann/community/blob/master/CANN/sigs/driver/README.md
+## 🔍FAQ
+- [FAQ](./docs/zh/FAQ.md)：汇总了源码编译、安装部署等问题。
 
-## 📝相关信息
+## 相关信息
 - [贡献指南](./CONTRIBUTING.md)
 - [安全声明](./SECURITY.md)
 - 许可证
 
-[CANN Open Software License Agreement Version 2.0](./LICENSES/CANN-V2.0)
+&emsp;&emsp;&emsp;[CANN Open Software License Agreement Version 2.0](./LICENSES/CANN-V2.0)
 
-[GNU GENERAL PUBLIC LICENSE Version 2](./LICENSES/GPL-V2.0)
+&emsp;&emsp;&emsp;[GNU GENERAL PUBLIC LICENSE Version 2](./LICENSES/GPL-V2.0)

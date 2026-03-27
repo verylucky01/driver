@@ -24,5 +24,5 @@ virt_addr_t devmm_virt_alloc_from_host_base(struct devmm_virt_heap_mgmt *mgmt, s
     virt_addr_t alloc_ptr);
 DVresult devmm_virt_free_mem_to_base(struct devmm_virt_heap_mgmt *mgmt, virt_addr_t ptr);
 
-void devmm_primary_heap_module_mem_stats_dec(struct devmm_virt_com_heap *heap);
+void devmm_primary_heap_module_mem_stats_dec(struct devmm_virt_com_heap *heap, uint64_t size);
 #endif /* _SVM_BASE_HEAP_H_ */

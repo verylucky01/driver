@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,6 +14,7 @@
 #include "ascend_kernel_hal.h"
 #include "comm_kernel_interface.h"
 #include "pbl/pbl_feature_loader.h"
+#include "pbl/pbl_ka_mem_query.h"
 #include "pbl_kernel_interface.h"
 #include "kernel_version_adapt.h"
 
@@ -41,6 +42,7 @@ struct svm_p2p_mem_info {
     void *data;
     struct p2p_page_table page_table;
     ka_list_head_t node;
+    ka_kref_t ref;
 };
 
 struct svm_mem_info {
@@ -402,6 +404,7 @@ static struct svm_p2p_mem_info *devmm_create_p2p_mem_info(struct devmm_svm_proce
     mem_info->free_callback = free_callback;
     mem_info->data = data;
     KA_INIT_LIST_HEAD(&mem_info->node);
+    ka_base_kref_init(&mem_info->ref);
 
     ret = devmm_init_p2p_page_table(svm_proc, &mem_info->page_table);
     if (ret != 0) {
@@ -413,10 +416,26 @@ static struct svm_p2p_mem_info *devmm_create_p2p_mem_info(struct devmm_svm_proce
     return mem_info;
 }
 
-static void devmm_destroy_p2p_mem_info(struct svm_p2p_mem_info *mem_info)
+static void devmm_p2p_mem_info_get(struct svm_p2p_mem_info *mem_info)
 {
+    ka_base_kref_get(&mem_info->ref);
+}
+
+static void devmm_p2p_mem_info_release(ka_kref_t *kref)
+{
+    struct svm_p2p_mem_info *mem_info = ka_container_of(kref, struct svm_p2p_mem_info, ref);
     devmm_uninit_p2p_page_table(&mem_info->page_table);
     devmm_kvfree(mem_info);
+}
+
+static void devmm_p2p_mem_info_put(struct svm_p2p_mem_info *mem_info)
+{
+    ka_base_kref_put(&mem_info->ref, devmm_p2p_mem_info_release);
+}
+
+static void devmm_destroy_p2p_mem_info(struct svm_p2p_mem_info *mem_info)
+{
+    devmm_p2p_mem_info_put(mem_info);
 }
 
 static struct p2p_page_table *devmm_create_p2p_page_table(struct devmm_svm_process *svm_proc,
@@ -454,9 +473,10 @@ static void devmm_destroy_p2p_page_table(struct p2p_page_table **page_table)
 
     master_data = (struct devmm_svm_proc_master *)svm_proc->priv_data;
     ka_task_mutex_lock(&master_data->p2p_mem_mng[mem_info->udevid].lock);
-    if (mem_info->free_callback != NULL) {
+    if (!ka_list_empty_careful(&mem_info->node)) {
         ka_list_del(&mem_info->node);
     }
+
     master_data->p2p_mem_mng[mem_info->udevid].put_cnt++;
     ka_task_mutex_unlock(&master_data->p2p_mem_mng[mem_info->udevid].lock);
     devmm_svm_proc_put(svm_proc);
@@ -495,40 +515,68 @@ static bool devmm_p2p_mem_info_va_is_overlap(struct svm_p2p_mem_info *mem_info, 
     return true;
 }
 
+static struct svm_p2p_mem_info *_devmm_p2p_mem_info_erase_and_get(struct devmm_master_p2p_mem_mng *mem_mng,
+    preprocess_cmp_fun cmp_fun, u64 free_va, u64 free_len)
+{
+    u32 stamp = (u32)ka_jiffies;
+    ka_list_head_t *pos = NULL;
+    ka_list_head_t *n = NULL;
+
+    if (ka_list_empty_careful(&mem_mng->list_head)) {
+        return NULL;
+    }
+
+    ka_list_for_each_safe(pos, n, &mem_mng->list_head) {
+        struct svm_p2p_mem_info *mem_info = ka_list_entry(pos, struct svm_p2p_mem_info, node);
+        bool need_erase = (cmp_fun != NULL) ? cmp_fun(mem_info, free_va, free_len) : true;
+        if (need_erase) {
+            ka_list_del(&mem_info->node);
+            KA_INIT_LIST_HEAD(&mem_info->node);
+            mem_mng->free_cb_cnt++;
+            devmm_drv_debug("Erase info. (devid=%u; va=%llx; len=%llx; free_cb_cnt=%llu)",
+                mem_info->udevid, mem_info->va, mem_info->len, mem_mng->free_cb_cnt);
+            devmm_p2p_mem_info_get(mem_info);
+            return mem_info;
+        }
+        devmm_try_cond_resched(&stamp);
+    }
+
+    return NULL;
+}
+
+static struct svm_p2p_mem_info *devmm_p2p_mem_info_erase_and_get(struct devmm_master_p2p_mem_mng *mem_mng,
+    preprocess_cmp_fun cmp_fun, u64 free_va, u64 free_len)
+{
+    struct svm_p2p_mem_info *mem_info = NULL;
+
+    ka_task_mutex_lock(&mem_mng->lock);
+    mem_info = _devmm_p2p_mem_info_erase_and_get(mem_mng, cmp_fun, free_va, free_len);
+    ka_task_mutex_unlock(&mem_mng->lock);
+
+    return mem_info;
+}
+
 static void devmm_mem_free_preprocess_inner(struct devmm_svm_process *svm_proc, u32 devid,
     preprocess_cmp_fun cmp_fun, u64 free_va, u64 free_len)
 {
     struct devmm_svm_proc_master *master_data = (struct devmm_svm_proc_master *)svm_proc->priv_data;
     struct devmm_master_p2p_mem_mng *mem_mng = &master_data->p2p_mem_mng[devid];
-    ka_list_head_t *pos = NULL;
-    ka_list_head_t *n = NULL;
+    struct svm_p2p_mem_info *mem_info = NULL;
     u32 stamp = (u32)ka_jiffies;
 
-    ka_task_mutex_lock(&mem_mng->lock);
-    if (ka_list_empty_careful(&mem_mng->list_head)) {
-        ka_task_mutex_unlock(&mem_mng->lock);
-        return;
-    }
-
-    ka_list_for_each_safe(pos, n, &mem_mng->list_head) {
-        struct svm_p2p_mem_info *mem_info = ka_list_entry(pos, struct svm_p2p_mem_info, node);
-        bool need_callback = (cmp_fun != NULL) ? cmp_fun(mem_info, free_va, free_len) : true;
-        if (need_callback) {
-            ka_list_del(&mem_info->node);
-            devmm_drv_debug("free_callback devid=%u; cmp_fun_is_null=%u; va=%llx; len=%llx)\n", devid, (cmp_fun == NULL), free_va, free_len);
-            if (mem_info->free_callback != NULL) {
-                mem_info->free_callback(mem_info->data);
-                mem_info->free_callback = NULL;
-                mem_info->data = NULL;
-                mem_mng->free_cb_cnt++;
-                devmm_drv_debug("free_callback finish. (devid=%u; va=%llx; len=%llx; free_cb_cnt=%llu)",
-                    mem_info->udevid, mem_info->va, mem_info->len, mem_mng->free_cb_cnt);
-            }
-            KA_INIT_LIST_HEAD(&mem_info->node);
+    do {
+        mem_info = devmm_p2p_mem_info_erase_and_get(mem_mng, cmp_fun, free_va, free_len);
+        if (mem_info == NULL) {
+            break;
         }
+        /* if hal_kernel_p2p_put_pages is called in free_callback, mem_info may been free, so need to add ref for mem_info */
+        if (mem_info->free_callback != NULL) {
+            mem_info->free_callback(mem_info->data);
+            devmm_drv_debug("Free callback finish.\n");
+        }
+        devmm_p2p_mem_info_put(mem_info);
         devmm_try_cond_resched(&stamp);
-    }
-    ka_task_mutex_unlock(&mem_mng->lock);
+    } while (1);
 }
 
 void devmm_mem_free_preprocess_by_dev_and_va(struct devmm_svm_process *svm_proc, u32 devid, u64 free_va, u64 free_len)

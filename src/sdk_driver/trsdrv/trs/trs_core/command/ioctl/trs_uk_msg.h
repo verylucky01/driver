@@ -18,11 +18,8 @@
 #define TRS_ASYNC_SEND_SIDE 0
 #define TRS_ASYNC_RECV_SIDE 1
 struct trs_d2d_send_info {
-    uint8_t eid[16];
     uint32_t flag;
     uint32_t pos;
-    uint32_t send_dev_id; // recv side need
-    uint32_t recv_dev_id; // send side need
     uint32_t sq_id;      // send side need
     uint32_t rsv[4];
 };
@@ -32,7 +29,6 @@ struct trs_import_jetty_info {
     uint32_t jetty_uasid;
     uint32_t jetty_id;
     uint32_t token_val;
-    uint32_t send_dev_id; // recv side need
     uint32_t recv_dev_id; // send side need
     uint32_t sq_id;      // send side need
     uint32_t rsv[4];

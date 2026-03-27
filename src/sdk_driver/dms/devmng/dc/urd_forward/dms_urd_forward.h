@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,9 +13,6 @@
 
 #ifndef __URD_FORWARD_H__
 #define __URD_FORWARD_H__
-
-#include <linux/types.h>
-#include <linux/time.h>
 
 #include "ascend_hal_error.h"
 #include "dms_define.h"

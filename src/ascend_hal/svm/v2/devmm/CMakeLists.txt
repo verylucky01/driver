@@ -23,6 +23,7 @@ target_sources(devmm_obj PRIVATE
     devmm_proc_event.c
     devmm_dynamic_addr.c
     devmm_record.c
+    svm_mem_register_record.c
 )
 
 add_subdirectory(devmm_rbtree)

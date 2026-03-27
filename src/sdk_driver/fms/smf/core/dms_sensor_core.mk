@@ -8,7 +8,6 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # ------------------------------------------------------------------------------------------------------------
 
-EXTRA_CFLAGS += -DCFG_HOST_ENV
 asdrv_fms-y += smf/core/dms_sensor_init.o
 asdrv_fms-y += smf/core/dms_notifier.o
 EXTRA_CFLAGS += -I$(DRIVER_SOURCE_DIR)/dms/devmng/drv_devmng/drv_devmng_host/ascend910

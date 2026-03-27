@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -33,7 +33,7 @@
 #define TRS_HOST_PHY_DEV_MAX    100U
 
 static DECLARE_RWSEM(trs_mode_lock);
-static int g_trs_sq_send_mode[TRS_HOST_PHY_DEV_MAX] = {TRS_MODE_TYPE_SQ_SEND_HIGH_PERFORMANCE, };
+static int g_trs_sq_send_mode[TRS_HOST_PHY_DEV_MAX] = {TRS_MODE_TYPE_SQ_SEND_HIGH_SECURITY, };
 static bool g_trs_sq_send_mode_user_set_flag[TRS_HOST_PHY_DEV_MAX] = {false, };
 static bool g_trs_mode_is_sia_flag[TRS_HOST_PHY_DEV_MAX] = {true, };
 
@@ -214,16 +214,54 @@ ADD_FEATURE_COMMAND(TRS_URD_CMD_NAME, URD_TRS_MODE_QUERY_CMD, ZERO_CMD, NULL, NU
 END_FEATURE_COMMAND()
 END_MODULE_DECLARATION()
 
-int trs_host_mode_config_init(void)
+int trs_host_mode_config_init_dev(u32 ts_inst_id)
 {
-    u32 i = 0;
+    struct trs_id_inst inst;
+    int chip_type = TRS_CHIP_TYPE_MAX;
 
-    for (i = 0; i < TRS_HOST_PHY_DEV_MAX; i++) {
-        g_trs_sq_send_mode[i] = TRS_MODE_TYPE_SQ_SEND_HIGH_PERFORMANCE;
-        g_trs_sq_send_mode_user_set_flag[i] = false;
-        g_trs_mode_is_sia_flag[i] = true;
+    trs_ts_inst_to_id_inst(ts_inst_id, &inst);
+    if ((inst.tsid > 0) || (inst.devid >= TRS_HOST_PHY_DEV_MAX)) {
+        return 0;
     }
 
+    if (uda_is_phy_dev(inst.devid) == false) {
+        return 0;
+    }
+
+    chip_type = trs_soc_get_chip_type(inst.devid);
+    if ((chip_type == TRS_CHIP_TYPE_CLOUD_V4) || (chip_type == TRS_CHIP_TYPE_CLOUD_V5)) {
+        g_trs_sq_send_mode[inst.devid] = TRS_MODE_TYPE_SQ_SEND_HIGH_PERFORMANCE;
+    } else {
+        g_trs_sq_send_mode[inst.devid] = TRS_MODE_TYPE_SQ_SEND_HIGH_SECURITY;
+    }
+
+    g_trs_sq_send_mode_user_set_flag[inst.devid] = false;
+    g_trs_mode_is_sia_flag[inst.devid] = true;
+    return 0;
+}
+DECLAER_FEATURE_AUTO_INIT_DEV(trs_host_mode_config_init_dev, FEATURE_LOADER_STAGE_0);
+
+void trs_host_mode_config_uninit_dev(u32 ts_inst_id)
+{
+    struct trs_id_inst inst;
+
+    trs_ts_inst_to_id_inst(ts_inst_id, &inst);
+    if ((inst.tsid > 0) || (inst.devid >= TRS_HOST_PHY_DEV_MAX)) {
+        return;
+    }
+
+    if (uda_is_phy_dev(inst.devid) == false) {
+        return;
+    }
+
+    g_trs_sq_send_mode[inst.devid] = TRS_MODE_TYPE_SQ_SEND_HIGH_SECURITY;
+    g_trs_sq_send_mode_user_set_flag[inst.devid] = false;
+    g_trs_mode_is_sia_flag[inst.devid] = true;
+}
+DECLAER_FEATURE_AUTO_UNINIT_DEV(trs_host_mode_config_uninit_dev, FEATURE_LOADER_STAGE_0);
+
+int trs_host_mode_config_init(void)
+{
     CALL_INIT_MODULE(TRS_URD_CMD_NAME);
     return 0;
 }

@@ -528,6 +528,12 @@ STATIC void dcmi_init_chip_board_product_for_rc(unsigned int board_id)
             dcmi_set_sub_board_type(DCMI_BOARD_TYPE_SOC_BASE);
             dcmi_set_product_type(DCMI_A200_A2_MODEL);
             break;
+        case DCMI_A5_POD_2D_MAIN_BOARD_ID_TMP:
+            dcmi_set_chip_type(DCMI_CHIP_TYPE_D910_95);
+            dcmi_set_board_type(DCMI_BOARD_TYPE_SOC);
+            dcmi_set_sub_board_type(DCMI_BOARD_TYPE_SOC_BASE);
+            dcmi_set_product_type(DCMI_PRODUCT_TYPE_INVALID);
+            break;
         default:
             dcmi_set_chip_type(DCMI_CHIP_TYPE_D310);
             dcmi_init_board_type_for_d310_rc();
@@ -600,12 +606,20 @@ int dcmi_get_board_info_handle(int device_logic_id, struct dsmi_board_info_stru 
     return DCMI_OK;
 }
 
-STATIC bool dcmi_get_chip_name_is_910_95(const struct dsmi_chip_info_stru *dsmi_chip_info)
+STATIC bool dcmi_scene_is_910_95_ub(const struct dsmi_chip_info_stru *dsmi_chip_info)
 {
     if (dsmi_chip_info == NULL) {
         return false;
     }
-    return (strncmp((const char *)dsmi_chip_info->chip_name, "910_95", strlen("910_95")) == 0);
+    return ((strncmp((const char *)dsmi_chip_info->chip_name, "910_95", strlen("910_95")) == 0) &&
+        ((g_mainboard_info.mainboard_id == DCMI_A_K_910_95_MAIN_BOARD_ID) ||
+        (g_mainboard_info.mainboard_id == DCMI_A_K_910_95_UBOE_MAIN_BOARD_ID) ||
+        (g_mainboard_info.mainboard_id == DCMI_A_K_910_95_2_6_MAIN_BOARD_ID) ||
+        (g_mainboard_info.mainboard_id == DCMI_A_K_910_95_2_6_UBOE_MAIN_BOARD_ID) ||
+        (g_mainboard_info.mainboard_id == DCMI_A5_POD_2D_BACKUP_MAIN_BOARD_ID) ||
+        (g_mainboard_info.mainboard_id == DCMI_A5_POD_2D_MAIN_BOARD_ID) ||
+        (g_mainboard_info.mainboard_id == DCMI_A5_POD_1D_MAIN_BOARD_ID) ||
+        (g_mainboard_info.mainboard_id == DCMI_A5_POD_EVB_MAIN_BOARD_ID_UB_TMP)));
 }
 
 void dcmi_init_chip_board_product_910_95(struct dsmi_board_info_stru *board_info)
@@ -630,8 +644,7 @@ STATIC int dcmi_init_chip_board_product_for_ep(int device_id, struct dsmi_board_
         return dcmi_convert_error_code(ret);
     }
 
-    if (dcmi_get_chip_name_is_910_95(&dsmi_chip_info) &&
-        dcmi_mainboard_is_a900_a5_ub(g_mainboard_info.mainboard_id)) {
+    if (dcmi_scene_is_910_95_ub(&dsmi_chip_info)) {
         dcmi_init_chip_board_product_910_95(board_info);
     } else {
 #ifndef _WIN32
@@ -933,7 +946,7 @@ STATIC int dcmi_init_pcie_slot_info_from_dmidecode_info(FILE *p_file)
             if (info_start_index == NULL) {
                 continue;
             }
-            slot_id = strtol(info_start_index, &end_ptr, DCMI_NUMBER_BASE);
+            slot_id = (int)strtol(info_start_index, &end_ptr, DCMI_NUMBER_BASE);
             has_find = 1;
         } else {
             find_flag = strstr(&msginfo[0], "Bus Address: ");

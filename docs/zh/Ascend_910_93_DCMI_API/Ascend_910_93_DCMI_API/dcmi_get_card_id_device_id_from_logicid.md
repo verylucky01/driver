@@ -141,7 +141,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001189111912_zh-cn_topic_0000001167913765_toc533412083"></a>**
 
-```c
+```
 …  
 int ret;
 int card_id = 0;
@@ -154,3 +154,4 @@ if (ret != DCMI_OK) {
 return ret; 
 …
 ```
+

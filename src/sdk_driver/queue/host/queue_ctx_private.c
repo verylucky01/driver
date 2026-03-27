@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,12 +11,10 @@
  * GNU General Public License for more details.
  */
 #ifndef QUEUE_UT
-#include <linux/spinlock.h>
-#include <linux/slab.h>
-
 #include "queue_module.h"
 #include "queue_context.h"
 #include "queue_ctx_private.h"
+#include "ka_list_pub.h"
 
 void *queue_context_private_data_create(void)
 {
@@ -24,7 +22,7 @@ void *queue_context_private_data_create(void)
     int devid;
 
     ctx_private = (struct context_private_data *)queue_drv_kmalloc(
-        sizeof(struct context_private_data), GFP_ATOMIC | __GFP_ACCOUNT);
+        sizeof(struct context_private_data), KA_GFP_ATOMIC | __KA_GFP_ACCOUNT);
     if (ctx_private == NULL) {
         return NULL;
     }
@@ -32,8 +30,8 @@ void *queue_context_private_data_create(void)
     for (devid = 0; devid < MAX_DEVICE; devid++) {
         ctx_private->hdc_session[devid] = -1;
     }
-    INIT_LIST_HEAD(&ctx_private->node_list_head);
-    spin_lock_init(&ctx_private->lock);
+    KA_INIT_LIST_HEAD(&ctx_private->node_list_head);
+    ka_task_spin_lock_init(&ctx_private->lock);
 
     return ctx_private;
 }

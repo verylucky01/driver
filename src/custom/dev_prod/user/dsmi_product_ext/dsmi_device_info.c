@@ -244,6 +244,48 @@ int dms_get_work_mode(unsigned int *work_mode)
     return ret;
 }
 
+int dms_get_multi_die_policy(unsigned int *out)
+{
+    struct dms_ioctl_arg ioarg = {0};
+    int ret;
+ 
+    ioarg.main_cmd = DMS_MAIN_CMD_PRODUCT;
+    ioarg.sub_cmd = DMS_SUBCMD_GET_CARD_MULTI_DIE_POLICY;
+    ioarg.filter_len = 0;
+    ioarg.input =  NULL;
+    ioarg.input_len = 0;
+    ioarg.output = (void *)out;
+    ioarg.output_len = sizeof(unsigned int);
+ 
+    ret = DmsIoctl(DMS_IOCTL_CMD, &ioarg);
+    if (ret != 0) {
+        DEV_MON_ERR("Dms get multi die policy failed. (ret=%d)\n", ret);
+    }
+ 
+    return ret;
+}
+ 
+int dms_set_multi_die_policy(unsigned int policy)
+{
+    struct dms_ioctl_arg ioarg = {0};
+    int ret;
+ 
+    ioarg.main_cmd = DMS_MAIN_CMD_PRODUCT;
+    ioarg.sub_cmd = DMS_SUBCMD_SET_CARD_MULTI_DIE_POLICY;
+    ioarg.filter_len = 0;
+    ioarg.input = (void*)&policy;
+    ioarg.input_len = sizeof(unsigned int);
+    ioarg.output = 0;
+    ioarg.output_len = (unsigned int)0;
+ 
+    ret = DmsIoctl(DMS_IOCTL_CMD, &ioarg);
+    if (ret != 0) {
+        DEV_MON_ERR("Dms set multi die policy failed. (ret=%d)\n", ret);
+    }
+ 
+    return ret;
+}
+
 int dsmi_product_set_device_info(unsigned int device_id, DSMI_MAIN_CMD main_cmd, unsigned int sub_cmd,
     const void *buf, unsigned int size)
 {
@@ -293,7 +335,29 @@ int dms_get_mainboard_id(unsigned int device_id, unsigned int *mainboard_id)
 
     return ret;
 }
- 
+
+int dsmi_get_multi_die_policy(unsigned int *out)
+{
+#ifdef CFG_SOC_PLATFORM_CLOUD_V3
+    return dms_get_multi_die_policy(out);
+#else
+    (void)out;
+    DEV_MON_ERR("Dsmi not support.");
+    return DRV_ERROR_NOT_SUPPORT;
+#endif
+}
+
+int dsmi_set_multi_die_policy(unsigned int policy)
+{
+#ifdef CFG_SOC_PLATFORM_CLOUD_V3
+    return dms_set_multi_die_policy(policy);
+#else
+    (void)policy;
+    DEV_MON_ERR("Dsmi not support.");
+    return DRV_ERROR_NOT_SUPPORT;
+#endif
+}
+
 int dsmi_get_mainboard_id(unsigned int device_id, unsigned int *mainboard_id)
 {
     if (mainboard_id == NULL) {

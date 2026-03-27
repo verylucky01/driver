@@ -47,7 +47,7 @@ enum devdrv_chip_type {
     CHIP_RSVD_4 = 12, /* Reserved */
     CHIP_CLOUD_V3 = 13,  /* Ascend910_93 */
     CHIP_RSVD_5 = 14,  /* Reserved */
-    CHIP_CLOUD_V4 = 15,  /* Ascend910_95 */
+    CHIP_CLOUD_V4 = 15,  /* Ascend950 */
     CHIP_CLOUD_V5 = 16,  /* Ascend910_96 */
     CHIP_RSVD_6 = 17, /* Reserved */
     CHIP_END

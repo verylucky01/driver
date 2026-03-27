@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,28 +11,6 @@
  * GNU General Public License for more details.
  */
 
-#ifndef DEVDRV_MANAGER_HOST_UT_TEST
-#include <linux/module.h>
-#include <linux/init.h>
-#include <linux/kernel.h>
-#include <linux/fs.h>
-#include <linux/errno.h>
-#include <linux/types.h>
-#include <linux/vmalloc.h>
-#include <linux/slab.h>
-#include <linux/cdev.h>
-#include <linux/interrupt.h>
-#include <linux/delay.h>
-#include <linux/mutex.h>
-#include <linux/nsproxy.h>
-#include <linux/sched.h>
-#include <linux/rbtree.h>
-#include <linux/uaccess.h>
-#include <linux/cred.h>
-#include <linux/namei.h>
-#include <linux/pid_namespace.h>
-#include <linux/cpuset.h>
-#endif
 #include "devdrv_manager.h"
 #include "devdrv_manager_common.h"
 #include "pbl_mem_alloc_interface.h"
@@ -45,21 +23,16 @@
 #endif
 
 #ifndef DEVDRV_MANAGER_HOST_UT_TEST
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
-#include <linux/sched/signal.h>
-#include <linux/sched/task.h>
-#include <linux/cgroup.h>
-#endif
-
 #include "pbl/pbl_uda.h"
 #include "ka_task_pub.h"
 #include "ka_fs_pub.h"
 #include "ka_errno_pub.h"
 #include "ka_base_pub.h"
+#include "ka_common_pub.h"
 #include "ka_kernel_def_pub.h"
 #include "devdrv_manager_container.h"
 
-struct mnt_namespace *devdrv_manager_get_host_mnt_ns(void)
+ka_mnt_namespace_t *devdrv_manager_get_host_mnt_ns(void)
 {
     return init_task.nsproxy->mnt_ns;
 }
@@ -67,7 +40,7 @@ struct mnt_namespace *devdrv_manager_get_host_mnt_ns(void)
 int devdrv_devpid_container_convert(int *ipid)
 {
 #ifndef UT_VCAST
-    struct pid *kpid = NULL;
+    ka_struct_pid_t *kpid = NULL;
 
     if (ipid == NULL) {
         devdrv_drv_err("Parameter invalid.\n");
@@ -95,8 +68,8 @@ int devdrv_devpid_container_convert(int *ipid)
 #if defined(CFG_HOST_ENV) || defined(CFG_FEATURE_BIND_TGID)
 int devdrv_get_tgid_by_pid(int pid, int *tgid)
 {
-    struct task_struct *tsk = NULL;
-    struct pid *pro_id = NULL;
+    ka_task_struct_t *tsk = NULL;
+    ka_struct_pid_t *pro_id = NULL;
     int ret;
 
     if (tgid == NULL) {
@@ -133,7 +106,7 @@ int devdrv_get_tgid_by_pid(int pid, int *tgid)
     }
 
     /* If in container, the PID mnt_ns will be equal to the current mnt_ns. */
-    if ((tsk->nsproxy != NULL) && (tsk->nsproxy->mnt_ns == current->nsproxy->mnt_ns)) {
+    if ((tsk->nsproxy != NULL) && (tsk->nsproxy->mnt_ns == ka_task_get_current_mnt_ns())) {
         *tgid = tsk->tgid;
         ret = 0;
         goto OUT;
@@ -157,7 +130,7 @@ bool devdrv_manager_container_is_admin(void)
 /**
  * Check the process is running in the physical machine or in container
  */
-bool devdrv_manager_container_is_host_system(struct mnt_namespace *mnt_ns)
+bool devdrv_manager_container_is_host_system(ka_mnt_namespace_t *mnt_ns)
 {
     if (mnt_ns == devdrv_manager_get_host_mnt_ns()) {
         return true;
@@ -173,7 +146,7 @@ bool devdrv_manager_container_is_host_system(struct mnt_namespace *mnt_ns)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
 STATIC int new_cpuset_read(char *buf, size_t count)
 {
-    struct cgroup_subsys_state *css = NULL;
+    ka_cgroup_subsys_state_t *css = NULL;
     int retval;
 
     css = ka_task_task_get_css(current, cpuset_cgrp_id);
@@ -183,7 +156,7 @@ STATIC int new_cpuset_read(char *buf, size_t count)
     }
 
     retval = ka_task_cgroup_path_ns(css->cgroup, buf,
-        count, current->nsproxy->cgroup_ns);
+        count, ka_task_get_current_cgroup_ns());
     ka_task_css_put(css);
     if (retval <= 0) {
         devdrv_drv_err("read buf failed. (retval=%d)\n", retval);
@@ -197,7 +170,7 @@ STATIC int new_cpuset_read(char *buf, size_t count)
 STATIC void devdrv_manager_get_container_id(unsigned long long *container_id)
 {
     char cpuset_file_text[DEVMNG_MAX_TEXT_LENGTH] = {0};
-    struct file *fp = NULL;
+    ka_file_t *fp = NULL;
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
     loff_t pos = 0;
 #endif
@@ -302,7 +275,7 @@ static int dms_mng_notifier_func(u32 udevid, enum uda_notified_action action)
         devdrv_manager_get_container_id(&container_id);
         ret = uda_set_dev_ns_identify(udevid, container_id);
         if (!uda_is_phy_dev(udevid)) {
-            (void)dev_mnt_vdevice_add_inform(udevid, VDEV_BIND, current->nsproxy->mnt_ns, container_id);
+            (void)dev_mnt_vdevice_add_inform(udevid, VDEV_BIND, ka_task_get_current_mnt_ns(), container_id);
             dev_mnt_vdevice_inform();
         }
     } else if (action == UDA_UNOCCUPY) {
@@ -368,7 +341,7 @@ STATIC int devdrv_manager_container_get_bare_pid(struct devdrv_container_para *c
         devdrv_drv_err("invalid parameter\n");
         return -EINVAL;
     }
-    pid = current->pid;
+    pid = ka_task_get_current_pid();
     ret = copy_to_user_safe(cmd->para.out, &pid, sizeof(ka_pid_t));
     if (ret != 0) {
         devdrv_drv_err("pid = %d, copy to user failed: %d.\n", pid, ret);
@@ -387,7 +360,7 @@ STATIC int devdrv_manager_container_get_bare_tgid(struct devdrv_container_para *
         devdrv_drv_err("invalid parameter\n");
         return -EINVAL;
     }
-    tgid = current->tgid;
+    tgid = ka_task_get_current_tgid();
     ret = copy_to_user_safe(cmd->para.out, &tgid, sizeof(ka_pid_t));
     if (ret != 0) {
         devdrv_drv_err("tgid = %d, copy to user failed: %d.\n", tgid, ret);
@@ -403,15 +376,15 @@ STATIC int devdrv_manager_container_get_bare_tgid(struct devdrv_container_para *
  */
 int devdrv_manager_container_is_in_container(void)
 {
-    struct mnt_namespace *current_mnt = NULL;
-    struct mnt_namespace *host_mnt = NULL;
+    ka_mnt_namespace_t *current_mnt = NULL;
+    ka_mnt_namespace_t *host_mnt = NULL;
     int is_in;
 
     if (devdrv_manager_container_check_current() != 0) {
         return false;
     }
 
-    current_mnt = current->nsproxy->mnt_ns;
+    current_mnt = ka_task_get_current_mnt_ns();
     host_mnt = devdrv_manager_get_host_mnt_ns();
     if (host_mnt == NULL) {
         is_in = false;
@@ -431,7 +404,7 @@ int devdrv_manager_container_is_in_admin_container(void)
         return false;
     }
 
-    if (devdrv_manager_container_is_host_system(current->nsproxy->mnt_ns)) {
+    if (devdrv_manager_container_is_host_system(ka_task_get_current_mnt_ns())) {
         return false;
     }
 
@@ -448,7 +421,7 @@ int devdrv_manager_container_check_devid_in_container(u32 devid, ka_pid_t hostpi
     return uda_proc_can_access_udevid(hostpid, devid) ? 0 : -EINVAL;
 }
 KA_EXPORT_SYMBOL(devdrv_manager_container_check_devid_in_container);
-int devdrv_manager_container_check_devid_in_container_ns(u32 devid, struct task_struct *task)
+int devdrv_manager_container_check_devid_in_container_ns(u32 devid, ka_task_struct_t *task)
 {
     bool ret = (task == current) ? uda_can_access_udevid(devid) : uda_proc_can_access_udevid(task->tgid, devid);
     return ret ? 0 : -EINVAL;
@@ -461,7 +434,7 @@ STATIC int (*CONST devdrv_manager_container_process_handler[DEVDRV_CONTAINER_MAX
         [DEVDRV_CONTAINER_GET_BARE_TGID] = devdrv_manager_container_get_bare_tgid,
     };
 
-int devdrv_manager_container_process(struct file *filep, unsigned long arg)
+int devdrv_manager_container_process(ka_file_t *filep, unsigned long arg)
 {
     struct devdrv_container_para container_cmd;
     int ret;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -30,9 +30,11 @@ struct trs_stream_ctx {
     u64 stream_uva; /* svm base addr */
     u64 stream_kva; /* svm base addr */
     u32 size;
+    u32 depth;
     u32 pa_num;
     u64 *pa_list;
     u32 tail;
+    u32 long_task_cnt;
 };
 
 #define RES_STATUS_NORMAL 0
@@ -63,6 +65,10 @@ void trs_sqcq_reg_unmap(struct trs_core_ts_inst *ts_inst, struct trs_sqcq_reg_ma
 void trs_stream_set_bind_sqcq(struct trs_core_ts_inst *ts_inst, u32 stream_id, u32 sqid, u32 cqid, int host_pid);
 int trs_stream_task_fill_proc(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst *ts_inst,
     struct trs_stream_task_para *para);
+int trs_stream_get_mem_pa_list(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst *ts_inst,
+    struct trs_stream_ctx *stream_ctx, void *stream_mem, u32 depth);
+void trs_stream_put_mem_pa_list(struct trs_core_ts_inst *ts_inst, struct trs_proc_ctx *proc_ctx,
+    struct trs_stream_ctx *stream_ctx);
 int trs_res_id_pre_del(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst *ts_inst, int res_type, u32 res_id);
 int trs_res_id_num_query(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst *ts_inst, struct trs_res_id_para *para);
 int trs_res_id_max_query(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst *ts_inst, struct trs_res_id_para *para);

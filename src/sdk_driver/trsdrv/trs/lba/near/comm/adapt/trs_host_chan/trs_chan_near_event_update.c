@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,7 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-#include "trs_pub_def.h"
+#include "ka_memory_pub.h"
+ #include "trs_pub_def.h"
 #ifndef EMU_ST
 #include "comm_kernel_interface.h"
 #include "ascend_hal_define.h"
@@ -144,15 +145,15 @@ int trs_sqcq_event_dev_init(u32 ts_inst_id)
         return ret;
     }
 
-    sq_pid_lists[inst.devid] = (u32 *)vzalloc(sizeof(u32) * sq_max);
+    sq_pid_lists[inst.devid] = (u32 *)ka_mm_vzalloc(sizeof(u32) * sq_max);
     if (sq_pid_lists[inst.devid] == NULL) {
         trs_err("Failed to alloc sq_pid_lists. (devid=%u; sq_max=%u)\n", inst.devid, sq_max);
         return -ENOMEM;
     }
 
-    cq_pid_lists[inst.devid] = (u32 *)vzalloc(sizeof(u32) * cq_max);
+    cq_pid_lists[inst.devid] = (u32 *)ka_mm_vzalloc(sizeof(u32) * cq_max);
     if (cq_pid_lists[inst.devid] == NULL) {
-        vfree(sq_pid_lists[inst.devid]);
+        ka_mm_vfree(sq_pid_lists[inst.devid]);
         sq_pid_lists[inst.devid] = NULL;
         trs_err("Failed to alloc cq_pid_lists. (devid=%u; cq_max=%u)\n", inst.devid, cq_max);
         return -ENOMEM;
@@ -174,11 +175,11 @@ void trs_sqcq_event_dev_uninit(u32 ts_inst_id)
 #endif
     }
     if (sq_pid_lists[inst.devid] != NULL) {
-        vfree(sq_pid_lists[inst.devid]);
+        ka_mm_vfree(sq_pid_lists[inst.devid]);
         sq_pid_lists[inst.devid] = NULL;
     }
     if (cq_pid_lists[inst.devid] != NULL) {
-        vfree(cq_pid_lists[inst.devid]);
+        ka_mm_vfree(cq_pid_lists[inst.devid]);
         cq_pid_lists[inst.devid] = NULL;
     }
 }
@@ -187,13 +188,13 @@ DECLAER_FEATURE_AUTO_UNINIT_DEV(trs_sqcq_event_dev_uninit, FEATURE_LOADER_STAGE_
 /* only host need */
 int trs_sqcq_event_init(void)
 {
-    sq_pid_lists = (u32 **)vzalloc(sizeof(u32 *) * TRS_DEV_MAX_NUM);
+    sq_pid_lists = (u32 **)ka_mm_vzalloc(sizeof(u32 *) * TRS_DEV_MAX_NUM);
     if (sq_pid_lists == NULL) {
         return -ENOMEM;
     }
-    cq_pid_lists = (u32 **)vzalloc(sizeof(u32 *) * TRS_DEV_MAX_NUM);
+    cq_pid_lists = (u32 **)ka_mm_vzalloc(sizeof(u32 *) * TRS_DEV_MAX_NUM);
     if (cq_pid_lists == NULL) {
-        vfree(sq_pid_lists);
+        ka_mm_vfree(sq_pid_lists);
         sq_pid_lists = NULL;
         return -ENOMEM;
     }
@@ -207,12 +208,12 @@ void trs_sqcq_event_uninit(void)
     hal_kernel_sched_unregister_event_pre_proc_handle(EVENT_DRV_MSG, SCHED_PRE_PROC_POS_REMOTE, trs_sqcq_event_update);
 
     if (sq_pid_lists != NULL) {
-        vfree(sq_pid_lists);
+        ka_mm_vfree(sq_pid_lists);
         sq_pid_lists = NULL;
     }
 
     if (cq_pid_lists != NULL) {
-        vfree(cq_pid_lists);
+        ka_mm_vfree(cq_pid_lists);
         cq_pid_lists = NULL;
     }
 }

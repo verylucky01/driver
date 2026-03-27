@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,19 +11,16 @@
  * GNU General Public License for more details.
  */
 
+#include "ka_barrier_pub.h"
+#include "ka_net_pub.h"
+#include "ka_driver_pub.h"
+#include "ka_memory_pub.h"
+#include "ka_system_pub.h"
+#include "ka_pci_pub.h"
 #include "pbl/pbl_uda.h"
 
 #include "pcivnic_host.h"
 #include "pcivnic_main.h"
-#include "ka_barrier_pub.h"
-#include "ka_net_pub.h"
-#include "ka_common_pub.h"
-#include "ka_driver_pub.h"
-#include "ka_memory_pub.h"
-#include "ka_task_pub.h"
-#include "ka_system_pub.h"
-#include "ka_pci_pub.h"
-
 
 struct pcivnic_netdev *g_vnic_dev = NULL;
 unsigned char g_pcivnic_mac[KA_ETH_ALEN] = {0};
@@ -341,7 +338,7 @@ STATIC int pcivnic_init_msg_instance(struct pcivnic_pcidev *pcidev)
      * do not change it. !!!!!
      */
     devdrv_info("dev id %d: %s, alloc new pcivnic device <%s> success (locked and finish).\n",
-        pcidev->dev_id, ka_driver_dev_driver_string(pcidev->dev), vnic_dev->ndev->name);
+        pcidev->dev_id, ka_driver_dev_driver_string(pcidev->dev), ka_net_netdev_get_name(vnic_dev->ndev));
 
     return 0;
 }
@@ -625,7 +622,7 @@ bool pcivnic_get_sysfs_creat_group_capbility(ka_device_t *dev, int dev_id)
 }
 
 #define PCIVNIC_HOST_NOTIFIER "vnic_host"
-static int pcivnic_host_notifier_func(u32 udevid, enum uda_notified_action action)
+STATIC int pcivnic_host_notifier_func(u32 udevid, enum uda_notified_action action)
 {
     int ret = 0;
 
@@ -673,7 +670,7 @@ void pcivnic_free_vnic_dev(void)
     struct pcivnic_netdev *vnic_dev = g_vnic_dev;
 
     if (vnic_dev != NULL) {
-        devdrv_info("destroy pcivnic device <%s>.\n", vnic_dev->ndev->name);
+        devdrv_info("destroy pcivnic device <%s>.\n", ka_net_netdev_get_name(vnic_dev->ndev));
         pcivnic_free_netdev(vnic_dev);
     }
     return;

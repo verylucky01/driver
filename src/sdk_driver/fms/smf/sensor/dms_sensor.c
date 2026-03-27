@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,8 +11,16 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/slab.h>
-#include <linux/kernel.h>
+#include "ka_dfx_pub.h"
+#include "ka_system_pub.h"
+#include "ka_list_pub.h"
+#include "ka_memory_pub.h"
+#include "ka_errno_pub.h"
+#include "ka_task_pub.h"
+#include "ka_base_pub.h"
+#include "ka_fs_pub.h"
+#include "ka_kernel_def_pub.h"
+#include "ka_common_pub.h"
 #include "dms_kernel_version_adapt.h"
 #include "pbl_mem_alloc_interface.h"
 #include "fms_define.h"
@@ -25,21 +33,8 @@
 #include "dms_event_converge.h"
 #include "kernel_version_adapt.h"
 #include "dms_sensor.h"
-#include "ka_dfx_pub.h"
-#include "ka_system_pub.h"
-#include "ka_list_pub.h"
-#include "ka_memory_pub.h"
-#include "ka_errno_pub.h"
-#include "ka_task_pub.h"
-#include "ka_base_pub.h"
-#include "ka_fs_pub.h"
-#include "ka_kernel_def_pub.h"
 
-#ifdef CFG_FEATURE_CLOCKID_CONFIG
-#include <linux/virt_wall_time.h>
-#endif
-
-#define print_sysfs (void)printk
+#define print_sysfs (void)ka_dfx_printk
 
 #define CLOCK_ID_STRLEN 9
 #define CMDLINE_BUFFER_SIZE 1000
@@ -66,7 +61,7 @@ KA_EXPORT_SYMBOL(g_event_configs);
 static ka_atomic_t g_dms_sensor_alarm_serial = KA_BASE_ATOMIC_INIT(0);
 
 DMS_EVENT_LIST_ITEM g_event_list_cb[DMS_MAX_EVENT_NUM];
-struct mutex g_sensor_event_list_mutex;
+ka_mutex_t g_sensor_event_list_mutex;
 
 static void sensor_init_event_list_cb(void)
 {
@@ -83,7 +78,7 @@ unsigned long dms_get_time_change(ka_ktime_t start, ka_ktime_t end)
 {
     unsigned long time_use;
 
-    time_use = (unsigned long)(ka_system_ktime_to_ns(end) - ka_system_ktime_to_ns(start)) / NSEC_PER_USEC;
+    time_use = (unsigned long)(ka_system_ktime_to_ns(end) - ka_system_ktime_to_ns(start)) / KA_NSEC_PER_USEC;
     return time_use;
 }
 
@@ -223,7 +218,7 @@ static struct dms_node_sensor_cb *dms_get_or_create_node_sensor_cb(struct dms_de
         return NULL;
     }
     /* for kernel space, not used the pid, set default value -1 */
-    pid = (env_type == DMS_SENSOR_ENV_USER_SPACE) ? (current->tgid) : (-1);
+    pid = (env_type == DMS_SENSOR_ENV_USER_SPACE) ? (ka_task_get_current_tgid()) : (-1);
     if (node_sensor_cb != NULL) {
         if (node_sensor_cb->env_type != env_type) {
             /* The currently registered environment (user mode, kernel mode) is inconsistent with the previously created
@@ -698,7 +693,7 @@ int dms_mgnt_clockid_init(void)
 {
     int ret = 0;
     char *buffer = NULL;
-    struct file *fp = NULL;
+    ka_file_t *fp = NULL;
     char *ptr = NULL;
     long read_num;
     loff_t pos = 0;
@@ -742,19 +737,19 @@ buff_free_exit:
 static int dms_sensor_get_timestamp(unsigned long long *timestamp)
 {
 #ifdef CFG_FEATURE_CLOCKID_CONFIG
-    struct timespec64 ts;
-    struct timeval sys_time = {0};
+    ka_timespec64_t ts;
+    ka_timeval_t sys_time = {0};
     if (timestamp == NULL) {
         return DRV_ERROR_PARA_ERROR;
     }
     if (g_dms_mgnt_clock_id == CLOCK_VIRTUAL) {
-        ktime_get_virtual_ts64(&ts);
+        ka_system_ktime_get_virtual_ts64(&ts);
     } else {
         ka_system_ktime_get_real_ts64(&ts);
     }
     sys_time.tv_sec = ts.tv_sec;
-    sys_time.tv_usec = ts.tv_nsec / NSEC_PER_USEC;
-    *timestamp = (sys_time.tv_sec * MSEC_PER_SEC) + (sys_time.tv_usec / USEC_PER_MSEC);
+    sys_time.tv_usec = ts.tv_nsec / KA_NSEC_PER_USEC;
+    *timestamp = (sys_time.tv_sec * KA_MSEC_PER_SEC) + (sys_time.tv_usec / KA_USEC_PER_MSEC);
 
 #else
     ka_ktime_t sys_time = 0;
@@ -1442,7 +1437,7 @@ static u32 dms_gen_event_id(u32 node_type, u8 sensor_type, u8 error_type)
 {
     u32 fault_id = 0;
 
-#ifdef CFG_HOST_ENV
+#ifdef CFG_EDGE_HOST
     fault_id |= FAULT_EVENT_CODE_HOST;
 #else
     fault_id |= FAULT_EVENT_CODE_DEVICE;

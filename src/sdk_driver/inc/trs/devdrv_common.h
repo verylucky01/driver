@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -19,6 +19,8 @@
 #include "ka_task_pub.h"
 #include "ka_common_pub.h"
 #include "ka_system_pub.h"
+#include "ka_memory_pub.h"
+#include "ka_compiler_pub.h"
 
 #include "devdrv_functional_cqsq.h"
 #include "devdrv_user_common.h"
@@ -32,16 +34,6 @@
 #include "tsdrv_interface.h"
 
 #define module_devdrv "devdrv"
-
-#ifndef __GFP_ACCOUNT
-#ifdef __GFP_KMEMCG
-#define __GFP_ACCOUNT __GFP_KMEMCG /* for linux version 3.10 */
-#endif
-
-#ifdef __GFP_NOACCOUNT
-#define __GFP_ACCOUNT 0 /* for linux version 4.1 */
-#endif
-#endif
 
 #ifdef UT_VCAST
 #define devdrv_drv_err(fmt, ...) drv_err(module_devdrv, fmt, ##__VA_ARGS__)
@@ -195,10 +187,6 @@
 
 #define DEVDRV_CBCQ_MAX_GID     1024
 #define ARMv8_Cortex_A55 0x41d05
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,10,0)
-#define ioremap_nocache ioremap
-#endif
 
 enum devdrv_power_mode {
     DEVDRV_LOW_POWER = 0x0,
@@ -644,14 +632,14 @@ struct devdrv_info {
                  */
 
     /* share memory info */
-    void __iomem *shm_vaddr;    /* bar virtual address & register to ub virtual address */
+    void __ka_mm_iomem *shm_vaddr;    /* bar virtual address & register to ub virtual address */
     u32 shm_size;
     u32 shm_size_register_rao;
-    U_SHM_INFO_HEAD __iomem *shm_head;
-    U_SHM_INFO_SOC __iomem *shm_soc;
-    U_SHM_INFO_BOARD __iomem *shm_board;
-    U_SHM_INFO_STATUS __iomem *shm_status;
-    U_SHM_INFO_HEARTBEAT __iomem *shm_heartbeat;
+    U_SHM_INFO_HEAD __ka_mm_iomem *shm_head;
+    U_SHM_INFO_SOC __ka_mm_iomem *shm_soc;
+    U_SHM_INFO_BOARD __ka_mm_iomem *shm_board;
+    U_SHM_INFO_STATUS __ka_mm_iomem *shm_status;
+    U_SHM_INFO_HEARTBEAT __ka_mm_iomem *shm_heartbeat;
 
     u64 computing_power[DEVDRV_MAX_COMPUTING_POWER_TYPE]; /* computing power level info */
     u32 dmp_started;
@@ -910,8 +898,8 @@ struct devdrv_client_info {
 
 #endif
 
-int copy_from_user_safe(void *to, const void __user *from, unsigned long n);
-int copy_to_user_safe(void __user *to, const void *from, unsigned long n);
+int copy_from_user_safe(void *to, const void __ka_user *from, unsigned long n);
+int copy_to_user_safe(void __ka_user *to, const void *from, unsigned long n);
 
 #define DRV_PRINT_START(args...)    \
         devdrv_drv_debug("enter %s: %.4d.\n", __func__, __LINE__)

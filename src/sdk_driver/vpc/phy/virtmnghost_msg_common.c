@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,6 +11,7 @@
  * GNU General Public License for more details.
  */
 
+#include "ka_kernel_def_pub.h"
 #include "virtmng_msg_common.h"
 #include "virtmng_extension.h"
 #include "virtmng_public_def.h"
@@ -19,7 +20,6 @@
 #include "virtmnghost_vpc_unit.h"
 #include "virtmnghost_msg.h"
 #include "virtmnghost_msg_common.h"
-#include "ka_kernel_def_pub.h"
 
 STATIC int vmngh_common_msg_send_para_check(u32 dev_id, u32 fid, enum vmng_msg_common_type cmn_type,
     const struct vmng_tx_msg_proc_info *tx_info)

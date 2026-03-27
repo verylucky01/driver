@@ -70,6 +70,12 @@ struct dsmi_sub_vdev_info {
     struct dsmi_vdev_spec_info spec; /**< specification of vdevice */
 };
 
+// 带宽单位是MB/S，对齐A2A3版本的实现，舍弃小数
+struct ub_bandwidth_t {
+    unsigned int tx_bandwidth;
+    unsigned int rx_bandwidth;
+};
+
 struct dsmi_vdev_info {
     unsigned int vdev_num;         /**< number of vdevice the devid had created */
     struct dsmi_vdev_spec_info spec_unused;  /**< resource the devid unallocated */
@@ -87,7 +93,7 @@ static inline void printf_stub(char *format, ...) {
 #define DEV_MON_PRINT        printf_stub
 #endif
 
-#if !defined CFG_SOC_PLATFORM_CLOUD && !defined CFG_FEATURE_ECC_DDR
+#if !defined CFG_SOC_PLATFORM_CLOUD && !defined CFG_FEATURE_ECC_DDR && !defined CFG_SOC_PLATFORM_CLOUD_V4
 DSMI_CMD_DEF_DAVINCI_INSTANCE(DEV_MON_CMD_GET_CHIP_PCIE_ERR_RATE, 0, sizeof(PCIE_ERR_RATE_INFO_STU), STATE_MANAGE_TYPE)
 DSMI_CMD_DEF_DAVINCI_INSTANCE(DEV_MON_CMD_CLEAR_CHIP_PCIE_ERR_RATE, 0, 0, STATE_MANAGE_TYPE)
 #else

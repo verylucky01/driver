@@ -321,4 +321,24 @@ void dev_mon_set_log_flag(unsigned int value);
     }  \
 } while (0)
 
+#define DEV_MON_ERR_RLIMIT(INTERVAL_SEC, fmt, ...) do {                                                         \
+    static long long last_print_ms_##INTERVAL_SEC##_##__LINE__ = 0;                                             \
+    static pthread_mutex_t rate_mutex_##INTERVAL_SEC##_##__LINE__ = PTHREAD_MUTEX_INITIALIZER;                  \
+    static int print_count_##INTERVAL_SEC##_##__LINE__ = 0;                                                     \
+    int can_print = 0;                                                                                          \
+    long long current_ms = 0;                                                                                   \
+    struct timespec ts;                                                                                         \
+    (void)clock_gettime(CLOCK_MONOTONIC, &ts);                                                                  \
+        current_ms = (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;                                        \
+    pthread_mutex_lock(&rate_mutex_##INTERVAL_SEC##_##__LINE__);                                                \
+    can_print = (current_ms - last_print_ms_##INTERVAL_SEC##_##__LINE__ >= (long long)INTERVAL_SEC * 1000);     \
+    if (can_print) {                                                                                            \
+        last_print_ms_##INTERVAL_SEC##_##__LINE__ = current_ms;                                                 \
+    }                                                                                                           \
+    print_count_##INTERVAL_SEC##_##__LINE__++;                                                                  \
+    pthread_mutex_unlock(&rate_mutex_##INTERVAL_SEC##_##__LINE__);                                              \
+    if (can_print) {                                                                                            \
+        DEV_MON_ERR("[Trigger=%d] " fmt, print_count_##INTERVAL_SEC##_##__LINE__, ##__VA_ARGS__);               \
+    }                                                                                                           \
+} while(0)
 #endif

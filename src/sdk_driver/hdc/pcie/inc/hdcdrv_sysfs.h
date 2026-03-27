@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,9 +14,8 @@
 #ifndef _EVENT_SYSFS_H_
 #define _EVENT_SYSFS_H_
 
-#include "hdcdrv_core.h"
 #include "ka_fs_pub.h"
-#include "ka_common_pub.h"
+#include "hdcdrv_core.h"
 
 #define HDCDRV_ATTR_RD (KA_S_IRUSR | KA_S_IRGRP)
 #define HDCDRV_ATTR_WR (KA_S_IWUSR | KA_S_IWGRP)

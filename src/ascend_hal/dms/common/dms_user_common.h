@@ -63,4 +63,7 @@ drvError_t ioctl_errno_convert(int ret, int errno_param);
 
 #define DMS_VIRT_ADAPT_FUNC(virt_func, phy_func) ((DmsGetVirtFlag() == true) ? (virt_func) : (phy_func))
 drvError_t dmsCloseRestoreHandler(uint32_t devid, halDevCloseIn *in);
+drvError_t dmsProcResRestoreHandler(halProcResRestoreInfo *info);
+drvError_t dms_res_enable_p2p(u32 dev_num);
+drvError_t dms_res_rollback_p2p(u32 target_dev_id, u32 target_peer_id, u32 tmp_cnt);
 #endif

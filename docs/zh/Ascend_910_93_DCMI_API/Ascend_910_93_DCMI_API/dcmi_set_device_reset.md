@@ -89,12 +89,12 @@
 
 **约束说明<a name="zh-cn_topic_0000001206467196_zh-cn_topic_0000001177894694_zh-cn_topic_0000001099300038_toc533412082"></a>**
 
-- 带外复位芯片功能依赖ipmitool软件，需要提前下载并加载驱动。详细操作请参见[准备ipmitool软件](faq.md#准备ipmitool软件)章节。
-- iBMC版本为5.8.3.43及之后的版本支持带外复位芯片功能。
-- 带外复位芯片依赖[dcmi\_get\_device\_outband\_channel\_state](dcmi_get_device_outband_channel_state.md)和[dcmi\_pre\_reset\_soc](dcmi_pre_reset_soc.md)接口，请先确保带外通道状态为正常并且芯片预复位成功，再调用该接口进行带外复位。
-- 复位指定芯片：对于Atlas 9000 A3 SuperPoD 集群算力系统会复位指定芯片所在的NPU模组；对于Atlas 900 A3 SuperPoD 超节点、Atlas 800T A3 超节点、Atlas 800I A3 超节点、A200T A3 Box8 超节点服务器会复位指定芯片所在的NPU模组及与其具备网口互助关系的NPU模组，网口互助关系的模组查询请参见[dcmi\_get\_netdev\_brother\_device](dcmi_get_netdev_brother_device.md)。
+-   带外复位芯片功能依赖ipmitool软件，需要提前下载并加载驱动。详细操作请参见[准备ipmitool软件](准备ipmitool软件.md)章节。
+-   iBMC版本为5.8.3.43及之后的版本支持带外复位芯片功能。
+-   带外复位芯片依赖[dcmi\_get\_device\_outband\_channel\_state](dcmi_get_device_outband_channel_state.md)和[dcmi\_pre\_reset\_soc](dcmi_pre_reset_soc.md)接口，请先确保带外通道状态为正常并且芯片预复位成功，再调用该接口进行带外复位。
+-   复位指定芯片：对于Atlas 9000 A3 SuperPoD 集群算力系统会复位指定芯片所在的NPU模组；对于Atlas 900 A3 SuperPoD 超节点、Atlas 800T A3 超节点、Atlas 800I A3 超节点、A200T A3 Box8 超节点服务器会复位指定芯片所在的NPU模组及与其具备网口互助关系的NPU模组，网口互助关系的模组查询请参见[dcmi\_get\_netdev\_brother\_device](dcmi_get_netdev_brother_device.md)。
 
-- 对于Atlas 9000 A3 SuperPoD 集群算力系统、Atlas 900 A3 SuperPoD 超节点、Atlas 800T A3 超节点和Atlas 800I A3 超节点，该接口支持在物理机+特权容器场景下使用；对于A200T A3 Box8 超节点服务器，该接口支持在物理机+特权容器场景下进行芯片带内复位，不支持在物理机+特权容器场景下进行芯片带外复位。
+-   对于Atlas 9000 A3 SuperPoD 集群算力系统、Atlas 900 A3 SuperPoD 超节点、Atlas 800T A3 超节点和Atlas 800I A3 超节点，该接口支持在物理机+特权容器场景下使用；对于A200T A3 Box8 超节点服务器，该接口支持在物理机+特权容器场景下进行芯片带内复位，不支持在物理机+特权容器场景下进行芯片带外复位。
 
 **表 1** 不同部署场景下的支持情况
 
@@ -167,7 +167,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001206467196_zh-cn_topic_0000001177894694_zh-cn_topic_0000001099300038_toc533412083"></a>**
 
-```c
+```
 … 
 int ret = 0;
 int card_id = 0;
@@ -191,3 +191,4 @@ if (ret != 0) {
 }
 …
 ```
+

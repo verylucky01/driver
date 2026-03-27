@@ -9,6 +9,6 @@
 # ------------------------------------------------------------------------------------------------------------
 if (${PRODUCT} STREQUAL ascend910B)
     add_subdirectory(v2)
-elseif(${PRODUCT} STREQUAL ascend910_95)
+elseif(${PRODUCT} STREQUAL ascend950)
     add_subdirectory(v3)
 endif()

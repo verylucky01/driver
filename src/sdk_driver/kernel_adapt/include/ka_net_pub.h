@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -122,76 +122,241 @@ typedef struct net_device_ops ka_net_device_ops_t;
     .ndo_get_stats = n_ndo_get_stats,
 
 typedef struct net_device_stats ka_net_device_stats_t;
-static inline void ka_net_netdev_set_stats(ka_net_device_t *dev, ka_net_device_stats_t *stats)
+static inline void ka_net_netdev_set_stats(ka_net_device_t *ndev, ka_net_device_stats_t *stats)
 {
-    dev->stats = *stats;
+    ndev->stats = *stats;
 }
 
-static inline ka_net_device_stats_t *ka_net_netdev_get_stats(ka_net_device_t *dev)
+static inline ka_net_device_stats_t *ka_net_netdev_get_stats(ka_net_device_t *ndev)
 {
-    return &dev->stats;
+    return &ndev->stats;
 }
 
-static inline unsigned long ka_net_netdev_get_stats_tx_packets(ka_net_device_t *dev)
+static inline unsigned long long ka_net_netdev_get_stats_tx_packets(ka_net_device_t *ndev)
 {
-    return dev->stats.tx_packets;
+    return ndev->stats.tx_packets;
 }
 
-static inline void ka_net_netdev_set_trans_start(ka_net_device_t *dev)
+static inline void ka_net_netdev_set_trans_start(ka_net_device_t *ndev)
 {
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(4, 2, 0)
 #ifndef RHEL_RELEASE_CODE
-    dev->trans_start = jiffies;
+    ndev->trans_start = jiffies;
 #endif
 #endif
 }
 
-static inline void ka_net_netdev_tx_dropped_add(ka_net_device_t *dev)
+static inline void ka_net_netdev_tx_dropped_add(ka_net_device_t *ndev)
 {
-    dev->stats.tx_dropped++;
+    ndev->stats.tx_dropped++;
 }
 
-static inline void ka_net_netdev_tx_fifo_errors_add(ka_net_device_t *dev)
+static inline unsigned long long ka_net_netdev_get_stats_tx_dropped(ka_net_device_t *ndev)
 {
-    dev->stats.tx_fifo_errors++;
+    return ndev->stats.tx_dropped;
 }
 
-static inline void ka_net_netdev_tx_packets_add(ka_net_device_t *dev)
+static inline void ka_net_netdev_tx_fifo_errors_add(ka_net_device_t *ndev)
 {
-    dev->stats.tx_packets++;
+    ndev->stats.tx_fifo_errors++;
 }
 
-static inline void ka_net_netdev_tx_bytes_add(ka_net_device_t *dev, unsigned int len)
+static inline unsigned long long ka_net_netdev_get_stats_tx_fifo_errors(ka_net_device_t *ndev)
 {
-    dev->stats.tx_bytes += len;
+    return ndev->stats.tx_fifo_errors;
 }
 
-static inline void ka_net_netdev_tx_errors_add(ka_net_device_t *dev)
+static inline void ka_net_netdev_tx_packets_add(ka_net_device_t *ndev)
 {
-    dev->stats.tx_errors++;
+    ndev->stats.tx_packets++;
 }
 
-static inline void ka_net_netdev_set_last_rx(ka_net_device_t *dev)
+static inline void ka_net_netdev_tx_bytes_add(ka_net_device_t *ndev, unsigned int len)
+{
+    ndev->stats.tx_bytes += len;
+}
+
+static inline unsigned long long ka_net_netdev_get_stats_tx_bytes(ka_net_device_t *ndev)
+{
+    return ndev->stats.tx_bytes;
+}
+
+static inline void ka_net_netdev_rx_bytes_add(ka_net_device_t *ndev, unsigned int len)
+{
+    ndev->stats.rx_bytes += len;
+}
+
+static inline unsigned long long ka_net_netdev_get_stats_rx_bytes(ka_net_device_t *ndev)
+{
+    return ndev->stats.rx_bytes;
+}
+
+static inline void ka_net_netdev_tx_errors_add(ka_net_device_t *ndev)
+{
+    ndev->stats.tx_errors++;
+}
+
+static inline unsigned long long ka_net_netdev_get_stats_tx_errors(ka_net_device_t *ndev)
+{
+    return ndev->stats.tx_errors;
+}
+
+static inline void ka_net_netdev_rx_packets_add(ka_net_device_t *ndev)
+{
+    ndev->stats.rx_packets++;
+}
+
+static inline unsigned long long ka_net_netdev_get_stats_rx_packets(ka_net_device_t *ndev)
+{
+    return ndev->stats.rx_packets;
+}
+
+static inline void ka_net_netdev_rx_dropped_add(ka_net_device_t *ndev)
+{
+    ndev->stats.rx_dropped++;
+}
+
+static inline unsigned long long ka_net_netdev_get_stats_rx_dropped(ka_net_device_t *ndev)
+{
+    return ndev->stats.rx_dropped;
+}
+
+static inline void ka_net_netdev_tx_carrier_errors_add(ka_net_device_t *ndev)
+{
+    ndev->stats.tx_carrier_errors++;
+}
+
+static inline unsigned long long ka_net_netdev_get_stats_tx_carrier_errors(ka_net_device_t *ndev)
+{
+    return ndev->stats.tx_carrier_errors;
+}
+
+static inline unsigned long long ka_net_netdev_get_stats_rx_errors(ka_net_device_t *ndev)
+{
+    return ndev->stats.rx_errors;
+}
+
+static inline unsigned long long ka_net_netdev_get_stats_multicast(ka_net_device_t *ndev)
+{
+    return ndev->stats.multicast;
+}
+
+static inline unsigned long long ka_net_netdev_get_stats_collisions(ka_net_device_t *ndev)
+{
+    return ndev->stats.collisions;
+}
+
+static inline unsigned long long ka_net_netdev_get_stats_rx_length_errors(ka_net_device_t *ndev)
+{
+    return ndev->stats.rx_length_errors;
+}
+
+static inline unsigned long long ka_net_netdev_get_stats_rx_over_errors(ka_net_device_t *ndev)
+{
+    return ndev->stats.rx_over_errors;
+}
+
+static inline unsigned long long ka_net_netdev_get_stats_rx_crc_errors(ka_net_device_t *ndev)
+{
+    return ndev->stats.rx_crc_errors;
+}
+
+static inline unsigned long long ka_net_netdev_get_stats_rx_frame_errors(ka_net_device_t *ndev)
+{
+    return ndev->stats.rx_frame_errors;
+}
+
+static inline unsigned long long ka_net_netdev_get_stats_rx_fifo_errors(ka_net_device_t *ndev)
+{
+    return ndev->stats.rx_fifo_errors;
+}
+
+static inline unsigned long long ka_net_netdev_get_stats_rx_missed_errors(ka_net_device_t *ndev)
+{
+    return ndev->stats.rx_missed_errors;
+}
+
+static inline unsigned long long ka_net_netdev_get_stats_tx_aborted_errors(ka_net_device_t *ndev)
+{
+    return ndev->stats.tx_aborted_errors;
+}
+
+static inline unsigned long long ka_net_netdev_get_stats_tx_heartbeat_errors(ka_net_device_t *ndev)
+{
+    return ndev->stats.tx_heartbeat_errors;
+}
+
+static inline unsigned long long ka_net_netdev_get_stats_tx_window_errors(ka_net_device_t *ndev)
+{
+    return ndev->stats.tx_window_errors;
+}
+
+static inline unsigned long long ka_net_netdev_get_stats_rx_compressed(ka_net_device_t *ndev)
+{
+    return ndev->stats.rx_compressed;
+}
+
+static inline unsigned long long ka_net_netdev_get_stats_tx_compressed(ka_net_device_t *ndev)
+{
+    return ndev->stats.tx_compressed;
+}
+
+static inline void ka_net_netdev_set_last_rx(ka_net_device_t *ndev)
 {
 #ifdef RHEL_RELEASE_CODE
 #if (RHEL_RELEASE_VERSION(7, 5) > RHEL_RELEASE_CODE)
-    dev->last_rx = jiffies;
+    ndev->last_rx = jiffies;
 #endif
 #else
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(4, 2, 0)
-    dev->last_rx = jiffies;
+    ndev->last_rx = jiffies;
 #endif
 #endif
 }
 
-static inline void ka_net_netdev_set_mtu(ka_net_device_t *dev, unsigned int mtu)
+static inline void ka_net_netdev_set_mtu(ka_net_device_t *ndev, unsigned int mtu)
 {
-    dev->mtu = mtu;
+    ndev->mtu = mtu;
 }
 
-static inline unsigned int ka_net_netdev_get_mtu(ka_net_device_t *dev)
+static inline unsigned int ka_net_netdev_get_mtu(ka_net_device_t *ndev)
 {
-    return dev->mtu;
+    return ndev->mtu;
+}
+
+static inline char *ka_net_netdev_get_name(ka_net_device_t *ndev)
+{
+    return ndev->name;
+}
+
+static inline void ka_net_netdev_set_netdev_ops(ka_net_device_t *ndev, ka_net_device_ops_t *netdev_ops)
+{
+    ndev->netdev_ops = netdev_ops;
+}
+
+static inline void ka_net_netdev_set_ethtool_ops(ka_net_device_t *ndev, ka_ethtool_ops_t *ethtools_ops)
+{
+    ndev->ethtool_ops = ethtools_ops;
+}
+
+static inline void ka_net_netdev_set_watchdog_timeo(ka_net_device_t *ndev, int val)
+{
+    ndev->watchdog_timeo = val;
+}
+
+static inline void ka_net_netdev_set_hw_features(ka_net_device_t *ndev, unsigned long long hw_features)
+{
+    ndev->hw_features |= hw_features;
+}
+
+static inline void ka_net_netdev_set_features(ka_net_device_t *ndev, unsigned long long features)
+{
+    ndev->features |= features;
+}
+
+static inline void ka_net_netdev_set_max_mtu(ka_net_device_t *ndev, unsigned int max_mtu)
+{
+    ndev->max_mtu = max_mtu;
 }
 
 static inline size_t ka_net_copy_to_iter(void *addr, size_t bytes, ka_iov_iter_t *i)
@@ -330,7 +495,7 @@ static inline void ka_net_set_ki_pos(ka_kiocb_t* iocb, long long ki_pos)
 #define ka_net_nlmsg_put(skb, portid, seq, type, len, flags) nlmsg_put(skb, portid, seq, type, len, flags)
 #define ka_net_netlink_dump_start(ssk, skb, nlh, control) netlink_dump_start(ssk, skb, nlh, control)
 ka_net_device_t *ka_net_alloc_netdev(int sizeof_priv, const char *ndev_name);
-void ka_net_netif_napi_add(ka_net_device_t *dev, ka_napi_struct_t *napi, int (*poll)(ka_napi_struct_t *, int), int weight);
+void ka_net_netif_napi_add(ka_net_device_t *ndev, ka_napi_struct_t *napi, int (*poll)(ka_napi_struct_t *, int), int weight);
 #ifndef EMU_ST
 #define ka_net_napi_gro_receive(napi, skb) napi_gro_receive(napi, skb)
 #define ka_net_netif_start_queue(kdev) netif_start_queue(kdev)

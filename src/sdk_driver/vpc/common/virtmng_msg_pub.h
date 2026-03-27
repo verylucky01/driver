@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,11 +14,11 @@
 #ifndef VIRTMNG_MSG_DEF_H
 #define VIRTMNG_MSG_DEF_H
 
+#include "ka_task_pub.h"
+#include "ka_list_pub.h"
 #include "virtmng_resource.h"
 #include "vmng_kernel_interface.h"
 #include "virtmng_msg_common.h"
-#include "ka_task_pub.h"
-#include "ka_list_pub.h"
 
 /* config */
 #define VMNG_MSG_CHAN_NUM_MAX VMNG_IRQ_NUM_FOR_MSG
@@ -190,8 +190,8 @@ enum vmng_msg_dev_type {
 struct vmng_msg_dev {
     void *unit;
     ka_workqueue_struct_t *work_queue;
-    void __iomem *db_base; /* db base from zero, so db_base + db_irq_base *4 is the first doorbell for msg */
-    void __iomem *mem_base;
+    void __ka_mm_iomem *db_base; /* db base from zero, so db_base + db_irq_base *4 is the first doorbell for msg */
+    void __ka_mm_iomem *mem_base;
     struct vmng_msg_ops ops;
     struct vmng_msg_cluster msg_cluster[VMNG_MSG_CHAN_TYPE_MAX];
     struct vmng_msg_chan_tx *admin_tx;

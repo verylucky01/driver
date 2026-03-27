@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,8 +11,8 @@
  * GNU General Public License for more details.
  */
 
-#include "msg_chan_main.h"
 #include "ka_kernel_def_pub.h"
+#include "msg_chan_main.h"
 
 ka_device_t *devdrv_base_comm_get_device(u32 devid, u32 vfid, u32 udevid);
 int devdrv_get_device_boot_status_inner(u32 index_id, u32 *boot_status)
@@ -21,7 +21,7 @@ int devdrv_get_device_boot_status_inner(u32 index_id, u32 *boot_status)
     struct devdrv_comm_dev_ops *dev_ops = devdrv_add_ops_ref();
     if (dev_ops == NULL) {
         devdrv_err("Get boot status fail.\n");
-        return -EINVAL;
+        return -ENODEV;
     }
     ret = dev_ops->ops.get_boot_status(index_id, boot_status);
     devdrv_sub_ops_ref(dev_ops);
@@ -45,7 +45,7 @@ int devdrv_get_host_phy_mach_flag(u32 devid, u32 *host_flag)
     struct devdrv_comm_dev_ops *dev_ops = devdrv_add_ops_ref();
     if (dev_ops == NULL) {
         devdrv_err("Get host phy mach flag fail.\n");
-        return -EINVAL;
+        return -ENODEV;
     }
     (void)uda_udevid_to_add_id(devid, &index_id);
     ret = dev_ops->ops.get_host_phy_mach_flag(index_id, host_flag);
@@ -60,7 +60,7 @@ int devdrv_get_env_boot_type_inner(u32 index_id)
     struct devdrv_comm_dev_ops *dev_ops = devdrv_add_ops_ref();
     if (dev_ops == NULL) {
         devdrv_err("Get env boot type fail.\n");
-        return -EINVAL;
+        return -ENODEV;
     }
     ret = dev_ops->ops.get_env_boot_type(index_id);
     devdrv_sub_ops_ref(dev_ops);
@@ -102,7 +102,7 @@ int devdrv_get_dev_topology(u32 devid, u32 peer_devid, int *topo_type)
     struct devdrv_comm_dev_ops *dev_ops = devdrv_add_ops_ref();
     if (dev_ops == NULL) {
         devdrv_err("Get dev topology fail.\n");
-        return -EINVAL;
+        return -ENODEV;
     }
     (void)uda_udevid_to_add_id(devid, &index_id);
     (void)uda_udevid_to_add_id(peer_devid, &peer_index_id);
@@ -120,7 +120,7 @@ int devdrv_get_device_info(u32 devid, struct devdrv_base_device_info *device_inf
     u32 index_id;
     if (dev_ops == NULL) {
         devdrv_err("Get dev info fail.\n");
-        return -EINVAL;
+        return -ENODEV;
     }
 
     if (dev_ops->ops.get_device_info != NULL) {
@@ -138,7 +138,7 @@ int devdrv_hot_pre_reset(u32 dev_id)
     u32 index_id;
     if (dev_ops == NULL) {
         devdrv_err("Get pre reset fail.\n");
-        return -EINVAL;
+        return -ENODEV;
     }
 
     if (dev_ops->ops.prereset_assemble != NULL) {
@@ -157,7 +157,7 @@ int devdrv_hot_reset_device(u32 dev_id)
     u32 index_id;
     if (dev_ops == NULL) {
         devdrv_err("Get reset fail.\n");
-        return -EINVAL;
+        return -ENODEV;
     }
 
     if (dev_ops->ops.hotreset_assemble != NULL) {
@@ -177,7 +177,7 @@ int devdrv_hotreset_atomic_rescan(u32 dev_id)
 
     if (dev_ops == NULL) {
         devdrv_err("Get rescan fail.\n");
-        return -EINVAL;
+        return -ENODEV;
     }
 
     if (dev_ops->ops.rescan_atomic != NULL) {
@@ -196,7 +196,7 @@ int devdrv_p2p_attr_op(struct devdrv_base_comm_p2p_attr *attr)
 
     if (dev_ops == NULL) {
         devdrv_err("Get p2p attr fail.\n");
-        return -EINVAL;
+        return -ENODEV;
     }
 
     if (dev_ops->ops.p2p_attr_op != NULL) {
@@ -225,7 +225,7 @@ int devdrv_hotreset_atomic_unbind(u32 dev_id)
     u32 index_id;
     if (dev_ops == NULL) {
         devdrv_err("Get unbind fail.\n");
-        return -EINVAL;
+        return -ENODEV;
     }
 
     if (dev_ops->ops.unbind_atomic != NULL) {
@@ -244,7 +244,7 @@ int devdrv_hotreset_atomic_reset(u32 dev_id)
     u32 index_id;
     if (dev_ops == NULL) {
         devdrv_err("Get devdrv_hotreset_atomic_reset fail.\n");
-        return -EINVAL;
+        return -ENODEV;
     }
 
     if (dev_ops->ops.reset_atomic != NULL) {
@@ -263,7 +263,7 @@ int devdrv_hotreset_atomic_remove(u32 dev_id)
     u32 index_id;
     if (dev_ops == NULL) {
         devdrv_err("Get remove fail.\n");
-        return -EINVAL;
+        return -ENODEV;
     }
 
     if (dev_ops->ops.remove_atomic != NULL) {
@@ -274,3 +274,22 @@ int devdrv_hotreset_atomic_remove(u32 dev_id)
     return ret;
 }
 KA_EXPORT_SYMBOL(devdrv_hotreset_atomic_remove);
+
+int devdrv_get_com_status_inner(u32 dev_id, struct devdrv_comm_status_info *status)
+{
+    struct devdrv_comm_dev_ops *dev_ops = devdrv_add_ops_ref_after_unbind();
+    int ret = -EOPNOTSUPP;
+    u32 index_id;
+    if (dev_ops == NULL) {
+        devdrv_err("Get dev ops fail.\n");
+        return -ENODEV;
+    }
+
+    if (dev_ops->ops.get_com_status != NULL) {
+        (void)uda_udevid_to_add_id(dev_id, &index_id);
+        ret = dev_ops->ops.get_com_status(index_id, status);
+    }
+    devdrv_sub_ops_ref(dev_ops);
+    return ret;
+}
+KA_EXPORT_SYMBOL(devdrv_get_com_status_inner);

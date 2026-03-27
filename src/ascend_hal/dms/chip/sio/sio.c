@@ -35,7 +35,7 @@ int DmsGetSioInfo(unsigned int dev_id, unsigned int vfid, unsigned int sub_cmd, 
     }
 
     sio_sub_cmd = sub_cmd & DSMI_SIO_SUB_CMD_BIT;
-    info.sllc_index  = (unsigned char)(sub_cmd & DSMI_SIO_SLLC_INDEX_BIT) >> DSMI_SIO_SLLC_INDEX_OFFSET;
+    info.sllc_index  = (unsigned char)((sub_cmd & DSMI_SIO_SLLC_INDEX_BIT) >> DSMI_SIO_SLLC_INDEX_OFFSET);
 
     ret = DmsGetDeviceInfoEx(dev_id, DSMI_MAIN_CMD_SIO, sio_sub_cmd, &info, &out_len);
     if (ret != 0) {

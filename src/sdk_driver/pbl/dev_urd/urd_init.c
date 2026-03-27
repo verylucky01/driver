@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,22 +10,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
-#include <linux/io.h>
-#include <linux/ioctl.h>
-#include <linux/kernel.h>
-#include <linux/slab.h>
-#include <linux/uaccess.h>
-#include <linux/mutex.h>
-#include <linux/cdev.h>
-#include <linux/delay.h>
-#include <linux/notifier.h>
-#include <linux/list.h>
-#include <linux/module.h>
-#include <linux/atomic.h>
-#include <linux/poll.h>
-#include <linux/sort.h>
-#include <linux/vmalloc.h>
 
 #include "pbl/pbl_davinci_api.h"
 #include "davinci_interface.h"
@@ -45,10 +29,7 @@
 #include "ka_memory_pub.h"
 #include "ka_kernel_def_pub.h"
 #include "ka_base_pub.h"
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0)
-#include <linux/namei.h>
-#endif
+#include "ka_common_pub.h"
 
 #define COPY_FUNC_NUM 2
 #define FILTER_MAX_LEN 128
@@ -80,7 +61,7 @@ int (*copy_func_from[MSG_FROM_TYPE_MAX])(void *to, unsigned long to_len, const v
     copy_from_user_local,
 };
 
-STATIC int dms_open(struct inode* inode, struct file* filep)
+STATIC int dms_open(ka_inode_t* inode, ka_file_t* filep)
 {
     struct urd_file_private_stru* file_private = NULL;
     if (filep == NULL) {
@@ -98,13 +79,13 @@ STATIC int dms_open(struct inode* inode, struct file* filep)
         ka_system_module_put(KA_THIS_MODULE);
         return -ENOMEM;
     }
-    file_private->owner_pid = current->tgid;
+    file_private->owner_pid = ka_task_get_current_tgid();
     filep->private_data = (void *)file_private;
     ka_base_atomic_set(&file_private->work_count, 0);
     return 0;
 }
 
-STATIC int dms_release(struct inode* inode, struct file* filep)
+STATIC int dms_release(ka_inode_t* inode, ka_file_t* filep)
 {
     struct urd_file_private_stru* file_private = NULL;
 
@@ -124,7 +105,7 @@ STATIC int dms_release(struct inode* inode, struct file* filep)
     return 0;
 }
 
-STATIC unsigned int dms_msg_poll(struct file* filep, struct poll_table_struct* wait)
+STATIC unsigned int dms_msg_poll(ka_file_t* filep, ka_poll_table_struct_t* wait)
 {
     return KA_POLLERR;
 }
@@ -217,9 +198,9 @@ STATIC int dms_make_feature_max_output(struct urd_cmd_para* cmd_para, DMS_FEATUR
         return -EINVAL;
     }
 
-    arg->output = ka_mm_kzalloc(cmd_para->output_len, KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
+    arg->output = ka_mm_vzalloc(cmd_para->output_len);
     if (arg->output == NULL) {
-        dms_err("ka_mm_kzalloc failed. (size=%u)\n", cmd_para->output_len);
+        dms_err("ka_mm_vzalloc failed. (size=%u)\n", cmd_para->output_len);
         return -ENOMEM;
     }
     arg->output_len = cmd_para->output_len;
@@ -257,9 +238,9 @@ STATIC int dms_make_feature_output(struct urd_cmd *cmd, struct urd_cmd_para *cmd
     }
 
     if (cmd_para->output_len <= DMS_MAX_OUTPUT_LEN) {
-        arg->output = ka_mm_kzalloc(cmd_para->output_len, KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
+        arg->output = ka_mm_vzalloc(cmd_para->output_len);
         if (arg->output == NULL) {
-            dms_err("ka_mm_kzalloc failed. (size=%u)\n", cmd_para->output_len);
+            dms_err("ka_mm_vzalloc failed. (size=%u)\n", cmd_para->output_len);
             return -ENOMEM;
         }
         arg->output_len = cmd_para->output_len;
@@ -297,7 +278,7 @@ STATIC void dms_free_msg(DMS_FEATURE_ARG_S* arg)
         arg->input = NULL;
     }
     if (arg->output != NULL) {
-        ka_mm_kfree(arg->output);
+        ka_mm_vfree(arg->output);
         arg->output = NULL;
     }
     return;
@@ -382,7 +363,7 @@ int dms_cmd_process_from_kernel(u32 devid, struct urd_cmd *cmd, struct urd_cmd_p
 }
 KA_EXPORT_SYMBOL(dms_cmd_process_from_kernel);
 
-STATIC long dms_ioctl(struct file* filep, unsigned int ioctl_cmd, unsigned long arg)
+STATIC long dms_ioctl(ka_file_t* filep, unsigned int ioctl_cmd, unsigned long arg)
 {
     int ret;
     struct urd_ioctl_arg ctl_arg = {0};
@@ -409,15 +390,15 @@ STATIC long dms_ioctl(struct file* filep, unsigned int ioctl_cmd, unsigned long 
     return ret;
 }
 
-const struct file_operations g_dms_file_operations = {
-    .owner = KA_THIS_MODULE,
-    .open = dms_open,
-    .release = dms_release,
-    .poll = dms_msg_poll,
-    .unlocked_ioctl = dms_ioctl,
+const ka_file_operations_t g_dms_file_operations = {
+    ka_fs_init_f_owner(KA_THIS_MODULE)
+    ka_fs_init_f_open(dms_open)
+    ka_fs_init_f_release(dms_release)
+    ka_fs_init_f_poll(dms_msg_poll)
+    ka_fs_init_f_unlocked_ioctl(dms_ioctl)
 };
 
-STATIC int urd_release_prepare(struct file *file_op, unsigned long mode)
+STATIC int urd_release_prepare(ka_file_t *file_op, unsigned long mode)
 {
     if (mode != NOTIFY_MODE_RELEASE_PREPARE) {
         dms_err("Invalid mode. (mode=%lu)\n", mode);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -46,14 +46,14 @@ static struct trs_rsv_mem *trs_rsv_mem_create(struct trs_id_inst *inst, int type
         return NULL;
     }
 
-    pool = ka_base_gen_pool_create(PAGE_SHIFT, NUMA_NO_NODE);
+    pool = ka_base_gen_pool_create(KA_MM_PAGE_SHIFT, KA_NUMA_NO_NODE);
     if (pool == NULL) {
         trs_kfree(rsv_mem);
         trs_err("Gen pool creat fail. (devid=%u; tsid=%u; type=%d)\n", inst->devid, inst->tsid, type);
         return NULL;
     }
 
-    ret = ka_base_gen_pool_add_virt(pool, (unsigned long)attr->vaddr, attr->paddr, attr->total_size, NUMA_NO_NODE);
+    ret = ka_base_gen_pool_add_virt(pool, (unsigned long)attr->vaddr, attr->paddr, attr->total_size, KA_NUMA_NO_NODE);
     if (ret != 0) {
         ka_base_gen_pool_destroy(pool);
         trs_kfree(rsv_mem);
@@ -160,6 +160,10 @@ static void trs_rsv_mem_del(struct trs_id_inst *inst, int type)
     ka_task_write_unlock_bh(&rsv_mem_lock);
 
     if (rsv_mem != NULL) {
+        u32 ref = kref_safe_read(&rsv_mem->ref);
+        if (ref > 1) {
+            trs_warn("Rsv mem is still in use. (type=%d; ref=%u)", type, ref);
+        }
         kref_safe_put(&rsv_mem->ref, trs_rsv_mem_release);
     }
 }

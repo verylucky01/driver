@@ -12,6 +12,7 @@ $(MODULE_NAME)-objs += msg_chan/common/msg_chan_main_comm.o
 $(MODULE_NAME)-objs += msg_chan/common/msg_chan_msg_comm.o
 $(MODULE_NAME)-objs += msg_chan/common/msg_chan_urd_comm.o
 $(MODULE_NAME)-objs += msg_chan/common/msg_chan_rao_comm.o
+$(MODULE_NAME)-objs += msg_chan/common/pcie_dma_interface.o
 $(MODULE_NAME)-objs += msg_chan/host/msg_chan_common_msg.o
 $(MODULE_NAME)-objs += msg_chan/host/msg_chan_dev_info.o
 $(MODULE_NAME)-objs += msg_chan/host/msg_chan_msg.o
@@ -19,6 +20,7 @@ $(MODULE_NAME)-objs += msg_chan/host/msg_chan_rao.o
 $(MODULE_NAME)-objs += msg_chan/host/msg_chan_urd.o
 $(MODULE_NAME)-objs += msg_chan/host/msg_chan_main.o
 $(MODULE_NAME)-objs += msg_chan/dc/msg_chan_init.o
+$(MODULE_NAME)-objs += msg_chan/host/msg_chan_s2s.o
 
 EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/inc
 EXTRA_CFLAGS += -I$(DRIVER_HAL_INC_DIR)
@@ -35,6 +37,9 @@ EXTRA_CFLAGS += -DCFG_HOST_ENV
 EXTRA_CFLAGS += -DCFG_FEATURE_SRIOV
 EXTRA_CFLAGS += -DCFG_ENV_HOST
 EXTRA_CFLAGS += -DCFG_FEATURE_HOST_LOG
+
+include $(FEATURE_MK_PATH)
+EXTRA_CFLAGS += $(CONFIG_DEFINES)
 
 ccflags-y += -fno-common -fstack-protector-all -funsigned-char -pipe -s -Wall -Wcast-align -Werror -Wfloat-equal
 ccflags-y += -Wformat=2 -Wstack-usage=2048 -Wstrict-prototypes -Wtrampolines -Wundef -Wunused -Wvla -Wno-format-nonliteral

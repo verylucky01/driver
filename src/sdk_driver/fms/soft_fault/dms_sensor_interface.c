@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,18 +10,16 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-#include <linux/string.h>
-#include <linux/slab.h>
-#include <linux/fs.h>
+#include "ka_base_pub.h"
+#include "ka_list_pub.h"
+#include "ka_memory_pub.h"
+#include "ka_task_pub.h"
+
 #include "soft_fault_define.h"
 #include "devdrv_user_common.h"
 #include "pbl_mem_alloc_interface.h"
 #include "dms_sensor_interface.h"
 #include "ascend_dev_num.h"
-#include "ka_base_pub.h"
-#include "ka_list_pub.h"
-#include "ka_memory_pub.h"
-#include "ka_task_pub.h"
 
 #define SOFT_PARSE_HANDLE(node_type, sensor_idx, sensor_type, handle) \
 do { \
@@ -101,7 +99,7 @@ STATIC int user_sensor_register(struct soft_dev *user_node, struct dms_sensor_no
     unsigned int user_id, unsigned int sub_id)
 {
     int ret;
-    int pid = current->tgid;
+    int pid = ka_task_get_current_tgid();
     unsigned int assert_event_mask = cfg->assert_event_mask;
     unsigned int deassert_event_mask = cfg->deassert_event_mask;
     struct dms_sensor_object_cfg *obj = &user_node->sensor_obj_table[sub_id];
@@ -128,7 +126,7 @@ STATIC int user_sensor_register(struct soft_dev *user_node, struct dms_sensor_no
     ret = dms_sensor_register_for_userspace(&user_node->dev_node, obj);
     if (ret != 0) {
         soft_drv_err("Register sensor failed. (dev_id=%u; user_name=%s; node_type=0x%x; sensor_type=0x%x; ret=%d)\n",
-            user_node->dev_id, current->comm, cfg->node_type, cfg->sensor_type, ret);
+            user_node->dev_id, ka_task_get_current_comm(), cfg->node_type, cfg->sensor_type, ret);
         return ret;
     }
 
@@ -160,7 +158,7 @@ STATIC int user_dev_node_register(unsigned int dev_id, unsigned int user_id, str
         ret = dms_register_dev_node(&user_node->dev_node);
         if (ret != 0) {
             soft_drv_err("register dev_node failed. (dev_id=%u; user_name=%s; node_type=%u; ret=%d)\n",
-                dev_id, current->comm, cfg->node_type, ret);
+                dev_id, ka_task_get_current_comm(), cfg->node_type, ret);
             return ret;
         }
     }
@@ -227,7 +225,7 @@ STATIC struct soft_dev *soft_dev_node_get(unsigned int dev_id, struct soft_dev_c
     if (*first_register) {
         s_dev =  dbl_kzalloc(sizeof(struct soft_dev), KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
         if (s_dev == NULL) {
-            soft_drv_err("ka_mm_kzalloc soft_dev failed. (user_name=%s)\n", current->comm);
+            soft_drv_err("ka_mm_kzalloc soft_dev failed. (user_name=%s)\n", ka_task_get_current_comm());
             return NULL;
         }
         soft_one_dev_init(s_dev);
@@ -244,7 +242,7 @@ STATIC void soft_dev_client_add(struct soft_dev_client *client, struct soft_dev 
     uint32_t *user_num, int first_register)
 {
     if (client->registered == 0) {
-        client->pid = current->tgid;
+        client->pid = ka_task_get_current_tgid();
         client->user_id = user_id;
         client->registered = 1;
         (*user_num)++;
@@ -264,7 +262,7 @@ STATIC struct soft_dev_client* dms_soft_get_client(u32 dev_id, struct drv_soft_c
     int i;
 
     for (i = SF_SENSOR_USER; i < SF_USER_MAX; i++) {
-        if (soft_ctrl->s_dev_t[dev_id][i]->pid == current->tgid) {
+        if (soft_ctrl->s_dev_t[dev_id][i]->pid == ka_task_get_current_tgid()) {
             *user_id = i;
             return soft_ctrl->s_dev_t[dev_id][i]; /* find pid, the user already registered */
         }
@@ -306,7 +304,7 @@ STATIC int dms_soft_node_register(unsigned int dev_id, struct dms_sensor_node_cf
 
     user_node = soft_dev_node_get(dev_id, client, cfg, user_id, &first_register);
     if (user_node == NULL) {
-        soft_drv_err("get new user soft_dev failed. (user_name=%s)\n", current->comm);
+        soft_drv_err("get new user soft_dev failed. (user_name=%s)\n", ka_task_get_current_comm());
         ka_task_mutex_unlock(&soft_ctrl->mutex[dev_id]);
         return -ENOMEM;
     }
@@ -314,7 +312,7 @@ STATIC int dms_soft_node_register(unsigned int dev_id, struct dms_sensor_node_cf
     ret = user_dev_node_register(dev_id, user_id, user_node, cfg, handle);
     if (ret != 0) {
         soft_drv_err("register user dev_node failed. (dev_id=%u; user_name=%s; node_id=%u; ret=%d)\n",
-            dev_id, current->comm, user_node->node_id, ret);
+            dev_id, ka_task_get_current_comm(), user_node->node_id, ret);
         if (first_register != 0) {
             dbl_kfree(user_node);
             user_node = NULL;
@@ -374,7 +372,7 @@ STATIC int dms_soft_node_unregister(unsigned int dev_id, uint64_t handle)
 
     ka_task_mutex_lock(&soft_ctrl->mutex[dev_id]);
     for (i = SF_SENSOR_USER; i < SF_USER_MAX; i++) {
-        if ((soft_ctrl->s_dev_t[dev_id][i]->pid == current->tgid) && (soft_ctrl->s_dev_t[dev_id][i]->registered == 1)) {
+        if ((soft_ctrl->s_dev_t[dev_id][i]->pid == ka_task_get_current_tgid()) && (soft_ctrl->s_dev_t[dev_id][i]->registered == 1)) {
             client = soft_ctrl->s_dev_t[dev_id][i];
             break;
         }
@@ -438,7 +436,7 @@ STATIC int dms_update_sensor_state(unsigned int dev_id, uint64_t handle, int val
 
     ka_task_mutex_lock(&soft_ctrl->mutex[dev_id]);
     for (i = SF_SENSOR_USER; i < SF_USER_MAX; i++) {
-        if ((soft_ctrl->s_dev_t[dev_id][i]->pid == current->tgid) && (soft_ctrl->s_dev_t[dev_id][i]->registered == 1)) {
+        if ((soft_ctrl->s_dev_t[dev_id][i]->pid == ka_task_get_current_tgid()) && (soft_ctrl->s_dev_t[dev_id][i]->registered == 1)) {
             client = soft_ctrl->s_dev_t[dev_id][i];
             break;
         }

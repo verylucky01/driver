@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,6 +13,9 @@
 
 #include "ka_task_pub.h"
 #include "ka_memory_pub.h"
+#include "ka_common_pub.h"
+#include "ka_driver_pub.h"
+
 #include "ascend_hal_define.h"
 #include "trs_id.h"
 #include "trs_ts_inst.h"
@@ -151,7 +154,7 @@ void trs_clear_map_addr_info(struct trs_sq_map_addr *addr_info)
 }
 
 #ifndef EMU_ST
-ka_task_struct_t *trs_shr_get_task_struct(pid_t pid)
+ka_task_struct_t *trs_shr_get_task_struct(ka_pid_t pid)
 {
     ka_task_struct_t *tsk = NULL;
 
@@ -173,13 +176,9 @@ void trs_shr_put_task_struct(ka_task_struct_t *tsk)
     ka_task_put_task_struct(tsk);
 }
 
-inline struct rw_semaphore *trs_shr_get_mmap_sem(ka_mm_struct_t *mm)
+inline ka_rw_semaphore_t *trs_shr_get_mmap_sem(ka_mm_struct_t *mm)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
-    return &mm->mmap_lock;
-#else
-    return &mm->mmap_sem;
-#endif
+    return ka_mm_get_mmap_sem(mm);
 }
 
 int trs_shr_unmap_sq(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst *ts_inst,
@@ -188,7 +187,7 @@ int trs_shr_unmap_sq(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst *ts_
     ka_task_struct_t *tsk = NULL;
     ka_vm_area_struct_t *vma = NULL;
     ka_mm_struct_t *tsk_mm = NULL;
-    pid_t pid = proc_ctx->cp2_pid;
+    ka_pid_t pid = proc_ctx->cp2_pid;
     int ret;
 
     if (pid == 0) {
@@ -202,7 +201,7 @@ int trs_shr_unmap_sq(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst *ts_
         return 0;
     }
 
-    tsk_mm = get_task_mm(tsk);
+    tsk_mm = ka_task_get_task_mm(tsk);
     if (tsk_mm == NULL) {
         trs_debug("Task mm is NULL. (pid=%d)\n", pid);
         ret = 0;
@@ -361,7 +360,7 @@ int trs_shr_sq_remap(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst *ts_
     trs_fill_map_addr_info(&shr_sq_ctx->que_mem, &map_para);
 
     trs_remap_fill_para(&map_para, TRS_MAP_TYPE_REG, uio_info->sq_ctrl_addr[TRS_UIO_HEAD],
-        ALIGN_DOWN(sq_info->head_addr, KA_MM_PAGE_SIZE), KA_MM_PAGE_SIZE);
+        KA_DRIVER_ALIGN_DOWN(sq_info->head_addr, KA_MM_PAGE_SIZE), KA_MM_PAGE_SIZE);
     uio_info->sq_ctrl_addr[TRS_UIO_HEAD] += sq_info->head_addr % KA_MM_PAGE_SIZE;
     ret = trs_shr_remap_sq(proc_ctx, ts_inst, &map_para);
     if (ret != 0) {
@@ -371,7 +370,7 @@ int trs_shr_sq_remap(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst *ts_
     trs_fill_map_addr_info(&shr_sq_ctx->head, &map_para);
 
     trs_remap_fill_para(&map_para, TRS_MAP_TYPE_REG, uio_info->sq_ctrl_addr[TRS_UIO_DB],
-        ALIGN_DOWN(sq_info->db_addr, KA_MM_PAGE_SIZE), KA_MM_PAGE_SIZE);
+        KA_DRIVER_ALIGN_DOWN(sq_info->db_addr, KA_MM_PAGE_SIZE), KA_MM_PAGE_SIZE);
     uio_info->sq_ctrl_addr[TRS_UIO_DB] += sq_info->db_addr % KA_MM_PAGE_SIZE;
     ret = trs_shr_remap_sq(proc_ctx, ts_inst, &map_para);
     if (ret != 0) {

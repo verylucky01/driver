@@ -107,7 +107,7 @@ static drvError_t drv_event_proc_dispatch(unsigned int dev_id, struct event_info
         (void *)(msg_buffer->msg + sizeof(struct event_sync_msg)), (int)msg_buffer->msg_len, rsp);
 #else
     char msg[EVENT_MAX_MSG_LEN];
-    drvError_t ret;
+    drvError_t ret, result;
     int len, r_len;
 
     len = sizeof(char) * EVENT_MAX_MSG_LEN - sizeof(struct event_sync_msg);
@@ -117,14 +117,18 @@ static drvError_t drv_event_proc_dispatch(unsigned int dev_id, struct event_info
         DRV_EVENT_LOG_ERR("Memcpy failed.\n");
         return DRV_ERROR_PARA_ERROR;
     }
-    ret = g_drv_event_proc[event->comm.subevent_id].proc_func(dev_id, (void *)msg, EVENT_MAX_MSG_LEN, rsp);
+    result = g_drv_event_proc[event->comm.subevent_id].proc_func(dev_id, (void *)msg, EVENT_MAX_MSG_LEN, rsp);
     ret = memcpy_s((void *)(msg_buffer->msg + sizeof(struct event_sync_msg)), r_len, (void *)msg, r_len);
     if (ret != 0) {
         DRV_EVENT_LOG_ERR("Memcpy failed.\n");
         return DRV_ERROR_PARA_ERROR;
     }
 
+#ifdef CFG_FEATURE_TSDRV_CORE_LIB
+    return result;
+#else
     return ret;
+#endif
 #endif
 }
 

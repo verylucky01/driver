@@ -11,12 +11,21 @@
 #ifndef DMS_P2P_COM_H
 #define DMS_P2P_COM_H
 
+#include "ascend_hal_error.h"
+#include "pbl_urd_sub_cmd_common.h"
+
 #ifdef STATIC_SKIP
 #define STATIC
 #else
 #define STATIC static
 #endif
 
+#define DMS_RES_FLAG_ENABLE 0
+#define DMS_RES_FLAG_DISABLE 1
+
 int dms_set_p2p_com_info(unsigned int dev_id, unsigned int sub_cmd, void *buf, unsigned int size);
 int dms_get_p2p_com_info(unsigned int dev_id, unsigned int vfid, unsigned int sub_cmd, void *buf, unsigned int *size);
+void dms_set_p2p_restore_info_flag(bool flag);
+drvError_t dms_set_p2p_restore_info(u32 dev_id, u32 peer_phy_id, u32 p2p_type, enum urd_devdrv_p2p_attr_op opcode);
+drvError_t dms_get_p2p_restore_info(u32 dev_id, u32 peer_phy_id, u32 *cnt, u32 *p2p_type);
 #endif

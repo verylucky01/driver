@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -84,13 +84,13 @@ void devmm_task_mem_stats_show(ka_seq_file_t *seq)
     ka_fs_seq_printf(seq, SVM_MEM_STATS_TITLE);
 
     svm_mem_stats_type_pack(&type, MEM_HOST_VAL, 0, 0);
-    devmm_mem_stats_show(seq, (struct devmm_svm_process *)seq->private, &type, 0);
+    devmm_mem_stats_show(seq, (struct devmm_svm_process *)ka_fs_get_seq_file_private(seq), &type, 0);
 
     for (page_type = 0; page_type < MEM_STATS_MAX_PAGE_TYPE; page_type++) {
         for (phy_memtype = 0; phy_memtype < MEM_STATS_MAX_PHY_MEMTYPE; phy_memtype++) {
             svm_mem_stats_type_pack(&type, MEM_DEV_VAL, page_type, phy_memtype);
             for (logic_id = 0; logic_id < SVM_MAX_AGENT_NUM; logic_id++) {
-                devmm_mem_stats_show(seq, (struct devmm_svm_process *)seq->private, &type, logic_id);
+                devmm_mem_stats_show(seq, (struct devmm_svm_process *)ka_fs_get_seq_file_private(seq), &type, logic_id);
             }
             devmm_try_cond_resched(&stamp);
         }
@@ -129,7 +129,7 @@ static void devmm_dev_mem_stats_show(ka_seq_file_t *seq, u32 logic_id)
 
 int devmm_dev_mem_stats_procfs_show(ka_seq_file_t *seq, void *offset)
 {
-    u32 logic_id = (u32)(uintptr_t)seq->private;
+    u32 logic_id = (u32)(uintptr_t)ka_fs_get_seq_file_private(seq);
 
 #ifndef EMU_ST
     if (devmm_thread_is_run_in_docker()) {
@@ -218,7 +218,7 @@ void devmm_mem_stats_va_unmap(struct devmm_svm_process *svm_proc)
             u64 page_num = ka_base_round_up(MEM_STATS_MNG_SIZE, KA_MM_PAGE_SIZE) / KA_MM_PAGE_SIZE;
 
             devmm_drv_debug("Va unmap. (logic_id=%u; num=%llu)\n", logic_id, page_num);
-            vunmap(master_data->mem_stats_va_mng[logic_id].kva);
+            ka_mm_vunmap(master_data->mem_stats_va_mng[logic_id].kva);
             devmm_unpin_user_pages(master_data->mem_stats_va_mng[logic_id].pages, page_num, page_num);
             devmm_kvfree(master_data->mem_stats_va_mng[logic_id].pages);
             master_data->mem_stats_va_mng[logic_id].kva = NULL;

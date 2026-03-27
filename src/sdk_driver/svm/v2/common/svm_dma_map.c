@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -52,7 +52,7 @@ static u64 devmm_get_continuous_pg_num_from_begin(u32 pg_type, ka_page_t **pages
 
     /* Hpage no need to merge, dma perf is ok */
     if (pg_type == DEVMM_HUGE_PAGE_TYPE) {
-        if (devmm_is_giant_page(pages)) {
+        if (devmm_is_giant_page(pages, pg_num)) {
             return DEVMM_GIANT_TO_HUGE_PAGE_NUM;
         } else {
             return 1;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -72,6 +72,7 @@ typedef struct timespec TASK_TIME_TYPE;
 #define KA_TASK_NORMAL                   TASK_NORMAL
 #define KA_TASK_INTERRUPTIBLE            TASK_INTERRUPTIBLE
 #define KA_TASK_KILLABLE                 TASK_KILLABLE
+#define KA_TASK_COMM_LEN                 TASK_COMM_LEN
 
 typedef enum pid_type  ka_pid_type_t;          /* defined in include/linux/pid.h */
 #define KA_PIDTYPE_PID    PIDTYPE_PID
@@ -114,9 +115,12 @@ typedef struct hlist_head  ka_hlist_head_t;
 #define ka_task_task_pid_nr_ns(task, ns)  task_pid_nr_ns(task, ns)
 #define ka_task_lockdep_tasklist_lock_is_held() lockdep_tasklist_lock_is_held()
 #define ka_task_task_pid_vnr(task) task_pid_vnr(task)
+#define ka_task_task_tgid_vnr(tsk) task_tgid_vnr(tsk)
+#define ka_task_task_tgid_nr(tsk)  task_tgid_nr(tsk)
 #define ka_task_get_task_struct(task)    get_task_struct(task)
 #define ka_task_cancel_work_sync(work)   cancel_work_sync(work)
 #define ka_task_alloc_workqueue    alloc_workqueue
+#define ka_task_alloc_ordered_workqueue    alloc_ordered_workqueue
 #define ka_task_create_workqueue(name)    create_workqueue(name)
 #define ka_task_destroy_workqueue(wq)    destroy_workqueue(wq)
 #define ka_task_create_singlethread_workqueue(name)    create_singlethread_workqueue(name)
@@ -145,6 +149,7 @@ typedef struct hlist_head  ka_hlist_head_t;
 #define ka_task_schedule()               schedule()
 #define ka_task_schedule_timeout(timeout)    schedule_timeout(timeout)
 #define ka_task_cond_resched()                 cond_resched()
+#define ka_task_to_delayed_work(work)    to_delayed_work(work)
 #define ka_task_schedule_delayed_work_on(cpu, dwork, delay)    schedule_delayed_work_on(cpu, dwork, delay)
 #define ka_task_schedule_delayed_work(work, delay)    schedule_delayed_work(work, delay)
 #define ka_task_init_waitqueue_head(wq_head)      init_waitqueue_head(wq_head)
@@ -221,7 +226,6 @@ ka_pid_namespace_t *ka_task_get_init_pid_ns_addr(void);
 #define ka_task_poll_wait(filp, wait_address, p)    poll_wait(filp, wait_address, p)
 #define ka_task_need_resched()    need_resched()
 #define ka_task_sched_setscheduler(p, policy, param)    sched_setscheduler(p, policy, param)
-#define ka_task_sched_set_fifo_low(p)    sched_set_fifo_low(p)
 #define ka_task_rcu_read_lock()    rcu_read_lock()
 #define ka_task_rcu_read_unlock()    rcu_read_unlock()
 #define ka_task_rcu_read_lock_bh()    rcu_read_lock_bh()
@@ -238,6 +242,12 @@ ka_pid_namespace_t *ka_task_get_init_pid_ns_addr(void);
 #define __ka_task_set_current_state(state_value)    __set_current_state(state_value)
 #define ka_task_set_current_state(state_value)    set_current_state(state_value)
 #define KA_TASK_DEFINE_WAIT(name)   DEFINE_WAIT(name)
+#define ka_task_task_lock(task)    task_lock(task)
+#define ka_task_task_unlock(task)    task_unlock(task)
+#define ka_task_task_pid(task)    task_pid(task)
+#define __ka_task_task_cred(task)    __task_cred(task)
+#define KA_TASK_DECLARE_WAIT_QUEUE_HEAD(name)    DECLARE_WAIT_QUEUE_HEAD(name)
+#define ka_task_tgid_vnr(tsk) task_tgid_vnr(tsk)
 
 static inline ka_workqueue_struct_t *ka_task_system_wq(void)
 {
@@ -301,6 +311,7 @@ ka_task_struct_t *ka_task_get_init_task(void);
 unsigned int ka_task_get_current_flags(void);
 u64 ka_task_get_starttime(ka_task_struct_t *task);
 unsigned int ka_task_get_cred_uid_val(const ka_cred_t *cred);
+int ka_task_sched_set_fifo_low(ka_task_struct_t *p);
 
 #define ka_task_rwlock_init(lock)                       rwlock_init(lock)
 #define ka_task_read_lock(lock)                         read_lock(lock)
@@ -323,7 +334,7 @@ unsigned int ka_task_get_cred_uid_val(const ka_cred_t *cred);
 #define ka_task_read_trylock(lock)                      read_trylock(lock)
 #define ka_task_write_trylock(lock)                     write_trylock(lock)
 #define ka_for_each_process(p)                          for_each_process(p)
-
+#define ka_current_cred()                               current_cred()
 #define ka_task_wait_event_interruptible_exclusive(wq, condition)   \
             wait_event_interruptible_exclusive(wq, condition)
 #define ka_task_wait_event_interruptible_timeout(wq_head, condition, timeout)    \

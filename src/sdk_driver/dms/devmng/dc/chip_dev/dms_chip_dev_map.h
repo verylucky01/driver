@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,8 +13,8 @@
 
 #ifndef DMS_CHIP_DEV_MAP_H
 #define DMS_CHIP_DEV_MAP_H
-#include <linux/list.h>
-#include <linux/types.h>
+
+#include "ka_list_pub.h"
 
 #include "urd_define.h"
 #include "devdrv_user_common.h"
@@ -28,19 +28,19 @@ typedef struct {
     unsigned int assign_to_chip_flag;
     unsigned int belong_to_chip;
     char random_number[RANDOM_SIZE];
-    struct list_head dev_node_list;
+    ka_list_head_t dev_node_list;
 } dms_chip_dev_node_t;
 
 typedef struct {
     unsigned int chip_id;
     unsigned int dev_num; /* device number belong to this chip */
-    struct list_head dev_head;   /* link list head for devices of one chip */
-    struct list_head chip_node_list;  /* link node for chips */
+    ka_list_head_t dev_head;   /* link list head for devices of one chip */
+    ka_list_head_t chip_node_list;  /* link node for chips */
 } dms_chip_node_t;
 
 typedef struct {
     unsigned int chip_num; /* total chip number */
-    struct list_head chip_head;
+    ka_list_head_t chip_head;
     unsigned int dev_num; /* total device num */
     dms_chip_dev_node_t *all_dev_info;
 } dms_chip_dev_map_t;

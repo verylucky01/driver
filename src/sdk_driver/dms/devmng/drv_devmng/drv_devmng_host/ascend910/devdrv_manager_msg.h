@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,14 +13,6 @@
 
 #ifndef DEVDRV_MANAGER_MSG_H
 #define DEVDRV_MANAGER_MSG_H
-
-#include <linux/of_address.h>
-#include <linux/platform_device.h>
-#include <linux/slab.h>
-#include <asm/uaccess.h>
-#include <linux/idr.h>
-#include <linux/errno.h>
-#include <linux/fs.h>
 
 #include "devdrv_common.h"
 #include "devdrv_manager_common.h"

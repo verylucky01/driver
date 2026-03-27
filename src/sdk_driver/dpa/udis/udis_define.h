@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,10 +14,8 @@
 #ifndef _UDIS_DEFINE_H_
 #define _UDIS_DEFINE_H_
 
-#include <linux/list.h>
-#include <linux/rwsem.h>
-#include <linux/slab.h>
-
+#include "ka_list_pub.h"
+#include "ka_common_pub.h"
 #include "ka_memory_pub.h"
 #include "comm_kernel_interface.h"
 #include "udis.h"
@@ -27,6 +25,8 @@
 #else
 #define STATIC static
 #endif
+
+#define UDIS_SEGMENT_MAX_LEN 128
 
 struct udis_info_stu {
     char name[UDIS_MAX_NAME_LEN];
@@ -38,10 +38,20 @@ struct udis_info_stu {
     char data[UDIS_MAX_DATA_LEN];
 };
 
-struct udis_dma_node {
-    struct list_head list;
+struct udis_node {
+    ka_list_head_t list;
     ka_dma_addr_t host_dma_addr;
     ka_dma_addr_t dev_dma_addr;
+    va_addr_t host_va_addr;
+    va_addr_t dev_va_addr;
+    UDIS_ADDR_ATTR dev_va_addr_attr;
+    void *host_segment;
+    void *device_segment_import;
+    char device_segment[UDIS_SEGMENT_MAX_LEN];
+    size_t host_segment_len;
+    size_t device_segment_import_len;
+    u32 token_value;
+    size_t device_segment_len;
     unsigned int acc_ctrl;
     unsigned int data_len;
     UDIS_UPDATE_TYPE update_type;
@@ -49,8 +59,20 @@ struct udis_dma_node {
     char name[UDIS_MAX_NAME_LEN];
 };
 
-struct udis_link_dma_nodes {
-    struct devdrv_dma_node *dma_nodes;
+struct udis_link_ub_node {
+    void *host_segment;
+    void *device_segment_import;
+    size_t host_segment_len;
+    size_t device_segment_import_len;
+    va_addr_t host_va_addr;
+    u32 data_len;
+};
+
+struct udis_link_nodes {
+    union {
+        struct devdrv_dma_node *dma_nodes;
+        struct udis_link_ub_node *ub_nodes;
+    } node;
     unsigned int node_num;
     unsigned int capacity;
 };
@@ -78,17 +100,17 @@ enum udis_search_scope {
 };
 
 struct udis_ctrl_block {
-    struct list_head addr_list[UPDATE_TYPE_MAX];
-    struct rw_semaphore addr_list_lock;
+    ka_list_head_t addr_list[UPDATE_TYPE_MAX];
+    ka_rw_semaphore_t addr_list_lock;
     struct udis_info_stu *udis_info_buf;
-    struct rw_semaphore udis_info_lock;
+    ka_rw_semaphore_t udis_info_lock;
     ka_dma_addr_t udis_info_buf_dma;
     enum udis_dev_state state;
 };
 
-void udis_release_dma_node(unsigned int udevid, struct udis_dma_node *dma_node);
-int period_link_dma_task_init(unsigned int udevid);
-void period_link_dma_task_uninit(unsigned int udevid);
-int udis_dma_sync_copy(unsigned int udevid, struct udis_ctrl_block *udis_cb, const struct udis_dma_node *node);
-int udis_update_info_by_dma(unsigned int udevid, UDIS_MODULE_TYPE module_id, const char *name);
+void udis_release_node(unsigned int udevid, struct udis_node *addr_node);
+int period_link_task_init(unsigned int udevid);
+void period_link_task_uninit(unsigned int udevid);
+int udis_sync_copy(unsigned int udevid, struct udis_ctrl_block *udis_cb, const struct udis_node *node);
+int udis_update_info(unsigned int udevid, UDIS_MODULE_TYPE module_id, const char *name);
 #endif

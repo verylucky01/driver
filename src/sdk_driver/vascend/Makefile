@@ -8,60 +8,48 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # ------------------------------------------------------------------------------------------------------------
 # SPDX-License-Identifier: GPL-2.0
-ifeq ($(ENABLE_OPEN_SRC), y)
-    MODULE_NAME := drv_vascend
-    obj-m += ${MODULE_NAME}.o
-    ${MODULE_NAME}-objs := dvt.o vdavinci.o cfg_space.o mmio.o interface.o kvmdt.o hw_dvt.o debugfs.o dma_pool.o \
-        domain_manage.o dma_pool_map.o dvt_sysfs.o dvt_sriov.o dma_pool_pt.o vdavinci_rdwr.o vfio_ops.o
-else
-    ifeq ($(TOP_DIR),)
+MODULE_NAME := drv_vascend
+DVT_DIR=$(shell pwd)
+UNAME=$(shell uname -r)
+KERNEL_DIR=/lib/modules/$(UNAME)/build
+KERNEL_SOURCE_DIR=/lib/modules/$(UNAME)/source
 
-    DVT_DIR=$(shell pwd)
-    UNAME=$(shell uname -r)
-    KERNEL_DIR=/lib/modules/$(UNAME)/build
-    KERNEL_SOURCE_DIR=/lib/modules/$(UNAME)/source
-
-    ifneq ($(NOT_SUPPORT_SP), y)
-        EXTRA_CFLAGS += -fstack-protector-all
-    endif
-
-    ifeq ($(DAVINCI_TEST),y)
-        ccflags-y += -DDAVINCI_TEST
-    endif
-
-    ifeq ($(DAVINCI_DEBUG),y)
-        ccflags-y += -DDAVINCI_DEBUG
-    endif
-
-    ccflags-y += -Wall -Werror
-
-    obj-m := drv_vascend.o
-    drv_vascend-objs := dvt.o vdavinci.o cfg_space.o mmio.o interface.o kvmdt.o hw_dvt.o debugfs.o dma_pool.o \
-            domain_manage.o dma_pool_map.o dvt_sysfs.o dvt_sriov.o dma_pool_pt.o vdavinci_rdwr.o vfio_ops.o
-
-    default:
-		$(MAKE) -C $(KERNEL_DIR) M=$(DVT_DIR) modules
-
-    .PHONY:clean
-    clean:
-		@$(RM) *.o *.ko *.mod.* Module.* .*.cmd *.order
-		$(MAKE) -C $(KERNEL_DIR) M=`pwd` $@
-
-    else
-
-    ifneq ($(NOT_SUPPORT_SP), y)
-        EXTRA_CFLAGS += -fstack-protector-all
-    endif
-
-    ifeq ($(DAVINCI_TEST),y)
-        ccflags-y += -DDAVINCI_TEST
-    endif
-
-    ccflags-y += -Wall -Werror
-
-    obj-m := drv_vascend.o
-    drv_vascend-objs := dvt.o vdavinci.o cfg_space.o mmio.o interface.o kvmdt.o hw_dvt.o debugfs.o dma_pool.o \
-            domain_manage.o dma_pool_map.o dvt_sysfs.o dvt_sriov.o dma_pool_pt.o vdavinci_rdwr.o vfio_ops.o
-
-    endif
+ifneq ($(TOP_DIR),)
+    EXTRA_CFLAGS += -I$(TOP_DIR)/driver/driver/src/sdk_driver/kernel_adapt/include
 endif
+
+ifeq ($(DAVINCI_HIAI_DKMS), y)
+    EXTRA_CFLAGS += -I$(HIAI_DKMS_DIR)/kernel_adapt/include
+else
+    EXTRA_CFLAGS += -I$(PWD)/../kernel_adapt/include
+endif
+
+ifeq ($(ENABLE_OPEN_SRC), y)
+    EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/kernel_adapt/include
+endif
+
+ifneq ($(NOT_SUPPORT_SP), y)
+    EXTRA_CFLAGS += -fstack-protector-all
+endif
+
+ifeq ($(DAVINCI_TEST),y)
+    ccflags-y += -DDAVINCI_TEST
+endif
+
+ifeq ($(DAVINCI_DEBUG),y)
+    ccflags-y += -DDAVINCI_DEBUG
+endif
+
+ccflags-y += -Wall -Werror
+
+obj-m := ${MODULE_NAME}.o
+${MODULE_NAME}-objs := dvt.o vdavinci.o cfg_space.o mmio.o interface.o kvmdt.o hw_dvt.o debugfs.o dma_pool.o \
+        domain_manage.o dma_pool_map.o dvt_sysfs.o dvt_sriov.o dma_pool_pt.o vdavinci_rdwr.o vfio_ops.o
+
+default:
+	$(MAKE) -C $(KERNEL_DIR) M=$(DVT_DIR) modules
+
+.PHONY:clean
+clean:
+	@$(RM) *.o *.ko *.mod.* Module.* .*.cmd *.order
+	$(MAKE) -C $(KERNEL_DIR) M=`pwd` $@

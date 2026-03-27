@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,10 +10,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
-#include <linux/string.h>
-#include <linux/types.h>
-#include <linux/uaccess.h>
 
 #include "devdrv_common.h"
 #include "dms_define.h"
@@ -28,6 +24,7 @@
 #include "devmng_forward_info.h"
 #include "pbl/pbl_runenv_config.h"
 #include "ka_base_pub.h"
+#include "ka_task_pub.h"
 #include "dms_urd_forward.h"
 
 #define MAX_PACKET_SIZE 300
@@ -35,6 +32,7 @@
 static int dms_l2buff_m_ecc_resume_cnt[ASCEND_DEV_MAX_NUM] = {0};
 
 STATIC int dms_send_msg_to_device_get_sdk_ex_version(void *feature, char *in, u32 in_len, char *out, u32 out_len);
+STATIC int dms_send_msg_to_device_fault_event_resume(void *feature, char *in, u32 in_len, char *out, u32 out_len);
 
 BEGIN_DMS_MODULE_DECLARATION(DMS_URD_FORWARD_CMD_NAME)
 BEGIN_FEATURE_COMMAND()
@@ -85,6 +83,8 @@ ADD_FEATURE_COMMAND(DMS_URD_FORWARD_CMD_NAME, DMS_GET_GET_DEVICE_INFO_CMD, ZERO_
                     DMS_ACC_NOT_LIMIT_USER | DMS_ENV_ALL | DMS_VDEV_NOTSUPPORT, dms_send_msg_to_device_by_h2d)
 ADD_FEATURE_COMMAND(DMS_URD_FORWARD_CMD_NAME, DMS_GET_GET_DEVICE_INFO_CMD, ZERO_CMD, "module=0x0,info=0x36", NULL,
                     DMS_SUPPORT_ALL, dms_send_msg_to_device_by_h2d)
+ADD_FEATURE_COMMAND(DMS_URD_FORWARD_CMD_NAME, DMS_GET_SET_DEVICE_INFO_CMD, ZERO_CMD, "module=0x0,info=0x3b", NULL,
+ 	  	            DMS_SUPPORT_ALL, dms_send_msg_to_device_fault_event_resume)
 END_FEATURE_COMMAND()
 END_MODULE_DECLARATION()
 
@@ -322,7 +322,7 @@ int dms_send_msg_to_device_by_h2d_get_va(void *feature, char *in, u32 in_len, ch
     }
 
     va_info = (struct hbm_pa_va_info *)in;
-    va_info->host_pid = current->tgid;
+    va_info->host_pid = ka_task_get_current_tgid();
 
     ret = dms_send_msg_to_device_by_h2d(feature, in, in_len, out, out_len);
     if (ret != 0) {
@@ -349,7 +349,7 @@ int dms_send_msg_to_device_lp_stress_set(void *feature, char *in, u32 in_len, ch
 
     forward_stru = (struct dms_hal_device_info_stru *)in;
     lp_stress_set = (struct lpm_soc_stress_hal_cfg_in *)forward_stru->payload;
-    lp_stress_set->pid = current->tgid;
+    lp_stress_set->pid = ka_task_get_current_tgid();
     lp_stress_set->is_offline = 1;
     ret = dms_send_msg_to_device_by_h2d(feature, in, in_len, out, out_len);
     if (ret != 0) {
@@ -440,7 +440,7 @@ int urd_forward_get_memory_fault_syscnt(void *feature, char *in, u32 in_len, cha
     }
 
     mem_para = (struct memory_fault_timestamp *)in;
-    mem_para->host_pid = current->tgid;
+    mem_para->host_pid = ka_task_get_current_tgid();
 
     ret = dms_send_msg_to_device_by_h2d(feature, (char *)in, in_len, (char *)out, out_len);
     if (ret != 0) {
@@ -583,4 +583,66 @@ int dms_send_msg_to_device_by_h2d_multi_packets_kernel(void *feature, char *in, 
         }
     }
     return ret;
+}
+
+struct fault_event_resume {
+    unsigned int event_id;
+    unsigned short node_type;
+    unsigned char node_id;
+    unsigned char resv[9];
+};
+
+unsigned int fault_event_resume_whitelist[] = {0x81AF8009}; 
+
+STATIC bool event_in_whiltlist(unsigned int event_id) 
+{ 
+    int i, len; 
+    len = sizeof(fault_event_resume_whitelist) / sizeof(unsigned int); 
+    for (i = 0; i < len; i++) { 
+        if (event_id == fault_event_resume_whitelist[i]) { 
+            return true; 
+        } 
+    } 
+    return false; 
+}
+
+STATIC void make_up_filter_fault_event(struct dms_filter_st *filter, int module_type, int info_type, unsigned short node_type)
+{
+    filter->filter_len = (unsigned int)sprintf_s(filter->filter, sizeof(filter->filter), "module=0x%x,info=0x%x,node_type=0x%x",
+        (unsigned int)module_type, (unsigned int)info_type, (unsigned int)node_type);
+}
+
+STATIC int dms_send_msg_to_device_fault_event_resume(void *feature, char *in, u32 in_len, char *out, u32 out_len)
+{
+    DMS_FEATURE_S *feature_cfg = NULL;
+    struct dms_filter_st filter = {0};
+    struct dms_hal_device_info_stru *info_in = NULL;
+    int ret;
+    
+    if ((feature == NULL) || (in == NULL) || (in_len < DMS_HAL_DEV_INFO_HEAD_LEN + sizeof(struct fault_event_resume))) {
+        dms_err("Feature or in are NULL, or in_len is invalid.(feature=%s; in=%s; in_len=%u)\n",
+                (feature == NULL) ? "NULL" : "OK", (in == NULL) ? "NULL" : "OK", in_len);
+        return -EINVAL;
+    }
+    info_in = (struct dms_hal_device_info_stru *)in;
+
+    if (!event_in_whiltlist(((struct fault_event_resume *)(info_in->payload))->event_id)) {
+        if (ka_task_get_current_cred_euid() != 0) {
+            dms_debug("Event_id is not in whiltlist, and it cannot be invoked by non-root user.\n");
+            return -EOPNOTSUPP;
+        }
+    }
+
+    make_up_filter_fault_event(&filter, info_in->module_type, info_in->info_type,
+            ((struct fault_event_resume *)(info_in->payload))->node_type);
+
+    feature_cfg = (DMS_FEATURE_S *)feature;
+    feature_cfg->filter = (char *)&filter;
+    ret = dms_send_msg_to_device_by_h2d(feature_cfg, in, in_len, out, out_len);
+    if (ret != 0) {
+        dms_ex_notsupport_err(ret, "dms_send_msg_to_device_by_h2d failed. (dev_id=%u; ret=%d)\n", info_in->dev_id, ret);
+        return ret;
+    }
+
+    return 0;
 }

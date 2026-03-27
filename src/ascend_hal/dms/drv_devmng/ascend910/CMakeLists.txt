@@ -27,8 +27,8 @@ target_include_directories(devdrv_obj PRIVATE
     ${DRIVER_USER_DIR}/tsdrv/
     $<$<STREQUAL:${PRODUCT},ascend910B>:${DRIVER_USER_DIR}/inc/config/user_config/cloudv2>
     $<$<STREQUAL:${PRODUCT},ascend910B>:${DRIVER_USER_DIR}/tsdrv/ascend910>
-    $<$<STREQUAL:${PRODUCT},ascend910_95>:${DRIVER_USER_DIR}/tsdrv/ascend910>
-    $<$<STREQUAL:${PRODUCT},ascend910_95>:${DRIVER_USER_DIR}/inc/config/user_config/cloudv4>
+    $<$<STREQUAL:${PRODUCT},ascend950>:${DRIVER_USER_DIR}/tsdrv/ascend910>
+    $<$<STREQUAL:${PRODUCT},ascend950>:${DRIVER_USER_DIR}/inc/config/user_config/cloudv4>
     ${DRIVER_USER_DIR}/dms/include
     ${DRIVER_USER_DIR}/dms/common
     ${DRIVER_USER_DIR}/dms/hbm
@@ -55,7 +55,7 @@ target_compile_options(devdrv_obj PRIVATE
 
 add_subdirectory(devdrv_dsmi)
 
-if(${PRODUCT} STREQUAL ascend910B OR ${PRODUCT} STREQUAL ascend910_95)
+if(${PRODUCT} STREQUAL ascend910B OR ${PRODUCT} STREQUAL ascend950)
    add_subdirectory(ascd910)
 else()
    message(FATAL_ERROR "Cannot find product: ${PRODUCT}.")

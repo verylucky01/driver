@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,10 +14,8 @@
 #ifndef PBL_SOC_RES_H
 #define PBL_SOC_RES_H
 
-#include <linux/types.h>
-#include <linux/string.h>
-#include <linux/pci.h>
-#include <linux/device.h>
+#include "ka_base_pub.h"
+#include "ka_common_pub.h"
 
 #define SOC_RESMNG_MAX_NAME_LEN 40
 #define SOC_MAX_MIA_GROUP_NUM 8
@@ -39,7 +37,7 @@ struct soc_pcie_info {
     u32 hccs_status;
     u32 hccs_group_id[SOC_HCCS_GROUP_SUPPORT_MAX_CHIPNUM];
     u32 host_flag;
-    struct pci_dev *pdev;
+    ka_pci_dev_t *pdev;
 };
 
 enum soc_mia_res_type {
@@ -171,7 +169,7 @@ static inline u32 soc_resmng_get_mia_res_type_by_name(const char *name)
     u32 res_type;
 
     for (res_type = MIA_AC_AIV; res_type < MIA_MAX_RES_TYPE; res_type++) {
-        if (strcmp(mia_res_name[res_type], name) == 0) {
+        if (ka_base_strcmp(mia_res_name[res_type], name) == 0) {
             break;
         }
     }
@@ -231,7 +229,7 @@ static inline u32 soc_resmng_get_ts_irq_type_by_name(const char *name)
     u32 ts_irq_type;
 
     for (ts_irq_type = 0; ts_irq_type < TS_IRQ_TYPE_MAX; ts_irq_type++) {
-        if (strcmp(ts_irq_name[ts_irq_type], name) == 0) {
+        if (ka_base_strcmp(ts_irq_name[ts_irq_type], name) == 0) {
             break;
         }
     }
@@ -345,7 +343,7 @@ int soc_resmng_set_host_phy_mach_flag(u32 devid, u32 host_flag);
 int soc_resmng_get_host_phy_mach_flag(u32 devid, u32 *host_flag);
 
 int soc_resmng_set_pdev_by_devid(u32 devid, struct pci_dev *pdev);
-int soc_resmng_get_pdev_by_devid(u32 devid, struct pci_dev *pdev);
+int soc_resmng_get_pdev_by_devid(u32 devid, struct pci_dev **pdev);
 
 int soc_resmng_get_dev_topology(u32 devid, u32 peer_devid, int *topo_type);
 int soc_resmng_get_topology_by_host_flag(u32 devid, u32 peer_devid, int *topo_type);

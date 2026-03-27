@@ -174,7 +174,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001251107199_zh-cn_topic_0000001223414423_zh-cn_topic_0000001146259777_toc533412083"></a>**
 
-```c
+```
 int ret = 0;
 int card_id = 0;
 int device_id = 0;
@@ -182,3 +182,4 @@ enum dcmi_device_compat compatibility = DCMI_COMPAT_UNKNOWN;
 ret = dcmi_get_device_compatibility (card_id, device_id, & compatibility);
 …
 ```
+

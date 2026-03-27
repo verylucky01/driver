@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -212,15 +212,15 @@ typedef void (*_fearture_uninit_selfdef_scope_func)(void *priv);
 
 /* the function declared will be auto call when module_feature_auto_uninit_selfdef called
    init_fn : should like "void _fearture_uninit_selfdef_func(void *priv)" */
-#define __DECLAER_FEATURE_AUTO_UNINIT_BY_SCOPE(module, scope, uninit_fn, stage) \
+#define __DECLAER_FEATURE_AUTO_UNINIT_BY_SCOPE(module_name, scope, uninit_fn, stage) \
     void module_name##_##stage##_##scope##_uninit_##uninit_fn(void *priv); \
     void module_name##_##stage##_##scope##_uninit_##uninit_fn(void *priv) \
     { \
         uninit_fn(priv); \
     } \
     EXPORT_SYMBOL(module_name##_##stage##_##scope##_uninit_##uninit_fn)
-#define _DECLAER_FEATURE_AUTO_UNINIT_BY_SCOPE(module, scope, uninit_fn, stage) \
-    __DECLAER_FEATURE_AUTO_UNINIT_BY_SCOPE(module, scope, uninit_fn, stage)
+#define _DECLAER_FEATURE_AUTO_UNINIT_BY_SCOPE(module_name, scope, uninit_fn, stage) \
+    __DECLAER_FEATURE_AUTO_UNINIT_BY_SCOPE(module_name, scope, uninit_fn, stage)
 #define DECLAER_FEATURE_AUTO_UNINIT_BY_SCOPE(scope, uninit_fn, stage) \
     _DECLAER_FEATURE_AUTO_UNINIT_BY_SCOPE(AUTO_INIT_MODULE_NAME, scope, uninit_fn, stage)
 
@@ -299,13 +299,77 @@ static inline void module_feature_try_to_uninit(int feature_scope, void *param,
     }
 }
 
-static inline void module_feature_uninit_prefix_range(int feature_scope, void *param,
-    struct module *module, char *prefix, u32 num_syms)
+static inline void _module_feature_uninit_by_full_name(int feature_scope, void *param,
+    struct module *module, char *full_name)
 {
     u32 i;
 
-    for (i = 0; i < num_syms; i++) {
-        module_feature_try_to_uninit(feature_scope, param, &module->syms[i], prefix);
+    for (i = 0; i < module->num_syms; i++) {
+        const char *sym_name = get_symbol_name(&module->syms[i]);
+        if (strcmp(sym_name, full_name) == 0) {
+            void *fn = get_symbol_fun(&module->syms[i]);
+            module_feature_uninit_call(feature_scope, fn, param);
+            break;
+        }
+    }
+}
+
+static inline void module_feature_rollback_format_uninit_func_name(const char *init_fn_name,
+    const char *init_label, char *uninit_func_name, int len)
+{
+    char *init_label_start = strstr(init_fn_name, init_label);
+    if (strncpy_s(uninit_func_name, len, init_fn_name, init_label_start - init_fn_name) == 0) {
+        if (strcat_s(uninit_func_name, len, "un") == 0) {
+            if (strcat_s(uninit_func_name, len, init_label_start) == 0) {
+                return;
+            }
+        }
+    }
+    uninit_func_name[0] = '\0';
+}
+
+static inline void module_feature_rollback_format_uninit_full_func_name(const struct kernel_symbol *sym,
+    char *init_prefix, char *uninit_prefix, char *uninit_full_func_name, int len)
+{
+    const char *init_fn_name = get_symbol_name(sym) + strlen(init_prefix);
+    const char *init_label = "init";
+
+    uninit_full_func_name[0] = '\0';
+    if (strlen(init_fn_name) > strlen(init_label)) {
+        /* rollback regular: xxx_init, xxx_uninit, xxx_init_dev, xxx_uninit_dev, xxx_init_task, xxx_uninit_task */
+        if (strstr(init_fn_name, init_label) != NULL) {
+            if (strcpy_s(uninit_full_func_name, len, uninit_prefix) == 0) {
+                module_feature_rollback_format_uninit_func_name(init_fn_name, init_label, 
+                    uninit_full_func_name + strlen(uninit_prefix), len -= strlen(uninit_prefix));
+            }
+        }
+    }
+}
+
+static inline void module_feature_init_prefix_rollback_one_fn(int feature_scope, void *param,
+    struct module *module, const struct kernel_symbol *sym, char *init_prefix, char *uninit_prefix)
+{
+    char uninit_full_func_name[PREFIX_MAX_LEN];
+
+    module_feature_rollback_format_uninit_full_func_name(sym, init_prefix, uninit_prefix, 
+        uninit_full_func_name, PREFIX_MAX_LEN);
+    if (strlen(uninit_full_func_name) > 0) {
+        _module_feature_uninit_by_full_name(feature_scope, param, module, uninit_full_func_name);
+    }
+}
+
+static inline void module_feature_init_prefix_rollback(int feature_scope, void *param,
+    char *init_prefix, char *uninit_prefix, u32 rollback_num)
+{
+    struct module *module = THIS_MODULE;
+    u32 i;
+
+    for (i = 0; i < rollback_num; i++) {
+        void *fn = get_symbol_prefix_func(&module->syms[i], init_prefix);
+        if (fn != NULL) {
+            module_feature_init_prefix_rollback_one_fn(feature_scope, param, module,
+                &module->syms[i], init_prefix, uninit_prefix);
+        }
     }
 }
 
@@ -317,7 +381,7 @@ static inline int module_feature_init_prefix(int feature_scope, void *param, cha
     for (i = 0; i < module->num_syms; i++) {
         int ret = module_feature_try_to_init(feature_scope, param, &module->syms[i], init_prefix);
         if (ret != 0) {
-            module_feature_uninit_prefix_range(feature_scope, param, module, uninit_prefix, i);
+            module_feature_init_prefix_rollback(feature_scope, param, init_prefix, uninit_prefix, i);
             return ret;
         }
     }
@@ -328,7 +392,11 @@ static inline int module_feature_init_prefix(int feature_scope, void *param, cha
 static inline void module_feature_uninit_prefix(int feature_scope, void *param, char *prefix)
 {
     struct module *module = THIS_MODULE;
-    module_feature_uninit_prefix_range(feature_scope, param, module, prefix, module->num_syms);
+    u32 i;
+
+    for (i = 0; i < module->num_syms; i++) {
+        module_feature_try_to_uninit(feature_scope, param, &module->syms[i], prefix);
+    }
 }
 
 static inline void module_feature_format_init_prefix(int feature_scope, void *param, char *prefix, int len, int stage)

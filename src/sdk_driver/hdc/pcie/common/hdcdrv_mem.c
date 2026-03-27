@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -21,14 +21,12 @@
 #undef CONFIG_DEBUG_BUGVERBOSE
 #endif
 
-#include "hdcdrv_core.h"
-#include "hdcdrv_mem.h"
-#include "ka_base_pub.h"
 #include "ka_task_pub.h"
-#include "ka_common_pub.h"
 #include "ka_memory_pub.h"
 #include "ka_list_pub.h"
 #include "ka_compiler_pub.h"
+#include "hdcdrv_core.h"
+#include "hdcdrv_mem.h"
 
 ka_delayed_work_t *hdcdrv_get_recycle_mem(void)
 {
@@ -52,29 +50,6 @@ ka_device_t* hdcdrv_get_pdev_dev(int dev_id)
 struct hdcdrv_dev_fmem *hdcdrv_get_dev_fmem_uni(void)
 {
     return &(hdc_ctrl->fmem);
-}
-
-struct hdcdrv_node_tree_ctrl *hdcdrv_get_node_tree(void)
-{
-    return hdc_node_tree;
-}
-
-struct hdcdrv_node_tree_info *hdcdrv_get_node_tree_info(int idx, u32 rb_side)
-{
-    if (rb_side == HDCDRV_RBTREE_SIDE_LOCAL) {
-        return &(hdc_node_tree->node_tree[idx].local_tree.tree_info);
-    } else {
-        return &(hdc_node_tree->node_tree[idx].re_tree.tree_info);
-    }
-}
-
-struct hdcdrv_dev_fmem *hdcdrv_get_ctrl_arry_uni_ex(int idx, int devid, u32 side)
-{
-    if (side == HDCDRV_RBTREE_SIDE_LOCAL) {
-        return &(hdc_node_tree->node_tree[idx].local_tree.fmem);
-    } else {
-        return &(hdc_node_tree->node_tree[idx].re_tree.devices[devid]);
-    }
 }
 
 struct hdcdrv_dev_fmem *hdcdrv_get_dev_fmem_sep(int devid)
@@ -559,7 +534,7 @@ void hdcdrv_uninit_mem_pool(u32 dev_id)
     hdcdrv_info("hdcdrv_uninit_mem_pool success.\n");
 }
 
-STATIC int hdcdrv_list_node_mem_alloc(struct hdcdrv_ctx *ctx, struct hdcdrv_mem_fd_list **new_node)
+int hdcdrv_list_node_mem_alloc(struct hdcdrv_ctx *ctx, struct hdcdrv_mem_fd_list **new_node)
 {
     if ((ctx != NULL) && (ctx != HDCDRV_KERNEL_WITHOUT_CTX)) {
         *new_node = (struct hdcdrv_mem_fd_list *)hdcdrv_kzalloc(sizeof(struct hdcdrv_mem_fd_list),
@@ -573,7 +548,7 @@ STATIC int hdcdrv_list_node_mem_alloc(struct hdcdrv_ctx *ctx, struct hdcdrv_mem_
     return HDCDRV_OK;
 }
 
-STATIC void hdcdrv_list_node_mem_free(void *ctx, struct hdcdrv_mem_fd_list *new_node)
+void hdcdrv_list_node_mem_free(void *ctx, struct hdcdrv_mem_fd_list *new_node)
 {
     if ((ctx != NULL) && ((struct hdcdrv_ctx *)ctx != HDCDRV_KERNEL_WITHOUT_CTX)) {
         hdcdrv_kfree(new_node, KA_SUB_MODULE_TYPE_1);
@@ -597,6 +572,7 @@ long hdcdrv_fast_alloc_mem(struct hdcdrv_ctx *ctx, struct hdcdrv_cmd_alloc_mem *
             hdcdrv_bind_mem_ctx(&ctx->abnormal_ctx_fmem, f_node, new_node);
         } else {
             hdcdrv_list_node_mem_free((void *)ctx, new_node);
+            new_node = NULL;
         }
         hdcdrv_err("Calling alloc memory error. (dev=%d)\n", cmd->dev_id);
         return ret;
@@ -619,245 +595,3 @@ bool hdcdrv_mem_is_notify(const struct hdcdrv_fast_mem *f_mem)
 
     return true;
 }
-
-#ifdef CFG_FEATURE_HDC_REG_MEM
-long hdcdrv_fast_register_mem(struct hdcdrv_ctx *ctx, struct hdcdrv_cmd_register_mem *cmd)
-{
-    long ret;
-    struct hdcdrv_fast_node *f_node = NULL;
-    struct hdcdrv_mem_fd_list *new_node = NULL;
-
-    ret = hdcdrv_list_node_mem_alloc(ctx, &new_node);
-    if (ret != HDCDRV_OK) {
-        return ret;
-    }
-
-    ret = hdccom_fast_register_mem(cmd, &f_node);
-    if ((ret != HDCDRV_OK) || (f_node == NULL)) {
-        hdcdrv_warn_limit("Calling alloc memory not success. (dev=%d)\n", cmd->dev_id);
-        hdcdrv_list_node_mem_free((void *)ctx, new_node);
-        return ret;
-    }
-
-    if ((ctx != NULL) && (ctx != HDCDRV_KERNEL_WITHOUT_CTX)) {
-        hdcdrv_bind_mem_ctx(&ctx->ctx_fmem, f_node, new_node);
-        f_node->mem_fd_node->async_ctx = &ctx->async_ctx;
-    }
-
-    f_node->ctx = (void *)ctx;
-
-    return HDCDRV_OK;
-}
-
-// create session，Create a kfifo queue for each session and associate it with the session.
-int hdcdrv_init_session_release_mem_event(struct hdcdrv_session *session)
-{
-    int ret;
-    if (session == NULL) {
-        hdcdrv_err("error init session mem fin event not exist\n");
-        return HDCDRV_ERR;
-    }
-    ka_task_spin_lock_init(&session->mem_release_lock);
-    ka_task_init_waitqueue_head(&session->wq_mem_release_event);
-    ret = ka_base_kfifo_alloc(&session->mem_release_fifo, HDC_WAIT_MEM_FIFO_SIZE, KA_GFP_KERNEL);
-    if (ret != 0) {
-        hdcdrv_err("error init session mem fin event (devid=%d)\n", session->dev_id);
-        return HDCDRV_ERR;
-    }
-    return HDCDRV_OK;
-}
-
-// kfifo queue for each session and associate it with the session.
-void hdcdrv_free_session_release_mem_event(struct hdcdrv_session *session)
-{
-    unsigned long flags;
-
-    if (session == NULL) {
-        hdcdrv_err("error init session mem fin event not exist\n");
-        return;
-    }
-    ka_task_spin_lock_irqsave(&session->mem_release_lock, flags);
-    if (session->mem_release_fifo.buf != NULL) {
-        ka_base_kfifo_free(&session->mem_release_fifo);
-    }
-    ka_task_spin_unlock_irqrestore(&session->mem_release_lock, flags);
-    return;
-}
-
-// fast send
-void hdcdrv_update_session_release_mem_event(struct hdcdrv_session *session,
-                                             const struct hdcdrv_wait_mem_fin_msg *in_msg)
-{
-    unsigned long flags;
-    unsigned int ret;
-
-    if ((session == NULL) || (in_msg == NULL)) {
-        hdcdrv_err("when update mem event, session and msg not exist\n");
-        return;
-    }
-    if (hdcdrv_get_session_status(session) == HDCDRV_SESSION_STATUS_IDLE) {
-        hdcdrv_limit_exclusive(warn, HDCDRV_LIMIT_LOG_0x108, "when update mem event, session have closed."
-            "(session=%d)\n", session->local_session_fd);
-        return;
-    }
-
-    if (ka_base_kfifo_is_full(&session->mem_release_fifo) == 0) {
-        ka_task_spin_lock_irqsave(&session->mem_release_lock, flags);
-        ret = ka_base_kfifo_in(&session->mem_release_fifo, (const void *)in_msg, sizeof(struct hdcdrv_wait_mem_fin_msg));
-        ka_task_spin_unlock_irqrestore(&session->mem_release_lock, flags);
-        if (ret != sizeof(struct hdcdrv_wait_mem_fin_msg)) {
-            hdcdrv_warn_limit("update mem fifo in event no success.\n");
-            return;
-        }
-        session->dbg_stat.hdcdrv_wait_mem_normal++;
-        if (ka_task_waitqueue_active(&session->wq_mem_release_event) != 0) {
-            session->mem_release_wait_flag = 1;
-            ka_task_wake_up_interruptible(&session->wq_mem_release_event);
-        }
-    } else {
-        session->dbg_stat.hdcdrv_wait_mem_fifo_full++;
-        return;
-    }
-    return;
-}
-
-// fast wait
-int hdcdrv_wait_session_release_mem_event(struct hdcdrv_session *session,
-    int time_out, unsigned int result_type, struct hdcdrv_wait_mem_fin_msg *out_msg)
-{
-    unsigned long flags;
-    unsigned int ret;
-    int session_status;
-
-    if ((session == NULL) || (out_msg == NULL)) {
-        hdcdrv_err("session illegal or out_msg is null\n");
-        return HDCDRV_ERR;
-    }
-
-    if ((time_out < 0) && (time_out != -1)) {
-        hdcdrv_err("HDC wait mem timeout para err(%d)\n", time_out);
-        return HDCDRV_PARA_ERR;
-    }
-
-    while (ka_base_kfifo_is_empty(&session->mem_release_fifo) != 0) {
-        if (hdcdrv_get_session_status(session) == HDCDRV_SESSION_STATUS_IDLE) {
-            hdcdrv_warn("session closed fd=%d.\n", session->local_session_fd);
-            return HDCDRV_SESSION_HAS_CLOSED;
-        }
-        if (time_out == 0) {
-            hdcdrv_warn("HDC wait mem release no timeout, fd=%d.\n", session->local_session_fd);
-            return HDCDRV_NO_WAIT_MEM_INFO;
-        }
-        if (time_out == -1) {
-            ka_task_wait_event_interruptible(session->wq_mem_release_event,
-                                     (session->mem_release_wait_flag == 1) ||
-                                     (hdcdrv_get_session_status(session) == HDCDRV_SESSION_STATUS_CLOSING) ||
-                                     (hdcdrv_get_session_status(session) == HDCDRV_SESSION_STATUS_IDLE) ||
-                                     (hdcdrv_get_peer_status() != DEVDRV_PEER_STATUS_NORMAL));
-        } else {
-            if (ka_task_wait_event_interruptible_timeout(session->wq_mem_release_event,
-                                                 (session->mem_release_wait_flag == 1) ||
-                                                 (hdcdrv_get_session_status(session) == HDCDRV_SESSION_STATUS_CLOSING) ||
-                                                 (hdcdrv_get_session_status(session) == HDCDRV_SESSION_STATUS_IDLE),
-                                                 ka_system_msecs_to_jiffies((unsigned int)time_out)) == 0) {
-                hdcdrv_warn("HDC wait mem release timeout, fd=%d.\n", session->local_session_fd);
-                return HDCDRV_NO_WAIT_MEM_TIMEOUT;
-            }
-        }
-
-        if (session->mem_release_wait_flag != 1) {
-            session->mem_release_wait_flag = 0;
-#ifndef DRV_UT
-            session_status = hdcdrv_get_session_status(session);
-            if ((session_status != HDCDRV_SESSION_STATUS_IDLE) && (session_status != HDCDRV_SESSION_STATUS_CLOSING)) {
-                hdcdrv_err("HDC wait mem release bad wakeup.(fd=%d; session_status=%d)\n", session->local_session_fd, session_status);
-                return HDCDRV_ERR;
-            } else {
-                return HDCDRV_SESSION_HAS_CLOSED;
-            }
-#endif
-        }
-        session->mem_release_wait_flag = 0;
-    }
-
-    ka_task_spin_lock_irqsave(&session->mem_release_lock, flags);
-    while (ka_base_kfifo_is_empty(&session->mem_release_fifo) == 0) {
-        ret = ka_base_kfifo_out(&session->mem_release_fifo, (void *)out_msg, (u32)sizeof(struct hdcdrv_wait_mem_fin_msg));
-        if ((result_type == (u32)HDC_WAIT_ALL) ||
-            ((out_msg->status != 0) && (result_type == (u32)HDC_WAIT_ONLY_EXCEPTION)) ||
-            ((out_msg->status == 0) && (result_type == HDC_WAIT_ONLY_SUCCESS))) {
-            break;
-        }
-    }
-    ka_task_spin_unlock_irqrestore(&session->mem_release_lock, flags);
-    if (ret != sizeof(struct hdcdrv_wait_mem_fin_msg)) {
-        hdcdrv_err("session mem fin event bad size (ret=%u)\n", ret);
-        return HDCDRV_ERR;
-    } else {
-        return HDCDRV_OK;
-    }
-}
-
-// destroy session
-void hdcdrv_destroy_session_del_mem_release_event(struct hdcdrv_session *session)
-{
-    unsigned long flags;
-    if (session != NULL) {
-        if ((ka_task_waitqueue_active(&session->wq_mem_release_event) != 0)) {
-            session->mem_release_wait_flag = 1;
-            ka_task_spin_lock_irqsave(&session->mem_release_lock, flags);
-            ka_base_kfifo_reset(&session->mem_release_fifo); // only the kfifo memory is set to empty.
-            ka_task_spin_unlock_irqrestore(&session->mem_release_lock, flags);
-            hdcdrv_info("Clear mem release fifo data.\n");
-            ka_task_wake_up_interruptible(&session->wq_mem_release_event);
-        }
-    } else {
-        hdcdrv_err("no session in mem release event\n");
-    }
-}
-
-// when peer fault happen, set peer_status and wake up mem_release_event
-void hdcdrv_peer_fault_del_mem_release_event(struct hdcdrv_session *session)
-{
-    unsigned long flags;
-    if (session != NULL) {
-        if ((ka_task_waitqueue_active(&session->wq_mem_release_event) != 0)) {
-            ka_task_spin_lock_irqsave(&session->mem_release_lock, flags);
-            ka_base_kfifo_reset(&session->mem_release_fifo); // only the kfifo memory is set to empty.
-            ka_task_spin_unlock_irqrestore(&session->mem_release_lock, flags);
-            hdcdrv_info("Clear mem release fifo data.\n");
-            ka_task_wake_up_interruptible(&session->wq_mem_release_event);
-        }
-    }
-}
-
-long hdcdrv_fast_wait_mem(struct hdcdrv_cmd_wait_mem *cmd)
-{
-    struct hdcdrv_session *session = NULL;
-    struct hdcdrv_wait_mem_fin_msg out_msg;
-    long ret;
-
-    ret = hdcdrv_session_valid_check(cmd->session, cmd->dev_id, cmd->pid);
-    if (ret != HDCDRV_OK) {
-        return ret;
-    }
-
-    session = &hdc_ctrl->sessions[cmd->session];
-    session->result_type = cmd->result_type;
-    ret = hdcdrv_wait_session_release_mem_event(session, cmd->timeout, cmd->result_type, &out_msg);
-    if (ret != HDCDRV_OK) {
-        cmd->data_addr = 0UL;
-        cmd->ctrl_addr = 0UL;
-        cmd->data_len = 0U;
-        cmd->ctrl_len = 0U;
-        cmd->result = 0U;
-    } else {
-        cmd->data_addr = (u64)out_msg.dataAddr;
-        cmd->ctrl_addr = (u64)out_msg.ctrlAddr;
-        cmd->data_len = (int)out_msg.dataLen;
-        cmd->ctrl_len = (int)out_msg.ctrlLen;
-        cmd->result = (int)out_msg.status;
-    }
-    return ret;
-}
-#endif

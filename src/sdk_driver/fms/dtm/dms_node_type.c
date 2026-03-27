@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -90,7 +90,9 @@ static struct dms_node_type_string g_dms_node_type[] = {
     {HAL_DMS_DEV_TYPE_CFG_MGR, "cfg_mgr"},
     {HAL_DMS_DEV_TYPE_DATA_GW, "data_gw"},
     {HAL_DMS_DEV_TYPE_RESMGR, "resource_mgr"},
+    {HAL_DMS_DEV_TYPE_MAMI_DEV_CTRL, "mami_dev_ctrl"},
     {HAL_DMS_DEV_TYPE_DRV_KERNEL, "driver_kernel"},
+    {HAL_DMS_DEV_TYPE_UBCFGLITE, "ubcfglite"},
     {HAL_DMS_DEV_TYPE_BASE_SERVCIE, "BaseService"},
     {HAL_DMS_DEV_TYPE_PROC_MGR, "process-manager"},
     {HAL_DMS_DEV_TYPE_PROC_LAUNCHER, "proc_launcher"},
@@ -173,7 +175,9 @@ static struct dms_node_type_string g_dms_node_type[] = {
     {DMS_DEV_TYPE_UB_PORT, "UB_PORT"},
     {DMS_DEV_TYPE_UBSUB_AA, "UB subsys AA"},
     {DMS_DEV_TYPE_UBSUB_DISP, "UB subsys DISP"},
-    {DMS_DEV_TYPE_ADSPC, "ADSPC"}
+    {DMS_DEV_TYPE_ADSPC, "ADSPC"},
+    {DMS_DEV_TYPE_CFG_BUS, "CFG_BUS"},
+    {DMS_DEV_TYPE_DJTAG, "DJTAG"}
 };
 
 int dms_get_node_type_str(unsigned short node_type,

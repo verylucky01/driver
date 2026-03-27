@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -29,7 +29,9 @@
 #define CPER_SEC_PCIE_AER_ERROR \
     GUID_INIT(0xD995E954, 0xBBC1, 0x430F, 0xAD, 0x91, 0xB4, 0x4D, \
         0xCB, 0x3C, 0x6F, 0x35)
-
+#define CPER_SEC_UB_AER_ERROR \
+    GUID_INIT(0x74D255B0, 0x73E8, 0x488A, 0xB8, 0x67, 0x90, 0x65, \
+        0x4A, 0x35, 0x86, 0x5E)
 #define CPER_SEC_PCIE_LOCAL_RESV_LEN        2
 
 
@@ -103,6 +105,30 @@ struct cper_sec_pcie_local {
     unsigned int err_misc_30;
     unsigned int err_misc_31;
     unsigned int err_misc_32;
+};
+
+#define UB_ERROR_NUM 32
+struct cper_sec_ub_error {
+    unsigned long long validation_bit;
+    unsigned int eid;
+    unsigned int can;
+    unsigned int port;
+    unsigned int oui;
+    unsigned short device;
+    unsigned short type;
+    unsigned short class_code;
+    unsigned short reserved;
+    unsigned int overflow_flag;
+    unsigned int err_ctrl_reg;
+    unsigned long long uncor_status;
+    unsigned long long uncor_mask;
+    unsigned long long uncor_severity;
+    unsigned long long cor_status;
+    unsigned long long cor_mask;
+    unsigned long long co_severity;
+    unsigned int err_info_ctrl_reg;
+    unsigned int spec_def_err_info[UB_ERROR_NUM];
+    unsigned long long vendor_def_err_info;
 };
 
 typedef enum {

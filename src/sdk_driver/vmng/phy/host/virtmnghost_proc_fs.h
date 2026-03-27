@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,10 +13,8 @@
 
 #ifndef VIRTMNGHOST_PROC_FS_H
 #define VIRTMNGHOST_PROC_FS_H
-#include "ka_base_pub.h"
 #include "ka_fs_pub.h"
 #include "ka_memory_pub.h"
-#include "ka_common_pub.h"
 #include "ka_compiler_pub.h"
 #include "ka_kernel_def_pub.h"
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -16,6 +16,7 @@
 #include "devmm_common.h"
 #include "svm_rbtree.h"
 #include "ka_base_pub.h"
+#include "ka_system_pub.h"
 #include "svm_dynamic_addr.h"
 
 struct svm_da_node_info {
@@ -26,6 +27,7 @@ struct svm_da_node_info {
     ka_vm_area_struct_t *vma;
     ka_vm_area_struct_t *custom_vma;
 
+    u32 status;
     u32 first_heap_idx;
     u32 last_heap_idx;
     struct devmm_svm_heap *heap;
@@ -69,7 +71,7 @@ void svm_occupy_da(struct devmm_svm_process *svm_proc)
                 break;
             }
 #ifndef EMU_ST
-            usleep_range(500, 600); /* 500~600us */
+            ka_system_usleep_range(500, 600); /* 500~600us */
 #endif
         }
     }
@@ -88,7 +90,7 @@ void svm_da_recycle(struct devmm_svm_process *svm_proc)
     struct svm_da_info *da_info = &svm_proc->da_info;
     struct svm_da_node_info *node = NULL, *tmp = NULL;
 
-	rbtree_postorder_for_each_entry_safe(node, tmp, &da_info->rbtree, rbnode) {
+	ka_base_rbtree_postorder_for_each_entry_safe(node, tmp, &da_info->rbtree, rbnode) {
         (void)devmm_rb_erase(&da_info->rbtree, &node->rbnode);
         devmm_kvfree(node);
 	}
@@ -156,6 +158,7 @@ int svm_da_add_addr(struct devmm_svm_process *svm_proc, u64 va, u64 size, ka_vm_
 
     node->va = va;
     node->size = size;
+    node->status = DEVMM_DA_STATUS_NONE;
     node->first_heap_idx = (u32)((va - DEVMM_SVM_MEM_START) / DEVMM_HEAP_SIZE);
     node->last_heap_idx = (u32)(node->first_heap_idx + size / DEVMM_HEAP_SIZE - 1);
     node->heap = NULL;
@@ -223,6 +226,36 @@ bool svm_is_da_match(struct devmm_svm_process *svm_proc, u64 va, u64 size)
     return match;
 }
 
+void svm_set_da_status(struct devmm_svm_process *svm_proc, u64 va, u64 size, u32 status)
+{
+    struct svm_da_info *da_info = &svm_proc->da_info;
+    struct svm_da_node_info *node = NULL;
+
+    svm_da_info_rbtree_lock(da_info, true);
+    node = svm_da_node_find(da_info, va, size);
+    if (node != NULL) {
+        node->status = status;
+    }
+    svm_da_info_rbtree_unlock(da_info, true);
+}
+
+#ifndef EMU_ST
+bool svm_is_da_unmap(struct devmm_svm_process *svm_proc, u64 va, u64 size)
+{
+    struct svm_da_info *da_info = &svm_proc->da_info;
+    struct svm_da_node_info *node = NULL;
+    bool unmap_flag = false;
+
+    svm_da_info_rbtree_lock(da_info, false);
+    node = svm_da_node_find(da_info, va, size);
+    if ((node != NULL) && (node->status == DEVMM_DA_STATUS_UNMAPING)) {
+        unmap_flag = true;
+    }
+    svm_da_info_rbtree_unlock(da_info, false);
+    return unmap_flag;
+}
+#endif
+
 ka_vm_area_struct_t *svm_da_query_vma(struct devmm_svm_process *svm_proc, u64 va)
 {
     struct svm_da_info *da_info = &svm_proc->da_info;
@@ -282,7 +315,7 @@ u32 svm_da_query_addr_num(struct devmm_svm_process *svm_proc)
 
     svm_da_info_rbtree_lock(da_info, false);
 
-    rbtree_postorder_for_each_entry_safe(node, tmp, &da_info->rbtree, rbnode) {
+    ka_base_rbtree_postorder_for_each_entry_safe(node, tmp, &da_info->rbtree, rbnode) {
         addr_num++;
     }
 
@@ -299,7 +332,7 @@ int svm_da_for_each_addr(struct devmm_svm_process *svm_proc, bool is_occupy,
 
     svm_da_info_rbtree_lock(da_info, is_occupy);
 
-    rbtree_postorder_for_each_entry_safe(node, tmp, &da_info->rbtree, rbnode) {
+    ka_base_rbtree_postorder_for_each_entry_safe(node, tmp, &da_info->rbtree, rbnode) {
         int ret = func(svm_proc, node->va, node->size, priv);
         if (ret != 0) {
             svm_da_info_rbtree_unlock(da_info, is_occupy);
@@ -316,7 +349,7 @@ static void _svm_set_da_heap(struct svm_da_info *da_info, u32 heap_idx, struct d
 {
     struct svm_da_node_info *node = NULL, *tmp = NULL;
 
-	rbtree_postorder_for_each_entry_safe(node, tmp, &da_info->rbtree, rbnode) {
+	ka_base_rbtree_postorder_for_each_entry_safe(node, tmp, &da_info->rbtree, rbnode) {
         if (heap_idx == node->first_heap_idx) {
             node->heap = heap;
             return;
@@ -339,7 +372,7 @@ static struct devmm_svm_heap *_svm_get_da_heap_by_idx(struct svm_da_info *da_inf
 {
     struct svm_da_node_info *node = NULL, *tmp = NULL;
 
-	rbtree_postorder_for_each_entry_safe(node, tmp, &da_info->rbtree, rbnode) {
+	ka_base_rbtree_postorder_for_each_entry_safe(node, tmp, &da_info->rbtree, rbnode) {
         if ((heap_idx >= node->first_heap_idx) && (heap_idx <= node->last_heap_idx)) {
             return node->heap;
         }

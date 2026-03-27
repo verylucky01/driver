@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -73,12 +73,13 @@ struct trs_proc_ctx {
     int pid;
     int status;
     ka_atomic_t release_flag;
+    int release_stage;
     TRS_PROC_RELEASE_TYPE release_type;
     int cp_ssid;
     u32 devid;
     bool force_recycle;
     u32 cmd_support_dfx_times;
-    struct workqueue_struct *work_queue;
+    ka_workqueue_struct_t *work_queue;
     ka_proc_dir_entry_t *entry;
     struct trs_proc_ts_ctx ts_ctx[TRS_TS_MAX_NUM];
     struct kref_safe ref;
@@ -86,7 +87,7 @@ struct trs_proc_ctx {
     u32 cp2_pid;
     s64 cp2_task_id;
     u32 agent_app_pid;
-    bool agent_res_leak_flag;
+    ka_atomic_t agent_release_flag;
 };
 
 struct trs_task_info_struct {

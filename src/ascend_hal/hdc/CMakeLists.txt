@@ -24,9 +24,18 @@ target_include_directories(hdc_obj PRIVATE
     ${DRIVER_KERNEL_DIR}/inc/
     ${DRIVER_USER_DIR}/hdc/inc/
     ${DRIVER_USER_DIR}/hdc/common/
+    ${DRIVER_USER_DIR}/hdc/pcie/    
     ${DRIVER_USER_DIR}/inc/dms
     ${DRIVER_KERNEL_DIR}/dms/command/ioctl
-    ${BASE_DIR}/host
+    ${DRIVER_USER_DIR}/hdc/common/hdc_file/host
+)
+
+target_sources(hdc_obj PRIVATE
+    pcie/hdc_pcie_epoll.c
+    pcie/hdc_pcie_drv.c
+    sock/hdc_sock_epoll.c
+    sock/hdc_ppc.c
+    common/hdc_file/host/hdc_file.c
 )
 
 target_compile_definitions(hdc_obj PRIVATE
@@ -36,10 +45,10 @@ target_compile_definitions(hdc_obj PRIVATE
     CFG_FEATURE_SHARE_LOG
     CFG_FEATURE_SRIOV
     $<$<STREQUAL:${PRODUCT},ascend910B>:CFG_FEATURE_PM_MONITOR>
-    $<$<STREQUAL:${PRODUCT},ascend910_95>:CFG_FEATURE_EVENT_PROC>
+    $<$<STREQUAL:${PRODUCT},ascend950>:CFG_FEATURE_EVENT_PROC>
 
-    $<$<AND:$<STREQUAL:${PRODUCT},ascend910_95>,$<STREQUAL:${ENABLE_UBE},true>,$<STREQUAL:${CMAKE_HOST_SYSTEM_PROCESSOR},aarch64>>:CFG_FEATURE_SUPPORT_UB>
-    $<$<AND:$<STREQUAL:${PRODUCT},ascend910_95>,$<STREQUAL:${CMAKE_HOST_SYSTEM_PROCESSOR},aarch64>>:SSAPI_USE_MAMI>
+    $<$<AND:$<STREQUAL:${PRODUCT},ascend950>,$<STREQUAL:${ENABLE_UBE},true>,$<STREQUAL:${CMAKE_HOST_SYSTEM_PROCESSOR},aarch64>>:CFG_FEATURE_SUPPORT_UB>
+    $<$<AND:$<STREQUAL:${PRODUCT},ascend950>,$<STREQUAL:${CMAKE_HOST_SYSTEM_PROCESSOR},aarch64>>:SSAPI_USE_MAMI>
 )
 
 target_link_options(hdc_obj PRIVATE

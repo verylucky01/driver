@@ -472,12 +472,12 @@ struct devmm_virt_com_heap *devmm_va_to_heap(virt_addr_t va)
         /* do not printf, p_heap_mgmt == NULL is allowable here, will be judged in other process */
         return NULL;
     }
-
+     
     if (devmm_is_in_host_pin_range(va)) {
         return &p_heap_mgmt->heap_queue.host_base_heap;
     }
 
-    if ((va < p_heap_mgmt->start) || (va >= p_heap_mgmt->end)) {
+    if (((va < p_heap_mgmt->start) || (va >= p_heap_mgmt->end))){
         /* do not printf ,printf too much */
         DEVMM_DRV_SWITCH("Address is not reserved. (addr=0x%lx; start=0x%lx; end=0x%lx)\n",
             va, p_heap_mgmt->start, p_heap_mgmt->end);
@@ -515,7 +515,7 @@ static void devmm_host_pin_pre_register(virt_addr_t ret_val, size_t alloc_size)
     if ((mgmt != NULL) && (mgmt->support_host_pin_pre_register)) {
         for (i = 0; i < DEVMM_MAX_PHY_DEVICE_NUM; ++i) {
             if (mgmt->is_dev_inited[i]) {
-                (void)devmm_register_mem_to_dma((void *)(uintptr_t)ret_val, alloc_size, i);
+                (void)devmm_register_mem_to_dma((void *)(uintptr_t)ret_val, alloc_size, 0, i);
             }
         }
     }
@@ -761,7 +761,6 @@ STATIC DVresult devmm_virt_init_mgmt_page_size_and_addr(struct devmm_virt_heap_m
     mgmt->end = end;
     mgmt->host_pin_start = (virt_addr_t)(DEVMM_HOST_PIN_START);
     mgmt->host_pin_end = (virt_addr_t)(DEVMM_HOST_PIN_START + DEVMM_HOST_PIN_SIZE);
-
     return DRV_ERROR_NONE;
 }
 
@@ -784,6 +783,7 @@ STATIC DVresult devmm_virt_init_mgmt_queue_and_lists(struct devmm_virt_heap_mgmt
         DEVMM_DRV_ERR("Init base heap fail.\n");
         return DRV_ERROR_INNER_ERR;
     }
+
     for (i = 0; i < DEVMM_MAX_PHY_DEVICE_NUM; i++) {
         mgmt->dvpp_mem_size[i] = DEVMM_MAX_HEAP_MEM_FOR_DVPP_4G;
         mgmt->support_bar_mem[i] = false;
@@ -803,7 +803,8 @@ STATIC DVresult devmm_virt_init_mgmt_queue_and_lists(struct devmm_virt_heap_mgmt
                 (void)pthread_rwlock_init(&mgmt->huge_list[i][j][k].list_lock, NULL);
             }
         }
-    }
+    }     
+    
     mgmt->inited = POOL_MGMT_INITED_FLAG;
     return DRV_ERROR_NONE;
 }
@@ -979,7 +980,7 @@ DVresult devmm_free_to_normal_heap(struct devmm_virt_heap_mgmt *p_heap_mgmt,
         DEVMM_DRV_ERR("Virt_heap_free_mem failed. (ret=%d; va=0x%llx)\n", ret, p);
         return ret;
     }
- 
+
     if (heap == &p_heap_mgmt->heap_queue.host_base_heap) {
         return DRV_ERROR_NONE;
     }
@@ -997,7 +998,7 @@ DVresult devmm_free_to_normal_heap(struct devmm_virt_heap_mgmt *p_heap_mgmt,
     return DRV_ERROR_NONE;
 }
 
-STATIC struct devmm_com_heap_ops g_heap_ops[SUB_MAX_TYPE] = {
+STATIC struct devmm_com_heap_ops g_heap_ops[SUB_MAX_TYPE - 1] = {
     [SUB_SVM_TYPE] = {
         devmm_virt_heap_alloc_svm,
         devmm_virt_heap_free_pages
@@ -1197,6 +1198,7 @@ struct devmm_virt_com_heap *devmm_virt_get_heap_from_queue(struct devmm_virt_hea
 
         tem_heap->heap_idx = heap_idx;
         tem_heap->rbtree_queue = (struct devmm_heap_rbtree){0};
+        SVM_INIT_LIST_HEAD(&tem_heap->list);
         (void)pthread_mutex_init(&tem_heap->tree_lock, NULL);
         (void)pthread_rwlock_init(&tem_heap->heap_rw_lock, NULL);
     } else {
@@ -1295,7 +1297,7 @@ DVresult devmm_virt_destroy_heap(struct devmm_virt_heap_mgmt *mgmt, struct devmm
         devmm_rbtree_destory(&heap->rbtree_queue);
     }
     if (need_mem_stats_dec) {
-        devmm_primary_heap_module_mem_stats_dec(heap);
+        devmm_primary_heap_module_mem_stats_dec(heap, heap->mapped_size);
         devmm_mem_mapped_size_dec(heap, heap->mapped_size);
     }
     (void)pthread_rwlock_unlock(&heap->heap_rw_lock);
@@ -1474,7 +1476,7 @@ virt_addr_t devmm_alloc_from_normal_heap(struct devmm_virt_heap_mgmt *p_heap_mgm
         return ptr;
     }
 
-    if (get_ptr_err(ptr) == DEVMM_OUT_OF_VIRT_MEM) {
+    if (get_ptr_err(ptr) == DEVMM_OUT_OF_VIRT_MEM ) {
         /*
          * Note that the write lock should be held,
          * otherwise alloc svm heap will fail if there are too many concurrent threads.

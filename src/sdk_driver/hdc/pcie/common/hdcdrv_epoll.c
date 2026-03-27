@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,17 +11,15 @@
  * GNU General Public License for more details.
  */
 
-#include "hdcdrv_cmd.h"
-#include "hdcdrv_core.h"
-#include "hdcdrv_epoll.h"
-#include "ka_task_pub.h"
 #include "ka_list_pub.h"
 #include "ka_barrier_pub.h"
-#include "ka_base_pub.h"
 #include "ka_compiler_pub.h"
 #include "ka_system_pub.h"
 #include "ka_memory_pub.h"
 #include "ka_kernel_def_pub.h"
+#include "hdcdrv_cmd.h"
+#include "hdcdrv_core.h"
+#include "hdcdrv_epoll.h"
 
 #ifdef DRV_UT
 #define STATIC

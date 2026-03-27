@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,15 +11,7 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/version.h>
-#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(4,14,0)) || (defined(DRV_UT)))
-#include <linux/vfio.h>
-#endif
-
-#include <linux/kvm_host.h>
-#include <linux/vmalloc.h>
-#include <linux/iova.h>
-#include <linux/iommu.h>
+#include "ka_kvm_pub.h"
 #include "dvt.h"
 #include "vfio_ops.h"
 #include "kvmdt.h"
@@ -118,6 +110,75 @@ bool hw_vdavinci_scheduled(struct hw_vdavinci *vdavinci,
     return false;
 }
 
+STATIC void dev_pin_scheduled(struct hw_vdavinci *vdavinci,
+                              unsigned long *count,
+                              struct page *page)
+{
+    (*count)++;
+    if (hw_vdavinci_scheduled(vdavinci,
+                              (*count) * VFIO_PIN_PAGES_MAX_ENTRIES,
+                              VDAVINCI_PIN_PAGES_OF_SCHEDULE,
+                              VDAVINCI_PIN_TIME_OF_SCHEDULE,
+                              page)) {
+        (*count) = 0;
+    }
+}
+
+STATIC int hw_vdavinci_vfio_pin_pages(struct hw_vdavinci *vdavinci,
+                                      struct vdavinci_pin_info *pin_info)
+{
+    int ret = 0, i = 0;
+
+    if (pin_info->npage <= 0 || pin_info->npage > (int)VFIO_PIN_PAGES_MAX_ENTRIES) {
+        vascend_err(vdavinci_to_dev(vdavinci), "vdavinci error npage or gfn: %d, %lx\n",
+                    pin_info->npage, pin_info->gfn);
+        return -EINVAL;
+    }
+    if (pin_info->pages == NULL) {
+        pin_info->pages = kzalloc(sizeof(struct page *) * pin_info->npage, GFP_KERNEL);
+        if (IS_ERR_OR_NULL(pin_info->pages)) {
+            return -ENOMEM;
+        }
+    }
+    ret = vdavinci_pin_pages(vdavinci, pin_info);
+    if (ret < 0) {
+        goto info_pages;
+    }
+    for (i = 0; i < pin_info->npage; i++) {
+        if (!pfn_valid(page_to_pfn(pin_info->pages[i]))) {
+            vascend_warn(vdavinci_to_dev(vdavinci), "vid: %u pfn 0x%lx is not mem backed\n",
+                         vdavinci->id, page_to_pfn(pin_info->pages[i]));
+            ret = -EFAULT;
+            goto unpin;
+        }
+    }
+
+    return 0;
+
+unpin:
+    vdavinci_unpin_pages(vdavinci, pin_info);
+info_pages:
+    if (pin_info->pages != NULL) {
+        kfree(pin_info->pages);
+        pin_info->pages = NULL;
+    }
+    return ret;
+}
+
+STATIC void hw_vdavinci_vfio_unpin_pages(struct hw_vdavinci *vdavinci,
+                                         struct vdavinci_pin_info *pin_info)
+{
+    if (pin_info->npage <= 0 || pin_info->npage > (int)VFIO_PIN_PAGES_MAX_ENTRIES) {
+        vascend_err(vdavinci_to_dev(vdavinci), "vdavinci error npage: %d\n", pin_info->npage);
+        return;
+    }
+    if (pin_info->pages != NULL) {
+        kfree(pin_info->pages);
+        pin_info->pages = NULL;
+    }
+    vdavinci_unpin_pages(vdavinci, pin_info);
+}
+
 STATIC int add_dma_page_list(struct page_info_list *dma_page_list, unsigned long gfn,
     unsigned int size, struct page *page)
 {
@@ -146,12 +207,6 @@ STATIC int add_dma_page_list(struct page_info_list *dma_page_list, unsigned long
     return 0;
 }
 
-STATIC void hw_vdavinci_unpin_page(struct hw_vdavinci *vdavinci,
-                                   struct vdavinci_pin_info *pin_info)
-{
-    vdavinci_unpin_pages(vdavinci, pin_info);
-}
-
 /**
  * When dealing with pfn, it is necessary to judge whether it is
  * continuous with the last area in dma_page_list. When a discontinuous
@@ -165,15 +220,11 @@ STATIC int hw_vdavinci_add_pfn_to_dma_list(struct hw_vdavinci *vdavinci,
 {
     int i, ret, last_end;
     unsigned int length = 0;
-    unsigned long *user_pfn = pin_info->gfns;
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6,0,0))
+    unsigned long gfn = 0;
     struct page **pages = pin_info->pages;
-#else
-    unsigned long *pfn = pin_info->pfns;
-#endif
     struct page_info_entry *dma_page_info, *tmp;
 
-    if (dma_page_list->elem_num != 0 || user_pfn == NULL) {
+    if (dma_page_list->elem_num != 0) {
         return -EINVAL;
     }
 
@@ -182,18 +233,12 @@ STATIC int hw_vdavinci_add_pfn_to_dma_list(struct hw_vdavinci *vdavinci,
          /* if launch the last pfn or find the pfn and the next pfn are
           * discontinuous, add this region into list.
           */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6,0,0))
         if (i + 1 == pin_info->npage || page_to_pfn(pages[i]) + 1 != page_to_pfn(pages[i + 1])) {
-            length = (i - last_end) * PAGE_SIZE;
-            ret = add_dma_page_list(dma_page_list, user_pfn[last_end + 1],
+            length = (unsigned int)(i - last_end) * PAGE_SIZE;
+            gfn = pin_info->gfn + (last_end + 1);
+            ret = add_dma_page_list(dma_page_list, gfn,
                                     length, pages[last_end + 1]);
-#else
-        if (i + 1 == pin_info->npage || pfn[i] + 1 != pfn[i + 1]) {
-            length = (i - last_end) * PAGE_SIZE;
-            ret = add_dma_page_list(dma_page_list, user_pfn[last_end + 1],
-                                    length, pfn_to_page(pfn[last_end + 1]));
-#endif
-            if (ret) {
+            if (ret != 0) {
                 goto clean_dma_page_list;
             }
 
@@ -201,61 +246,13 @@ STATIC int hw_vdavinci_add_pfn_to_dma_list(struct hw_vdavinci *vdavinci,
         }
     }
     return 0;
+
 clean_dma_page_list:
     list_for_each_entry_safe(dma_page_info, tmp, &dma_page_list->head, list) {
         list_del(&dma_page_info->list);
         kfree(dma_page_info);
     }
     dma_page_list->elem_num = 0;
-    return ret;
-}
-
-/**
- * Pin a set of pages, return success or error.
- * If only some pages are pinned, release those pinned pages and return failed.
- */
-STATIC int hw_vdavinci_pin_page(struct hw_vdavinci *vdavinci,
-                                struct vdavinci_pin_info *pin_info,
-                                struct page_info_list *dma_page_list)
-{
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(6,3,0))
-    int i;
-#endif
-    int ret, count;
-
-    ret = vdavinci_pin_pages(vdavinci, pin_info);
-    if (ret < 0) {
-        vascend_warn(vdavinci_to_dev(vdavinci),
-            "pin pages failed, vid: %u, gfn : 0x%lx, npage : %d, ret : %d\n",
-            vdavinci->id, pin_info->gfn, pin_info->npage, ret);
-        return ret;
-    }
-
-    count = ret;
-    if (count != pin_info->npage) {
-        ret = -EFAULT;
-        goto unpin;
-    }
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(6,3,0))
-    for (i = 0; i < pin_info->npage; i++) {
-        if (!pfn_valid(pin_info->pfns[i])) {
-            vascend_warn(vdavinci_to_dev(vdavinci),
-                "vid: %u pfn 0x%lx is not mem backed\n",
-                vdavinci->id, pin_info->pfns[i]);
-            ret = -EFAULT;
-            goto unpin;
-        }
-    }
-#endif
-    ret = hw_vdavinci_add_pfn_to_dma_list(vdavinci, dma_page_list, pin_info);
-    if (ret) {
-        goto unpin;
-    }
-
-    return 0;
-unpin:
-    pin_info->npage = count;
-    vdavinci_unpin_pages(vdavinci, pin_info);
     return ret;
 }
 
@@ -277,93 +274,23 @@ STATIC int hw_vdavinci_pin_page_2m(struct hw_vdavinci *vdavinci,
                                    struct vdavinci_pin_info *pin_info,
                                    struct page_info_list *dma_page_list)
 {
-    return hw_vdavinci_pin_page(vdavinci, pin_info, dma_page_list);
-}
+    int ret = 0;
 
-STATIC void hw_vdavinci_unpin_page_single(struct hw_vdavinci *vdavinci,
-                                          struct page_info_list *dma_page_list)
-{
-    int i, npage;
-    struct page_info_entry *dma_page_info = NULL;
-    struct list_head *pos = NULL, *next = NULL;
-    unsigned long gfn;
-    struct vdavinci_pin_info pin_info = { 0 };
-
-    list_for_each_safe(pos, next, &(dma_page_list->head)) {
-        dma_page_info = list_entry(pos, struct page_info_entry, list);
-        npage = DIV_ROUND_UP(dma_page_info->length, PAGE_SIZE);
-
-        for (i = 0; i < npage; i++) {
-            gfn = dma_page_info->gfn + i;
-            pin_info.gfn = gfn;
-            pin_info.npage = 1;
-            pin_info.gfns = &gfn;
-            hw_vdavinci_unpin_page(vdavinci, &pin_info);
-        }
-
-        list_del(pos);
-        kfree(dma_page_info);
+    ret = hw_vdavinci_vfio_pin_pages(vdavinci, pin_info);
+    if (ret != 0) {
+        return ret;
     }
-}
-
-STATIC int gfn_array_init_2m(unsigned long gfn, int npage,
-                             struct vdavinci_pin_info *pin_info)
-{
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(6,0,0))
-    int i;
-#endif
-
-    if (npage > (int)VFIO_PIN_PAGES_MAX_ENTRIES) {
-        return -EINVAL;
+    ret = hw_vdavinci_add_pfn_to_dma_list(vdavinci, dma_page_list, pin_info);
+    if (ret != 0) {
+        vascend_err(vdavinci_to_dev(vdavinci), "vdavinci add pfns to dma list failed");
+        goto unpin;
     }
-    pin_info->gfn = gfn;
-    pin_info->npage = npage;
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6,0,0))
-    if (pin_info->pages == NULL) {
-        pin_info->pages = kmalloc(sizeof(struct page *) * npage, GFP_KERNEL);
-        if (pin_info->pages == NULL) {
-            return -ENOMEM;
-        }
-    }
-#else
-    if (pin_info->gfns == NULL) {
-        pin_info->gfns = kmalloc(sizeof(unsigned long) * npage, GFP_KERNEL);
-        if (pin_info->gfns == NULL) {
-            return -ENOMEM;
-        }
-    }
-    if (pin_info->pfns == NULL) {
-        pin_info->pfns = kmalloc(sizeof(unsigned long) * npage, GFP_KERNEL);
-        if (pin_info->pfns == NULL) {
-            kfree(pin_info->gfns);
-            pin_info->gfns = NULL;
-            return -ENOMEM;
-        }
-    }
-    for (i = 0; i < npage; i++) {
-        pin_info->gfns[i] = gfn + i;
-    }
-#endif
 
     return 0;
-}
 
-STATIC void gfn_array_uninit_2m(struct vdavinci_pin_info *pin_info)
-{
-    if (!IS_ERR_OR_NULL(pin_info->gfns)) {
-        kfree(pin_info->gfns);
-        pin_info->gfns = NULL;
-    }
-
-    if (!IS_ERR_OR_NULL(pin_info->pfns)) {
-        kfree(pin_info->pfns);
-        pin_info->pfns = NULL;
-    }
-
-    if (!IS_ERR_OR_NULL(pin_info->pages)) {
-        kfree(pin_info->pages);
-        pin_info->pages = NULL;
-    } 
+unpin:
+    hw_vdavinci_vfio_unpin_pages(vdavinci, pin_info);
+    return ret;
 }
 
 STATIC void hw_vdavinci_unpin_page_2m(struct hw_vdavinci *vdavinci,
@@ -378,8 +305,10 @@ STATIC void hw_vdavinci_unpin_page_2m(struct hw_vdavinci *vdavinci,
         dma_page_info = list_entry(pos, struct page_info_entry, list);
         npage = (int)DIV_ROUND_UP(dma_page_info->length, PAGE_SIZE);
 
-        (void)gfn_array_init_2m(dma_page_info->gfn, npage, pin_info);
-        hw_vdavinci_unpin_page(vdavinci, pin_info);
+        pin_info->npage = npage;
+        pin_info->gfn = dma_page_info->gfn;
+        hw_vdavinci_vfio_unpin_pages(vdavinci, pin_info);
+
         list_del(pos);
         kfree(dma_page_info);
     }
@@ -388,48 +317,24 @@ STATIC void hw_vdavinci_unpin_page_2m(struct hw_vdavinci *vdavinci,
 STATIC void hw_vdavinci_unpin_page_range(struct hw_vdavinci *vdavinci,
                                          struct ram_range_info *ram_info)
 {
-    int j, ret;
+    int j;
     unsigned long count = 0;
     unsigned int dma_start_cpu;
     struct dma_info_2m *dma_array_node = NULL;
     struct page_info_entry *dma_page_info = NULL;
     struct vdavinci_pin_info pin_info = { 0 };
 
-    pin_info.pfns = ERR_PTR(-1);
-    pin_info.pages = ERR_PTR(-1);
-    ret = gfn_array_init_2m(0, VFIO_PIN_PAGES_MAX_ENTRIES, &pin_info);
-    if (ret != 0) {
-        for (j = 0; j < ram_info->dma_array_len; j++) {
-            dma_array_node = ram_info->dma_array[j];
-            hw_vdavinci_unpin_page_single(vdavinci,
-                            &(dma_array_node->dma_page_list));
-            kfree(dma_array_node);
-        }
-        kfree(ram_info->dma_array);
-        ram_info->dma_array = NULL;
-        return;
-    }
-
     dma_start_cpu = smp_processor_id();
     for (j = 0; j < ram_info->dma_array_len; j++) {
-        count++;
         dma_array_node = ram_info->dma_array[j];
         dma_page_info = list_first_entry(&(dma_array_node->dma_page_list.head),
                                          struct page_info_entry, list);
-        if (hw_vdavinci_scheduled(vdavinci,
-                                  count * VFIO_PIN_PAGES_MAX_ENTRIES,
-                                  VDAVINCI_PIN_PAGES_OF_SCHEDULE,
-                                  VDAVINCI_PIN_TIME_OF_SCHEDULE,
-                                  dma_page_info->page)) {
-            count = 0;
-        }
-
+        dev_pin_scheduled(vdavinci, &count, dma_page_info->page);
         hw_vdavinci_unpin_page_2m(vdavinci, &pin_info, &(dma_array_node->dma_page_list));
         kfree(dma_array_node);
     }
 
     (void)hw_vdavinci_changed_cpu(current, cpumask_of(dma_start_cpu));
-    gfn_array_uninit_2m(&pin_info);
     kfree(ram_info->dma_array);
     ram_info->dma_array = NULL;
 }
@@ -462,10 +367,8 @@ STATIC int hw_vdavinci_pin_page_range(struct hw_vdavinci *vdavinci,
         npages_step = npages > VFIO_PIN_PAGES_MAX_ENTRIES ?
                         VFIO_PIN_PAGES_MAX_ENTRIES : npages;
 
-        ret = gfn_array_init_2m(base_gfn, npages_step, &pin_info);
-        if (ret != 0) {
-            goto out;
-        }
+        pin_info.gfn = base_gfn;
+        pin_info.npage = (int)npages_step;
 
         new = (struct dma_info_2m *)kzalloc(sizeof(struct dma_info_2m), GFP_KERNEL);
         if (!new) {
@@ -488,23 +391,13 @@ STATIC int hw_vdavinci_pin_page_range(struct hw_vdavinci *vdavinci,
         base_gfn += npages_step;
         dma_array_temp++;
         ram_info->dma_array_len++;
-
-        count++;
-        if (hw_vdavinci_scheduled(vdavinci,
-                                  count * VFIO_PIN_PAGES_MAX_ENTRIES,
-                                  VDAVINCI_PIN_PAGES_OF_SCHEDULE,
-                                  VDAVINCI_PIN_TIME_OF_SCHEDULE,
-                                  pfn_to_page(pin_info.pfns[0]))) {
-            count = 0;
-        }
+        dev_pin_scheduled(vdavinci, &count, pin_info.pages[0]);
     }
 
     (void)hw_vdavinci_changed_cpu(current, cpumask_of(dma_start_cpu));
-    gfn_array_uninit_2m(&pin_info);
     return 0;
 out:
     hw_vdavinci_unpin_page_range(vdavinci, ram_info);
-    gfn_array_uninit_2m(&pin_info);
     return ret;
 }
 
@@ -656,8 +549,7 @@ STATIC int vm_reserve_iova(struct hw_vdavinci *vdavinci, struct vm_dom_info *vm_
     return 0;
 }
 
-STATIC void raminfo_list_destroy(struct hw_vdavinci *vdavinci,
-                                 struct list_head *slot_ram_list)
+STATIC void raminfo_list_cleanup(struct list_head *slot_ram_list)
 {
     struct ram_range_info *ram_info = NULL;
     struct list_head *pos = NULL, *next = NULL;
@@ -669,35 +561,28 @@ STATIC void raminfo_list_destroy(struct hw_vdavinci *vdavinci,
     }
 }
 
+STATIC void raminfo_list_destroy(struct hw_vdavinci *vdavinci,
+                                 struct list_head *slot_ram_list)
+{
+    raminfo_list_cleanup(slot_ram_list);
+}
+
 STATIC int raminfo_list_init(struct hw_vdavinci *vdavinci,
                              struct list_head *slot_ram_list)
 {
-    struct list_head *pos = NULL, *next = NULL;
     int ret = -1;
     struct ram_range_info *ram_info = NULL;
     struct kvm_memslots *slots = NULL;
     struct kvm_memory_slot *slot = NULL;
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,17,0))
-    int bkt = 0;
-#else
-    int i;
-    struct kvm_memory_slot *memslots = NULL;
-#endif
+    int __maybe_unused iter = 0;
 
     mutex_lock(&(vdavinci->vdev.kvm->slots_lock));
     slots = kvm_memslots(vdavinci->vdev.kvm);
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,17,0))
-    kvm_for_each_memslot(slot, bkt, slots) {
-#else
-    memslots = slots->memslots;
-    for (i = 0; i < slots->used_slots; i++) {
-        slot = &(memslots[i]);
-#endif
+    vdavinci_for_each_memslot(slot, slots, iter) {
         if (slot->flags & KVM_MEM_READONLY) {
             continue;
         }
-
         ret = raminfo_init(&ram_info, slot);
         if (ret != 0) {
             vascend_err(vdavinci_to_dev(vdavinci), "vdavinci ram init failed, ret: %d\n", ret);
@@ -712,11 +597,7 @@ STATIC int raminfo_list_init(struct hw_vdavinci *vdavinci,
 
     return 0;
 out:
-    list_for_each_safe(pos, next, slot_ram_list) {
-        ram_info = list_entry(pos, struct ram_range_info, list);
-        list_del(pos);
-        kfree(ram_info);
-    }
+    raminfo_list_cleanup(slot_ram_list);
 
     return ret;
 }
@@ -748,8 +629,8 @@ STATIC int dma_dom_pool_pin(struct hw_vdavinci *vdavinci, struct vm_dom_info *vm
         ret_t = hw_vdavinci_pin_page_range(vdavinci, ram_info);
         if (ret_t) {
             vascend_warn(vdavinci_to_dev(vdavinci),
-                "pin ram range failed, npage : %lu, ret : %d\n",
-                ram_info->npages, ret_t);
+                         "page may not be ram : %lu, ret : %d\n",
+                         ram_info->npages, ret_t);
             continue;
         }
 

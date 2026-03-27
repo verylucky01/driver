@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,5 +14,13 @@
 #ifndef _UDIS_CMD_H_
 #define _UDIS_CMD_H_
 #include "udis.h"
+
+#define UDIS_FUNC_MAX_NUM 10
+
+struct udis_func_info {
+    UDIS_MODULE_TYPE module_type;
+    char name[UDIS_MAX_NAME_LEN];
+    udis_trigger func;
+};
 
 #endif

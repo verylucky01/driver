@@ -7,7 +7,7 @@
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 # ------------------------------------------------------------------------------------------------------------
-set(product_list "ascend910B" "ascend910_95")
+set(product_list "ascend910B" "ascend950")
 if (${PRODUCT} IN_LIST product_list)
 
     get_filename_component(PROJ_DIR "${CMAKE_CURRENT_LIST_DIR}" ABSOLUTE)

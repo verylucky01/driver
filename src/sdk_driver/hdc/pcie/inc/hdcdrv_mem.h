@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,11 +14,10 @@
 #ifndef _HDCDRV_MEM_H_
 #define _HDCDRV_MEM_H_
 
-#include "hdcdrv_mem_com.h"
 #include "ka_memory_pub.h"
-#include "ka_common_pub.h"
 #include "ka_list_pub.h"
 #include "ka_task_pub.h"
+#include "hdcdrv_mem_com.h"
 
 struct hdcdrv_mem_pool *find_mem_pool(int pool_type, int dev_id, int len);
 int alloc_mem(struct hdcdrv_mem_pool *pool, void **buf, ka_dma_addr_t *addr, u32 *offset, ka_list_head_t *wait_head);
@@ -52,5 +51,6 @@ int hdcdrv_init_alloc_mem_pool(u32 dev_id, u32 small_packet_num, u32 huge_packet
 void hdcdrv_uninit_alloc_mem_pool(u32 dev_id);
 int hdcdrv_init_reserve_mem_pool(u32 dev_id, u32 small_packet_num, u32 huge_packet_num);
 void hdcdrv_uninit_reserve_mem_pool(u32 dev_id);
-
+int hdcdrv_list_node_mem_alloc(struct hdcdrv_ctx *ctx, struct hdcdrv_mem_fd_list **new_node);
+void hdcdrv_list_node_mem_free(void *ctx, struct hdcdrv_mem_fd_list *new_node);
 #endif

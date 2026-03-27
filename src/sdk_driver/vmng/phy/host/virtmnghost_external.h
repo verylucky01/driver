@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,9 +14,9 @@
 #ifndef VIRTMNGHOST_EXTERNAL_H
 #define VIRTMNGHOST_EXTERNAL_H
 
-#include "virtmnghost_unit.h"
 #include "ka_memory_pub.h"
 #include "ka_kernel_def_pub.h"
+#include "virtmnghost_unit.h"
 
 int vmngh_alloc_external_db_entries(struct vmngh_vd_dev *vd_dev);
 void vmngh_free_external_db_entries(struct vmngh_vd_dev *vd_dev);

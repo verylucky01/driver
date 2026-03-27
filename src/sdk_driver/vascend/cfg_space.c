@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -32,7 +32,6 @@
 #define DAVINCI_COMMON_CFG_STATUS    DAVINCI_COMMON_CFG_STATUS_CAP_ENABLE
 #define DAVINCI_COMMON_CFG_REV_ID    0x71
 #define DAVINCI_COMMON_CFG_BASE_CLASS    0x12
-#define DAVINCI_COMMON_CFG_910D_CLASS    0x02
 #define DAVINCI_COMMON_CFG_CACHE_LINE_SIZE    0x8
 #define DAVINCI_COMMON_CFG_BAR_64B    (1 << 2)
 #define DAVINCI_COMMON_CFG_BAR_PREFETCHABLE    (1 << 3)
@@ -90,13 +89,13 @@ struct hw_vdavinci_cfg_init_ops {
 
 static void init_910b_cfg_space(struct hw_vdavinci *vdavinci);
 static void init_910_93_cfg_space(struct hw_vdavinci *vdavinci);
-static void init_910d_cfg_space(struct hw_vdavinci *vdavinci);
+static void init_950_cfg_space(struct hw_vdavinci *vdavinci);
 static void init_common_cfg_space(struct hw_vdavinci *vdavinci);
 
 STATIC const struct hw_vdavinci_cfg_init_ops vdavinci_cfg_init_ops[] = {
     { PCI_DEVICE_ID_ASCEND910B, init_910b_cfg_space },
     { PCI_DEVICE_ID_ASCEND910_93, init_910_93_cfg_space },
-    { PCI_DEVICE_ID_ASCEND910D, init_910d_cfg_space },
+    { PCI_DEVICE_ID_ASCEND950, init_950_cfg_space },
     { PCI_ANY_ID, init_common_cfg_space },
     { }
 };
@@ -349,13 +348,13 @@ STATIC void init_910_93_cfg_space(struct hw_vdavinci *vdavinci)
     vdavinci_cfg_space(vdavinci)[DAVINCI_PCI_BASE_CLASS] = DAVINCI_COMMON_CFG_BASE_CLASS;
 }
 
-STATIC void init_910d_cfg_space(struct hw_vdavinci *vdavinci)
+STATIC void init_950_cfg_space(struct hw_vdavinci *vdavinci)
 {
     struct pci_dev *pdev = to_pci_dev(vdavinci_resource_dev(vdavinci));
     /* VF BAR */
     STORE_LE32((u32 *) &vdavinci_cfg_space(vdavinci)[PCI_BASE_ADDRESS_0],
                DAVINCI_COMMON_CFG_BAR_0);
-    vdavinci->cfg_space.bar[VFIO_PCI_BAR0_REGION_INDEX].size = VF_MMIO_BAR0_SIZE_910D;
+    vdavinci->cfg_space.bar[VFIO_PCI_BAR0_REGION_INDEX].size = VF_MMIO_BAR0_SIZE_950;
  
     STORE_LE32((u32 *) &vdavinci_cfg_space(vdavinci)[PCI_BASE_ADDRESS_2],
                DAVINCI_COMMON_CFG_BAR_2 | DAVINCI_COMMON_CFG_BAR_PREFETCHABLE);
@@ -377,8 +376,8 @@ STATIC void init_910d_cfg_space(struct hw_vdavinci *vdavinci)
                pdev->vendor);
     STORE_LE16((u16 *) &vdavinci_cfg_space(vdavinci)[PCI_DEVICE_ID],
                pdev->device);
-    /* Base class : 02 */
-    vdavinci_cfg_space(vdavinci)[DAVINCI_PCI_BASE_CLASS] = DAVINCI_COMMON_CFG_910D_CLASS;
+    /* Base class : 12 */
+    vdavinci_cfg_space(vdavinci)[DAVINCI_PCI_BASE_CLASS] = DAVINCI_COMMON_CFG_BASE_CLASS;
 }
 
 static void init_common_cfg_space(struct hw_vdavinci *vdavinci)

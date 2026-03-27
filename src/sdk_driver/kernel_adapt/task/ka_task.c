@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,6 +10,13 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
+
+#include <linux/version.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+#include <uapi/linux/sched/types.h>
+#else
+#include <linux/sched.h>
+#endif
 
 #include "securec.h"
 #include "ka_system_pub.h"
@@ -278,3 +285,15 @@ ka_pid_namespace_t *ka_task_get_init_pid_ns_addr(void)
     return &init_pid_ns;
 }
 EXPORT_SYMBOL_GPL(ka_task_get_init_pid_ns_addr);
+
+int ka_task_sched_set_fifo_low(ka_task_struct_t *p)
+{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 9, 0)
+    struct sched_param sp = {.sched_priority = 1};
+    return sched_setscheduler(p, SCHED_FIFO, &sp);
+#else
+    sched_set_fifo_low(p);
+    return 0;
+#endif
+}
+EXPORT_SYMBOL_GPL(ka_task_sched_set_fifo_low);

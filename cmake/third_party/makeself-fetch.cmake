@@ -16,6 +16,7 @@ if(POLICY CMP0135)
 endif()
 
 set(MAKESELF_SEARCH_PATHS
+    ${CANN_3RD_LIB_PATH}/open_source/${MAKESELF_NAME}       # compile with ci
     ${CANN_3RD_LIB_PATH}/${MAKESELF_NAME}
 )
 

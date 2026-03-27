@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,10 +10,10 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-#include <asm/io.h>
-#include <linux/uaccess.h>
 
 #include "securec.h"
+#include "ka_type.h"
+#include "ka_dfx_pub.h"
 #include "devdrv_user_common.h"
 #include "dms_define.h"
 #include "dms_template.h"
@@ -23,7 +23,6 @@
 #include "pbl/pbl_feature_loader.h"
 #include "devdrv_common.h"
 #include "dms/dms_notifier.h"
-#include "ka_dfx_pub.h"
 #include "dms_hccs_init.h"
 
 BEGIN_DMS_MODULE_DECLARATION(DMS_MODULE_HCCS)
@@ -119,7 +118,7 @@ static int (*const dms_hccs_notifier_handle_func[DMS_DEVICE_NOTIFIER_MAX]) \
         [DMS_DEVICE_DOWN3] = dms_hccs_task_unregister,
 };
 
-STATIC int dms_hccs_notifier_handle(struct notifier_block *nb, unsigned long mode, void *data)
+STATIC int dms_hccs_notifier_handle(ka_notifier_block_t *nb, unsigned long mode, void *data)
 {
     struct devdrv_info *dev_info = (struct devdrv_info *)data;
     int ret;
@@ -145,7 +144,7 @@ STATIC int dms_hccs_notifier_handle(struct notifier_block *nb, unsigned long mod
     return KA_NOTIFY_DONE;
 }
 
-STATIC struct notifier_block g_dms_hccs_notifier = {
+STATIC ka_notifier_block_t g_dms_hccs_notifier = {
     .notifier_call = dms_hccs_notifier_handle,
 };
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -35,7 +35,7 @@ static int trs_chan_tscpu_init(struct trs_id_inst *inst)
         return ret;
     }
 
-    ret = trs_chan_ts_inst_register(inst, trs_soc_get_hw_type(inst->devid), trs_chan_get_tscpu_adapt_ops());
+    ret = trs_chan_ts_inst_register(inst, trs_soc_get_hw_type(inst->devid), UDA_NEAR, trs_chan_get_tscpu_adapt_ops());
     if (ret != 0) {
         trs_tscpu_chan_ops_uninit(inst);
     }

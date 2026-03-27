@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -279,7 +279,7 @@ STATIC int devmm_reboot_notify_handle(ka_notifier_block_t *notifier, unsigned lo
     g_svm_active_reboot = true;
 #endif
 
-    return NOTIFY_OK;
+    return KA_NOTIFY_OK;
 }
 
 STATIC ka_notifier_block_t devmm_reboot_notifier = {

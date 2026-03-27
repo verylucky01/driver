@@ -129,7 +129,7 @@ int halBuffInit(BuffCfg *cfg)
     if ((buff_already_init == true) && (g_self_pid == getpid())) {
         (void)pthread_mutex_unlock(&g_buff_grp_init_mutex);
         buff_warn("Buff already init.\n");
-        return (int)DRV_ERROR_REPEATED_INIT;
+        return (int)DRV_ERROR_NONE;
     }
 
     buff_already_init = false;

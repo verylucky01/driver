@@ -8,14 +8,14 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # ------------------------------------------------------------------------------------------------------------
 get_filename_component(BASE_DIR "${CMAKE_CURRENT_LIST_DIR}" ABSOLUTE)
-if(${PRODUCT} STREQUAL ascend910_95)
+if(${PRODUCT} STREQUAL ascend950)
     add_subdirectory(mem_prof)
 endif ()
 
-if (${PRODUCT} STREQUAL ascend910_95)
+if (${PRODUCT} STREQUAL ascend950)
     if(${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL aarch64)
         if ((${ENABLE_UBE}))
-            set(product_support_urma ascend910_95$<SEMICOLON>)
+            set(product_support_urma ascend950$<SEMICOLON>)
         endif ()
     endif ()
 endif ()
@@ -71,8 +71,8 @@ target_include_directories(prof_obj PRIVATE
 
 target_compile_definitions(prof_obj PRIVATE
     DRV_HOST
-    $<$<STREQUAL:${PRODUCT},ascend910_95>:CFG_SOC_PLATFORM_CLOUD_V4>
-    $<$<AND:$<STREQUAL:${PRODUCT},ascend910_95>,$<STREQUAL:${CMAKE_HOST_SYSTEM_PROCESSOR},aarch64>>:SSAPI_USE_MAMI>
+    $<$<STREQUAL:${PRODUCT},ascend950>:CFG_SOC_PLATFORM_CLOUD_V4>
+    $<$<AND:$<STREQUAL:${PRODUCT},ascend950>,$<STREQUAL:${CMAKE_HOST_SYSTEM_PROCESSOR},aarch64>>:SSAPI_USE_MAMI>
 )
 
 target_link_libraries(prof_obj PRIVATE

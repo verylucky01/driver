@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -32,8 +32,8 @@
 #ifdef CONFIG_PLATFORM_910B
 #include "ascend_platform_910B.h"
 #endif
-#ifdef CONFIG_PLATFORM_910_95
-#include "ascend_platform_910_95.h"
+#ifdef CONFIG_PLATFORM_950
+#include "ascend_platform_950.h"
 #endif
 #ifdef CONFIG_PLATFORM_910_96
 #include "ascend_platform_910_96.h"

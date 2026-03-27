@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,34 +13,33 @@
 #ifndef MSG_CHAN_MAIN_H
 #define MSG_CHAN_MAIN_H
 
-#include "comm_kernel_interface.h"
-#include "msg_chan_adapt.h"
 #include "ka_system_pub.h"
 #include "ka_base_pub.h"
-#include "ka_task_pub.h"
 #include "ka_dfx_pub.h"
+#include "comm_kernel_interface.h"
+#include "msg_chan_adapt.h"
 
 #ifndef EMU_ST
 #include "dmc_kernel_interface.h"
 #endif
 
-#define module_devdrv "devdrv"
+#define module_devdrv "msg_chan"
 #ifndef EMU_ST
 #define devdrv_err(fmt, ...) do { \
     drv_err(module_devdrv, "<%s:%d:%d:%d> " fmt, \
-        ka_task_get_current_comm(), ka_task_get_current_tgid(), ka_task_get_current_pid(), ka_system_smp_processor_id(), ##__VA_ARGS__); \
+        ka_task_get_current_comm(), ka_task_get_current_tgid(), ka_task_get_current_pid(), ka_system_raw_smp_processor_id(), ##__VA_ARGS__); \
 } while (0)
 #define devdrv_warn(fmt, ...) do { \
     drv_warn(module_devdrv, "<%s:%d:%d:%d> " fmt, \
-        ka_task_get_current_comm(), ka_task_get_current_tgid(), ka_task_get_current_pid(), ka_system_smp_processor_id(), ##__VA_ARGS__); \
+        ka_task_get_current_comm(), ka_task_get_current_tgid(), ka_task_get_current_pid(), ka_system_raw_smp_processor_id(), ##__VA_ARGS__); \
 } while (0)
 #define devdrv_info(fmt, ...) do { \
     drv_info(module_devdrv, "<%s:%d:%d:%d> " fmt, \
-        ka_task_get_current_comm(), ka_task_get_current_tgid(), ka_task_get_current_pid(), ka_system_smp_processor_id(), ##__VA_ARGS__); \
+        ka_task_get_current_comm(), ka_task_get_current_tgid(), ka_task_get_current_pid(), ka_system_raw_smp_processor_id(), ##__VA_ARGS__); \
 } while (0)
 #define devdrv_debug(fmt, ...) do { \
     drv_pr_debug(module_devdrv, "<%s:%d:%d:%d> " fmt, \
-        ka_task_get_current_comm(), ka_task_get_current_tgid(), ka_task_get_current_pid(), ka_system_smp_processor_id(), ##__VA_ARGS__); \
+        ka_task_get_current_comm(), ka_task_get_current_tgid(), ka_task_get_current_pid(), ka_system_raw_smp_processor_id(), ##__VA_ARGS__); \
 } while (0)
 #else  // EMU_ST
 #define devdrv_info(fmt, ...) do {                                      \

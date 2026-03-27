@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -16,9 +16,11 @@
 #include "ka_barrier_pub.h"
 #include "ka_memory_pub.h"
 #include "ka_system_pub.h"
+#include "ka_task_pub.h"
 
 #include <securec.h>
 #include "pbl/pbl_soc_res.h"
+#include "trs_timestamp.h"
 #include "trs_mailbox_def.h"
 #include "chan_init.h"
 #include "chan_rxtx.h"
@@ -70,10 +72,10 @@ static int trs_chan_sqe_update(struct trs_chan *chan, u8 *sqe)
     return ret;
 }
 
-int trs_chan_stream_task_update(struct trs_id_inst *inst, int pid, void *vaddr)
+int trs_chan_stream_task_update(struct trs_id_inst *inst, int pid, void *vaddr, u32 *long_task_cnt)
 {
     struct trs_chan_ts_inst *ts_inst = NULL;
-    int ret;
+    int ret = 0;
 
     ts_inst = trs_chan_ts_inst_get(inst);
     if (ts_inst == NULL) {
@@ -84,19 +86,18 @@ int trs_chan_stream_task_update(struct trs_id_inst *inst, int pid, void *vaddr)
     if (ts_inst->ops.sqe_update != NULL) {
         struct trs_sqe_update_info update_info = {0};
         update_info.pid = pid;
-        update_info.sqid = U32_MAX;
+        update_info.sqid = KA_U32_MAX;
         update_info.sqe = vaddr;
+        update_info.long_sqe_cnt = long_task_cnt;
         ret = ts_inst->ops.sqe_update(inst, &update_info);
-        if (ret != 0) {
-            trs_err("Failed to update sqe. (ret=%d; devid=%u; pid=%d)\n", ret, inst->devid, pid);
-            trs_chan_ts_inst_put(ts_inst);
-            return ret;
+        if ((ret == 0) && (*long_task_cnt != 0)) {
+            (*long_task_cnt)--;
         }
     }
     trs_chan_ts_inst_put(ts_inst);
     trs_debug("Chan update sqe success. (devid=%u; pid=%d)\n", inst->devid, pid);
 
-    return 0;
+    return ret;
 }
 KA_EXPORT_SYMBOL_GPL(trs_chan_stream_task_update);
 
@@ -304,7 +305,7 @@ static int trs_chan_send_ex(struct trs_id_inst *inst, int chan_id, struct trs_ch
         return -EPERM;
     }
 
-    if (in_softirq()) {
+    if (ka_base_in_softirq()) {
         ka_task_spin_lock_bh(&chan->sq.lock);   /* submit task in tasklet */
         para->timeout = 0;  /* to avoid into wait event, if sq is full. */
     } else {
@@ -321,7 +322,7 @@ static int trs_chan_send_ex(struct trs_id_inst *inst, int chan_id, struct trs_ch
     para->first_pos = chan->sq.sq_tail;
     ret = trs_chan_submit(chan, para, addr_domain);
 
-    if (in_softirq()) {
+    if (ka_base_in_softirq()) {
         ka_task_spin_unlock_bh(&chan->sq.lock);
     } else {
         trs_chan_sem_up(chan);
@@ -459,7 +460,7 @@ static int trs_chan_fetch_wait(struct trs_chan *chan, u32 timeout)
         return -ETIMEDOUT;
     }
 
-    tm = (timeout == -1) ? MAX_SCHEDULE_TIMEOUT : ka_system_msecs_to_jiffies((u32)timeout);
+    tm = (timeout == -1) ? KA_TASK_MAX_SCHEDULE_TIMEOUT : ka_system_msecs_to_jiffies((u32)timeout);
 
     ret = ka_task_wait_event_interruptible_timeout(cq->wait_queue, (cq->cqe_valid == 1), tm);
     if (ret == 0) {
@@ -667,6 +668,7 @@ static int trs_chan_cq_dispatch(struct trs_chan *chan, u32 dispatch_num)
         return 0;
     }
 
+    chan->interrupt_time_us = trs_get_us_timestamp();
     while (ka_base_atomic_read(&chan->chan_status)) {
         cq_addr = (u8 *)cq->cq_addr + cq->para.cqe_size * cq->cq_head;
         trs_chan_cqe_invalid_cache(chan, cq_addr);
@@ -764,19 +766,21 @@ static int trs_chan_irq_proc_cqs(struct trs_chan_ts_inst *ts_inst, u32 irq_type,
         struct trs_chan *chan = NULL;
         int chan_id;
 
-        if (cqid[i] == U32_MAX) {
-            continue;   /* in mia. if cqid equals U32_MAX, it means the cqid is belong to vf. */
+        if (cqid[i] == KA_U32_MAX) {
+            continue;   /* in mia. if cqid equals KA_U32_MAX, it means the cqid is belong to vf. */
         }
         chan_id = (irq_type == TS_FUNC_CQ_IRQ) ?
             trs_chan_maint_cq_to_chan_id(ts_inst, cqid[i]) : trs_chan_cq_to_chan_id(ts_inst, cqid[i]);
         chan = trs_chan_get(&ts_inst->inst, (u32)chan_id);
         if (chan != NULL) {
+            chan->tasklet_running = 1;
             if (trs_chan_is_recv_block(chan) || ka_system_time_after(ka_jiffies, timeout) || (chan->work_running == 1)) {
                 ka_task_schedule_work(&chan->work);
                 ret = -EBUSY;
             } else {
                 ret = trs_chan_cq_dispatch_non_block(chan);
             }
+            chan->tasklet_running = 0;
             trs_chan_put(chan);
         } else {
             trs_debug("Chan failed. (devid=%u; tsid=%u; cqid=%u; chan_id=%d)\n",
@@ -838,6 +842,56 @@ void trs_chan_tasklet(unsigned long data)
 {
     struct trs_chan_irq_ctx *irq_ctx = (struct trs_chan_irq_ctx *)data;
     trs_chan_irq_proc_list(irq_ctx);
+}
+
+void trs_chan_cq_guard_work_proc(struct trs_chan_ts_inst *ts_inst)
+{
+    unsigned long cur_jiffies = ka_jiffies;
+    struct trs_chan *chan = NULL;
+    u64 cq_head, cq_tail, time_cost;
+    u32 cqid;
+    int ret;
+
+    for (cqid = 0; cqid < ts_inst->cq_max_id; cqid++) {
+        if (ts_inst->hw_cq_ctx[cqid].valid == false) {
+            continue;
+        }
+
+        chan = trs_chan_get(&ts_inst->inst, ts_inst->hw_cq_ctx[cqid].chan_id);
+        if (chan == NULL) {
+            trs_debug("Failed to get chan. (devid=%u; cqid=%u; chan_id=%u)\n",
+                ts_inst->inst.devid, cqid, ts_inst->hw_cq_ctx[cqid].chan_id);
+            continue;
+        }
+
+        if (chan->types.type != CHAN_TYPE_HW) {
+            trs_chan_put(chan);
+            continue;
+        }
+
+        if (chan->types.sub_type != CHAN_SUB_TYPE_HW_RTS) {
+            trs_chan_put(chan);
+            continue;
+        }
+        trs_try_resched(&cur_jiffies, 8); /* timeout is 8ms */
+
+        ret = ts_inst->ops.sqcq_query(&chan->inst, &chan->types, cqid, QUERY_CMD_CQ_HEAD, &cq_head);
+        ret |= ts_inst->ops.sqcq_query(&chan->inst, &chan->types, cqid, QUERY_CMD_CQ_TAIL, &cq_tail);
+        if (ret != 0) {
+            trs_debug("Failed to query cq head tail. (ret=%d; devid=%u; cqid=%u; chan_id=%u)\n",
+                ret, ts_inst->inst.devid, cqid, ts_inst->hw_cq_ctx[cqid].chan_id);
+            trs_chan_put(chan);
+            continue;
+        }
+        time_cost = trs_get_us_timestamp() - chan->interrupt_time_us;
+        if ((cq_head != cq_tail) && (time_cost > 1000000) && (chan->tasklet_running == 0)) { /* 1s = 1000000us */
+            trs_debug("Guard work process cq. (devid=%u; chan_id=%u; cqid=%u; cq_head=%llu; cq_tail=%llu; "
+                "time_cost=%llu)\n", ts_inst->inst.devid, ts_inst->hw_cq_ctx[cqid].chan_id, cqid,
+                cq_head, cq_tail, time_cost);
+            ka_task_schedule_work(&chan->work);
+        }
+        trs_chan_put(chan);
+    }
 }
 
 static int trs_chan_reset_sq(struct trs_chan *chan)
@@ -1024,6 +1078,30 @@ int trs_chan_query(struct trs_id_inst *inst, int chan_id, u32 cmd, u32 *value)
     return ret;
 }
 KA_EXPORT_SYMBOL_GPL(trs_chan_query);
+
+int trs_chan_dma_desc_destroy(struct trs_id_inst *inst, int chan_id)
+{
+    struct trs_chan *chan = NULL;
+    chan = trs_chan_get(inst, chan_id);
+    if (chan == NULL) {
+        trs_err("Invalid para. (devid=%u; tsid=%u; chan_id=%d)\n", inst->devid, inst->tsid, chan_id);
+        return -EINVAL;
+    }
+
+    if (!trs_chan_has_sq(chan)) {
+        trs_chan_put(chan);
+        trs_err("Chan no sq. (devid=%u; tsid=%u, chan_id=%d)\n", inst->devid, inst->tsid, chan_id);
+        return -EINVAL;
+    }
+
+    if (chan->ts_inst->ops.sq_dma_desc_destroy != NULL) {
+        chan->ts_inst->ops.sq_dma_desc_destroy(inst, chan->sq.sqid);
+    }
+
+    trs_chan_put(chan);
+    return 0;
+}
+KA_EXPORT_SYMBOL_GPL(trs_chan_dma_desc_destroy);
 
 int trs_chan_dma_desc_create(struct trs_id_inst *inst, int chan_id, struct trs_chan_dma_desc *para)
 {

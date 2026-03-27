@@ -22,11 +22,8 @@ add_subdirectory(svm)
 add_subdirectory(dpa)
 add_subdirectory(mmpa)
 add_subdirectory(trs)
+add_subdirectory(msnpureport)
 
 if(${PRODUCT} STREQUAL ascend910B)
-    add_subdirectory(msnpureport)
-
     add_subdirectory(roce)
-elseif(${PRODUCT} STREQUAL ascend910_95)
-    # add_subdirectory(msnpureport)
 endif()

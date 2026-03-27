@@ -165,7 +165,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001251427195_zh-cn_topic_0000001178373126_zh-cn_topic_0000001148244627_toc533412083"></a>**
 
-```c
+```
 … 
 int ret = 0;
 int card_id = 0;
@@ -174,3 +174,4 @@ unsigned int voltage = 0;
 ret = dcmi_get_device_voltage(card_id, device_id, &voltage);
 …
 ```
+

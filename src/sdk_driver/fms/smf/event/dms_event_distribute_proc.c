@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,8 +11,6 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/errno.h>
-#include <linux/slab.h>
 #include "ascend_hal_error.h"
 #include "fms_define.h"
 #include "dms_event.h"
@@ -24,6 +22,7 @@
 #include "dms_event_distribute_proc.h"
 #include "ka_base_pub.h"
 #include "ka_kernel_def_pub.h"
+#include "ka_system_pub.h"
 
 static add_exception_handle g_add_exception_func = NULL;
 
@@ -151,7 +150,7 @@ static struct dms_event_bbox_map *dms_event_bbox_map(DMS_EVENT_NODE_STRU *except
 
 static int dms_event_call_add_exception_handle(u32 devid, u32 code)
 {
-    struct timespec stamp = current_kernel_time();
+    ka_timespec_t stamp = current_kernel_time();
     if (g_add_exception_func != NULL) {
         return g_add_exception_func(devid, code, stamp);
     }
@@ -172,7 +171,7 @@ static int dms_event_distribute_to_bbox(DMS_EVENT_NODE_STRU *exception_node)
     struct dms_event_bbox_map *bbox_map = NULL;
     int ret = DRV_ERROR_NONE;
 
-#ifdef CFG_HOST_ENV
+#ifdef CFG_EDGE_HOST
     if (!DMS_EVENT_CODE_IS_HOST(exception_node->event.event_id)) {
         return ret;
     }
@@ -183,7 +182,7 @@ static int dms_event_distribute_to_bbox(DMS_EVENT_NODE_STRU *exception_node)
 #endif
     bbox_map = dms_event_bbox_map(exception_node);
     if (bbox_map == NULL) {
-#ifdef CFG_HOST_ENV
+#ifdef CFG_EDGE_HOST
         dms_warn("Unsupported bbox event_code. (dev_id=%u; event_code=0x%x)\n",
             exception_node->event.deviceid, exception_node->event.event_code);
 #endif

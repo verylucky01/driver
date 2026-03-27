@@ -8,18 +8,6 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-/**
- * This project includes code snippets from the following open source projects:
- * Software: Ascend/tensorflow
- * Official Repository: https://gitee.com/ascend
- * Usage: "
- * log_system_api.h
- * Copyright Notice:
- * Copyright 2020 Huawei Technologies Co., Ltd
- * License: Apache License V2.0
- * Please see above
- */
-
 #ifndef LOG_SYSTEM_API_H
 #define LOG_SYSTEM_API_H
 

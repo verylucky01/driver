@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -112,12 +112,12 @@ struct devdrv_dma_channel;
 struct devdrv_dma_dev;
 
 void devdrv_dma_chan_ptr_show(struct devdrv_dma_channel *dma_chan, int wait_status);
-u32 devdrv_get_sq_err_ptr(const void __iomem *io_base);
+u32 devdrv_get_sq_err_ptr(const void __ka_mm_iomem *io_base);
 
-void devdrv_set_dma_sq_tail(void __iomem *io_base, u32 val);
-void devdrv_set_dma_cq_head(void __iomem *io_base, u32 val);
-u32 devdrv_get_dma_cq_head(void __iomem *io_base);
-u32 devdrv_get_dma_cq_tail(void __iomem *io_base);
+void devdrv_set_dma_sq_tail(void __ka_mm_iomem *io_base, u32 val);
+void devdrv_set_dma_cq_head(void __ka_mm_iomem *io_base, u32 val);
+u32 devdrv_get_dma_cq_head(void __ka_mm_iomem *io_base);
+u32 devdrv_get_dma_cq_tail(void __ka_mm_iomem *io_base);
 
 void devdrv_dma_set_sq_addr_info(struct devdrv_dma_sq_node *sq_desc, u64 src_addr, u64 dst_addr, u32 length);
 void devdrv_dma_set_sq_attr(struct devdrv_dma_sq_node *sq_desc, u32 opcode, u32 attr,

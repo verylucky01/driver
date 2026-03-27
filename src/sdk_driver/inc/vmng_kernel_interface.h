@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,16 +14,12 @@
 #ifndef __VMNG_KERNEL_INTERFACE_H__
 #define __VMNG_KERNEL_INTERFACE_H__
 
-#include <linux/types.h>
-#include <linux/mutex.h>
-#include <linux/interrupt.h>
-
-#ifndef LOG_UT
-#include <linux/scatterlist.h>
-#endif
+#include "ka_task_pub.h"
+#include "ka_pci_pub.h"
+#include "ka_memory_pub.h"
 #include "vpc_kernel_interface.h"
 #include "pbl/pbl_soc_res_attr.h"
-#include "vmng_cmd_msg.h"
+#include "vmng_kernel_interface_cmd.h"
 
 #define VMNG_PDEV_MAX 64U
 #define VMNG_VDEV_MAX_PER_PDEV 17 /* 0: physical others: virtual */
@@ -263,7 +259,7 @@ struct vmng_bandwidth_check_info {
 struct vmngh_client_instance {
     void *priv;
     struct vmng_vdev_ctrl *dev_ctrl;
-    struct mutex flag_mutex;
+    ka_mutex_t  flag_mutex;
     enum vmng_client_type type;
     u32 flag;
     u32 vdev_type;
@@ -321,9 +317,9 @@ enum vmng_split_mode vmng_get_device_split_mode(u32 dev_id);
 
 /* agent client */
 struct vmnga_ctrl {
-    struct device *dev;
-    struct pci_bus *bus;
-    struct pci_dev *pdev;
+    ka_device_t *dev;
+    ka_pci_bus_t *bus;
+    ka_pci_dev_t *pdev;
     void *unit;
     enum vmng_startup_flag_type startup_flag;
     u32 dev_id;
@@ -336,7 +332,7 @@ struct vmnga_ctrl {
 struct vmnga_client_instance {
     void *priv;
     struct vmnga_ctrl *dev_ctrl;
-    struct mutex flag_mutex;
+    ka_mutex_t flag_mutex;
     enum vmng_client_type type;
     u32 flag;
 };
@@ -383,7 +379,7 @@ int vmnga_trigger_remote_db(u32 dev_id, u32 db_index);
 int vmngh_get_remote_msix(u32 dev_id, u32 fid, enum vmng_get_irq_type type, u32 *msix_base, u32 *msix_num);
 int vmngh_trigger_remote_msix(u32 dev_id, u32 fid, u32 msix_index);
 int vmnga_get_local_msix(u32 dev_id, enum vmng_get_irq_type type, u32 *msix_base, u32 *msix_num);
-int vmnga_register_local_msix(u32 dev_id, u32 msix_index, irq_handler_t handler, void *data, const char *name);
+int vmnga_register_local_msix(u32 dev_id, u32 msix_index, ka_irq_handler_t handler, void *data, const char *name);
 int vmnga_unregister_local_msix(u32 dev_id, u32 msix_index, void *data);
 
 /* addr info : alloc bar4 to external modules */
@@ -396,23 +392,23 @@ enum vmng_get_addr_type {
 int vmngh_get_virtual_addr_info(u32 dev_id, u32 fid, enum vmng_get_addr_type type, u64 *addr, u64 *size);
 int vmnga_get_physicl_addr_info(u32 dev_id, enum vmng_get_addr_type type, phys_addr_t *addr, u64 *size);
 
-#define DMA_MAP_ERROR (~(dma_addr_t)0)
+#define DMA_MAP_ERROR (~(ka_dma_addr_t)0)
 /* vm dma_addr change to host pa */
-dma_addr_t vmngh_dma_map_guest_page(u32 dev_id, u32 fid, unsigned long addr, unsigned long size,
-    struct sg_table **dma_sgt);
-void vmngh_dma_unmap_guest_page(u32 dev_id, u32 fid, struct sg_table *dma_sgt);
+ka_dma_addr_t vmngh_dma_map_guest_page(u32 dev_id, u32 fid, unsigned long addr, unsigned long size,
+    ka_sg_table_t **dma_sgt);
+void vmngh_dma_unmap_guest_page(u32 dev_id, u32 fid, ka_sg_table_t *dma_sgt);
 bool vmngh_dma_pool_active(u32 dev_id, u32 fid);
 int vmngh_dma_map_guest_page_batch(u32 dev_id, u32 fid, unsigned long *gfn, unsigned long *dma_addr,
     unsigned long count);
 void vmngh_dma_unmap_guest_page_batch(u32 dev_id, u32 fid, unsigned long *gfn, unsigned long *dma_addr,
     unsigned long count);
 void *vmngh_get_vdavinci_by_id(u32 dev_id, u32 fid);
-void *vmngh_dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *dma_handle, gfp_t gfp);
-void vmngh_dma_free_coherent(struct device *dev, size_t size, void *cpu_addr, dma_addr_t dma_handle);
+void *vmngh_dma_alloc_coherent(ka_device_t *dev, size_t size, ka_dma_addr_t *dma_handle, ka_gfp_t gfp);
+void vmngh_dma_free_coherent(ka_device_t *dev, size_t size, void *cpu_addr, ka_dma_addr_t dma_handle);
 // inject msix irq to vm
 int vmngh_hypervisor_inject_msix(unsigned int dev_id, unsigned int irq_vector);
 int vmngh_check_vdev_phy_address(unsigned int dev_id, u64 phy_address, u64 length);
-int vmng_check_vdev_iova_address(unsigned int dev_id, dma_addr_t iova_addr, size_t size);
+int vmng_check_vdev_iova_address(unsigned int dev_id, ka_dma_addr_t iova_addr, size_t size);
 /* @Function: vmngh_ctrl_get_vm_id
  * @Description: get vm id
  * @Returun: 0~31: normal -1: error
@@ -501,7 +497,7 @@ static inline const char *get_client_name(enum vmngd_client_type type)
 struct vmngd_client_instance {
     enum vmngd_client_type type;
     u32 flag;
-    struct mutex mutex;
+    ka_mutex_t mutex;
     struct vmng_vdev_ctrl vdev_ctrl;
 };
 

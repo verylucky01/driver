@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -151,6 +151,8 @@ DMS_DECLARE_SEN_TYPE_END;
         {0x0B, 0x02, "PMU config error. "},
         {0x0C, 0x00, "reserved. "},
         {0x0D, 0x02, "Power Unit can not be access. "},
+        {0x0E, 0x01, "Pmu non-lethal error. "},
+ 	    {0x0F, 0x03, "Pmu H112 power error. "},
 DMS_DECLARE_SEN_TYPE_END;
 
     /* 0x0c: Memory  Sensor,type:0CH,offset:00H-08h,all:9 */
@@ -535,7 +537,7 @@ DMS_DECLARE_SEN_TYPE_END;
         { 0x09, 0,  "OS init" },
         { 0x0A, 3,  "SOC Lost" },
         { 0x0B, 2,  "system memory used by service threshold over limit" },
-        { 0x0C, 2,  "The software fails to cannot recover."},
+        { 0x0C, 2,  "The software has failed and cannot recover."},
 DMS_DECLARE_SEN_TYPE_END;
 
     /* Chip hardware,type:D1 */

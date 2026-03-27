@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -75,7 +75,7 @@ static StarsNotifyTableSlice *trs_get_notify_table(struct trs_id_inst *inst, u32
 int trs_stars_get_notify_tbl_flag(struct trs_id_inst *inst, u32 id)
 {
     StarsNotifyTableSlice *slice = NULL;
-    int tbl_flag = INT_MAX;
+    int tbl_flag = KA_INT_MAX;
 
     ka_task_read_lock(&notify_table_all_reg_lock);
     slice = trs_get_notify_table(inst, id);

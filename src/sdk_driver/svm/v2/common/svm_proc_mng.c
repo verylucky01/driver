@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -41,7 +41,7 @@ struct devmm_proc_node {
 #define DEVMM_RELEASE_WAIT_TIMES_OUT 604800 /* one week */
 
 #define DEVMM_HOSTPID_LIST_MAX   (1U << DEVMM_HOSTPID_LIST_SHIFT)
-#define DEVMM_HOSTPID_LIST_SHIFT 4  /* 16 1<<4 */
+#define DEVMM_HOSTPID_LIST_SHIFT 6  /* 64 1<<6 */
 
 static ka_rwlock_t svm_proc_hash_spinlock[DEVMM_HOSTPID_LIST_MAX];
 STATIC KA_DEFINE_HASHTABLE(svm_proc_hashtable, DEVMM_HOSTPID_LIST_SHIFT);
@@ -229,10 +229,7 @@ static void devmm_init_svm_proc_state(struct devmm_svm_process *svm_proc)
     svm_proc->msg_processing = 0;
     svm_proc->proc_status = 0; /* clear CodeDEX alarm */
     svm_proc->release_work_timeout = DEVMM_RELEASE_WAIT_TIMES_OUT;
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
     svm_proc->notifier = NULL;
-#endif
     svm_proc->mm = ka_task_get_current_mm();
     svm_proc->tsk = ka_task_get_current();
     svm_proc->is_enable_svm_mem = false;
@@ -279,12 +276,12 @@ static int devmm_init_svm_proc_host_pin_heap(struct devmm_svm_process *svm_proc)
     u64 used_mask_size;
     struct devmm_svm_heap *heap;
  
-    used_mask_size = sizeof(unsigned long) * BITS_TO_LONGS((u64)(DEVMM_HOST_PIN_SIZE / HEAP_USED_PER_MASK_SIZE));
+    used_mask_size = sizeof(unsigned long) * KA_BASE_BITS_TO_LONGS((u64)(DEVMM_HOST_PIN_SIZE / HEAP_USED_PER_MASK_SIZE));
     heap = devmm_kvzalloc(sizeof(struct devmm_svm_heap) + used_mask_size);
     if (heap == NULL) {
         return -ENOMEM;
     }
- 
+
     heap->heap_type = DEVMM_HEAP_PINNED_HOST;
     heap->heap_sub_type = SUB_HOST_TYPE;
     heap->used_mask = (unsigned long *)(void *)(heap + 1);
@@ -296,7 +293,7 @@ static int devmm_init_svm_proc_host_pin_heap(struct devmm_svm_process *svm_proc)
         devmm_kvfree(heap);
         return ret;
     }
- 
+
     if (dbl_get_deployment_mode() == DBL_HOST_DEPLOYMENT) {
         if (devmm_alloc_new_heap_pagebitmap(heap) != 0) {
             devmm_drv_err("Devmm_alloc_new_heap_pagebitmap for host pin error.\n");
@@ -304,21 +301,21 @@ static int devmm_init_svm_proc_host_pin_heap(struct devmm_svm_process *svm_proc)
             return ret;
         }
     }
- 
+
     svm_proc->host_pin_heap = heap;
     return 0;
 }
- 
+
 void devmm_destroy_svm_proc_host_pin_heap(struct devmm_svm_process *svm_proc)
 {
     struct devmm_svm_heap *heap;
- 
+
     heap = svm_proc->host_pin_heap;
     svm_proc->host_pin_heap = NULL;
     if (heap == NULL) {
         return;
     }
- 
+
     if (dbl_get_deployment_mode() == DBL_HOST_DEPLOYMENT) {
         devmm_free_heap_pagebitmap_ref(heap);
     }
@@ -351,13 +348,13 @@ STATIC int devmm_init_svm_proc(struct devmm_svm_process *svm_proc)
         devmm_drv_err("devmm init host pin heap failed : %d\n", ret);
         return ret;
     }
- 
+
     ret = devmm_svm_proc_init_private(svm_proc);
     if (ret != 0) {
         devmm_destroy_svm_proc_host_pin_heap(svm_proc);
         return ret;
     }
- 
+
     return 0;
 }
 
@@ -382,7 +379,7 @@ struct devmm_svm_process *devmm_alloc_svm_proc(void)
         return NULL;
     }
     svm_proc->proc_idx = (u32)ka_base_atomic_inc_return(&proc_idx);
-
+            
     return svm_proc;
 }
 

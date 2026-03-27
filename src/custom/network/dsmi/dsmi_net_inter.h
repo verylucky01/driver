@@ -55,10 +55,12 @@ enum ds_net_opcode_type_ext {
     DS_STOP_HCCS_PING_MESH = 0x0130,
     DS_START_PING_MESH_TASK = 0x0131,
     DS_SET_PRBS_ADAPT_IN_ORDER = 0x0136,
+    DS_SET_DEVICE_OFFLINE_NET_DOWN = 0x46,
+    DS_MAX_CMD_EXT,
 };
 
 int dsmi_del_default_gateway_address(int logic_id, int port, unsigned int gateway, bool is_gateway_on_eth);
 int dsmi_get_netdev_link(int logic_id, int port, int *link);
 int dsmi_clear_netdev_stat(int logic_id, int port);
-
+int dsmi_set_device_offline_nic_down_flag(int logic_id, int enable_flag);
 #endif

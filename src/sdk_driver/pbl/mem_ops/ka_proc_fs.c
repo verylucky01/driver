@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -19,6 +19,7 @@
 #include "ka_memory_mng.h"
 #include "ka_module_init.h"
 #include "ka_proc_fs.h"
+#include "ka_base_pub.h"
 
 #define KA_PROC_FS_NAME_LEN 32
 #define KA_PROC_FS_MODE 0444
@@ -33,11 +34,7 @@ STATIC int ka_enable_mem_record_show(struct seq_file *seq, void *offset)
 
 STATIC int ka_enable_mem_record_ops_open(struct inode *inode, struct file *file)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)
-    return single_open(file, ka_enable_mem_record_show, pde_data(inode));
-#else
-    return single_open(file, ka_enable_mem_record_show, PDE_DATA(inode));
-#endif
+    return single_open(file, ka_enable_mem_record_show, ka_base_pde_data(inode));
 }
 
 #define MEM_RECORD_DISABLE 0
@@ -64,11 +61,7 @@ STATIC ssize_t ka_enable_record_ops_write(struct file *filp, const char __user *
 
 STATIC int ka_get_alloc_mem_desc_open(struct inode *inode, struct file *file)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)
-    return single_open(file, ka_mem_stats_show, pde_data(inode));
-#else
-    return single_open(file, ka_mem_stats_show, PDE_DATA(inode));
-#endif
+    return single_open(file, ka_mem_stats_show, ka_base_pde_data(inode));
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 5, 0)

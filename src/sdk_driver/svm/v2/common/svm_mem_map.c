@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -94,8 +94,9 @@ static int devmm_mem_map_need_page_adjust(struct devmm_svm_process *svm_proc,
 
     devmm_drv_debug("(pg_num=%llu; adjust_num=%llu; pg_type=%u)\n", info->pg_num, adjust_num, blk->attr.pg_type);
 
-    if (info->pg_num % adjust_num != 0) {
-        devmm_drv_err("pg_num invalid. (info->pg_num=%llu; adjust_num=%llu)\n", info->pg_num, (u64)adjust_num);
+    if ((blk->attr.pg_type != DEVMM_NORMAL_PAGE_TYPE) && (info->pg_num % adjust_num != 0)) {
+        devmm_drv_err("pg_num invalid. (pg_type=%u; pg_num=%llu; adjust_num=%llu)\n", 
+            blk->attr.pg_type, info->pg_num, (u64)adjust_num);
         return -EINVAL;
     }
 

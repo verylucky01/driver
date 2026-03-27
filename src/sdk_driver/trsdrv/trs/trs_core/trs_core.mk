@@ -15,7 +15,7 @@ ifeq ($(CFG_FEATURE_TRACE_EVENT_FUNC_SUPPORT),y)
     $(MODULE_NAME)-objs += trs_core/trs_core_trace.o
 endif
 
-ifneq ($(filter $(PRODUCT), ascend910_95),)
+ifneq ($(filter $(PRODUCT), ascend950),)
     EXTRA_CFLAGS += -DCFG_FEATURE_SUPPORT_APM
     EXTRA_CFLAGS += -DCFG_FEATURE_NOTSUPPORT_BOARD_CONFIG
 endif

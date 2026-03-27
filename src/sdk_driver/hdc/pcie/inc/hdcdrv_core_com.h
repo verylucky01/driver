@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,6 +14,10 @@
 #ifndef _HDCDRV_CORE_COM_H_
 #define _HDCDRV_CORE_COM_H_
 
+#include "ka_memory_pub.h"
+#include "ka_task_pub.h"
+#include "ka_fs_pub.h"
+#include "ka_kernel_def_pub.h"
 #include "hdcdrv_cmd.h"
 #include "hdcdrv_cmd_ioctl.h"
 #include "hdcdrv_log.h"
@@ -22,13 +26,6 @@
 
 #include "pbl/pbl_ka_memory.h"
 #include "ascend_hal_define.h"
-
-#include "ka_base_pub.h"
-#include "ka_common_pub.h"
-#include "ka_memory_pub.h"
-#include "ka_task_pub.h"
-#include "ka_fs_pub.h"
-#include "ka_kernel_def_pub.h"
 
 /*
     KA_SUB_MODULE_TYPE_0: for init/uninit when probe/remove or instance/uninstance
@@ -312,8 +309,8 @@ struct hdcdrv_link_ctrl_msg_stats {
 #endif
 
 /* reserved 1k mem for non trans msg head and hdc ctrl msg head */
-#define HDCDRV_MAX_DMA_NODE ((int)((HDCDRV_NON_TRANS_MSG_S_DESC_SIZE - 0x400) / sizeof(struct hdcdrv_dma_mem)))
-#define HDCDRV_CTRL_MEM_MAX_PHY_NUM (HDCDRV_CTRL_MEM_MAX_LEN / HDCDRV_MEM_MIN_LEN)
+#define HDCDRV_MAX_DMA_NODE ((int)((HDCDRV_NON_TRANS_MSG_S_DESC_SIZE - 0x400) / (int)sizeof(struct hdcdrv_dma_mem)))
+#define HDCDRV_CTRL_MEM_MAX_PHY_NUM ((int)(HDCDRV_CTRL_MEM_MAX_LEN / HDCDRV_MEM_MIN_LEN))
 #define HDCDRV_MEM_MAX_PHY_NUM (HDCDRV_MAX_DMA_NODE - HDCDRV_CTRL_MEM_MAX_PHY_NUM)
 
 #define HDCDRV_NODE_IDLE 0

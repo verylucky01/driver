@@ -47,7 +47,7 @@ enum ReportType {
     REPORT_TYPE,
 };
 
-#define MAX_VALUE_STR_LEN 64
+#define MAX_VALUE_STR_LEN 4096
 #define MIN_USER_ARG_LEN 2
 
 typedef struct {
@@ -60,7 +60,7 @@ typedef struct {
     int32_t dockerFlag;
     int32_t printMode;
     int32_t selfLogLevel;
-    char value[MAX_VALUE_STR_LEN];
+    char value[MAX_VALUE_STR_LEN + 64];
 } ArgInfo;
 
 struct MsnReq {
@@ -90,6 +90,7 @@ typedef struct {
     uint32_t deviceAppDirNum;
     uint32_t faultEventDirNum;
     uint32_t bboxDirNum;
+    char outputFileName[MAX_VALUE_STR_LEN];
 } FileAgeingParam;
 
 #define MAX_ICACHE_CHECK_RANGE (128U * 1024U)   // 128M

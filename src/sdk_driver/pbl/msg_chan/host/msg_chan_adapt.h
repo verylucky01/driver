@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,7 +14,6 @@
 #ifndef MSG_CHAN_ADAPT_H
 #define MSG_CHAN_ADAPT_H
 #include "comm_kernel_interface.h"
-#include "ka_task_pub.h"
 
 struct devdrv_msg_client {
     const struct devdrv_common_msg_client* comm[DEVDRV_COMMON_MSG_TYPE_MAX];

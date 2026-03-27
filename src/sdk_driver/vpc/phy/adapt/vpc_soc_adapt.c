@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,11 +10,10 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
+#include "ka_pci_pub.h"
 #include "virtmnghost_resource.h"
 #include "virtmnghost_vpc_unit.h"
 #include "vpc_soc_adapt.h"
-
-#include "ka_pci_pub.h"
 
 static inline bool vmngh_is_support_sriov(struct vmng_msg_dev *msg_dev)
 {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,8 +11,14 @@
  * GNU General Public License for more details.
  */
 
-#include "ka_kernel_def_pub.h"
 #include "ka_memory_pub.h"
+#include "ka_system_pub.h"
+#include "ka_list_pub.h"
+#include "ka_compiler_pub.h"
+#include "ka_barrier_pub.h"
+#include "ka_ioctl_pub.h"
+#include "ka_kernel_def_pub.h"
+#include "ka_fs_pub.h"
 #include "kernel_version_adapt.h"
 #include "hdcdrv_sysfs.h"
 #include "hdcdrv_cmd_ioctl.h"
@@ -27,20 +33,7 @@
 #include "hdcdrv_pfstat.h"
 #endif
 
-#include "ka_task_pub.h"
-#include "ka_base_pub.h"
-#include "ka_memory_pub.h"
-#include "ka_common_pub.h"
-#include "ka_system_pub.h"
-#include "ka_list_pub.h"
-#include "ka_compiler_pub.h"
-#include "ka_barrier_pub.h"
-#include "ka_ioctl_pub.h"
-#include "ka_kernel_def_pub.h"
-#include "ka_fs_pub.h"
-
 struct hdcdrv_ctrl *hdc_ctrl = NULL;
-struct hdcdrv_node_tree_ctrl *hdc_node_tree = NULL;
 
 struct hdcdrv_session_notify g_session_notify[HDCDRV_SUPPORT_MAX_SERVICE];
 
@@ -537,6 +530,7 @@ STATIC void hdcdrv_print_status(int service_type)
         }
     }
     hdcdrv_kvfree((void **)&server_count, KA_SUB_MODULE_TYPE_1);
+    server_count = NULL;
     print_limit_count[service_type]++;
 
     hdcdrv_err_limit("Get session info. (idx=%d; state_idle=%u; connected=%u; remote_close=%u; others=%u)\n",
@@ -1497,8 +1491,9 @@ STATIC void hdcdrv_msg_chan_tx_static(struct hdcdrv_msg_chan *msg_chan)
     u32 delay;
     delay = ka_system_jiffies_to_msecs(ka_jiffies - msg_chan->dfx_tx_stamp);
     if (delay > (u32)HDCDRV_CHAN_DFX_DELAY_TIME) {
-        msg_chan->dfx_tx_stamp = (u32)ka_jiffies;
-        hdcdrv_info("chan tx statistic. (chan_id=%d; total=%llu; finish=%llu, full=%llu, fail=%llu, alloc_err=%llu)\n",
+        msg_chan->dfx_tx_stamp = ka_jiffies;
+        hdcdrv_info("chan tx statistic. (chan_id=%d, total=%llu, finish=%llu, full=%llu, "
+            "tx_unsuccess=%llu, alloc_unsuccess=%llu)\n",
             msg_chan->chan_id, msg_chan->stat.tx, msg_chan->stat.tx_finish,
             msg_chan->stat.tx_full, msg_chan->stat.tx_fail, msg_chan->stat.alloc_mem_err);
     }
@@ -1512,8 +1507,8 @@ STATIC void hdcdrv_msg_chan_rx_static(struct hdcdrv_msg_chan *msg_chan)
     u32 delay;
     delay = ka_system_jiffies_to_msecs(ka_jiffies - msg_chan->dfx_rx_stamp);
     if (delay > (u32)HDCDRV_CHAN_DFX_DELAY_TIME) {
-        msg_chan->dfx_rx_stamp = (u32)ka_jiffies;
-        hdcdrv_info("chan rx statistic. (chan_id=%d; rx_total=%llu; finish=%llu, full=%llu, fails=%llu)\n",
+        msg_chan->dfx_rx_stamp = ka_jiffies;
+        hdcdrv_info("chan rx statistic. (chan_id=%d, rx_total=%llu, finish=%llu, full=%llu, rx_unsuccess=%llu)\n",
             msg_chan->chan_id, msg_chan->stat.rx, msg_chan->stat.rx_finish,
             msg_chan->stat.rx_full, msg_chan->stat.rx_fail);
     }
@@ -2468,6 +2463,7 @@ STATIC struct hdcdrv_fast_node *hdcdrv_remote_node_alloc(int num)
     mem = (struct hdcdrv_mem_f *)hdcdrv_kvmalloc(len_mem, KA_SUB_MODULE_TYPE_2);
     if (mem == NULL) {
         hdcdrv_fast_node_free(f_node);
+        f_node = NULL;
         hdcdrv_err("Calling ka_mm_kzalloc failed. (size=%lld)\n", len_mem);
         return NULL;
     }
@@ -2517,8 +2513,17 @@ STATIC int hdcdrv_add_mem_info(int devid, u32 fid, u32 rb_side, struct hdcdrv_ct
             hdcdrv_fast_node_erase(&dev_fmem->rb_lock, rbtree, f_node);
         }
         hdcdrv_node_status_init(f_node);
+#ifdef CFG_FEATURE_OVER_XCOM
+        hdcdrv_remote_mem_unmap(f_node);
+#endif
         hdcdrv_kvfree((void **)&f_node->fast_mem.mem, KA_SUB_MODULE_TYPE_2);
+#ifndef DRV_UT
+        f_node->fast_mem.mem = NULL;
+#endif
         hdcdrv_fast_node_free(f_node);
+#ifndef DRV_UT
+        f_node = NULL;
+#endif
     }
 
     f_node = hdcdrv_remote_node_alloc(msg->phy_addr_num);
@@ -2528,7 +2533,12 @@ STATIC int hdcdrv_add_mem_info(int devid, u32 fid, u32 rb_side, struct hdcdrv_ct
     }
 
     hdcdrv_get_fnode_from_msg(f_node, hash_va_wfid, msg, devid);
-
+#ifdef CFG_FEATURE_OVER_XCOM
+    ret = hdcdrv_remote_mem_map(f_node, msg);
+    if (ret != 0) {
+        goto remote_map_fail;
+    }
+#endif
     /* if add rb is not remote, so is vm mode, map iova and send to remote. */
     if (rb_side == HDCDRV_RBTREE_SIDE_LOCAL) {
         ret = hdcdrv_iova_fmem_map((u32)devid, fid, &(f_node->fast_mem));
@@ -2571,8 +2581,16 @@ add_remote_fail:
         hdcdrv_iova_fmem_unmap((u32)devid, fid, &(f_node->fast_mem), (u32)f_node->fast_mem.phy_addr_num);
     }
 iova_fail:
+#ifdef CFG_FEATURE_OVER_XCOM
+    hdcdrv_remote_mem_unmap(f_node);
+remote_map_fail:
+#endif
     hdcdrv_kvfree((void **)&f_node->fast_mem.mem, KA_SUB_MODULE_TYPE_2);
+#ifndef DRV_UT
+    f_node->fast_mem.mem = NULL;
     hdcdrv_fast_node_free(f_node);
+    f_node = NULL;
+#endif
     return ret;
 }
 
@@ -2618,8 +2636,13 @@ STATIC int hdcdrv_del_mem_info(int devid, u32 fid, u32 rb_side, const struct hdc
         hdcdrv_fast_node_erase(&dev_fmem->rb_lock, rbtree, f_node);
     }
     hdcdrv_node_status_init(f_node);
+#ifdef CFG_FEATURE_OVER_XCOM
+    hdcdrv_remote_mem_unmap(f_node);
+#endif
     hdcdrv_kvfree((void **)&f_node->fast_mem.mem, KA_SUB_MODULE_TYPE_2);
+    f_node->fast_mem.mem = NULL;
     hdcdrv_fast_node_free(f_node);
+    f_node = NULL;
 
     return HDCDRV_OK;
 }
@@ -2681,8 +2704,8 @@ STATIC void hdcdrv_fast_mem_sep_uninit(ka_task_spinlock_t *lock, const ka_rb_roo
     ka_task_spin_unlock_bh(lock);
 }
 
-int hdcdrv_mem_adapter(const struct hdcdrv_fast_addr_info *src_info, const struct hdcdrv_fast_addr_info *dst_info,
-    struct devdrv_dma_node *node, int *node_idx, int len)
+int __attribute__((weak)) hdcdrv_mem_adapter(const struct hdcdrv_fast_addr_info *src_info,
+    const struct hdcdrv_fast_addr_info *dst_info, struct devdrv_dma_node *node, int *node_idx, int len)
 {
     int idx;
     u32 total_len;
@@ -4610,11 +4633,14 @@ retry_next:
     session->owner = hdccom_get_fid_owner(session->local_fid, session->container_id);
 
 #ifdef CFG_FEATURE_HDC_REG_MEM
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Waddress"
     if (session->mem_release_fifo.buf != NULL) {
         ka_task_spin_lock_irqsave(&session->mem_release_lock, flags);
         ka_base_kfifo_reset(&session->mem_release_fifo);
         ka_task_spin_unlock_irqrestore(&session->mem_release_lock, flags);
     }
+#pragma GCC diagnostic pop
 #endif
 
     hdcdrv_set_session_run_env((u32)cmd->dev_id, fid, &(session->run_env));
@@ -4942,11 +4968,14 @@ STATIC long hdcdrv_connect(struct hdcdrv_cmd_connect *cmd, u32 fid)
     session = &hdc_ctrl->sessions[session_fd];
 
 #ifdef CFG_FEATURE_HDC_REG_MEM
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Waddress"
     if (session->mem_release_fifo.buf != NULL) {
         ka_task_spin_lock_irqsave(&session->mem_release_lock, flags);
         ka_base_kfifo_reset(&session->mem_release_fifo);
         ka_task_spin_unlock_irqrestore(&session->mem_release_lock, flags);
     }
+#pragma GCC diagnostic pop
 #endif
 
     session->unique_val = hdcdrv_gen_unique_value();
@@ -5524,6 +5553,7 @@ STATIC long hdcdrv_recv(struct hdcdrv_cmd_recv *cmd, int mode)
     return ret;
 }
 
+#ifndef CFG_FEATURE_OVER_XCOM
 STATIC int hdcdrv_calc_page_start_idx(u64 send_va, int len, struct hdcdrv_fast_mem *f_mem,
     struct hdcdrv_fast_page_info *addr_info)
 {
@@ -5604,10 +5634,12 @@ STATIC int hdcdrv_sync_used_fast_mem(struct hdcdrv_fast_mem *f_mem, ka_device_t 
 
     return HDCDRV_OK;
 }
+#endif
 
 STATIC long hdcdrv_sync_fast_mem(const struct hdcdrv_session *session,
     int type, u64 user_va, int len, u64 hash_va)
 {
+#ifndef CFG_FEATURE_OVER_XCOM
     struct hdcdrv_fast_mem *f_mem = NULL;
     long ret;
 #ifdef CFG_FEATURE_HDC_REG_MEM
@@ -5628,6 +5660,7 @@ STATIC long hdcdrv_sync_fast_mem(const struct hdcdrv_session *session,
     }
 
     hdcdrv_node_status_idle_by_mem(f_mem);
+#endif
     return HDCDRV_OK;
 }
 
@@ -6312,16 +6345,16 @@ long hdcdrv_ioctl_com(struct hdcdrv_ctx *ctx, unsigned int cmd, union hdcdrv_cmd
         hdcdrv_err("Command type is error. (cmd=%x)\n", cmd);
         return HDCDRV_PARA_ERR;
     }
-    ka_base_atomic_set(&g_ioctl_cmd, drv_cmd);
+    ka_base_atomic_set(&g_ioctl_cmd, (int)drv_cmd);
     hdcdrv_peer_fault_proc(drv_cmd, &ret);
     if (ret != HDCDRV_OK) {
         return ret;
     }
-    if (drv_cmd < HDCDRV_CMD_SET_SESSION_OWNER) {
+    if (drv_cmd < (u32)HDCDRV_CMD_SET_SESSION_OWNER) {
         ret = hdcdrv_operation(ctx, drv_cmd, cmd_data, copy_flag, fid);
-    } else if (drv_cmd < HDCDRV_CMD_ALLOC_MEM) {
+    } else if (drv_cmd < (u32)HDCDRV_CMD_ALLOC_MEM) {
         ret = hdcdrv_cfg_operation(ctx, drv_cmd, cmd_data, copy_flag, fid);
-    } else if (drv_cmd < HDCDRV_CMD_EPOLL_ALLOC_FD) {
+    } else if (drv_cmd < (u32)HDCDRV_CMD_EPOLL_ALLOC_FD) {
         ret = hdcdrv_fast_operation(ctx, drv_cmd, cmd_data, copy_flag);
     } else {
         ret = hdcdrv_epoll_operation(ctx, drv_cmd, cmd_data, copy_flag, fid);
@@ -6535,6 +6568,7 @@ STATIC int hdcdrv_release(ka_inode_t *node, ka_file_t *file)
         (void)ka_task_queue_work(async_release_workqueue, &ctx->async_release_work);
     } else {
         hdcdrv_free_ctx(ctx);
+        ctx = NULL;
     }
     ka_fs_set_file_private_data(file, NULL);
 
@@ -6550,6 +6584,7 @@ STATIC void hdcdrv_release_mem_async_work(ka_work_struct_t *p_work)
     struct hdcdrv_ctx *ctx = ka_container_of(p_work, struct hdcdrv_ctx, async_release_work);
     hdcdrv_release_free_mem(&ctx->async_ctx);
     hdcdrv_free_ctx(ctx);
+    ctx = NULL;
 }
 
 struct hdcdrv_ctx *hdcdrv_alloc_ctx(void)
@@ -7175,8 +7210,8 @@ int hdcdrv_add_msg_chan_to_dev(u32 dev_id, void *chan)
     msg_chan->submit_dma_head = HDCDRV_DESC_QUEUE_DEPTH - 1;
     msg_chan->chan = chan;
     msg_chan->session_cnt = 0;
-    msg_chan->dfx_tx_stamp = (u32)ka_jiffies;
-    msg_chan->dfx_rx_stamp = (u32)ka_jiffies;
+    msg_chan->dfx_tx_stamp = ka_jiffies;
+    msg_chan->dfx_rx_stamp = ka_jiffies;
 
     for (i = 0; i < HDCDRV_DESC_QUEUE_DEPTH; i++) {
         msg_chan->tx[i].buf = NULL;
@@ -7751,12 +7786,14 @@ int hdcdrv_suspend(u32 dev_id)
     hdcdrv_set_running_status(HDCDRV_RUNNING_SUSPEND_ENTERING);
     hdcdrv_info("hdcdrv suspend start. (dev_id=%u)\n", dev_id);
 
+#ifndef CFG_FEATURE_OVER_XCOM
     /* check session status: before suspend, all session must be closed */
     ret = hdcdrv_session_free_check(1);
     if (ret != HDCDRV_OK) {
         hdcdrv_err("hdcdrv_suspend fail.\n");
         return HDCDRV_ERR;
     }
+#endif
 
     (void)ka_task_cancel_delayed_work_sync(&hdc_ctrl->recycle);
     (void)ka_task_cancel_delayed_work_sync(&hdc_ctrl->recycle_mem);
@@ -7841,47 +7878,6 @@ STATIC void hdcdrv_session_pre_init(struct hdcdrv_session *session)
     session->pid_flag = 0;
     session->task_start_time = HDCDRV_KERNEL_DEFAULT_START_TIME;
 }
-#ifdef CFG_FEATURE_HDC_REG_MEM
-/* alloc node buff and init params */
-STATIC struct hdcdrv_node_tree_ctrl *hdcdrv_new_tree_init(void)
-{
-    int i;
-    int j;
-    struct hdcdrv_node_tree *node_tree = NULL;
-    hdc_node_tree = (struct hdcdrv_node_tree_ctrl *)hdcdrv_vzalloc(sizeof(struct hdcdrv_node_tree_ctrl),
-        KA_SUB_MODULE_TYPE_0);
-    if (hdc_node_tree == NULL) {
-        hdcdrv_err("hdc_node_tree calling alloc failed. (size=%ld)\n", sizeof(struct hdcdrv_node_tree_ctrl));
-        return NULL;
-    }
-
-    ka_task_rwlock_init(&hdc_node_tree->lock);
-    for (i = 0; i < HDCDRV_SUPPORT_MAX_FID_PID; i++) {
-        node_tree = &hdc_node_tree->node_tree[i];
-        node_tree->local_tree.tree_info.pid = HDCDRV_INVALID_PID;
-        node_tree->local_tree.tree_info.fid = HDCDRV_INVALID_FID;
-        ka_base_atomic_set(&node_tree->local_tree.tree_info.refcnt, 0);
-        node_tree->local_tree.tree_info.idx = i;
-        node_tree->local_tree.fmem.rbtree = KA_RB_ROOT;
-        node_tree->local_tree.fmem.rbtree_re = KA_RB_ROOT;
-        ka_task_spin_lock_init(&node_tree->local_tree.fmem.rb_lock);
-        ka_task_spin_lock_init(&node_tree->local_tree.fmem.mem_dfx_stat.lock);
-
-        node_tree->re_tree.tree_info.pid = HDCDRV_INVALID_PID;
-        node_tree->re_tree.tree_info.fid = HDCDRV_INVALID_FID;
-        ka_base_atomic_set(&node_tree->re_tree.tree_info.refcnt, 0);
-        node_tree->re_tree.tree_info.idx = i;
-        for (j = 0; j < hdcdrv_get_max_support_dev(); j++) {
-            node_tree->re_tree.devices[j].rbtree = KA_RB_ROOT;
-            node_tree->re_tree.devices[j].rbtree_re = KA_RB_ROOT;
-            ka_task_spin_lock_init(&node_tree->re_tree.devices[j].rb_lock);
-            ka_task_spin_lock_init(&node_tree->re_tree.devices[j].mem_dfx_stat.lock);
-        }
-    }
-    hdcdrv_info("hdc_node_tree init success.\n");
-    return hdc_node_tree;
-}
-#endif
 
 STATIC struct hdcdrv_ctrl *hdcdrv_ctrl_init(void)
 {

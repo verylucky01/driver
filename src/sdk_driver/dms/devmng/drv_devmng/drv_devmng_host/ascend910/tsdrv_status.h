@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -15,17 +15,13 @@
 #ifndef TSDRV_STATUS_H
 #define TSDRV_STATUS_H
 
-#include <linux/types.h>
+#include "ka_base_pub.h"
 
 #include "devdrv_user_common.h"
 #include "tsdrv_kernel_common.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 struct tsdrv_mng {
-    atomic_t status;
+    ka_atomic_t status;
 };
 
 void tsdrv_status_init(void);
@@ -34,9 +30,5 @@ bool tsdrv_is_ts_sleep(u32 devid, u32 tsid);
 
 void tsdrv_set_ts_status(u32 devid, u32 tsid, enum devdrv_ts_status status);
 enum devdrv_ts_status tsdrv_get_ts_status(u32 devid, u32 tsid);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif

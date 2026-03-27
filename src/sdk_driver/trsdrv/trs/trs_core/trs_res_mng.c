@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,6 +13,7 @@
 #include "ka_memory_pub.h"
 #include "ka_task_pub.h"
 #include "ka_kernel_def_pub.h"
+#include "ka_driver_pub.h"
 
 #include "kernel_version_adapt.h"
 #include "dms/dms_devdrv_manager_comm.h"
@@ -314,18 +315,50 @@ int trs_res_id_alloc(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst *ts_
 }
 
 #ifdef CFG_FEATURE_SUPPORT_STREAM_TASK
-static void trs_stream_put_mem_pa_list(struct trs_proc_ctx *proc_ctx, struct trs_stream_ctx *stream_ctx)
+static inline void trs_pack_stream_mem_attr(struct trs_core_ts_inst *ts_inst, u64 addr, u64 size,
+    struct ka_mem_attr *stream_mem_attr)
 {
-    int ret = hal_kernel_put_mem_pa_list(0, proc_ctx->pid, stream_ctx->stream_uva,
-        stream_ctx->size, 1, stream_ctx->pa_list);
+    stream_mem_attr->addr = addr;
+    stream_mem_attr->size = size;
+
+    if ((ts_inst->ops.get_sq_send_mode != NULL) &&
+        (ts_inst->ops.get_sq_send_mode(ts_inst->inst.devid) == TRS_MODE_TYPE_SQ_SEND_HIGH_SECURITY)) {
+        stream_mem_attr->cp_only_flag = false; /* change to true when svm support huge page cp only pin */
+    } else {
+        stream_mem_attr->cp_only_flag = false;
+    }
+
+    if ((ts_inst->ops.get_connect_protocol != NULL) &&
+        (ts_inst->ops.get_connect_protocol(&ts_inst->inst) == TRS_CONNECT_PROTOCOL_UB)) {
+        stream_mem_attr->raw_pa_flag = true;
+    } else {
+        stream_mem_attr->raw_pa_flag = false;
+    }
+}
+
+void trs_stream_put_mem_pa_list(struct trs_core_ts_inst *ts_inst, struct trs_proc_ctx *proc_ctx,
+    struct trs_stream_ctx *stream_ctx)
+{
+    struct ka_pa_wraper pa_wraper = {.pa = stream_ctx->pa_list[0], .size = stream_ctx->size};
+    struct ka_mem_attr stream_mem_attr = {0};
+    int ret = 0;
+
+    trs_pack_stream_mem_attr(ts_inst, stream_ctx->stream_uva, stream_ctx->size, &stream_mem_attr);
+    ret = hal_kernel_put_mem_pa_list(proc_ctx->devid, proc_ctx->pid, &stream_mem_attr, 1, &pa_wraper);
     if (ret != 0) {
         trs_warn("Put pa list failed. (devid=%u; pid=%d)\n", proc_ctx->devid, proc_ctx->pid);
     }
+
     trs_vfree(stream_ctx->pa_list);
     stream_ctx->pa_list = NULL;
-    ka_mm_iounmap((void *)(uintptr_t)stream_ctx->stream_kva);
-    stream_ctx->stream_kva = 0;
     stream_ctx->stream_uva = 0;
+    stream_ctx->stream_base_addr = 0;
+    stream_ctx->depth = 0;
+
+    if (stream_ctx->stream_kva != 0) {
+        ka_mm_iounmap((void *)(uintptr_t)stream_ctx->stream_kva);
+        stream_ctx->stream_kva = 0;
+    }
 }
 
 static int trs_stream_unbind_sq(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst *ts_inst, u32 res_id)
@@ -340,8 +373,8 @@ static int trs_stream_unbind_sq(struct trs_proc_ctx *proc_ctx, struct trs_core_t
                 return -EINVAL;
             }
         }
-        ts_inst->stream_ctx[res_id].stream_base_addr = 0;
-        trs_stream_put_mem_pa_list(proc_ctx, &ts_inst->stream_ctx[res_id]);
+
+        trs_stream_put_mem_pa_list(ts_inst, proc_ctx, &ts_inst->stream_ctx[res_id]);
     }
     ts_inst->stream_ctx[res_id].sq = -1;
     ts_inst->stream_ctx[res_id].tail = 0;
@@ -388,32 +421,32 @@ int trs_res_id_free(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst *ts_i
 #define ALIGN_UP(len, pagesize) (((len) + (pagesize) - 1) & (~((pagesize) - 1)))
 
 #ifdef CFG_FEATURE_SUPPORT_STREAM_TASK
-static int trs_stream_get_mem_pa_list(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst *ts_inst,
-    struct trs_stream_task_para *para)
+#define TRS_STREAM_MEM_DEFAULT_PAGE_SIZE    0x200000U
+int trs_stream_get_mem_pa_list(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst *ts_inst,
+    struct trs_stream_ctx *stream_ctx, void *stream_mem, u32 depth)
 {
-    struct trs_stream_ctx *stream_ctx = &ts_inst->stream_ctx[para->stream_id];
-    u32 size = para->task_cnt * TRS_HW_SQE_SIZE;
-    u32 page_size, align_len;
+    struct ka_pa_wraper pa_wraper = {0};
+    struct ka_mem_attr stream_mem_attr = {0};
+    u32 size = depth * TRS_HW_SQE_SIZE;
     u64 base_va, *pa_list = NULL;
     void *vaddr = NULL;
+    u32 align_len;
+    u64 pa_num = 1;
     int ret;
- 
-    page_size = hal_kernel_get_mem_page_size(0, proc_ctx->pid, (u64)(uintptr_t)para->stream_mem, size);
-    if (page_size == 0) {
-        trs_err("Failed to get page_size. (devid=%u; pid=%d)\n", proc_ctx->devid, proc_ctx->pid);
+
+    if (stream_mem == NULL) {
+        trs_err("Invalid NULL stream mem.\n");
         return -EINVAL;
-    }
-    if (page_size != 0x200000) { /* only support 2M huge page */
-        trs_err("Only support 2M memory. (page_size=%u)\n", page_size);
-        return -ENOTSUPP;
     }
 
-    base_va = ALIGN_DOWN((u64)(uintptr_t)para->stream_mem, page_size);
-    if (((u64)(uintptr_t)para->stream_mem + (stream_ctx->tail + para->task_cnt) * TRS_HW_SQE_SIZE) >
-        (base_va + page_size)) {
-        trs_err("The task_cnt is invalid. (task_cnt=%u; tail=%u; page_size=%u)\n",
-            para->task_cnt, stream_ctx->tail, page_size);
+    align_len = ALIGN_UP(size, TRS_STREAM_MEM_DEFAULT_PAGE_SIZE);
+    base_va = KA_DRIVER_ALIGN_DOWN((u64)(uintptr_t)stream_mem, TRS_STREAM_MEM_DEFAULT_PAGE_SIZE);
+    if (((u64)(uintptr_t)stream_mem + depth * TRS_HW_SQE_SIZE) >
+        (base_va + TRS_STREAM_MEM_DEFAULT_PAGE_SIZE)) {
+#ifndef EMU_ST
+        trs_err("The depth is invalid. (depth=%u; depth=%u)\n", depth, depth);
         return -EINVAL;
+#endif
     }
 
     pa_list = trs_vzalloc(sizeof(u64));
@@ -422,31 +455,42 @@ static int trs_stream_get_mem_pa_list(struct trs_proc_ctx *proc_ctx, struct trs_
         return -ENOMEM;
     }
 
-    align_len = ALIGN_UP(size, page_size);
-    ret = hal_kernel_get_mem_pa_list(0, proc_ctx->pid, base_va, align_len, 1, pa_list);
+    trs_pack_stream_mem_attr(ts_inst, base_va, align_len, &stream_mem_attr);
+    ret = hal_kernel_get_mem_pa_list(proc_ctx->devid, proc_ctx->pid, &stream_mem_attr, &pa_num, &pa_wraper);
     if (ret != 0) {
-        trs_err("Failed to get pa list. (ret=%d; devid=%u; pid=%d; align_len=%u; page_size=%u)\n",
-            ret, proc_ctx->devid, proc_ctx->pid, align_len, page_size);
+        trs_err("Failed to get pa list. (ret=%d; devid=%u; pid=%d; align_len=%u;)\n",
+            ret, proc_ctx->devid, proc_ctx->pid, align_len);
         goto free_mem;
     }
 
-    vaddr = ka_mm_ioremap(pa_list[0], align_len);
-    if (vaddr == NULL) {
-        trs_err("Iomem remap fail. (devid=%u;  align_len=%u)\n", proc_ctx->devid, align_len);
-        ret = -ENOMEM;
-        goto put_mem;
+    if (pa_wraper.size != align_len) {
+        trs_err("Mem size equal to align_len. (size=0x%llx; align_len=0x%x)\n", pa_wraper.size, align_len);
+        ret = -EINVAL;
+        goto free_mem;
     }
 
+    pa_list[0] = pa_wraper.pa;
+    if (!stream_mem_attr.raw_pa_flag) { /* raw device pa not support ioremap */
+        vaddr = ka_mm_ioremap(pa_list[0], align_len);
+        if (vaddr == NULL) {
+            trs_err("Iomem remap fail. (devid=%u;  align_len=%u)\n", proc_ctx->devid, align_len);
+            ret = -ENOMEM;
+            goto put_mem;
+        }
+    }
+
+    stream_ctx->stream_base_addr = (u64)(uintptr_t)stream_mem;
     stream_ctx->pa_num = 1;
     stream_ctx->pa_list = pa_list;
-    stream_ctx->stream_uva = ALIGN_DOWN((u64)(uintptr_t)para->stream_mem, page_size);
+    stream_ctx->stream_uva = base_va;
     stream_ctx->stream_kva = (u64)(uintptr_t)vaddr;
     stream_ctx->size = align_len;
+    stream_ctx->depth = depth;
     trs_debug("Get and pin page success. (devid=%u; size=%u; align_len=%u)\n", proc_ctx->devid, size, align_len);
     return 0;
 
 put_mem:
-    (void)hal_kernel_put_mem_pa_list(0, proc_ctx->pid, base_va, align_len, 1, pa_list);
+    (void)hal_kernel_put_mem_pa_list(proc_ctx->devid, proc_ctx->pid, &stream_mem_attr, 1, &pa_wraper);
 free_mem:
     trs_vfree(pa_list);
     return ret;
@@ -465,37 +509,37 @@ int trs_stream_task_fill_proc(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_
         trs_err("Stream not alloced. (stream_id=%u; pid=%d)\n", para->stream_id, proc_ctx->pid);
         return -EINVAL;
     }
-    stream_ctx = &ts_inst->stream_ctx[para->stream_id];
 
+    stream_ctx = &ts_inst->stream_ctx[para->stream_id];
     if (stream_ctx->pa_list == NULL) {
-        ret = trs_stream_get_mem_pa_list(proc_ctx, ts_inst, para);
+        ret = trs_stream_get_mem_pa_list(proc_ctx, ts_inst, stream_ctx, para->stream_mem, para->task_cnt);
         if (ret != 0) {
             trs_err("Failed to get pa list. (ret=%d; devid=%u; stream=%u)\n", ret, proc_ctx->devid, para->stream_id);
             return ret;
         }
         get_mem_flag = 1;
     } else {
-        if (stream_ctx->stream_base_addr != 0) {
-            if (stream_ctx->stream_base_addr != (u64)(uintptr_t)para->stream_mem) {
-                trs_err("Stream and memory not match. (stream_id=%u)\n", para->stream_id);
-                return -EINVAL;
-            }
+        if (((para->stream_mem != NULL) && (stream_ctx->stream_base_addr != (u64)(uintptr_t)para->stream_mem)) ||
+            (stream_ctx->stream_kva == 0)) {
+            trs_err("Stream and memory not match or stream kva not inited. (stream_id=%u)\n", para->stream_id);
+            return -EINVAL;
         }
     }
 
-    task_addr = stream_ctx->stream_kva + ((u64)(uintptr_t)para->stream_mem - stream_ctx->stream_uva) +
+    task_addr = stream_ctx->stream_kva + (stream_ctx->stream_base_addr - stream_ctx->stream_uva) +
         stream_ctx->tail * TRS_HW_SQE_SIZE;
 
     if ((task_addr + para->task_cnt * TRS_HW_SQE_SIZE) > (stream_ctx->stream_kva + stream_ctx->size)) {
-        trs_err("Failed to get pa list. (ret=%d; devid=%u; stream=%u; tail=%u; task_cnt=%u)\n",
-            ret, proc_ctx->devid, para->stream_id, stream_ctx->tail, para->task_cnt);
+        trs_err("Failed to get pa list. (devid=%u; stream=%u; tail=%u; task_cnt=%u)\n",
+            proc_ctx->devid, para->stream_id, stream_ctx->tail, para->task_cnt);
         ret = -ENOSPC;
         goto put_mem;
     }
 
     cur_jiffies = ka_jiffies;
     for (i = 0; i < para->task_cnt; i++) {
-        ret = trs_chan_stream_task_update(&ts_inst->inst, proc_ctx->pid, (para->task_info + i * TRS_HW_SQE_SIZE));
+        ret = trs_chan_stream_task_update(&ts_inst->inst, proc_ctx->pid, (para->task_info + i * TRS_HW_SQE_SIZE),
+            &stream_ctx->long_task_cnt);
         if (ret != 0) {
             trs_err("Update stream task fail. (devid=%u; i=%u; task_cnt=%u; ret=%d)\n",
                 proc_ctx->devid, i, para->task_cnt, ret);
@@ -507,17 +551,13 @@ int trs_stream_task_fill_proc(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_
     ka_mm_memcpy_toio((void *)(uintptr_t)task_addr, para->task_info, para->task_cnt * TRS_HW_SQE_SIZE);
 
     stream_ctx->tail += para->task_cnt;
-    if (stream_ctx->stream_base_addr == 0) {
-        stream_ctx->stream_base_addr = (u64)(uintptr_t)para->stream_mem;
-    }
-
     trs_debug("Fill stream task success. (devid=%u; stream_id=%u; task_cnt=%u; tail=%u)\n",
         proc_ctx->devid, para->stream_id, para->task_cnt, stream_ctx->tail);
     return 0;
 
 put_mem:
     if (get_mem_flag == 1) {
-        trs_stream_put_mem_pa_list(proc_ctx, stream_ctx);
+        trs_stream_put_mem_pa_list(ts_inst, proc_ctx, stream_ctx);
     }
     return ret;
 }
@@ -562,7 +602,7 @@ int trs_res_id_check(struct trs_id_inst *inst, int res_type, u32 res_id)
     ts_inst = trs_core_ts_inst_get(inst);
     if (ts_inst == NULL) {
         trs_err("Invalid para. (devid=%u; tsid=%u)\n", inst->devid, inst->tsid);
-        return false;
+        return -EINVAL;
     }
 
     if (ts_inst->ops.res_id_check != NULL) {
@@ -674,6 +714,21 @@ int trs_res_id_used_query(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst
         return ret;
     }
     para->para = used_num;
+
+    if (ts_inst->ops.res_num_query != NULL) {
+        struct trs_res_query_para query_para;
+        query_para.type = trs_res_get_id_type(ts_inst, para->res_type);
+        ret = ts_inst->ops.res_num_query(&ts_inst->inst, &query_para);
+        if (ret == 0) {
+            para->para += query_para.alloc_num;
+        } else if (ret != -EOPNOTSUPP) {
+            trs_err("Failed to query resource number. (ret=%d; devid=%u; type=%d)\n",
+                ret, ts_inst->inst.devid, para->res_type);
+            return ret;
+        }
+        trs_debug("Query from remote. (devid=%u; type=%d; device_alloc_num=%u; alloc_num=%u)\n",
+            ts_inst->inst.devid, para->res_type, query_para.alloc_num, para->para);
+    }
 
     if (!trs_is_stars_inst(ts_inst)) {
         /* non stars hw res store in TRS_HW_* and TRS_SW_* type */
@@ -853,7 +908,7 @@ static int trs_res_id_ctrl_comm(struct trs_proc_ctx *proc_ctx, struct trs_core_t
     u32 res_id = para->id;
     int ret;
 
-    if ((para->prop == DRV_ID_RESET) && (res_id == U32_MAX)) {
+    if ((para->prop == DRV_ID_RESET) && (res_id == KA_U32_MAX)) {
         return trs_set_res_id_ctrl_of_proc(proc_ctx, ts_inst, (u32)res_type);
     }
 
@@ -1014,7 +1069,7 @@ int trs_stream_bind_remote_sqcq(struct trs_id_inst *inst, u32 stream_id, u32 sqi
 {
     struct trs_core_ts_inst *ts_inst = NULL;
 
-    if (stream_id == U32_MAX) {
+    if (stream_id == KA_U32_MAX) {
         return 0;
     }
 

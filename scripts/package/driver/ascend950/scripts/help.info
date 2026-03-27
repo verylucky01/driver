@@ -1,0 +1,28 @@
+  --full                            Install full type
+    --vnpu_host                       Install vnpu_host mode
+    --vnpu_guest                      Install vnpu_guest mode
+    --install-path=<path>             Install to specific dir
+    --install-username=<username>     Install to specific username
+    --install-usergroup=<usergroup>   Install to specific usergroup
+    --install-for-all                 Install for all user
+  --run                             Install run type
+    --vnpu_host                       Install vnpu_host mode
+    --vnpu_guest                      Install vnpu_guest mode
+    --install-path=<path>             Install to specific dir
+    --install-username=<username>     Install to specific username
+    --install-usergroup=<usergroup>   Install to specific usergroup
+    --install-for-all                 Install for all user
+  --devel                           Install devel type
+    --install-path=<path>             Install to specific dir
+    --install-username=<username>     Install to specific username
+    --install-usergroup=<usergroup>   Install to specific usergroup
+    --install-for-all                 Install for all user
+  --docker                          Install docker type
+    --install-path=<path>             Install to specific dir
+    --install-username=<username>     Install to specific username
+    --install-usergroup=<usergroup>   Install to specific usergroup
+  --upgrade                         Upgrade product immediately
+    --install-for-all                 Install for all user
+  --uninstall                       Uninstall product
+  --version                         Query the package version
+  --boot-server-path=<path>         Deploy device Image file to specific dir for boot server

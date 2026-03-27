@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,23 +11,13 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/uaccess.h>
-#include <linux/delay.h>
-#include <linux/mutex.h>
-#include <linux/printk.h>
-#include <asm/atomic.h>
-#include <linux/hashtable.h>
-#include <linux/jhash.h>
-#include <linux/cdev.h>
-#include <linux/slab.h>
-#include <linux/mod_devicetable.h>
-#include <linux/ioctl.h>
 #include <securec.h>
-#include <linux/semaphore.h>
-
-#include <linux/fs.h>
-#include <linux/pci.h>
-
+#include "ka_fs_pub.h"
+#include "ka_ioctl_pub.h"
+#include "ka_list_pub.h"
+#include "ka_compiler_pub.h"
+#include "ka_kernel_def_pub.h"
+#include "ka_pci_pub.h"
 #include "esched_kernel_interface.h"
 #include "ascend_kernel_hal.h"
 #include "ascend_hal_error.h"
@@ -44,34 +34,36 @@
 #include "queue_proc_fs.h"
 
 #define PCI_VENDOR_ID_HUAWEI 0x19e5
-STATIC const struct pci_device_id g_queue_driver_tbl[] = {{ PCI_VDEVICE(HUAWEI, 0xd100), 0 },
-                                                          { PCI_VDEVICE(HUAWEI, 0xd105), 0 },
-                                                          { PCI_VDEVICE(HUAWEI, 0xa126), 0 },
-                                                          { PCI_VDEVICE(HUAWEI, 0xd801), 0 },
-                                                          { PCI_VDEVICE(HUAWEI, 0xd500), 0 },
-                                                          { PCI_VDEVICE(HUAWEI, 0xd501), 0 },
-                                                          { PCI_VDEVICE(HUAWEI, 0xd802), 0 },
-                                                          { PCI_VDEVICE(HUAWEI, 0xd803), 0 },
-                                                          { PCI_VDEVICE(HUAWEI, 0xd804), 0 },
-                                                          { PCI_VDEVICE(HUAWEI, 0xd805), 0 },
-                                                          { PCI_VDEVICE(HUAWEI, 0xd806), 0 },
-                                                          { PCI_VDEVICE(HUAWEI, 0xd807), 0 },
+STATIC const ka_pci_device_id_t g_queue_driver_tbl[] = {{ KA_PCI_VDEVICE(HUAWEI, 0xd100), 0 },
+                                                          { KA_PCI_VDEVICE(HUAWEI, 0xd105), 0 },
+                                                          { KA_PCI_VDEVICE(HUAWEI, 0xa126), 0 },
+                                                          { KA_PCI_VDEVICE(HUAWEI, 0xd801), 0 },
+                                                          { KA_PCI_VDEVICE(HUAWEI, 0xd500), 0 },
+                                                          { KA_PCI_VDEVICE(HUAWEI, 0xd501), 0 },
+                                                          { KA_PCI_VDEVICE(HUAWEI, 0xd802), 0 },
+                                                          { KA_PCI_VDEVICE(HUAWEI, 0xd803), 0 },
+                                                          { KA_PCI_VDEVICE(HUAWEI, 0xd804), 0 },
+                                                          { KA_PCI_VDEVICE(HUAWEI, 0xd805), 0 },
+                                                          { KA_PCI_VDEVICE(HUAWEI, 0xd806), 0 },
+                                                          { KA_PCI_VDEVICE(HUAWEI, 0xd807), 0 },
                                                           { DEVDRV_DIVERSITY_PCIE_VENDOR_ID, 0xd500,
-                                                            PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
-                                                          { 0x20C6, 0xd500, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-                                                          { 0x203F, 0xd500, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-                                                          { 0x20C6, 0xd802, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-                                                          { 0x203F, 0xd802, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+                                                            KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+                                                          { 0x20C6, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+                                                          { 0x203F, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+                                                          { 0x20C6, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+                                                          { 0x203F, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+                                                          { 0x20E9, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+                                                          { 0x20E9, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
                                                           {}};
-MODULE_DEVICE_TABLE(pci, g_queue_driver_tbl);
+KA_MODULE_DEVICE_TABLE(pci, g_queue_driver_tbl);
 
-STATIC atomic64_t queue_serial_num = ATOMIC64_INIT(0);
+STATIC ka_atomic64_t queue_serial_num = KA_BASE_ATOMIC64_INIT(0);
 
-int queue_drv_open(struct inode *inode, struct file *file)
+int queue_drv_open(ka_inode_t *inode, ka_file_t *file)
 {
     struct queue_context *ctx = NULL;
 
-    ctx = queue_context_init(current->tgid);
+    ctx = queue_context_init(ka_task_get_current()->tgid);
     if (ctx == NULL) {
         queue_err("Queue context init failed.\n");
         return -EEXIST;
@@ -80,12 +72,12 @@ int queue_drv_open(struct inode *inode, struct file *file)
     queue_proc_fs_add_process(ctx);
     file->private_data = ctx;
 
-    queue_run_info("Open success. (pid=%d; thread pid=%d)\n", current->tgid, current->pid);
+    queue_run_info("Open success. (pid=%d; thread pid=%d)\n", ka_task_get_current()->tgid, ka_task_get_current()->pid);
 
     return 0;
 }
 
-int queue_drv_release(struct inode *inode, struct file *file)
+int queue_drv_release(ka_inode_t *inode, ka_file_t *file)
 {
     struct queue_context *context = file->private_data;
     if (context == NULL) {
@@ -98,11 +90,11 @@ int queue_drv_release(struct inode *inode, struct file *file)
 
     file->private_data = NULL;
 
-    queue_info("Release success. (pid=%d; thread_pid=%d)\n", current->tgid, current->pid);
+    queue_info("Release success. (pid=%d; thread_pid=%d)\n", ka_task_get_current()->tgid, ka_task_get_current()->pid);
     return 0;
 }
 
-STATIC long queue_drv_host_init(struct file *filep, struct queue_ioctl_host_common_op *para)
+STATIC long queue_drv_host_init(ka_file_t *filep, struct queue_ioctl_host_common_op *para)
 {
     struct queue_context *context = filep->private_data;
     struct context_private_data *ctx_private = NULL;
@@ -127,7 +119,7 @@ STATIC long queue_drv_host_init(struct file *filep, struct queue_ioctl_host_comm
     return 0;
 }
 
-STATIC long queue_drv_host_uninit(struct file *filep, struct queue_ioctl_host_common_op *para)
+STATIC long queue_drv_host_uninit(ka_file_t *filep, struct queue_ioctl_host_common_op *para)
 {
 #ifndef EMU_ST
     struct queue_context *context = filep->private_data;
@@ -156,7 +148,7 @@ STATIC long queue_drv_host_uninit(struct file *filep, struct queue_ioctl_host_co
 
 STATIC int queue_check_vector(struct buff_iovec *vector, unsigned int count)
 {
-    unsigned long stamp = jiffies;
+    unsigned long stamp = ka_jiffies;
     u32 i;
 
     if ((vector->context_base == NULL && vector->context_len != 0) ||
@@ -197,7 +189,7 @@ STATIC struct buff_iovec *queue_get_vector(struct queue_ioctl_enqueue *para)
         return NULL;
     }
 
-    if (copy_from_user(vector, para->vector, vector_len) != 0) {
+    if (ka_base_copy_from_user(vector, para->vector, vector_len) != 0) {
         queue_err("copy_from_user failed.\n");
         queue_kvfree(vector);
         return NULL;
@@ -224,32 +216,32 @@ int queue_wakeup_enqueue(struct queue_context *context, u64 que_chan_addr)
     struct queue_chan *que_chan = NULL;
 
     ctx_private = (struct context_private_data *)context->private_data;
-    spin_lock_bh(&ctx_private->lock);
-    list_for_each_entry(que_chan, &ctx_private->node_list_head, list) {
+    ka_task_spin_lock_bh(&ctx_private->lock);
+    ka_list_for_each_entry(que_chan, &ctx_private->node_list_head, list) {
         if ((u64)(uintptr_t)que_chan == que_chan_addr) {
             /* wake up queue enqueue ioctl */
             queue_chan_wake_up(que_chan);
-            spin_unlock_bh(&ctx_private->lock);
+            ka_task_spin_unlock_bh(&ctx_private->lock);
             return 0;
         }
     }
-    spin_unlock_bh(&ctx_private->lock);
+    ka_task_spin_unlock_bh(&ctx_private->lock);
 
     return DRV_ERROR_NOT_EXIST;
 }
 
 static inline void queue_add_que_chan(struct context_private_data *ctx_private, struct queue_chan *que_chan)
 {
-    spin_lock_bh(&ctx_private->lock);
-    list_add_tail(&que_chan->list, &ctx_private->node_list_head);
-    spin_unlock_bh(&ctx_private->lock);
+    ka_task_spin_lock_bh(&ctx_private->lock);
+    ka_list_add_tail(&que_chan->list, &ctx_private->node_list_head);
+    ka_task_spin_unlock_bh(&ctx_private->lock);
 }
 
 static inline void queue_del_que_chan(struct context_private_data *ctx_private, struct queue_chan *que_chan)
 {
-    spin_lock_bh(&ctx_private->lock);
-    list_del(&que_chan->list);
-    spin_unlock_bh(&ctx_private->lock);
+    ka_task_spin_lock_bh(&ctx_private->lock);
+    ka_list_del(&que_chan->list);
+    ka_task_spin_unlock_bh(&ctx_private->lock);
 }
 
 STATIC void queue_init_host_qid_status(struct queue_context *context, struct queue_qid_status *qid_status,
@@ -335,13 +327,13 @@ STATIC bool queue_is_hccs_vm_through_scene(u32 dev_id)
 }
 #endif
 
-static void queue_chan_attr_pack(struct queue_ioctl_enqueue *para, int hdc_session, u64 serial_num, struct device *dev,
+static void queue_chan_attr_pack(struct queue_ioctl_enqueue *para, int hdc_session, u64 serial_num, ka_device_t *dev,
     struct queue_chan_attr *attr)
 {
     attr->msg_type = QUEUE_DATA_MSG;
     attr->memory_type = para->type;
     attr->devid = para->devid;
-    attr->host_pid = current->tgid;
+    attr->host_pid = ka_task_get_current()->tgid;
     attr->dev = dev;
     attr->serial_num = serial_num;
     attr->qid = para->qid;
@@ -359,7 +351,7 @@ static int queue_drv_vector_add(struct queue_chan *que_chan, struct queue_ioctl_
 {
     bool dma_flag = (para->type == QUEUE_BUFF) ? true : false;
     struct queue_chan_iovec iovec;
-    unsigned long stamp = jiffies;
+    unsigned long stamp = ka_jiffies;
     int ret;
     u32 i;
 
@@ -367,7 +359,7 @@ static int queue_drv_vector_add(struct queue_chan *que_chan, struct queue_ioctl_
     iovec.len = vector->context_len;
     iovec.dma_flag = true;
     ret = queue_chan_iovec_add(que_chan, &iovec);
-    if (unlikely(ret != 0)) {
+    if (ka_unlikely(ret != 0)) {
         queue_err("Add ctx iovec fail. (ret=%d)\n", ret);
         return ret;
     }
@@ -376,7 +368,7 @@ static int queue_drv_vector_add(struct queue_chan *que_chan, struct queue_ioctl_
         iovec.len = vector->ptr[i].len;
         iovec.dma_flag = dma_flag;
         ret = queue_chan_iovec_add(que_chan, &iovec);
-        if (unlikely(ret != 0)) {
+        if (ka_unlikely(ret != 0)) {
             queue_err("Add data iovec fail. (ret=%d; i=%u; count=%u)\n", ret, i, vector->count);
             return ret;
         }
@@ -386,7 +378,7 @@ static int queue_drv_vector_add(struct queue_chan *que_chan, struct queue_ioctl_
 }
 
 static struct queue_chan *queue_drv_que_chan_create(struct context_private_data *ctx_private,
-    struct queue_ioctl_enqueue *para, u64 serial_num, struct device *dev)
+    struct queue_ioctl_enqueue *para, u64 serial_num, ka_device_t *dev)
 {
     struct queue_chan *que_chan = NULL;
     struct queue_chan_attr attr = {0};
@@ -409,7 +401,7 @@ static struct queue_chan *queue_drv_que_chan_create(struct context_private_data 
     return que_chan;
 }
 
-STATIC long queue_drv_enqueue(struct file *filep, struct queue_ioctl_enqueue *para, struct device *dev)
+STATIC long queue_drv_enqueue(ka_file_t *filep, struct queue_ioctl_enqueue *para, ka_device_t *dev)
 {
     struct queue_context *context = filep->private_data;
     struct context_private_data *ctx_private = NULL;
@@ -432,7 +424,7 @@ STATIC long queue_drv_enqueue(struct file *filep, struct queue_ioctl_enqueue *pa
     if (ret != 0) {
         return ret;
     }
-    serial_num = (u64)atomic64_inc_return(&queue_serial_num);
+    serial_num = (u64)ka_base_atomic64_inc_return(&queue_serial_num);
     /* qid_status may be NULL , If you want to use it directly, please judge the null pointer */
     qid_status = queue_create_or_get_exit_qid_status(context, para->qid);
     que_chan = queue_drv_que_chan_create(ctx_private, para, serial_num, dev);
@@ -494,23 +486,23 @@ err_que_chan_vec_add:
 }
 
 STATIC long (*g_queue_host_common_op[QUEUE_OP_MAX])
-    (struct file *filep, struct queue_ioctl_host_common_op *para) = {
+    (ka_file_t *filep, struct queue_ioctl_host_common_op *para) = {
         [QUEUE_INIT] = queue_drv_host_init,
         [QUEUE_UNINIT] = queue_drv_host_uninit,
 };
 
-STATIC long queue_fop_host_common_op(struct file *filep, unsigned int cmd, unsigned long arg)
+STATIC long queue_fop_host_common_op(ka_file_t *filep, unsigned int cmd, unsigned long arg)
 {
     struct queue_ioctl_host_common_op para;
     u32 phy_devid, vfid;
     int ret;
 
-    if (_IOC_SIZE(cmd) != sizeof(struct queue_ioctl_host_common_op)) {
+    if (_KA_IOC_SIZE(cmd) != sizeof(struct queue_ioctl_host_common_op)) {
         queue_err("cmd(0x%x) size not valid.\n", cmd);
         return -ENOTTY;
     }
 
-    if (copy_from_user(&para, (void *)(uintptr_t)arg, _IOC_SIZE(cmd)) != 0) {
+    if (ka_base_copy_from_user(&para, (void *)(uintptr_t)arg, _KA_IOC_SIZE(cmd)) != 0) {
         queue_err("copy_from_user fail cmd(0x%x)\n", cmd);
         return -EFAULT;
     }
@@ -531,19 +523,19 @@ STATIC long queue_fop_host_common_op(struct file *filep, unsigned int cmd, unsig
     return g_queue_host_common_op[para.op_flag](filep, &para);
 }
 
-STATIC long queue_fop_enqueue(struct file *filep, unsigned int cmd, unsigned long arg)
+STATIC long queue_fop_enqueue(ka_file_t *filep, unsigned int cmd, unsigned long arg)
 {
     struct queue_ioctl_enqueue para;
-    struct device *dev = NULL;
+    ka_device_t *dev = NULL;
     u32 phy_devid, vfid;
     long ret;
 
-    if (_IOC_SIZE(cmd) != sizeof(struct queue_ioctl_enqueue)) {
+    if (_KA_IOC_SIZE(cmd) != sizeof(struct queue_ioctl_enqueue)) {
         queue_err("cmd(0x%x) size not valid.\n", cmd);
         return -ENOTTY;
     }
 
-    if (copy_from_user(&para, (void *)(uintptr_t)arg, _IOC_SIZE(cmd)) != 0) {
+    if (ka_base_copy_from_user(&para, (void *)(uintptr_t)arg, _KA_IOC_SIZE(cmd)) != 0) {
         queue_err("copy_from_user fail cmd(0x%x)\n", cmd);
         return -EFAULT;
     }
@@ -582,14 +574,14 @@ STATIC struct queue_chan_ctrl_msg_mng *queue_ctrl_msg_mng_create(struct queue_io
         return NULL;
     }
 
-    ret = (long)copy_from_user(ctrl_msg_mng->head.msg, para->event_info.msg, para->event_info.msg_len);
+    ret = (long)ka_base_copy_from_user(ctrl_msg_mng->head.msg, para->event_info.msg, para->event_info.msg_len);
     if (ret != 0) {
         queue_err("Msg copy_from_user failed. (ret=%ld)\n", ret);
         queue_kvfree(ctrl_msg_mng);
         return NULL;
     }
 
-    ret = (long)copy_from_user(ctrl_msg_mng->ctrl_data, para->ctrl_data_addr, para->ctrl_data_len);
+    ret = (long)ka_base_copy_from_user(ctrl_msg_mng->ctrl_data, para->ctrl_data_addr, para->ctrl_data_len);
     if (ret != 0) {
         queue_err("Ctrl data copy_from_user failed. (ret=%ld)\n", ret);
         queue_kvfree(ctrl_msg_mng);
@@ -598,7 +590,7 @@ STATIC struct queue_chan_ctrl_msg_mng *queue_ctrl_msg_mng_create(struct queue_io
 
     ctrl_msg_mng->head.msg_type = QUEUE_CTRL_MSG;
     ctrl_msg_mng->head.devid = para->devid;
-    ctrl_msg_mng->head.hostpid = current->tgid;
+    ctrl_msg_mng->head.hostpid = ka_task_get_current()->tgid;
     ctrl_msg_mng->head.event_info = para->event_info;
     ctrl_msg_mng->ctrl_data_len = para->ctrl_data_len;
     ctrl_msg_mng->host_timestamp = para->host_timestamp;
@@ -613,7 +605,7 @@ STATIC void queue_ctrl_msg_mng_destroy(struct queue_chan_ctrl_msg_mng *ctrl_msg_
     }
 }
 
-STATIC long queue_ctrl_msg_send_by_hdc(struct file *filep, struct queue_ioctl_ctrl_msg_send *para)
+STATIC long queue_ctrl_msg_send_by_hdc(ka_file_t *filep, struct queue_ioctl_ctrl_msg_send *para)
 {
     struct queue_context *context = filep->private_data;
     struct context_private_data *ctx_private = (struct context_private_data *)context->private_data;
@@ -640,18 +632,18 @@ STATIC long queue_ctrl_msg_send_by_hdc(struct file *filep, struct queue_ioctl_ct
     return ret;
 }
 
-STATIC long queue_ctrl_msg_send(struct file *filep, unsigned int cmd, unsigned long arg)
+STATIC long queue_ctrl_msg_send(ka_file_t *filep, unsigned int cmd, unsigned long arg)
 {
     struct queue_ioctl_ctrl_msg_send para;
     u32 phy_devid, vfid;
     long ret;
 
-    if (_IOC_SIZE(cmd) != sizeof(struct queue_ioctl_ctrl_msg_send)) {
+    if (_KA_IOC_SIZE(cmd) != sizeof(struct queue_ioctl_ctrl_msg_send)) {
         queue_err("Cmd size not valid. (cmd=0x%x)\n", cmd);
         return -ENOTTY;
     }
 
-    if (copy_from_user(&para, (void *)(uintptr_t)arg, _IOC_SIZE(cmd)) != 0) {
+    if (ka_base_copy_from_user(&para, (void *)(uintptr_t)arg, _KA_IOC_SIZE(cmd)) != 0) {
         queue_err("Copy from user failed. (cmd=0x%x)\n", cmd);
         return -EFAULT;
     }
@@ -685,10 +677,10 @@ STATIC long queue_ctrl_msg_send(struct file *filep, unsigned int cmd, unsigned l
 }
 
 long (*const drv_queue_ioctl_handlers[QUEUE_CMD_MAX])
-    (struct file *filep, unsigned int cmd, unsigned long arg) = {
-        [_IOC_NR(QUEUE_HOST_COMMON_OP_CMD)] = queue_fop_host_common_op,
-        [_IOC_NR(QUEUE_ENQUEUE_CMD)] = queue_fop_enqueue,
-        [_IOC_NR(QUEUE_CTRL_MSG_SEND_CMD)] = queue_ctrl_msg_send,
+    (ka_file_t *filep, unsigned int cmd, unsigned long arg) = {
+        [_KA_IOC_NR(QUEUE_HOST_COMMON_OP_CMD)] = queue_fop_host_common_op,
+        [_KA_IOC_NR(QUEUE_ENQUEUE_CMD)] = queue_fop_enqueue,
+        [_KA_IOC_NR(QUEUE_CTRL_MSG_SEND_CMD)] = queue_ctrl_msg_send,
 };
 
 static int queue_event_try_mcast(unsigned int devid, struct sched_published_event_info *event_info,
@@ -740,7 +732,7 @@ static int queue_event_try_mcast(unsigned int devid, struct sched_published_even
     return 0;
 }
 
-int queue_drv_module_init(const struct file_operations *ops)
+int queue_drv_module_init(const ka_file_operations_t *ops)
 {
     int ret;
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,25 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
-#include <linux/module.h>
-#include <linux/init.h>
-#include <linux/kernel.h>
-#include <linux/fs.h>
-#include <linux/errno.h>
-#include <linux/types.h>
-#include <linux/vmalloc.h>
-#include <linux/slab.h>
-#include <linux/cdev.h>
-#include <linux/interrupt.h>
-#include <linux/delay.h>
-#include <linux/mutex.h>
-#include <linux/sched.h>
-#include <linux/uaccess.h>
-#include <linux/namei.h>
-#include <linux/nsproxy.h>
-#include <linux/cred.h>
-#include <linux/cpuset.h>
+#include "ka_task_pub.h"
+#include "ka_common_pub.h"
 
 #include "pbl/pbl_runenv_config.h"
 #include "urd_define.h"
@@ -45,7 +28,7 @@
 #include "pbl/pbl_uda.h"
 
 #ifndef CFG_RUNENV_SUPPORT
-STATIC int urd_container_task_struct_check(struct task_struct *tsk)
+STATIC int urd_container_task_struct_check(ka_task_struct_t *tsk)
 {
     if (tsk == NULL) {
         dms_err("tsk is NULL.\n");
@@ -88,9 +71,9 @@ STATIC int urd_container_check_current(void)
     return 0;
 }
 
-static inline struct mnt_namespace *urd_get_host_mnt_ns(void)
+static inline ka_mnt_namespace_t *urd_get_host_mnt_ns(void)
 {
-    return init_task.nsproxy->mnt_ns;
+    return ka_task_get_init_task()->nsproxy->mnt_ns;
 }
 
 static bool urd_container_is_admin(void)
@@ -118,7 +101,7 @@ bool urd_is_pf_device(unsigned int dev_id)
 /**
  * Check the process is running in the physical machine or in container
  */
-STATIC bool urd_container_is_host_system(struct mnt_namespace *mnt_ns)
+STATIC bool urd_container_is_host_system(ka_mnt_namespace_t *mnt_ns)
 {
     if (mnt_ns == urd_get_host_mnt_ns()) {
         return true;

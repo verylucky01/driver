@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,22 +10,15 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
-#include <linux/sysfs.h>
-
-#include <linux/fs.h>
-#include <linux/version.h>
-#include <linux/slab.h>
-#include <linux/vmalloc.h>
-#ifndef CFG_ENV_HOST
-#include <asm/uaccess.h>
-#endif
-
+#include "ka_fs_pub.h"
+#include "ka_driver_pub.h"
+#include "ka_barrier_pub.h"
+#include "ka_errno_pub.h"
+#include "ka_memory_pub.h"
 #include "securec.h"
 
 #include "esched.h"
 #include "esched_sysfs.h"
-#include "ka_fs_pub.h"
 
 #define SCHED_FILE_PATH "/var/log/esched_trace"
 #define SCHED_FILE_MODE 0640
@@ -58,8 +51,8 @@ STATIC void pid_list_for_each_handle(char *buf, ssize_t *offset, pid_handle hand
         return;
     }
 
-    mutex_lock(&node->pid_list_mutex);
-    list_for_each_entry(entry, &node->pid_list, list) {
+    ka_task_mutex_lock(&node->pid_list_mutex);
+    ka_list_for_each_entry(entry, &node->pid_list, list) {
         proc_ctx = esched_proc_get(node, entry->pid);
         if (proc_ctx == NULL) {
             continue;
@@ -68,7 +61,7 @@ STATIC void pid_list_for_each_handle(char *buf, ssize_t *offset, pid_handle hand
         handle(buf, offset, proc_ctx);
         esched_proc_put(proc_ctx);
     }
-    mutex_unlock(&node->pid_list_mutex);
+    ka_task_mutex_unlock(&node->pid_list_mutex);
 
     esched_dev_put(node);
 }
@@ -78,7 +71,7 @@ STATIC void pid_list_for_each_handle(char *buf, ssize_t *offset, pid_handle hand
 * here to shield until the problem is solved.
 */
 /*lint -e144 -e666 -e102 -e1112 -e145 -e151 -e514*/
-STATIC void sched_sysfs_write_file(struct file *file, const void *buf, size_t count, loff_t *pos)
+STATIC void sched_sysfs_write_file(ka_file_t *file, const void *buf, size_t count, loff_t *pos)
 {
     ssize_t ret;
     ret = ka_fs_kernel_write_ret(file, buf, count, pos);
@@ -103,14 +96,14 @@ STATIC int32_t sched_sysfs_clear_node_stat(struct sched_numa_node *node)
 
     return 0;
 }
-STATIC ssize_t sched_sysfs_node_list(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_list(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     u32 i;
     int32_t ret;
     ssize_t offset = 0;
     struct sched_numa_node *node = NULL;
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
         "node id,cpu num,sched cpu num\n");
     if (ret >= 0) {
         offset += ret;
@@ -119,7 +112,7 @@ STATIC ssize_t sched_sysfs_node_list(struct device *dev, struct device_attribute
     for (i = 0; i < SCHED_MAX_CHIP_NUM; i++) {
         node = esched_dev_get(i);
         if (node != NULL) {
-            ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, "%u,%u,%u\n",
+            ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, "%u,%u,%u\n",
                 i, node->cpu_num, node->sched_cpu_num);
             if (ret >= 0) {
                 offset += ret;
@@ -128,15 +121,32 @@ STATIC ssize_t sched_sysfs_node_list(struct device *dev, struct device_attribute
         }
     }
 
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
+        "node id,msg_type,dst_pid,dst_event_id,dst_subevent_id\n");
+    if (ret >= 0) {
+        offset += ret;
+    }
+
+    for (i = 0; i < SCHED_MAX_CHIP_NUM; i++) {
+        node = esched_dev_get(i);
+        if (node != NULL) {
+            ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, "%u,%u,%u,%u,%u\n",
+                i, node->curr_msg.msg_type, node->curr_msg.dst_pid, node->curr_msg.dst_event_id, node->curr_msg.dst_subevent_id);
+            if (ret >= 0) {
+                offset += ret;
+            }
+            esched_dev_put(node);
+        }
+    }
     return offset;
 }
 
-STATIC ssize_t sched_sysfs_node_id_read(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_id_read(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     int32_t ret;
     ssize_t offset = 0;
 
-    ret = snprintf_s(buf, PAGE_SIZE, PAGE_SIZE - 1, "%u\n", g_node_id);
+    ret = snprintf_s(buf, KA_MM_PAGE_SIZE, KA_MM_PAGE_SIZE - 1, "%u\n", g_node_id);
     if (ret >= 0) {
         offset += ret;
     }
@@ -144,13 +154,13 @@ STATIC ssize_t sched_sysfs_node_id_read(struct device *dev, struct device_attrib
     return offset;
 }
 
-STATIC ssize_t sched_sysfs_node_id_write(struct device *dev, struct device_attribute *attr,
+STATIC ssize_t sched_sysfs_node_id_write(ka_device_t *dev, ka_device_attribute_t *attr,
                                          const char *buf, size_t count)
 {
     u32 val = 0;
     struct sched_numa_node *node = NULL;
 
-    if (kstrtou32(buf, 0, &val) < 0) {
+    if (ka_base_kstrtou32(buf, 0, &val) < 0) {
         sched_err("Failed to invoke the kstrtou32.\n");
         return count;
     }
@@ -166,7 +176,7 @@ STATIC ssize_t sched_sysfs_node_id_write(struct device *dev, struct device_attri
     return (ssize_t)count;
 }
 
-STATIC ssize_t sched_sysfs_node_debug_read(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_debug_read(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     int32_t ret;
     ssize_t offset = 0;
@@ -175,12 +185,12 @@ STATIC ssize_t sched_sysfs_node_debug_read(struct device *dev, struct device_att
         return offset;
     }
 
-    ret = snprintf_s(buf, PAGE_SIZE, PAGE_SIZE - 1, "0x%x\n", node->debug_flag);
+    ret = snprintf_s(buf, KA_MM_PAGE_SIZE, KA_MM_PAGE_SIZE - 1, "0x%x\n", node->debug_flag);
     if (ret >= 0) {
         offset += ret;
     }
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, "bit0: clear node event trace, bit1:"
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, "bit0: clear node event trace, bit1:"
         "record cpu usage and event num sample data, bit2: support trigger sched event trace, bit3: record all event"
         "trace (only valid when bit2 = 1)\n");
     if (ret >= 0) {
@@ -226,7 +236,7 @@ STATIC int32_t sched_sysfs_node_debug_init(struct sched_numa_node *node)
     return 0;
 }
 
-STATIC ssize_t sched_sysfs_node_debug_write(struct device *dev, struct device_attribute *attr,
+STATIC ssize_t sched_sysfs_node_debug_write(ka_device_t *dev, ka_device_attribute_t *attr,
                                             const char *buf, size_t count)
 {
     u32 val = 0;
@@ -237,7 +247,7 @@ STATIC ssize_t sched_sysfs_node_debug_write(struct device *dev, struct device_at
         return count;
     }
 
-    if (kstrtou32(buf, 0, &val) < 0) {
+    if (ka_base_kstrtou32(buf, 0, &val) < 0) {
         sched_err("Failed to invoke the kstrtou32.\n");
         esched_dev_put(node);
         return count;
@@ -251,11 +261,11 @@ STATIC ssize_t sched_sysfs_node_debug_write(struct device *dev, struct device_at
         return count;
     }
 
-    mutex_lock(&node->node_guard_work_mutex);
+    ka_task_mutex_lock(&node->node_guard_work_mutex);
     if (val != 0) {
         ret = sched_sysfs_node_debug_init(node);
         if (ret != 0) {
-            mutex_unlock(&node->node_guard_work_mutex);
+            ka_task_mutex_unlock(&node->node_guard_work_mutex);
             sched_err("Failed to invoke the sched_sysfs_node_debug_init. (node_id=%u; ret=%d)\n",
                 node->node_id, ret);
             esched_dev_put(node);
@@ -281,14 +291,14 @@ STATIC ssize_t sched_sysfs_node_debug_write(struct device *dev, struct device_at
     if (val == 0) {
         sched_sysfs_node_debug_uninit(node);
     }
-    mutex_unlock(&node->node_guard_work_mutex);
+    ka_task_mutex_unlock(&node->node_guard_work_mutex);
     sched_info("Set node dbg %u.\n", val);
     esched_dev_put(node);
 
     return count;
 }
 
-STATIC ssize_t sched_sysfs_node_cpu_list(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_cpu_list(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     u32 i;
     int32_t ret;
@@ -298,7 +308,7 @@ STATIC ssize_t sched_sysfs_node_cpu_list(struct device *dev, struct device_attri
         return offset;
     }
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, "cpuid,sched_mode,"
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, "cpuid,sched_mode,"
         "sched stat:sched_event_num,check_sched_num,proc_exit_drop_num,exclusive_sched_num,timeout_cnt\n");
     if (ret >= 0) {
         offset += ret;
@@ -307,7 +317,7 @@ STATIC ssize_t sched_sysfs_node_cpu_list(struct device *dev, struct device_attri
     for (i = 0; i < node->sched_cpu_num; i++) {
         struct sched_cpu_ctx *cpu_ctx = sched_get_cpu_ctx(node, node->sched_cpuid[i]);
         struct sched_cpu_stat *stat = &cpu_ctx->stat;
-        ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+        ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
             "%u,sched,%llu,%llu,%llu,%llu,%llu\n", cpu_ctx->cpuid, stat->sched_event_num,
             stat->check_sched_num, stat->proc_exit_drop_num, stat->exclusive_sched_num, stat->timeout_cnt);
         if (ret >= 0) {
@@ -315,7 +325,7 @@ STATIC ssize_t sched_sysfs_node_cpu_list(struct device *dev, struct device_attri
         }
     }
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, "cpuid,"
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, "cpuid,"
         "thread(pid,gid,task_id,tid,event_id,sub_event_id,cpu_sched_time,curr_timestamp)\n");
     if (ret >= 0) {
         offset += ret;
@@ -324,7 +334,7 @@ STATIC ssize_t sched_sysfs_node_cpu_list(struct device *dev, struct device_attri
     for (i = 0; i < node->sched_cpu_num; i++) {
         struct sched_cpu_ctx *cpu_ctx = sched_get_cpu_ctx(node, node->sched_cpuid[i]);
         struct esched_abnormal_thread_record *record = &cpu_ctx->cpu_abnormal_thread;
-        ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+        ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
             "%u,(%d,%u,%u,%u,%u,%u,%llu,%llu)\n", cpu_ctx->cpuid,
             record->thread_info.pid, record->thread_info.gid, record->thread_info.task_id, record->thread_info.tid,
             record->event_id, record->sub_event_id, record->cpu_sched_time, record->curr_timestamp);
@@ -338,7 +348,7 @@ STATIC ssize_t sched_sysfs_node_cpu_list(struct device *dev, struct device_attri
     return offset;
 }
 
-STATIC ssize_t sched_sysfs_node_sched_cpu_mask(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_sched_cpu_mask(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     int32_t ret;
     ssize_t offset = 0;
@@ -349,7 +359,7 @@ STATIC ssize_t sched_sysfs_node_sched_cpu_mask(struct device *dev, struct device
     }
 
     for (i = 0; i < node->sched_cpu_num; i++) {
-        ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, "%u\n", node->sched_cpuid[i]);
+        ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, "%u\n", node->sched_cpuid[i]);
         if (ret >= 0) {
             offset += ret;
         }
@@ -362,15 +372,15 @@ STATIC ssize_t sched_sysfs_node_sched_cpu_mask(struct device *dev, struct device
 
 STATIC void sched_sysfs_node_get_proc_list(char *buf, ssize_t *offset, struct sched_proc_ctx *proc_ctx)
 {
-    int ret = snprintf_s(buf + *offset, PAGE_SIZE - *offset, PAGE_SIZE - *offset - 1, "%d,%s,%d,%d,%d\n",
+    int ret = snprintf_s(buf + *offset, KA_MM_PAGE_SIZE - *offset, KA_MM_PAGE_SIZE - *offset - 1, "%d,%s,%d,%d,%d\n",
         proc_ctx->pid, proc_ctx->name, proc_ctx->refcnt,
-        atomic_read(&proc_ctx->publish_event_num), atomic_read(&proc_ctx->sched_event_num));
+        ka_base_atomic_read(&proc_ctx->publish_event_num), ka_base_atomic_read(&proc_ctx->sched_event_num));
     if (ret >= 0) {
         *offset += ret;
     }
 }
 
-STATIC ssize_t sched_sysfs_node_proc_list(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_proc_list(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     ssize_t offset = 0;
 
@@ -379,25 +389,25 @@ STATIC ssize_t sched_sysfs_node_proc_list(struct device *dev, struct device_attr
     return offset;
 }
 
-STATIC ssize_t sched_sysfs_node_del_proc_list(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_del_proc_list(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     int32_t ret;
     ssize_t offset = 0;
     struct sched_proc_ctx *proc_ctx = NULL;
-    struct list_head *pos = NULL;
-    struct list_head *n = NULL;
+    ka_list_head_t *pos = NULL;
+    ka_list_head_t *n = NULL;
     struct sched_numa_node *node = esched_dev_get(g_node_id);
     if (node == NULL) {
         return offset;
     }
 
-    mutex_lock(&node->proc_mng_mutex);
+    ka_task_mutex_lock(&node->proc_mng_mutex);
 
-    if (!list_empty_careful(&node->del_proc_head)) {
-        list_for_each_safe(pos, n, &node->del_proc_head) {
-            proc_ctx = list_entry(pos, struct sched_proc_ctx, list);
+    if (!ka_list_empty_careful(&node->del_proc_head)) {
+        ka_list_for_each_safe(pos, n, &node->del_proc_head) {
+            proc_ctx = ka_list_entry(pos, struct sched_proc_ctx, list);
 
-            ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, "%d,%d\n",
+            ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, "%d,%d\n",
                 proc_ctx->pid, proc_ctx->refcnt);
             if (ret >= 0) {
                 offset += ret;
@@ -405,14 +415,14 @@ STATIC ssize_t sched_sysfs_node_del_proc_list(struct device *dev, struct device_
         }
     }
 
-    mutex_unlock(&node->proc_mng_mutex);
+    ka_task_mutex_unlock(&node->proc_mng_mutex);
 
     esched_dev_put(node);
 
     return offset;
 }
 
-STATIC ssize_t sched_sysfs_node_event_resource(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_event_resource(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     int32_t ret;
     ssize_t offset = 0;
@@ -422,14 +432,14 @@ STATIC ssize_t sched_sysfs_node_event_resource(struct device *dev, struct device
         return offset;
     }
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
         "resource total:use:que head:que tail,max use,enque_full,deque empty\n");
     if (ret >= 0) {
         offset += ret;
     }
 
     res_que = &node->event_res;
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, "%u:%u:%u:%u:%u:%llu:%llu\n",
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, "%u:%u:%u:%u:%u:%llu:%llu\n",
         res_que->depth, res_que->depth - sched_que_element_num(res_que), res_que->head, res_que->tail,
         res_que->stat.max_use, res_que->stat.enque_full, res_que->stat.deque_empty);
     if (ret >= 0) {
@@ -463,7 +473,7 @@ STATIC ssize_t sched_sysfs_event_que_trace(struct sched_event *event_base,
         }
 
         if (flag == SCHED_INVALID) {
-            ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, "%s(%u),%u,%u,%u,%u,%u\n",
+            ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, "%s(%u),%u,%u,%u,%u,%u\n",
                 que_name, que_id, i, event->trace.type, event->trace.a, event->trace.b, event->trace.c);
             if (ret >= 0) {
                 offset += ret;
@@ -474,7 +484,7 @@ STATIC ssize_t sched_sysfs_event_que_trace(struct sched_event *event_base,
     return offset;
 }
 
-STATIC ssize_t sched_sysfs_event_trace(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_event_trace(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     u32 i;
     int32_t ret;
@@ -485,7 +495,7 @@ STATIC ssize_t sched_sysfs_event_trace(struct device *dev, struct device_attribu
         return offset;
     }
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
         "que name(que id),event index,sched type,dest_pid,dest_gid,event_pri\n");
     if (ret >= 0) {
         offset += ret;
@@ -504,7 +514,7 @@ STATIC ssize_t sched_sysfs_event_trace(struct device *dev, struct device_attribu
     return offset;
 }
 
-STATIC ssize_t sched_sysfs_sample_period_read(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_sample_period_read(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     int32_t ret;
     ssize_t offset = 0;
@@ -513,7 +523,7 @@ STATIC ssize_t sched_sysfs_sample_period_read(struct device *dev, struct device_
         return offset;
     }
 
-    ret = snprintf_s(buf, PAGE_SIZE, PAGE_SIZE - 1, "%u ms\n", node->sample_period);
+    ret = snprintf_s(buf, KA_MM_PAGE_SIZE, KA_MM_PAGE_SIZE - 1, "%u ms\n", node->sample_period);
     if (ret >= 0) {
         offset += ret;
     }
@@ -523,15 +533,15 @@ STATIC ssize_t sched_sysfs_sample_period_read(struct device *dev, struct device_
     return offset;
 }
 
-STATIC ssize_t sched_sysfs_sample_period_write(struct device *dev,
-                                               struct device_attribute *attr,
+STATIC ssize_t sched_sysfs_sample_period_write(ka_device_t *dev,
+                                               ka_device_attribute_t *attr,
                                                const char *buf,
                                                size_t count)
 {
     u32 val = 0;
     struct sched_numa_node *node = NULL;
 
-    if (kstrtou32(buf, 0, &val) < 0) {
+    if (ka_base_kstrtou32(buf, 0, &val) < 0) {
         sched_err("Failed to invoke the kstrtou32.\n");
         return count;
     }
@@ -573,7 +583,7 @@ STATIC ssize_t sched_sysfs_event_sample_format(const char *period, char *buf, u3
     submit_speed = (int)((total_event_num * SCHED_SYSFS_EVENT_NUM) / duration);
     sched_speed = (int)(((total_event_num - cur_event_num) * SCHED_SYSFS_EVENT_NUM) / duration);
 
-    if (strlen(period) > 0) {
+    if (ka_base_strlen(period) > 0) {
         ret = snprintf_s(buf + offset, buf_len - offset, buf_len - offset - 1,
             "%s,%llu,%d,%d", period, data[idx].timestamp, submit_speed, sched_speed);
     } else {
@@ -585,7 +595,7 @@ STATIC ssize_t sched_sysfs_event_sample_format(const char *period, char *buf, u3
     }
 
     for (i = 0 ; i < SCHED_MAX_EVENT_TYPE_NUM; i++) {
-        if (strlen(period) > 0) {
+        if (ka_base_strlen(period) > 0) {
             event_num = data[idx].publish_event_num[i] - data[pre_index].sched_event_num[i];
             submit_speed = (int)((event_num * SCHED_SYSFS_EVENT_NUM) / duration);
             ret = snprintf_s(buf + offset, buf_len - offset, buf_len - offset - 1, ",%d", submit_speed);
@@ -612,7 +622,7 @@ STATIC int32_t sched_sysfs_record_event_sample_data(struct sched_numa_node *node
     struct sched_event_sample *sample_data, SAMPLE_TYPE_VALUE type)
 {
     struct sched_proc_ctx *proc_stat = NULL;
-    struct file *fp = NULL;
+    ka_file_t *fp = NULL;
     char *buf = NULL;
     int32_t ret;
     loff_t offset_tmp = 0;
@@ -625,21 +635,21 @@ STATIC int32_t sched_sysfs_record_event_sample_data(struct sched_numa_node *node
     }
 
 #if !defined (EVENT_SCHED_UT) && !defined (EMU_ST)
-    buf = (char *)sched_kzalloc(PAGE_SIZE, GFP_KERNEL);
+    buf = (char *)sched_kzalloc(KA_MM_PAGE_SIZE, KA_GFP_KERNEL);
     if (buf == NULL) {
-        sched_err("Failed to alloc memory.(size=%lx)\n", PAGE_SIZE);
+        sched_err("Failed to alloc memory.(size=%lx)\n", KA_MM_PAGE_SIZE);
         return DRV_ERROR_OUT_OF_MEMORY;
     }
 
     if (type == NODE_SAMPLE_TYPE) {
-        ret = snprintf_s(buf, PAGE_SIZE, PAGE_SIZE - 1, "%s/event_sample_%llu", SCHED_FILE_PATH, timestamp);
+        ret = snprintf_s(buf, KA_MM_PAGE_SIZE, KA_MM_PAGE_SIZE - 1, "%s/event_sample_%llu", SCHED_FILE_PATH, timestamp);
     } else {
         proc_stat = esched_proc_get(node, node->sample_proc_id);
         if (proc_stat == NULL) {
             sched_kfree(buf);
             return 0;
         }
-        ret = snprintf_s(buf, PAGE_SIZE, PAGE_SIZE - 1, "%s/event_sample_pid_%d_%llu", SCHED_FILE_PATH,
+        ret = snprintf_s(buf, KA_MM_PAGE_SIZE, KA_MM_PAGE_SIZE - 1, "%s/event_sample_pid_%d_%llu", SCHED_FILE_PATH,
             proc_stat->pid, timestamp);
         esched_proc_put(proc_stat);
     }
@@ -650,34 +660,34 @@ STATIC int32_t sched_sysfs_record_event_sample_data(struct sched_numa_node *node
         return ret;
     }
 
-    fp = filp_open(buf, O_RDWR | O_TRUNC | O_CREAT, SCHED_FILE_MODE);
-    if (IS_ERR(fp)) {
+    fp = ka_fs_filp_open(buf, KA_O_RDWR | KA_O_TRUNC | KA_O_CREAT, SCHED_FILE_MODE);
+    if (KA_IS_ERR(fp)) {
         sched_err("Failed to invoke the filp_open. (buf=\"%s\")\n", buf);
         sched_kfree(buf);
         return DRV_ERROR_INNER_ERR;
     }
 
-    ret = snprintf_s(buf, PAGE_SIZE, PAGE_SIZE - 1, "timestamp, publish_event_num, cur_event_num,"
+    ret = snprintf_s(buf, KA_MM_PAGE_SIZE, KA_MM_PAGE_SIZE - 1, "timestamp, publish_event_num, cur_event_num,"
         "(event_id, publish_event_num, cur_event_num).....\n");
     if (ret > 0) {
-        sched_sysfs_write_file(fp, (const void *)buf, strlen(buf), &offset_tmp);
+        sched_sysfs_write_file(fp, (const void *)buf, ka_base_strlen(buf), &offset_tmp);
     }
 
     for (i = 1; i < sample_data->record_num; i++) {
-        ret = sched_sysfs_event_sample_format("", buf, PAGE_SIZE, i, i - 1, sample_data->data);
+        ret = sched_sysfs_event_sample_format("", buf, KA_MM_PAGE_SIZE, i, i - 1, sample_data->data);
         if (ret > 0) {
-            sched_sysfs_write_file(fp, (const void *)buf, strlen(buf), &offset_tmp);
+            sched_sysfs_write_file(fp, (const void *)buf, ka_base_strlen(buf), &offset_tmp);
         }
     }
 
     sched_kfree(buf);
 #endif
-    (void)filp_close(fp, NULL);
+    (void)ka_fs_filp_close(fp, NULL);
 
     return 0;
 }
 
-STATIC ssize_t sched_sysfs_event_sample(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_event_sample(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     u32 idx, pre_index, period;
     int32_t ret;
@@ -688,22 +698,22 @@ STATIC ssize_t sched_sysfs_event_sample(struct device *dev, struct device_attrib
         return offset;
     }
 
-    mutex_lock(&node->node_guard_work_mutex);
+    ka_task_mutex_lock(&node->node_guard_work_mutex);
     sample = node->node_event_sample;
     if (sample == NULL) {
-        mutex_unlock(&node->node_guard_work_mutex);
+        ka_task_mutex_unlock(&node->node_guard_work_mutex);
         esched_dev_put(node);
         return offset;
     }
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
         "timestamp, publish_speed(num/s), sched_speed(num/s), each type\n");
     if (ret >= 0) {
         offset += ret;
     }
 
     if (sample->record_num == 0) {
-        mutex_unlock(&node->node_guard_work_mutex);
+        ka_task_mutex_unlock(&node->node_guard_work_mutex);
         esched_dev_put(node);
         return offset;
     }
@@ -713,39 +723,39 @@ STATIC ssize_t sched_sysfs_event_sample(struct device *dev, struct device_attrib
     period = node->sample_period;
     if (idx >= (period / node->sample_period)) {
         pre_index = idx - (period / node->sample_period);
-        offset += sched_sysfs_event_sample_format("single", buf + offset, PAGE_SIZE - offset, idx, pre_index,
+        offset += sched_sysfs_event_sample_format("single", buf + offset, KA_MM_PAGE_SIZE - offset, idx, pre_index,
             sample->data);
     }
 
     period = SYS_SCHED_PERIOD_TIME_1S;
     if (idx >= (period / node->sample_period)) {
         pre_index = idx - (period / node->sample_period);
-        offset += sched_sysfs_event_sample_format("1s", buf + offset, PAGE_SIZE - offset, idx, pre_index,
+        offset += sched_sysfs_event_sample_format("1s", buf + offset, KA_MM_PAGE_SIZE - offset, idx, pre_index,
             sample->data);
     }
 
     period = SYS_SCHED_PERIOD_TIME_10S;
     if (idx >= (period / node->sample_period)) {
         pre_index = idx - (period / node->sample_period);
-        offset += sched_sysfs_event_sample_format("10s", buf + offset, PAGE_SIZE - offset, idx, pre_index,
+        offset += sched_sysfs_event_sample_format("10s", buf + offset, KA_MM_PAGE_SIZE - offset, idx, pre_index,
             sample->data);
     }
 
     period = SYS_SCHED_PERIOD_TIME_60S;
     if (idx >= (period / node->sample_period)) {
         pre_index = idx - (period / node->sample_period);
-        offset += sched_sysfs_event_sample_format("60s", buf + offset, PAGE_SIZE - offset, idx, pre_index,
+        offset += sched_sysfs_event_sample_format("60s", buf + offset, KA_MM_PAGE_SIZE - offset, idx, pre_index,
             sample->data);
     }
 
     period = SYS_SCHED_PERIOD_TIME_300S;
     if (idx >= (period / node->sample_period)) {
         pre_index = idx - (period / node->sample_period);
-        offset += sched_sysfs_event_sample_format("300s", buf + offset, PAGE_SIZE - offset, idx, pre_index,
+        offset += sched_sysfs_event_sample_format("300s", buf + offset, KA_MM_PAGE_SIZE - offset, idx, pre_index,
             sample->data);
     }
 
-    mutex_unlock(&node->node_guard_work_mutex);
+    ka_task_mutex_unlock(&node->node_guard_work_mutex);
     esched_dev_put(node);
     return offset;
 }
@@ -772,7 +782,7 @@ STATIC ssize_t sched_sysfs_cpu_usage_sample_format(struct sched_cpu_sample *samp
 
 STATIC int32_t sched_sysfs_record_cpu_sample_data(u64 timestamp, int32_t cpu_id, struct sched_cpu_sample *sample_data)
 {
-    struct file *fp = NULL;
+    ka_file_t *fp = NULL;
     char buf[MAX_LENTH];
     loff_t offset_tmp = 0;
     int32_t ret;
@@ -784,25 +794,25 @@ STATIC int32_t sched_sysfs_record_cpu_sample_data(u64 timestamp, int32_t cpu_id,
         return ret;
     }
 
-    fp = filp_open(buf, O_RDWR | O_TRUNC | O_CREAT, SCHED_FILE_MODE);
-    if (IS_ERR(fp)) {
+    fp = ka_fs_filp_open(buf, KA_O_RDWR | KA_O_TRUNC | KA_O_CREAT, SCHED_FILE_MODE);
+    if (KA_IS_ERR(fp)) {
         sched_err("Failed to invoke the filp_open.\n");
         return DRV_ERROR_INNER_ERR;
     }
 
     ret = snprintf_s(buf, MAX_LENTH, MAX_LENTH - 1, "timestamp, cpu_usage(percent)\n");
     if (ret > 0) {
-        sched_sysfs_write_file(fp, (const void *)buf, strlen(buf), &offset_tmp);
+        sched_sysfs_write_file(fp, (const void *)buf, ka_base_strlen(buf), &offset_tmp);
     }
 
     for (i = 1; i < sample_data->record_num; i++) {
         ret = sched_sysfs_cpu_usage_sample_format(sample_data, buf, MAX_LENTH, i, i - 1);
         if (ret > 0) {
-            sched_sysfs_write_file(fp, (const void *)buf, strlen(buf), &offset_tmp);
+            sched_sysfs_write_file(fp, (const void *)buf, ka_base_strlen(buf), &offset_tmp);
         }
     }
 
-    (void)filp_close(fp, NULL);
+    (void)ka_fs_filp_close(fp, NULL);
 
     return 0;
 }
@@ -850,7 +860,7 @@ STATIC ssize_t sched_sysfs_cpu_usage_sample_period(const char *period, char *buf
     return offset;
 }
 
-STATIC ssize_t sched_sysfs_cpu_usage_sample(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_cpu_usage_sample(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     u32 idx, pre_index, period;
     int32_t ret;
@@ -861,22 +871,22 @@ STATIC ssize_t sched_sysfs_cpu_usage_sample(struct device *dev, struct device_at
         return offset;
     }
 
-    mutex_lock(&node->node_guard_work_mutex);
+    ka_task_mutex_lock(&node->node_guard_work_mutex);
     sample = node->node_event_sample; /* use event sample record index */
     if (sample == NULL) {
-        mutex_unlock(&node->node_guard_work_mutex);
+        ka_task_mutex_unlock(&node->node_guard_work_mutex);
         esched_dev_put(node);
         return offset;
     }
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
         "cpuid,timestamp,usage(%%)\n");
     if (ret >= 0) {
         offset += ret;
     }
 
     if (sample->record_num == 0) {
-        mutex_unlock(&node->node_guard_work_mutex);
+        ka_task_mutex_unlock(&node->node_guard_work_mutex);
         esched_dev_put(node);
         return offset;
     }
@@ -886,34 +896,34 @@ STATIC ssize_t sched_sysfs_cpu_usage_sample(struct device *dev, struct device_at
     period = node->sample_period;
     if (idx >= (period / node->sample_period)) {
         pre_index = idx - (period / node->sample_period);
-        offset += sched_sysfs_cpu_usage_sample_period("single", buf + offset, PAGE_SIZE - offset, idx, pre_index);
+        offset += sched_sysfs_cpu_usage_sample_period("single", buf + offset, KA_MM_PAGE_SIZE - offset, idx, pre_index);
     }
 
     period = SYS_SCHED_PERIOD_TIME_1S;
     if (idx >= (period / node->sample_period)) {
         pre_index = idx - (period / node->sample_period);
-        offset += sched_sysfs_cpu_usage_sample_period("1s", buf + offset, PAGE_SIZE - offset, idx, pre_index);
+        offset += sched_sysfs_cpu_usage_sample_period("1s", buf + offset, KA_MM_PAGE_SIZE - offset, idx, pre_index);
     }
 
     period = SYS_SCHED_PERIOD_TIME_10S;
     if (idx >= (period / node->sample_period)) {
         pre_index = idx - (period / node->sample_period);
-        offset += sched_sysfs_cpu_usage_sample_period("10s", buf + offset, PAGE_SIZE - offset, idx, pre_index);
+        offset += sched_sysfs_cpu_usage_sample_period("10s", buf + offset, KA_MM_PAGE_SIZE - offset, idx, pre_index);
     }
 
     period = SYS_SCHED_PERIOD_TIME_60S;
     if (idx >= (period / node->sample_period)) {
         pre_index = idx - (period / node->sample_period);
-        offset += sched_sysfs_cpu_usage_sample_period("60s", buf + offset, PAGE_SIZE - offset, idx, pre_index);
+        offset += sched_sysfs_cpu_usage_sample_period("60s", buf + offset, KA_MM_PAGE_SIZE - offset, idx, pre_index);
     }
 
     period = SYS_SCHED_PERIOD_TIME_300S;
     if (idx >= (period / node->sample_period)) {
         pre_index = idx - (period / node->sample_period);
-        offset += sched_sysfs_cpu_usage_sample_period("300s", buf + offset, PAGE_SIZE - offset, idx, pre_index);
+        offset += sched_sysfs_cpu_usage_sample_period("300s", buf + offset, KA_MM_PAGE_SIZE - offset, idx, pre_index);
     }
 
-    mutex_unlock(&node->node_guard_work_mutex);
+    ka_task_mutex_unlock(&node->node_guard_work_mutex);
     esched_dev_put(node);
     return offset;
 }
@@ -971,7 +981,7 @@ STATIC ssize_t sched_sysfs_node_sched_abnormal_time_read(char *buf, u64 timestam
     int32_t ret;
     ssize_t offset = 0;
 
-    ret = snprintf_s(buf, PAGE_SIZE, PAGE_SIZE - 1, "%llu (us)\n", tick_to_microsecond(timestamp_thres));
+    ret = snprintf_s(buf, KA_MM_PAGE_SIZE, KA_MM_PAGE_SIZE - 1, "%llu (us)\n", tick_to_microsecond(timestamp_thres));
     if (ret >= 0) {
         offset += ret;
     }
@@ -984,7 +994,7 @@ STATIC ssize_t sched_sysfs_node_sched_abnormal_time_write(const char *buf,
 {
     u32 val = 0;
 
-    if (kstrtou32(buf, 0, &val) < 0) {
+    if (ka_base_kstrtou32(buf, 0, &val) < 0) {
         sched_err("Failed to invoke the kstrtou32.\n");
         return count;
     }
@@ -994,8 +1004,8 @@ STATIC ssize_t sched_sysfs_node_sched_abnormal_time_write(const char *buf,
     return count;
 }
 
-STATIC ssize_t sched_sysfs_node_sched_proc_abnormal_time_read(struct device *dev,
-    struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_sched_proc_abnormal_time_read(ka_device_t *dev,
+    ka_device_attribute_t *attr, char *buf)
 {
     size_t count = 0;
     struct sched_numa_node *node = esched_dev_get(g_node_id);
@@ -1006,8 +1016,8 @@ STATIC ssize_t sched_sysfs_node_sched_proc_abnormal_time_read(struct device *dev
     return count;
 }
 
-STATIC ssize_t sched_sysfs_node_sched_proc_abnormal_time_write(struct device *dev,
-    struct device_attribute *attr, const char *buf, size_t count)
+STATIC ssize_t sched_sysfs_node_sched_proc_abnormal_time_write(ka_device_t *dev,
+    ka_device_attribute_t *attr, const char *buf, size_t count)
 {
     struct sched_numa_node *node = esched_dev_get(g_node_id);
     if (node != NULL) {
@@ -1017,8 +1027,8 @@ STATIC ssize_t sched_sysfs_node_sched_proc_abnormal_time_write(struct device *de
     return count;
 }
 
-STATIC ssize_t sched_sysfs_node_sched_publish_syscall_abnormal_time_read(struct device *dev,
-    struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_sched_publish_syscall_abnormal_time_read(ka_device_t *dev,
+    ka_device_attribute_t *attr, char *buf)
 {
     size_t count = 0;
     struct sched_numa_node *node = esched_dev_get(g_node_id);
@@ -1029,8 +1039,8 @@ STATIC ssize_t sched_sysfs_node_sched_publish_syscall_abnormal_time_read(struct 
     return count;
 }
 
-STATIC ssize_t sched_sysfs_node_sched_publish_syscall_abnormal_time_write(struct device *dev,
-    struct device_attribute *attr, const char *buf, size_t count)
+STATIC ssize_t sched_sysfs_node_sched_publish_syscall_abnormal_time_write(ka_device_t *dev,
+    ka_device_attribute_t *attr, const char *buf, size_t count)
 {
     struct sched_numa_node *node = esched_dev_get(g_node_id);
     if (node != NULL) {
@@ -1041,8 +1051,8 @@ STATIC ssize_t sched_sysfs_node_sched_publish_syscall_abnormal_time_write(struct
     return count;
 }
 
-STATIC ssize_t sched_sysfs_node_sched_publish_in_kernel_abnormal_time_read(struct device *dev,
-    struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_sched_publish_in_kernel_abnormal_time_read(ka_device_t *dev,
+    ka_device_attribute_t *attr, char *buf)
 {
     size_t count = 0;
     struct sched_numa_node *node = esched_dev_get(g_node_id);
@@ -1053,8 +1063,8 @@ STATIC ssize_t sched_sysfs_node_sched_publish_in_kernel_abnormal_time_read(struc
     return count;
 }
 
-STATIC ssize_t sched_sysfs_node_sched_publish_in_kernel_abnormal_time_write(struct device *dev,
-    struct device_attribute *attr, const char *buf, size_t count)
+STATIC ssize_t sched_sysfs_node_sched_publish_in_kernel_abnormal_time_write(ka_device_t *dev,
+    ka_device_attribute_t *attr, const char *buf, size_t count)
 {
     struct sched_numa_node *node = esched_dev_get(g_node_id);
     if (node != NULL) {
@@ -1065,8 +1075,8 @@ STATIC ssize_t sched_sysfs_node_sched_publish_in_kernel_abnormal_time_write(stru
     return count;
 }
 
-STATIC ssize_t sched_sysfs_node_sched_wakeup_abnormal_time_read(struct device *dev,
-    struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_sched_wakeup_abnormal_time_read(ka_device_t *dev,
+    ka_device_attribute_t *attr, char *buf)
 {
     size_t count = 0;
     struct sched_numa_node *node = esched_dev_get(g_node_id);
@@ -1077,8 +1087,8 @@ STATIC ssize_t sched_sysfs_node_sched_wakeup_abnormal_time_read(struct device *d
     return count;
 }
 
-STATIC ssize_t sched_sysfs_node_sched_wakeup_abnormal_time_write(struct device *dev,
-    struct device_attribute *attr, const char *buf, size_t count)
+STATIC ssize_t sched_sysfs_node_sched_wakeup_abnormal_time_write(ka_device_t *dev,
+    ka_device_attribute_t *attr, const char *buf, size_t count)
 {
     struct sched_numa_node *node = esched_dev_get(g_node_id);
     if (node != NULL) {
@@ -1088,8 +1098,8 @@ STATIC ssize_t sched_sysfs_node_sched_wakeup_abnormal_time_write(struct device *
     return count;
 }
 
-STATIC ssize_t sched_sysfs_node_sched_publish_subscribe_abnormal_time_read(struct device *dev,
-    struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_sched_publish_subscribe_abnormal_time_read(ka_device_t *dev,
+    ka_device_attribute_t *attr, char *buf)
 {
     size_t count = 0;
     struct sched_numa_node *node = esched_dev_get(g_node_id);
@@ -1100,8 +1110,8 @@ STATIC ssize_t sched_sysfs_node_sched_publish_subscribe_abnormal_time_read(struc
     return count;
 }
 
-STATIC ssize_t sched_sysfs_node_sched_publish_subscribe_abnormal_time_write(struct device *dev,
-    struct device_attribute *attr, const char *buf, size_t count)
+STATIC ssize_t sched_sysfs_node_sched_publish_subscribe_abnormal_time_write(ka_device_t *dev,
+    ka_device_attribute_t *attr, const char *buf, size_t count)
 {
     struct sched_numa_node *node = esched_dev_get(g_node_id);
     if (node != NULL) {
@@ -1112,8 +1122,8 @@ STATIC ssize_t sched_sysfs_node_sched_publish_subscribe_abnormal_time_write(stru
     return count;
 }
 
-STATIC ssize_t sched_sysfs_node_sched_thread_run_abnormal_time_read(struct device *dev,
-    struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_sched_thread_run_abnormal_time_read(ka_device_t *dev,
+    ka_device_attribute_t *attr, char *buf)
 {
     size_t count = 0;
     struct sched_numa_node *node = esched_dev_get(g_node_id);
@@ -1124,13 +1134,13 @@ STATIC ssize_t sched_sysfs_node_sched_thread_run_abnormal_time_read(struct devic
     return count;
 }
 
-STATIC ssize_t sched_sysfs_node_sched_thread_run_abnormal_time_write(struct device *dev,
-    struct device_attribute *attr, const char *buf, size_t count)
+STATIC ssize_t sched_sysfs_node_sched_thread_run_abnormal_time_write(ka_device_t *dev,
+    ka_device_attribute_t *attr, const char *buf, size_t count)
 {
     struct sched_numa_node *node = NULL;
     u32 val = 0;
 
-    if (kstrtou32(buf, 0, &val) < 0) {
+    if (ka_base_kstrtou32(buf, 0, &val) < 0) {
         sched_err("Failed to invoke the kstrtou32.\n");
         return count;
     }
@@ -1176,7 +1186,7 @@ STATIC int32_t sched_sysfs_node_single_event_info(char *buf, struct sched_abnorm
         tick_to_microsecond(timestamp->subscribe_in_kernel - timestamp->publish_user) :
         tick_to_microsecond((timestamp->publish_user - timestamp->subscribe_in_kernel) * (-1));
 
-    ret = snprintf_s(buf + *offset, PAGE_SIZE - *offset, PAGE_SIZE - *offset - 1,
+    ret = snprintf_s(buf + *offset, KA_MM_PAGE_SIZE - *offset, KA_MM_PAGE_SIZE - *offset - 1,
         format_string[type], idx, timestamp->publish_user, timestamp->publish_user_of_day,
         tick_to_microsecond(timestamp->publish_in_kernel - timestamp->publish_user), wakeup_offset,
         tick_to_microsecond(timestamp->publish_out_kernel - timestamp->publish_user), subscribe_in_kernel,
@@ -1203,12 +1213,12 @@ STATIC ssize_t sched_sysfs_node_event_all_info(char *buf, struct sched_abnormal_
     struct sched_abnormal_event_item *event_info = NULL;
     struct sched_event_timestamp *timestamp = NULL;
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, "record index %d\n\n", cur_id);
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, "record index %d\n\n", cur_id);
     if (ret >= 0) {
         offset += ret;
     }
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
         "index,publish_user,publish_user_of_day,publish_syscall(+),publish_to_wakeup(+),publish_finish(+),"
         "publish_to_wait_start(+),wakeup_to_waked(+),publish_to_waked(+),publish_to_wait_end(+),proc time(us),event id,"
         "publish_pid,publish_cpuid,wait_event_num_in_que,pid,gid,tid,bind cpuid,kernel tid,thread name\n");
@@ -1216,7 +1226,7 @@ STATIC ssize_t sched_sysfs_node_event_all_info(char *buf, struct sched_abnormal_
         offset += ret;
     }
 
-    if (i == event_num) {
+    if (i >= event_num) {
         i = 0;
     }
 
@@ -1235,8 +1245,8 @@ STATIC ssize_t sched_sysfs_node_event_all_info(char *buf, struct sched_abnormal_
 
     return offset;
 }
-STATIC ssize_t sched_sysfs_node_sched_abnormal_event_clear(struct device *dev,
-    struct device_attribute *attr, const char *buf, size_t count)
+STATIC ssize_t sched_sysfs_node_sched_abnormal_event_clear(ka_device_t *dev,
+    ka_device_attribute_t *attr, const char *buf, size_t count)
 {
     u32 val = 0;
     struct sched_node_abnormal_event *abnormal_event = NULL;
@@ -1245,7 +1255,7 @@ STATIC ssize_t sched_sysfs_node_sched_abnormal_event_clear(struct device *dev,
         return count;
     }
 
-    if (kstrtou32(buf, 0, &val) < 0) {
+    if (ka_base_kstrtou32(buf, 0, &val) < 0) {
         sched_err("Failed to invoke the kstrtou32.\n");
         esched_dev_put(node);
         return count;
@@ -1276,27 +1286,27 @@ STATIC ssize_t sched_sysfs_node_sched_abnormal_event_clear(struct device *dev,
     return count;
 }
 
-STATIC ssize_t sched_sysfs_node_sched_proc_abnormal_event(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_sched_proc_abnormal_event(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     ssize_t offset = 0;
     struct sched_numa_node *node = esched_dev_get(g_node_id);
     if (node != NULL) {
         offset = sched_sysfs_node_event_all_info(buf, node->abnormal_event.proc.event_info,
-            atomic_read(&node->abnormal_event.proc.cur_index), SCHED_ABNORMAL_EVENT_MAX_NUM, PROC_ABNORMAL_EVENT);
+            ka_base_atomic_read(&node->abnormal_event.proc.cur_index), SCHED_ABNORMAL_EVENT_MAX_NUM, PROC_ABNORMAL_EVENT);
         esched_dev_put(node);
     }
 
     return offset;
 }
 
-STATIC ssize_t sched_sysfs_node_sched_thread_run_abnormal_event(struct device *dev,
-    struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_sched_thread_run_abnormal_event(ka_device_t *dev,
+    ka_device_attribute_t *attr, char *buf)
 {
     ssize_t offset = 0;
     struct sched_numa_node *node = esched_dev_get(g_node_id);
     if (node != NULL) {
         offset = sched_sysfs_node_event_all_info(buf, node->abnormal_event.thread_run.event_info,
-            atomic_read(&node->abnormal_event.thread_run.cur_index),
+            ka_base_atomic_read(&node->abnormal_event.thread_run.cur_index),
             SCHED_ABNORMAL_EVENT_MAX_NUM, PROC_ABNORMAL_EVENT);
         esched_dev_put(node);
     }
@@ -1304,8 +1314,8 @@ STATIC ssize_t sched_sysfs_node_sched_thread_run_abnormal_event(struct device *d
     return offset;
 }
 
-STATIC ssize_t sched_sysfs_node_sched_publish_syscall_abnormal_event(struct device *dev,
-    struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_sched_publish_syscall_abnormal_event(ka_device_t *dev,
+    ka_device_attribute_t *attr, char *buf)
 {
     static u32 i = 0; /* output msg is large than 1 page */
     int32_t ret;
@@ -1317,13 +1327,13 @@ STATIC ssize_t sched_sysfs_node_sched_publish_syscall_abnormal_event(struct devi
         return offset;
     }
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
-        "record index %d\n\n", atomic_read(&node->abnormal_event.publish_syscall.cur_index));
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
+        "record index %d\n\n", ka_base_atomic_read(&node->abnormal_event.publish_syscall.cur_index));
     if (ret >= 0) {
         offset += ret;
     }
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
         "index,publish_user,publish_syscall(+),event id,publish_pid,publish_cpuid\n");
     if (ret >= 0) {
         offset += ret;
@@ -1340,7 +1350,7 @@ STATIC ssize_t sched_sysfs_node_sched_publish_syscall_abnormal_event(struct devi
             continue;
         }
 
-        ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, "%d,%llu,%llu,%d,%d,%d\n", i,
+        ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, "%d,%llu,%llu,%d,%d,%d\n", i,
             timestamp->publish_user, tick_to_microsecond(timestamp->publish_in_kernel - timestamp->publish_user),
             event_info->event_id, event_info->publish_pid, event_info->publish_cpuid);
         if (ret >= 0) {
@@ -1355,8 +1365,8 @@ STATIC ssize_t sched_sysfs_node_sched_publish_syscall_abnormal_event(struct devi
     return offset;
 }
 
-STATIC ssize_t sched_sysfs_node_sched_publish_in_kernel_abnormal_event(struct device *dev,
-    struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_sched_publish_in_kernel_abnormal_event(ka_device_t *dev,
+    ka_device_attribute_t *attr, char *buf)
 {
     static u32 i = 0; /* output msg is large than 1 page */
     int32_t ret;
@@ -1368,13 +1378,13 @@ STATIC ssize_t sched_sysfs_node_sched_publish_in_kernel_abnormal_event(struct de
         return offset;
     }
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
-        "record index %d\n\n", atomic_read(&node->abnormal_event.publish_in_kernel.cur_index));
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
+        "record index %d\n\n", ka_base_atomic_read(&node->abnormal_event.publish_in_kernel.cur_index));
     if (ret >= 0) {
         offset += ret;
     }
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
         "index,publish_user,publish_syscall(+),publish_finish(+),event id,publish_pid,publish_cpuid\n");
     if (ret >= 0) {
         offset += ret;
@@ -1391,7 +1401,7 @@ STATIC ssize_t sched_sysfs_node_sched_publish_in_kernel_abnormal_event(struct de
             continue;
         }
 
-        ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, "%d,%llu,%llu,%llu,%d,%d,%d\n", i,
+        ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, "%d,%llu,%llu,%llu,%d,%d,%d\n", i,
             timestamp->publish_user, tick_to_microsecond(timestamp->publish_in_kernel - timestamp->publish_user),
             tick_to_microsecond(timestamp->publish_out_kernel - timestamp->publish_user),
             event_info->event_id, event_info->publish_pid, event_info->publish_cpuid);
@@ -1407,28 +1417,28 @@ STATIC ssize_t sched_sysfs_node_sched_publish_in_kernel_abnormal_event(struct de
     return offset;
 }
 
-STATIC ssize_t sched_sysfs_node_sched_wakeup_abnormal_event(struct device *dev,
-    struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_sched_wakeup_abnormal_event(ka_device_t *dev,
+    ka_device_attribute_t *attr, char *buf)
 {
     ssize_t offset = 0;
     struct sched_numa_node *node = esched_dev_get(g_node_id);
     if (node != NULL) {
         offset = sched_sysfs_node_event_all_info(buf, node->abnormal_event.wakeup.event_info,
-            atomic_read(&node->abnormal_event.wakeup.cur_index), SCHED_ABNORMAL_EVENT_MAX_NUM, WAKEUP_ABNORMAL_EVENT);
+            ka_base_atomic_read(&node->abnormal_event.wakeup.cur_index), SCHED_ABNORMAL_EVENT_MAX_NUM, WAKEUP_ABNORMAL_EVENT);
         esched_dev_put(node);
     }
 
     return offset;
 }
 
-STATIC ssize_t sched_sysfs_node_sched_publish_subscribe_abnormal_event(struct device *dev,
-    struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_sched_publish_subscribe_abnormal_event(ka_device_t *dev,
+    ka_device_attribute_t *attr, char *buf)
 {
     ssize_t offset = 0;
     struct sched_numa_node *node = esched_dev_get(g_node_id);
     if (node != NULL) {
         offset = sched_sysfs_node_event_all_info(buf, node->abnormal_event.publish_subscribe.event_info,
-            atomic_read(&node->abnormal_event.publish_subscribe.cur_index), SCHED_ABNORMAL_EVENT_MAX_NUM,
+            ka_base_atomic_read(&node->abnormal_event.publish_subscribe.cur_index), SCHED_ABNORMAL_EVENT_MAX_NUM,
             PUBLISH_SUBSCRIBE_ABNORMAL_EVENT);
         esched_dev_put(node);
     }
@@ -1436,13 +1446,13 @@ STATIC ssize_t sched_sysfs_node_sched_publish_subscribe_abnormal_event(struct de
     return offset;
 }
 
-STATIC ssize_t sched_sysfs_node_sched_event_list(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_sched_event_list(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     ssize_t offset = 0;
     struct sched_numa_node *node = esched_dev_get(g_node_id);
     if (node != NULL) {
         offset = sched_sysfs_node_event_all_info(buf, node->event_trace.event_info,
-            atomic_read(&node->event_trace.cur_index), SCHED_EVENT_TRACE_MAX_NUM, NORMAL_EVENT);
+            ka_base_atomic_read(&node->event_trace.cur_index), SCHED_EVENT_TRACE_MAX_NUM, NORMAL_EVENT);
         esched_dev_put(node);
     }
 
@@ -1500,7 +1510,7 @@ STATIC void sched_sysfs_get_all_cpu_event_summary(struct sched_cpu_perf_stat *pe
     esched_dev_put(node);
 }
 
-STATIC ssize_t sched_sysfs_node_event_summary(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_event_summary(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     u32 i, dump_times;
     int32_t ret;
@@ -1514,7 +1524,7 @@ STATIC ssize_t sched_sysfs_node_event_summary(struct device *dev, struct device_
         return offset;
     }
     wakeup_err_times = node->wakeup_err_info.wakeup_err_times;
-    perf_stat = (struct sched_cpu_perf_stat *)sched_kzalloc(sizeof(struct sched_cpu_perf_stat), GFP_KERNEL);
+    perf_stat = (struct sched_cpu_perf_stat *)sched_kzalloc(sizeof(struct sched_cpu_perf_stat), KA_GFP_KERNEL);
     if (perf_stat == NULL) {
         sched_err("Failed to alloc memory.(size=%lx)\n", sizeof(struct sched_cpu_perf_stat));
         esched_dev_put(node);
@@ -1523,7 +1533,7 @@ STATIC ssize_t sched_sysfs_node_event_summary(struct device *dev, struct device_
 
     sched_sysfs_get_all_cpu_event_summary(perf_stat);
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
         "submit_event_num %llu\ntotal_submit_fail_event_num %llu\npublish_event_num %llu\ntotal_publish_fail_event_num %llu\nsched_event_num %llu\nwakeup_event_num %llu\nwakeup_err_num %llu\n\n",
         perf_stat->total_submit_event_num, perf_stat->total_submit_fail_event_num, perf_stat->total_publish_event_num,
         perf_stat->total_publish_fail_event_num, perf_stat->total_sched_event_num, perf_stat->total_wakeup_event_num, wakeup_err_times);
@@ -1532,7 +1542,7 @@ STATIC ssize_t sched_sysfs_node_event_summary(struct device *dev, struct device_
     }
 
     if (perf_stat->total_publish_event_num != 0) {
-        ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+        ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
             "publish system call:\nave time(us) %llu \nmax time(us) %llu \n",
             tick_to_microsecond(perf_stat->publish_syscall_total_time / perf_stat->total_publish_event_num),
             tick_to_microsecond(perf_stat->publish_syscall_max_time));
@@ -1540,7 +1550,7 @@ STATIC ssize_t sched_sysfs_node_event_summary(struct device *dev, struct device_
             offset += ret;
         }
 
-        ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+        ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
             "publish in kernel:\nave time(us) %llu \nmax time(us) %llu \n",
             tick_to_microsecond(perf_stat->publish_in_kernel_total_time / perf_stat->total_publish_event_num),
             tick_to_microsecond(perf_stat->publish_in_kernel_max_time));
@@ -1550,7 +1560,7 @@ STATIC ssize_t sched_sysfs_node_event_summary(struct device *dev, struct device_
     }
 
     if (perf_stat->total_wakeup_event_num != 0) {
-        ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+        ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
             "wakeup:\nave time(us) %llu \nmax time(us) %llu \n",
             tick_to_microsecond(perf_stat->wakeup_total_time / perf_stat->total_wakeup_event_num),
             tick_to_microsecond(perf_stat->wakeup_max_time));
@@ -1560,7 +1570,7 @@ STATIC ssize_t sched_sysfs_node_event_summary(struct device *dev, struct device_
     }
 
     if (perf_stat->total_sched_event_num != 0) {
-        ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+        ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
             "publish subscribe:\nave time(us) %llu \nmax time(us) %llu \n",
             tick_to_microsecond(perf_stat->publish_subscribe_total_time / perf_stat->total_sched_event_num),
             tick_to_microsecond(perf_stat->publish_subscribe_max_time));
@@ -1569,7 +1579,7 @@ STATIC ssize_t sched_sysfs_node_event_summary(struct device *dev, struct device_
         }
     }
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
         "\nevent id,submit_event_num,submit_fail_event_num,sw_publish_event_num,hw_publish_event_num,publish_fail_event_num,sched_event_num\n");
     if (ret >= 0) {
         offset += ret;
@@ -1578,7 +1588,7 @@ STATIC ssize_t sched_sysfs_node_event_summary(struct device *dev, struct device_
     for (i = 0; i < SCHED_MAX_EVENT_TYPE_NUM; i++) {
         if ((perf_stat->sw_publish_event_num[i] != 0) || (perf_stat->sched_event_num[i] != 0) ||
             (perf_stat->submit_event_num[i] != 0) || (perf_stat->hw_publish_event_num[i] != 0)) {
-            ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+            ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
                 "%d, %llu, %llu, %llu, %llu, %llu, %llu\n",
                 i, perf_stat->submit_event_num[i], perf_stat->submit_fail_event_num[i], perf_stat->sw_publish_event_num[i],
                 perf_stat->hw_publish_event_num[i], perf_stat->publish_fail_event_num[i], perf_stat->sched_event_num[i]);
@@ -1589,7 +1599,7 @@ STATIC ssize_t sched_sysfs_node_event_summary(struct device *dev, struct device_
     }
 
     if (wakeup_err_times != 0) {
-        ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+        ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
             "\nthread_status,bind_cpuid,pid,gid,tid,kernel_tid,curr_wakeup_reason,pre_wakeup_reason\n");
         if (ret >= 0) {
             offset += ret;
@@ -1597,7 +1607,7 @@ STATIC ssize_t sched_sysfs_node_event_summary(struct device *dev, struct device_
         dump_times = (wakeup_err_times > SCHED_WAKEUP_ERR_RECORD_NUM) ? SCHED_WAKEUP_ERR_RECORD_NUM : wakeup_err_times;
         for (i = 0; i < dump_times; i++) {
             err_info = &node->wakeup_err_info.err_info[i];
-            ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+            ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
                 "%u, %u, %u, %u, %u, %u, %u, %u\n",
                 err_info->thread_status, err_info->bind_cpuid, err_info->pid, err_info->group_id, err_info->tid,
                 err_info->kernel_tid, err_info->normal_wakeup_reason, err_info->pre_normal_wakeup_reason);
@@ -1612,12 +1622,12 @@ STATIC ssize_t sched_sysfs_node_event_summary(struct device *dev, struct device_
     return offset;
 }
 
-STATIC ssize_t sched_sysfs_node_cpuid_read(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_cpuid_read(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     int32_t ret;
     ssize_t offset = 0;
 
-    ret = snprintf_s(buf, PAGE_SIZE, PAGE_SIZE - 1, "%u\n", cpuid_in_node);
+    ret = snprintf_s(buf, KA_MM_PAGE_SIZE, KA_MM_PAGE_SIZE - 1, "%u\n", cpuid_in_node);
     if (ret >= 0) {
         offset += ret;
     }
@@ -1625,7 +1635,7 @@ STATIC ssize_t sched_sysfs_node_cpuid_read(struct device *dev, struct device_att
     return offset;
 }
 
-STATIC ssize_t sched_sysfs_node_cpuid_write(struct device *dev, struct device_attribute *attr,
+STATIC ssize_t sched_sysfs_node_cpuid_write(ka_device_t *dev, ka_device_attribute_t *attr,
                                             const char *buf, size_t count)
 {
     u32 val = 0;
@@ -1634,7 +1644,7 @@ STATIC ssize_t sched_sysfs_node_cpuid_write(struct device *dev, struct device_at
         return count;
     }
 
-    if (kstrtou32(buf, 0, &val) < 0) {
+    if (ka_base_kstrtou32(buf, 0, &val) < 0) {
         sched_err("Failed to invoke the kstrtou32.\n");
         esched_dev_put(node);
         return count;
@@ -1652,7 +1662,7 @@ STATIC ssize_t sched_sysfs_node_cpuid_write(struct device *dev, struct device_at
     return count;
 }
 
-STATIC ssize_t sched_sysfs_node_cur_event_num(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_cur_event_num(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
 #ifdef CFG_FEATURE_VFIO
     int32_t k;
@@ -1665,9 +1675,9 @@ STATIC ssize_t sched_sysfs_node_cur_event_num(struct device *dev, struct device_
         return offset;
     }
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
         "node_id %u current event num: %u\n\nnode_id proc_pri event_pri event_num (vf0~vf16)\n",
-        node->node_id, atomic_read(&node->cur_event_num));
+        node->node_id, ka_base_atomic_read(&node->cur_event_num));
     if (ret >= 0) {
         offset += ret;
     }
@@ -1675,32 +1685,32 @@ STATIC ssize_t sched_sysfs_node_cur_event_num(struct device *dev, struct device_
     for (i = 0; i < SCHED_MAX_PROC_PRI_NUM; i++) {
         for (j = 0; j < SCHED_MAX_EVENT_PRI_NUM; j++) {
             event_list = sched_get_sched_event_list(node, i, j);
-            ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+            ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
                 "%u,%d,%d,%u", node->node_id, i, j, event_list->cur_num);
             if (ret >= 0) {
                 offset += ret;
             }
 
 #ifdef CFG_FEATURE_VFIO
-            ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, " (");
+            ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, " (");
             if (ret >= 0) {
                 offset += ret;
             }
 
             /* Count the number of events for each VF */
             for (k = 0; k < VMNG_VDEV_MAX_PER_PDEV; k++) {
-                ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, "%u ",
+                ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, "%u ",
                     event_list->slice_cur_event_num[k]);
                 if (ret >= 0) {
                     offset += ret;
                 }
             }
-            ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, ")\n");
+            ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, ")\n");
             if (ret >= 0) {
                 offset += ret;
             }
 #else
-            ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, "\n");
+            ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, "\n");
             if (ret >= 0) {
                 offset += ret;
             }
@@ -1713,7 +1723,7 @@ STATIC ssize_t sched_sysfs_node_cur_event_num(struct device *dev, struct device_
     return offset;
 }
 
-STATIC ssize_t sched_sysfs_node_cpu_cur_thread(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_cpu_cur_thread(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     u32 i;
     int32_t ret;
@@ -1725,7 +1735,7 @@ STATIC ssize_t sched_sysfs_node_cpu_cur_thread(struct device *dev, struct device
         return offset;
     }
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, "cpuid,pid,gid,tid\n");
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, "cpuid,pid,gid,tid\n");
     if (ret >= 0) {
         offset += ret;
     }
@@ -1734,7 +1744,7 @@ STATIC ssize_t sched_sysfs_node_cpu_cur_thread(struct device *dev, struct device
         cpu_ctx = sched_get_cpu_ctx(node, node->sched_cpuid[i]);
         thread_ctx = esched_cpu_cur_thread_get(cpu_ctx);
         if (thread_ctx != NULL) {
-            ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+            ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
                 "%u,pid:%d(%s),gid:%u,tid:%u\n",
                 i, thread_ctx->grp_ctx->pid, thread_ctx->grp_ctx->proc_ctx->name,
                 thread_ctx->grp_ctx->gid, thread_ctx->tid);
@@ -1743,7 +1753,7 @@ STATIC ssize_t sched_sysfs_node_cpu_cur_thread(struct device *dev, struct device
             }
             esched_cpu_cur_thread_put(thread_ctx);
         } else {
-            ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, "%d,idle\n", cpu_ctx->cpuid);
+            ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, "%d,idle\n", cpu_ctx->cpuid);
             if (ret >= 0) {
                 offset += ret;
             }
@@ -1755,7 +1765,7 @@ STATIC ssize_t sched_sysfs_node_cpu_cur_thread(struct device *dev, struct device
     return offset;
 }
 
-STATIC ssize_t sched_sysfs_node_cpu_event_resource(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_cpu_event_resource(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     u32 i;
     int32_t ret;
@@ -1767,7 +1777,7 @@ STATIC ssize_t sched_sysfs_node_cpu_event_resource(struct device *dev, struct de
         return offset;
     }
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
         "cpuid,resouce total:use:que head:que tail,max use, enque_full cnt, deque empty cnt\n");
     if (ret >= 0) {
         offset += ret;
@@ -1780,7 +1790,7 @@ STATIC ssize_t sched_sysfs_node_cpu_event_resource(struct device *dev, struct de
         }
 
         res_que = &cpu_ctx->event_res;
-        ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, "%u,%u:%u:%u:%u:%u:%llu:%llu\n", i,
+        ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, "%u,%u:%u:%u:%u:%u:%llu:%llu\n", i,
             res_que->depth, res_que->depth - sched_que_element_num(res_que), res_que->head, res_que->tail,
             res_que->stat.max_use, res_que->stat.enque_full, res_que->stat.deque_empty);
         if (ret >= 0) {
@@ -1799,16 +1809,16 @@ STATIC int32_t sched_sysfs_node_proc_single_thread_info(char *buf, struct sched_
     int32_t ret;
     char *status = NULL;
 
-    if (atomic_read(&thread_ctx->status) == SCHED_THREAD_STATUS_IDLE) {
+    if (ka_base_atomic_read(&thread_ctx->status) == SCHED_THREAD_STATUS_IDLE) {
         status = "idle";
-    } else if (atomic_read(&thread_ctx->status) == SCHED_THREAD_STATUS_RUN) {
+    } else if (ka_base_atomic_read(&thread_ctx->status) == SCHED_THREAD_STATUS_RUN) {
         status = "running";
     } else {
         status = "ready";
     }
 
     if (grp_ctx->sched_mode == SCHED_MODE_SCHED_CPU) {
-        ret = snprintf_s(buf + *offset, PAGE_SIZE - *offset, PAGE_SIZE - *offset - 1,
+        ret = snprintf_s(buf + *offset, KA_MM_PAGE_SIZE - *offset, KA_MM_PAGE_SIZE - *offset - 1,
             "%u,%d,%d,%d,%s,%u,%s,%u,%u,%d,%d,%llu,%llu,%llu,%llu,%llu,%llx,%u,%u,%u\n",
             thread_ctx->bind_cpuid, grp_ctx->pid, grp_ctx->gid, idx,
             thread_ctx->name, thread_ctx->kernel_tid, status, thread_ctx->wait_flag, thread_ctx->timeout_flag,
@@ -1819,9 +1829,9 @@ STATIC int32_t sched_sysfs_node_proc_single_thread_info(char *buf, struct sched_
             (thread_ctx->stat.sched_event != 0) ? (tick_to_microsecond(thread_ctx->total_sched_time) /
             thread_ctx->stat.sched_event) : 0, thread_ctx->subscribe_event_bitmap,
             thread_ctx->stat.sched_event, thread_ctx->stat.timeout_cnt,
-            atomic_read(&thread_ctx->stat.discard_event));
+            ka_base_atomic_read(&thread_ctx->stat.discard_event));
     } else {
-        ret = snprintf_s(buf + *offset, PAGE_SIZE - *offset, PAGE_SIZE - *offset - 1,
+        ret = snprintf_s(buf + *offset, KA_MM_PAGE_SIZE - *offset, KA_MM_PAGE_SIZE - *offset - 1,
             "%d,%s,%u,%s,%u,%llu,%llu,%llu,%llu,%llu,%llx,%u,%u\n",
             idx,
             thread_ctx->name, thread_ctx->kernel_tid, status, thread_ctx->wait_flag,
@@ -1830,7 +1840,7 @@ STATIC int32_t sched_sysfs_node_proc_single_thread_info(char *buf, struct sched_
             thread_ctx->stat.sched_event) : 0, tick_to_microsecond(thread_ctx->max_sched_time),
             (thread_ctx->stat.sched_event != 0) ? (tick_to_microsecond(thread_ctx->total_sched_time) /
             thread_ctx->stat.sched_event) : 0, thread_ctx->subscribe_event_bitmap,
-            atomic_read(&grp_ctx->cur_event_num), thread_ctx->stat.sched_event);
+            ka_base_atomic_read(&grp_ctx->cur_event_num), thread_ctx->stat.sched_event);
     }
     if (ret >= 0) {
         *offset += ret;
@@ -1870,7 +1880,7 @@ STATIC void sched_sysfs_node_proc_thread_info(char *buf, ssize_t *offset, struct
     }
 }
 
-STATIC ssize_t sched_sysfs_node_cpu_thread_info(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_cpu_thread_info(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     int32_t ret;
     ssize_t offset = 0;
@@ -1880,7 +1890,7 @@ STATIC ssize_t sched_sysfs_node_cpu_thread_info(struct device *dev, struct devic
     }
 
     if ((cpuid_in_node >= node->cpu_num) || (sched_get_cpu_ctx(node, cpuid_in_node) == NULL)) {
-        ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+        ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
             "current cpu is not sched cpu\n");
         if (ret >= 0) {
             offset += ret;
@@ -1889,7 +1899,7 @@ STATIC ssize_t sched_sysfs_node_cpu_thread_info(struct device *dev, struct devic
         return offset;
     }
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
         "bind_cpuid,pid,gid,tid,name,kernel_tid,status,wait flag,timeout flag,pre_wakeup reason,normal wakeup reason,"
         "start time(ms),max proc time(us),ave proc time(us),max sched time(us),ave sched time(us),"
         "subscribe event bitmap,fwd event,sched event,timeout cnt,discard cnt\n");
@@ -1972,8 +1982,8 @@ STATIC ssize_t sched_sysfs_node_cpu_sched_track_format(struct sched_cpu_sched_tr
 STATIC void sched_cpu_trace_record(struct sched_cpu_ctx *cpu_ctx,
     u64 trace_num, const struct sched_trace_record_info *trace_record)
 {
-    static char sched_sysfs_buf[PAGE_SIZE];
-    struct file *fp = NULL;
+    static char sched_sysfs_buf[KA_MM_PAGE_SIZE];
+    ka_file_t *fp = NULL;
     char buf[MAX_LENTH];
     loff_t offset_tmp = 0;
     int32_t ret;
@@ -1987,19 +1997,19 @@ STATIC void sched_cpu_trace_record(struct sched_cpu_ctx *cpu_ctx,
         return;
     }
 
-    fp = filp_open(buf, O_RDWR | O_TRUNC | O_CREAT, SCHED_FILE_MODE);
-    if (IS_ERR(fp)) {
+    fp = ka_fs_filp_open(buf, KA_O_RDWR | KA_O_TRUNC | KA_O_CREAT, SCHED_FILE_MODE);
+    if (KA_IS_ERR(fp)) {
         sched_err("Failed to invoke the filp_open. (buf=\"%s\")\n", buf);
         return;
     }
 
-    ret = snprintf_s(sched_sysfs_buf, PAGE_SIZE, PAGE_SIZE - 1, "cpuid %d thread schedule track\n"
+    ret = snprintf_s(sched_sysfs_buf, KA_MM_PAGE_SIZE, KA_MM_PAGE_SIZE - 1, "cpuid %d thread schedule track\n"
         "(index)(sched timestamp,publish timestamp,add list timestamp): (pid gid tid event),(pid pri, event pri),"
         "(wakeup reason),(use time(us)),(cpu cur event num, sched wait time(us),waked to wakeup time(us),"
         "callback time(us)) -->\n",
         cpu_ctx->cpuid);
     if (ret > 0) {
-        sched_sysfs_write_file(fp, (const void *)sched_sysfs_buf, strlen(sched_sysfs_buf), &offset_tmp);
+        sched_sysfs_write_file(fp, (const void *)sched_sysfs_buf, ka_base_strlen(sched_sysfs_buf), &offset_tmp);
     }
 
     sched_debug("Show details. (cpuid=%u; trace_num=%llu)\n", cpu_ctx->cpuid, trace_num);
@@ -2007,14 +2017,14 @@ STATIC void sched_cpu_trace_record(struct sched_cpu_ctx *cpu_ctx,
     for (i = 0; i < SCHED_SWICH_THREAD_RECORD_NUM; i += SCHED_SWICH_THREAD_SHOW_NUM) {
         start_index = (trace_num - SCHED_SWICH_THREAD_RECORD_NUM + i) & SCHED_SWICH_THREAD_NUM_MASK;
 
-        ret = sched_sysfs_node_cpu_sched_track_format(cpu_ctx->sched_trace, sched_sysfs_buf, PAGE_SIZE,
+        ret = sched_sysfs_node_cpu_sched_track_format(cpu_ctx->sched_trace, sched_sysfs_buf, KA_MM_PAGE_SIZE,
             start_index, SCHED_SWICH_THREAD_SHOW_NUM, &timestamp);
         if (ret > 0) {
-            sched_sysfs_write_file(fp, (const void *)sched_sysfs_buf, strlen(sched_sysfs_buf), &offset_tmp);
+            sched_sysfs_write_file(fp, (const void *)sched_sysfs_buf, ka_base_strlen(sched_sysfs_buf), &offset_tmp);
         }
     }
 
-    (void)filp_close(fp, NULL);
+    (void)ka_fs_filp_close(fp, NULL);
 }
 
 void sched_trace_record(struct sched_numa_node *node, struct sched_trace_record_info *trace_record)
@@ -2030,7 +2040,7 @@ void sched_trace_record(struct sched_numa_node *node, struct sched_trace_record_
     }
 }
 
-STATIC ssize_t sched_sysfs_node_cpu_sched_track(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_cpu_sched_track(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     struct sched_cpu_ctx *cpu_ctx = NULL;
     int32_t ret;
@@ -2042,7 +2052,7 @@ STATIC ssize_t sched_sysfs_node_cpu_sched_track(struct device *dev, struct devic
         return offset;
     }
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, "cpuid %d thread schedule track\n"
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, "cpuid %d thread schedule track\n"
         "(index)timestamp: (pid gid tid event),(use time(us)),(cpu cur event num, sched wait time(us),"
         "waked to wakeup time(us), callback time(us)) -->\n",
         cpuid_in_node);
@@ -2058,18 +2068,18 @@ STATIC ssize_t sched_sysfs_node_cpu_sched_track(struct device *dev, struct devic
 
     start_index = (cpu_ctx->sched_trace->trace_num - SCHED_SWICH_THREAD_SHOW_NUM) & SCHED_SWICH_THREAD_NUM_MASK;
 
-    offset += sched_sysfs_node_cpu_sched_track_format(cpu_ctx->sched_trace, buf + offset, PAGE_SIZE - offset,
+    offset += sched_sysfs_node_cpu_sched_track_format(cpu_ctx->sched_trace, buf + offset, KA_MM_PAGE_SIZE - offset,
         start_index, SCHED_SWICH_THREAD_SHOW_NUM, &timestamp);
     esched_dev_put(node);
     return offset;
 }
 
-STATIC ssize_t sched_sysfs_pid_read(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_pid_read(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     int32_t ret;
     ssize_t offset = 0;
 
-    ret = snprintf_s(buf, PAGE_SIZE, PAGE_SIZE - 1, "%u\n", cur_pid);
+    ret = snprintf_s(buf, KA_MM_PAGE_SIZE, KA_MM_PAGE_SIZE - 1, "%u\n", cur_pid);
     if (ret >= 0) {
         offset += ret;
     }
@@ -2077,7 +2087,7 @@ STATIC ssize_t sched_sysfs_pid_read(struct device *dev, struct device_attribute 
     return offset;
 }
 
-STATIC ssize_t sched_sysfs_pid_write(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+STATIC ssize_t sched_sysfs_pid_write(ka_device_t *dev, ka_device_attribute_t *attr, const char *buf, size_t count)
 {
     int32_t val = 0;
     struct sched_proc_ctx *proc_ctx = NULL;
@@ -2087,7 +2097,7 @@ STATIC ssize_t sched_sysfs_pid_write(struct device *dev, struct device_attribute
         return count;
     }
 
-    if (kstrtou32(buf, 0, (u32 *)&val) < 0) {
+    if (ka_base_kstrtou32(buf, 0, (u32 *)&val) < 0) {
         sched_err("Failed to invoke the kstrtou32.\n");
         esched_dev_put(node);
         return count;
@@ -2108,7 +2118,7 @@ STATIC ssize_t sched_sysfs_pid_write(struct device *dev, struct device_attribute
     return count;
 }
 
-STATIC ssize_t sched_sysfs_proc_status(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_proc_status(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     int32_t ret;
     ssize_t offset = 0;
@@ -2121,7 +2131,7 @@ STATIC ssize_t sched_sysfs_proc_status(struct device *dev, struct device_attribu
 
     proc_ctx = esched_proc_get(node, cur_pid);
     if (proc_ctx == NULL) {
-        ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+        ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
             "pid %d invalid. can not find in node %u.\n", cur_pid, node->node_id);
         if (ret >= 0) {
             offset += ret;
@@ -2136,7 +2146,7 @@ STATIC ssize_t sched_sysfs_proc_status(struct device *dev, struct device_attribu
 
     esched_proc_put(proc_ctx);
 
-    ret = snprintf_s(buf, PAGE_SIZE, PAGE_SIZE - 1, "%s\n", msg);
+    ret = snprintf_s(buf, KA_MM_PAGE_SIZE, KA_MM_PAGE_SIZE - 1, "%s\n", msg);
     if (ret >= 0) {
         offset += ret;
     }
@@ -2146,7 +2156,7 @@ STATIC ssize_t sched_sysfs_proc_status(struct device *dev, struct device_attribu
     return offset;
 }
 
-STATIC ssize_t sched_sysfs_proc_pri(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_proc_pri(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     int32_t ret;
     ssize_t offset = 0;
@@ -2158,7 +2168,7 @@ STATIC ssize_t sched_sysfs_proc_pri(struct device *dev, struct device_attribute 
 
     proc_ctx = esched_proc_get(node, cur_pid);
     if (proc_ctx == NULL) {
-        ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+        ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
             "pid %u invalid. can not find in node %u.\n", cur_pid, node->node_id);
         if (ret >= 0) {
             offset += ret;
@@ -2167,7 +2177,7 @@ STATIC ssize_t sched_sysfs_proc_pri(struct device *dev, struct device_attribute 
         return offset;
     }
 
-    ret = snprintf_s(buf, PAGE_SIZE, PAGE_SIZE - 1, "%u\n", proc_ctx->pri);
+    ret = snprintf_s(buf, KA_MM_PAGE_SIZE, KA_MM_PAGE_SIZE - 1, "%u\n", proc_ctx->pri);
     if (ret >= 0) {
         offset += ret;
     }
@@ -2178,7 +2188,7 @@ STATIC ssize_t sched_sysfs_proc_pri(struct device *dev, struct device_attribute 
     return offset;
 }
 
-STATIC ssize_t sched_sysfs_proc_event_num(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_proc_event_num(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     int32_t ret;
     ssize_t offset = 0;
@@ -2190,7 +2200,7 @@ STATIC ssize_t sched_sysfs_proc_event_num(struct device *dev, struct device_attr
 
     proc_ctx = esched_proc_get(node, cur_pid);
     if (proc_ctx == NULL) {
-        ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+        ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
             "pid %d invalid. can not find in node %u.\n", cur_pid, node->node_id);
         if (ret >= 0) {
             offset += ret;
@@ -2199,13 +2209,13 @@ STATIC ssize_t sched_sysfs_proc_event_num(struct device *dev, struct device_attr
         return offset;
     }
 
-    ret = snprintf_s(buf, PAGE_SIZE, PAGE_SIZE - 1, "publish,schedule\n");
+    ret = snprintf_s(buf, KA_MM_PAGE_SIZE, KA_MM_PAGE_SIZE - 1, "publish,schedule\n");
     if (ret >= 0) {
         offset += ret;
     }
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, "%d,%d\n",
-        atomic_read(&proc_ctx->publish_event_num), atomic_read(&proc_ctx->sched_event_num));
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, "%d,%d\n",
+        ka_base_atomic_read(&proc_ctx->publish_event_num), ka_base_atomic_read(&proc_ctx->sched_event_num));
     if (ret >= 0) {
         offset += ret;
     }
@@ -2216,7 +2226,7 @@ STATIC ssize_t sched_sysfs_proc_event_num(struct device *dev, struct device_attr
     return offset;
 }
 
-STATIC ssize_t sched_sysfs_node_proc_event_pri(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_proc_event_pri(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     u32 i;
     int32_t ret;
@@ -2229,7 +2239,7 @@ STATIC ssize_t sched_sysfs_node_proc_event_pri(struct device *dev, struct device
 
     proc_ctx = esched_proc_get(node, cur_pid);
     if (proc_ctx == NULL) {
-        ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+        ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
             "pid %d invalid. can not find in node %u.\n", cur_pid, node->node_id);
         if (ret >= 0) {
             offset += ret;
@@ -2238,13 +2248,13 @@ STATIC ssize_t sched_sysfs_node_proc_event_pri(struct device *dev, struct device
         return offset;
     }
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, "event id,pri\n");
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, "event id,pri\n");
     if (ret >= 0) {
         offset += ret;
     }
 
     for (i = 0; i < SCHED_MAX_EVENT_TYPE_NUM; i++) {
-        ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, "%u,%u\n",
+        ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, "%u,%u\n",
             i, proc_ctx->event_pri[i]);
         if (ret >= 0) {
             offset += ret;
@@ -2272,7 +2282,7 @@ STATIC ssize_t sched_sysfs_node_proc_group_list_inner(struct sched_numa_node *no
 
     proc_ctx = esched_proc_get(node, pid);
     if (proc_ctx == NULL) {
-        ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+        ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
             "pid %d invalid. can not find in chip %d\n", pid, node->node_id);
         if (ret >= 0) {
             offset += ret;
@@ -2282,7 +2292,7 @@ STATIC ssize_t sched_sysfs_node_proc_group_list_inner(struct sched_numa_node *no
         return offset;
     }
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
         "group,sched type,is_exclusive,thread num,run status,wait cpu mask,tid, cur event num\n");
     if (ret >= 0) {
         offset += ret;
@@ -2298,10 +2308,10 @@ STATIC ssize_t sched_sysfs_node_proc_group_list_inner(struct sched_numa_node *no
         } else {
             sched_mode = "non sched";
         }
-        ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, "%u,%s,%u,%u,%d,0x%x,%u,%d\n",
+        ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, "%u,%s,%u,%u,%d,0x%x,%u,%d\n",
                          i, sched_mode, grp_ctx->is_exclusive, grp_ctx->thread_num,
-                         atomic_read(&grp_ctx->run_status), atomic_read(&grp_ctx->wait_cpu_mask),
-                         grp_ctx->cur_tid, atomic_read(&grp_ctx->cur_event_num));
+                         ka_base_atomic_read(&grp_ctx->run_status), ka_base_atomic_read(&grp_ctx->wait_cpu_mask),
+                         grp_ctx->cur_tid, ka_base_atomic_read(&grp_ctx->cur_event_num));
         if (ret >= 0) {
             sched_sysfs_info_to_log(pid, buf + offset, mode, offset, ret);
             offset += ret;
@@ -2314,7 +2324,7 @@ STATIC ssize_t sched_sysfs_node_proc_group_list_inner(struct sched_numa_node *no
 }
 
 
-STATIC ssize_t sched_sysfs_node_proc_group_list(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_proc_group_list(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     ssize_t offset = 0;
     struct sched_numa_node *node = esched_dev_get(g_node_id);
@@ -2325,12 +2335,12 @@ STATIC ssize_t sched_sysfs_node_proc_group_list(struct device *dev, struct devic
     return offset;
 }
 
-STATIC ssize_t sched_sysfs_proc_group_id_read(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_proc_group_id_read(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     int32_t ret;
     ssize_t offset = 0;
 
-    ret = snprintf_s(buf, PAGE_SIZE, PAGE_SIZE - 1, "%u\n", cur_gid);
+    ret = snprintf_s(buf, KA_MM_PAGE_SIZE, KA_MM_PAGE_SIZE - 1, "%u\n", cur_gid);
     if (ret >= 0) {
         offset += ret;
     }
@@ -2338,12 +2348,12 @@ STATIC ssize_t sched_sysfs_proc_group_id_read(struct device *dev, struct device_
     return offset;
 }
 
-STATIC ssize_t sched_sysfs_proc_group_id_write(struct device *dev, struct device_attribute *attr,
+STATIC ssize_t sched_sysfs_proc_group_id_write(ka_device_t *dev, ka_device_attribute_t *attr,
     const char *buf, size_t count)
 {
     u32 val = 0;
 
-    if (kstrtou32(buf, 0, &val) < 0) {
+    if (ka_base_kstrtou32(buf, 0, &val) < 0) {
         sched_err("Failed to invoke the kstrtou32.\n");
         return count;
     }
@@ -2382,7 +2392,7 @@ static void sched_sysfs_cur_grp_put(struct sched_grp_ctx *grp_ctx)
     esched_proc_put(grp_ctx->proc_ctx);
 }
 
-STATIC ssize_t sched_sysfs_node_proc_group_event_list(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_proc_group_event_list(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     u32 i, j;
     int32_t ret;
@@ -2396,7 +2406,7 @@ STATIC ssize_t sched_sysfs_node_proc_group_event_list(struct device *dev, struct
 
     grp_ctx = sched_sysfs_cur_grp_get(node);
     if (grp_ctx == NULL) {
-        ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+        ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
             "pid %d gid %d invalid. can not find in node %u.\n", cur_pid, cur_gid, node->node_id);
         if (ret >= 0) {
             offset += ret;
@@ -2405,7 +2415,7 @@ STATIC ssize_t sched_sysfs_node_proc_group_event_list(struct device *dev, struct
         return offset;
     }
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
         "event id,thread num(thread list),max_event_num,event_num,drop_event_num\n");
     if (ret >= 0) {
         offset += ret;
@@ -2417,22 +2427,22 @@ STATIC ssize_t sched_sysfs_node_proc_group_event_list(struct device *dev, struct
             continue;
         }
 
-        ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, "%u,%u(%u",
+        ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, "%u,%u(%u",
             i, event_thread_map->thread_num, event_thread_map->thread[0]);
         if (ret >= 0) {
             offset += ret;
         }
 
         for (j = 1; j < event_thread_map->thread_num; j++) {
-            ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, ",%u",
+            ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, ",%u",
                 event_thread_map->thread[j]);
             if (ret >= 0) {
                 offset += ret;
             }
         }
 
-        ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, "),%u,%u,%u\n",
-            grp_ctx->max_event_num[i], atomic_read(&grp_ctx->event_num[i]), atomic_read(&grp_ctx->drop_event_num[i]));
+        ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, "),%u,%u,%u\n",
+            grp_ctx->max_event_num[i], ka_base_atomic_read(&grp_ctx->event_num[i]), ka_base_atomic_read(&grp_ctx->drop_event_num[i]));
         if (ret >= 0) {
             offset += ret;
         }
@@ -2452,12 +2462,12 @@ STATIC ssize_t sched_sysfs_node_proc_group_thread_inner(struct sched_grp_ctx *gr
     struct sched_thread_ctx *thread_ctx = NULL;
 
     if (grp_ctx->sched_mode == SCHED_MODE_SCHED_CPU) {
-        ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+        ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
             "bind_cpuid,pid,gid,tid,name,kernel_tid,status,wait flag,timeout flag,pre_wakeup reason,normal wakeup reason,"
             "start time(ms),max proc time(us),ave proc time(us),max sched time(us),ave sched time(us),"
             "subscribe event bitmap,fwd event,sched event,timeout cnt,discard cnt\n");
     } else {
-        ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+        ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
             "tid,name,kernel_tid,status,wait flag,start time(ms),max proc time(us),ave proc time(us),"
             "max sched time(us),ave sched time(us),subscribe event bitmap,queue remain event,sched event,"
             "publish enque full\n");
@@ -2486,7 +2496,7 @@ STATIC ssize_t sched_sysfs_node_proc_group_thread_inner(struct sched_grp_ctx *gr
 }
 
 
-STATIC ssize_t sched_sysfs_node_proc_group_thread(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_node_proc_group_thread(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     struct sched_grp_ctx *grp_ctx = NULL;
     ssize_t offset = 0;
@@ -2499,7 +2509,7 @@ STATIC ssize_t sched_sysfs_node_proc_group_thread(struct device *dev, struct dev
     grp_ctx = sched_sysfs_cur_grp_get(node);
     if (grp_ctx == NULL) {
         int count;
-        count = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+        count = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
             "pid %d gid %d invalid. can not find in node %u.\n", cur_pid, cur_gid, node->node_id);
         if (count >= 0) {
             offset += count;
@@ -2533,7 +2543,7 @@ void sched_sysfs_show_proc_info(u32 chip_id, int32_t pid)
         return;
     }
 
-    buf = (char *)sched_kzalloc(sizeof(char) * PAGE_SIZE, GFP_KERNEL);
+    buf = (char *)sched_kzalloc(sizeof(char) * KA_MM_PAGE_SIZE, KA_GFP_KERNEL);
     if (buf == NULL) {
         esched_proc_put(proc_ctx);
         return;
@@ -2556,7 +2566,7 @@ void sched_sysfs_show_proc_info(u32 chip_id, int32_t pid)
     buf = NULL;
 }
 
-STATIC ssize_t sched_sysfs_group_cur_event_num(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_group_cur_event_num(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     int32_t ret, i;
     ssize_t offset = 0;
@@ -2568,7 +2578,7 @@ STATIC ssize_t sched_sysfs_group_cur_event_num(struct device *dev, struct device
 
     grp_ctx = sched_sysfs_cur_grp_get(node);
     if (grp_ctx == NULL) {
-        ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+        ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
             "pid %d gid %d invalid. can not find in node %u.\n", cur_pid, cur_gid, node->node_id);
         if (ret >= 0) {
             offset += ret;
@@ -2578,7 +2588,7 @@ STATIC ssize_t sched_sysfs_group_cur_event_num(struct device *dev, struct device
     }
 
     if (grp_ctx->sched_mode != SCHED_MODE_NON_SCHED_CPU) {
-        ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+        ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
             "pid %d gid %d mode is invalid, cur_mode %d.\n", cur_pid, cur_gid, grp_ctx->sched_mode);
         if (ret >= 0) {
             offset += ret;
@@ -2589,9 +2599,9 @@ STATIC ssize_t sched_sysfs_group_cur_event_num(struct device *dev, struct device
         return offset;
     }
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
         "node_id %d pid %d gid %d current event num: %u\n\npid gid event_pri event_num\n",
-        node->node_id, cur_pid, cur_gid, atomic_read(&grp_ctx->cur_event_num));
+        node->node_id, cur_pid, cur_gid, ka_base_atomic_read(&grp_ctx->cur_event_num));
     if (ret >= 0) {
         offset += ret;
     }
@@ -2600,21 +2610,21 @@ STATIC ssize_t sched_sysfs_group_cur_event_num(struct device *dev, struct device
         struct sched_event_list *event_list = NULL;
         struct sched_event *event = NULL;
         event_list = sched_get_non_sched_event_list(grp_ctx, i);
-        ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+        ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
             "%d,%u,%d,%u\n", cur_pid, cur_gid, i, event_list->cur_num);
         if (ret >= 0) {
             offset += ret;
         }
 
-        spin_lock_bh(&event_list->lock);
-        list_for_each_entry(event, &event_list->head, list) {
-            ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+        ka_task_spin_lock_bh(&event_list->lock);
+        ka_list_for_each_entry(event, &event_list->head, list) {
+            ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
                 "   %u,%u\n", event->event_id, event->subevent_id);
             if (ret >= 0) {
                 offset += ret;
             }
         }
-        spin_unlock_bh(&event_list->lock);
+        ka_task_spin_unlock_bh(&event_list->lock);
     }
 
     sched_sysfs_cur_grp_put(grp_ctx);
@@ -2628,7 +2638,7 @@ void sched_get_vf_proc_list(char *buf, ssize_t *offset, struct sched_proc_ctx *p
     int ret;
 
     if ((u32)proc_ctx->vfid == g_cur_vf) {
-        ret = snprintf_s(buf + *offset, PAGE_SIZE - *offset, PAGE_SIZE - *offset - 1, "%ld, %s\n",
+        ret = snprintf_s(buf + *offset, KA_MM_PAGE_SIZE - *offset, KA_MM_PAGE_SIZE - *offset - 1, "%ld, %s\n",
             proc_ctx->pid, proc_ctx->name);
         if (ret >= 0) {
             *offset += ret;
@@ -2636,7 +2646,7 @@ void sched_get_vf_proc_list(char *buf, ssize_t *offset, struct sched_proc_ctx *p
     }
 }
 
-ssize_t sched_sysfs_node_vf_proc_list(struct device *dev, struct device_attribute *attr, char *buf)
+ssize_t sched_sysfs_node_vf_proc_list(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     int32_t ret;
     ssize_t offset = 0;
@@ -2647,7 +2657,7 @@ ssize_t sched_sysfs_node_vf_proc_list(struct device *dev, struct device_attribut
     }
 
     if (g_cur_vf == SCHED_DEFAULT_VF_ID) {
-        ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+        ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
             "vf_0 (used by physical machine) is not supported\n");
         if (ret >= 0) {
             offset += ret;
@@ -2658,9 +2668,9 @@ ssize_t sched_sysfs_node_vf_proc_list(struct device *dev, struct device_attribut
 
     vf_ctx = sched_get_vf_ctx(node, g_cur_vf);
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
-        "vf_%u (status: %u) have %u valid proc.\n", g_cur_vf, atomic_read(&vf_ctx->status),
-        atomic_read(&vf_ctx->proc_num));
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
+        "vf_%u (status: %u) have %u valid proc.\n", g_cur_vf, ka_base_atomic_read(&vf_ctx->status),
+        ka_base_atomic_read(&vf_ctx->proc_num));
     if (ret >= 0) {
         offset += ret;
     }
@@ -2671,7 +2681,7 @@ ssize_t sched_sysfs_node_vf_proc_list(struct device *dev, struct device_attribut
     return offset;
 }
 
-ssize_t sched_sysfs_node_vf_list(struct device *dev, struct device_attribute *attr, char *buf)
+ssize_t sched_sysfs_node_vf_list(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     int32_t ret, i;
     ssize_t offset = 0;
@@ -2684,14 +2694,14 @@ ssize_t sched_sysfs_node_vf_list(struct device *dev, struct device_attribute *at
         return offset;
     }
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, "vf_id, status, resource_packet_num.\n");
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, "vf_id, status, resource_packet_num.\n");
     if (ret >= 0) {
         offset += ret;
     }
 
     for (i = 0; i < VMNG_VDEV_MAX_PER_PDEV; i++) {
         vf_ctx = sched_get_vf_ctx(node, i);
-        vf_status = atomic_read(&vf_ctx->status);
+        vf_status = ka_base_atomic_read(&vf_ctx->status);
 
         switch (vf_status) {
             case SCHED_VF_STATUS_UNCREATED:
@@ -2705,19 +2715,19 @@ ssize_t sched_sysfs_node_vf_list(struct device *dev, struct device_attribute *at
                 msg = "deleting";
                 break;
             default:
-                ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+                ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
                     "vf_%d unknown status: %d.\n", i, vf_status);
                 break;
         }
 
-        ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, "%5d, %s, %llx.\n", i, msg,
+        ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, "%5d, %s, %llx.\n", i, msg,
             vf_ctx->config_sched_cpu_mask);
         if (ret >= 0) {
             offset += ret;
         }
     }
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
         "total used resource packet num: %llx.\n", total_sched_cpu_mask);
     if (ret >= 0) {
         offset += ret;
@@ -2727,12 +2737,12 @@ ssize_t sched_sysfs_node_vf_list(struct device *dev, struct device_attribute *at
     return offset;
 }
 
-ssize_t sched_sysfs_vfid_read(struct device *dev, struct device_attribute *attr, char *buf)
+ssize_t sched_sysfs_vfid_read(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     int32_t ret;
     ssize_t offset = 0;
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, "%u\n", g_cur_vf);
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, "%u\n", g_cur_vf);
     if (ret >= 0) {
         offset += ret;
     }
@@ -2740,11 +2750,11 @@ ssize_t sched_sysfs_vfid_read(struct device *dev, struct device_attribute *attr,
     return offset;
 }
 
-ssize_t sched_sysfs_vfid_write(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+ssize_t sched_sysfs_vfid_write(ka_device_t *dev, ka_device_attribute_t *attr, const char *buf, size_t count)
 {
     u32 val = 0;
 
-    if (kstrtou32(buf, 0, &val) < 0) {
+    if (ka_base_kstrtou32(buf, 0, &val) < 0) {
         sched_err("Failed to invoke the kstrtou32.\n");
         return count;
     }
@@ -2759,7 +2769,7 @@ ssize_t sched_sysfs_vfid_write(struct device *dev, struct device_attribute *attr
     return count;
 }
 
-ssize_t sched_sysfs_vf_info_show(struct device *dev, struct device_attribute *attr, char *buf)
+ssize_t sched_sysfs_vf_info_show(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     int32_t ret;
     ssize_t offset = 0;
@@ -2770,7 +2780,7 @@ ssize_t sched_sysfs_vf_info_show(struct device *dev, struct device_attribute *at
     }
 
     if (g_cur_vf == SCHED_DEFAULT_VF_ID) {
-        ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+        ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
             "vf_0 (used by physical machine) is not supported\n");
         if (ret >= 0) {
             offset += ret;
@@ -2781,19 +2791,19 @@ ssize_t sched_sysfs_vf_info_show(struct device *dev, struct device_attribute *at
 
     vf_ctx = sched_get_vf_ctx(node, g_cur_vf);
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, "vf_ctx %u info show: \n"
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, "vf_ctx %u info show: \n"
         "vf_id: %u \nstatus: %u \ncreate timestamp: %llu \n"
         "proc num: %u \nque depth: %u \nconfig_sched_cpu_mask: 0x%llx \nsched_cpu_mask: 0x%llx",
-        g_cur_vf, vf_ctx->vfid, atomic_read(&vf_ctx->status), vf_ctx->create_timestamp,
-        atomic_read(&vf_ctx->proc_num), vf_ctx->que_depth, vf_ctx->config_sched_cpu_mask, vf_ctx->sched_cpu_mask);
+        g_cur_vf, vf_ctx->vfid, ka_base_atomic_read(&vf_ctx->status), vf_ctx->create_timestamp,
+        ka_base_atomic_read(&vf_ctx->proc_num), vf_ctx->que_depth, vf_ctx->config_sched_cpu_mask, vf_ctx->sched_cpu_mask);
     if (ret >= 0) {
         offset += ret;
     }
 
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, "\n\nvf_ctx: %u stat show \n"
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, "\n\nvf_ctx: %u stat show \n"
         "publish event num: %llu \nsched event num: %llu \ncur event num: %llu \n\n", g_cur_vf,
-        atomic64_read(&vf_ctx->stat.publish_event_num), atomic64_read(&vf_ctx->stat.sched_event_num),
-        atomic64_read(&vf_ctx->stat.cur_event_num));
+        ka_base_atomic64_read(&vf_ctx->stat.publish_event_num), ka_base_atomic64_read(&vf_ctx->stat.sched_event_num),
+        ka_base_atomic64_read(&vf_ctx->stat.cur_event_num));
     if (ret >= 0) {
         offset += ret;
     }
@@ -2802,7 +2812,7 @@ ssize_t sched_sysfs_vf_info_show(struct device *dev, struct device_attribute *at
     return offset;
 }
 
-ssize_t sched_sysfs_vf_occupy_cpu(struct device *dev, struct device_attribute *attr, char *buf)
+ssize_t sched_sysfs_vf_occupy_cpu(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     int32_t ret;
     u32 i;
@@ -2817,7 +2827,7 @@ ssize_t sched_sysfs_vf_occupy_cpu(struct device *dev, struct device_attribute *a
     }
 
     if (g_cur_vf == SCHED_DEFAULT_VF_ID) {
-        ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+        ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
             "vf_0 (used by physical machine) is not supported\n");
         if (ret >= 0) {
             offset += ret;
@@ -2829,8 +2839,8 @@ ssize_t sched_sysfs_vf_occupy_cpu(struct device *dev, struct device_attribute *a
     vf_ctx = sched_get_vf_ctx(node, g_cur_vf);
 
     config_sched_cpu_mask = vf_ctx->config_sched_cpu_mask;
-    ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1, "vf %u(status %u) max occupy aicpu\n"
-        "config sched cpu mask: 0x%llx sched cpu mask: 0x%llx\n", g_cur_vf, atomic_read(&vf_ctx->status),
+    ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1, "vf %u(status %u) max occupy aicpu\n"
+        "config sched cpu mask: 0x%llx sched cpu mask: 0x%llx\n", g_cur_vf, ka_base_atomic_read(&vf_ctx->status),
         config_sched_cpu_mask, vf_ctx->sched_cpu_mask);
     if (ret >= 0) {
         offset += ret;
@@ -2844,7 +2854,7 @@ ssize_t sched_sysfs_vf_occupy_cpu(struct device *dev, struct device_attribute *a
         }
 
         if (config_sched_cpu_mask & (0x1ULL << node->sched_cpuid[i])) {
-            ret = snprintf_s(buf + offset, PAGE_SIZE - offset, PAGE_SIZE - offset - 1,
+            ret = snprintf_s(buf + offset, KA_MM_PAGE_SIZE - offset, KA_MM_PAGE_SIZE - offset - 1,
                 "aicpu:%u, pid:%d(%s), gid:%u, tid:%u\n",
                 cpu_ctx->cpuid, thread_ctx->grp_ctx->pid, thread_ctx->grp_ctx->proc_ctx->name,
                 thread_ctx->grp_ctx->gid, thread_ctx->tid);
@@ -2865,12 +2875,12 @@ ssize_t sched_sysfs_vf_occupy_cpu(struct device *dev, struct device_attribute *a
 
 static uint32_t sched_sysfs_record_num = SCHED_RECORD_DEFAULT_NUM; // sched record deflaut num is 1000
 
-STATIC ssize_t sched_sysfs_record_num_read(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t sched_sysfs_record_num_read(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     int32_t ret;
     ssize_t offset = 0;
 
-    ret = snprintf_s(buf, PAGE_SIZE, PAGE_SIZE - 1, "%u\n", sched_sysfs_record_num);
+    ret = snprintf_s(buf, KA_MM_PAGE_SIZE, KA_MM_PAGE_SIZE - 1, "%u\n", sched_sysfs_record_num);
     if (ret >= 0) {
         offset += ret;
     }
@@ -2878,12 +2888,12 @@ STATIC ssize_t sched_sysfs_record_num_read(struct device *dev, struct device_att
     return offset;
 }
 
-STATIC ssize_t sched_sysfs_record_num_write(struct device *dev, struct device_attribute *attr,
+STATIC ssize_t sched_sysfs_record_num_write(ka_device_t *dev, ka_device_attribute_t *attr,
                                             const char *buf, size_t count)
 {
     u32 val = 0;
 
-    if (kstrtou32(buf, 0, &val) < 0) {
+    if (ka_base_kstrtou32(buf, 0, &val) < 0) {
         sched_err("Failed to invoke the kstrtou32.\n");
         return count;
     }
@@ -2904,15 +2914,12 @@ uint32_t sched_sysfs_record_num_data(void)
     return sched_sysfs_record_num;
 }
 
-#define SCHED_ATTR_RD (S_IRUSR | S_IRGRP | S_IROTH)
-#define SCHED_ATTR_WR (S_IWUSR | S_IWGRP)
+#define SCHED_ATTR_RD (KA_S_IRUSR | KA_S_IRGRP | KA_S_IROTH)
+#define SCHED_ATTR_WR (KA_S_IWUSR | KA_S_IWGRP)
 #define SCHED_ATTR_RW (SCHED_ATTR_RD | SCHED_ATTR_WR)
 
-#define DRV_FS_ATTR DEVICE_ATTR
+#define DRV_FS_ATTR KA_DRIVER_DEVICE_ATTR
 #define DRV_FS_ATTR_NAME_POINTER(_name)  &dev_attr_##_name.attr
-
-
-
 
 #define DECLEAR_ESCHED_FS_ATTR \
     static DRV_FS_ATTR(node_list, SCHED_ATTR_RD, sched_sysfs_node_list, NULL); \
@@ -3037,7 +3044,7 @@ uint32_t sched_sysfs_record_num_data(void)
 
 #ifdef CFG_FEATURE_VFIO
 #define DECLEAR_ESCHED_FS_VFIO_ATTR_LIST(_struct_type, _profix) \
-static struct attribute *g_sched_##_profix##_vfio_attrs[] = { \
+static ka_attribute_t *g_sched_##_profix##_vfio_attrs[] = { \
     DRV_FS_ATTR_NAME_POINTER(vfid), \
     DRV_FS_ATTR_NAME_POINTER(vf_proc_list), \
     DRV_FS_ATTR_NAME_POINTER(vf_list), \
@@ -3047,13 +3054,11 @@ static struct attribute *g_sched_##_profix##_vfio_attrs[] = { \
 }
 #endif
 
-
-
 DECLEAR_ESCHED_FS_ATTR;
 
 DECLEAR_ESCHED_FS_ATTR_NORMAL_LIST(attribute, sysfs);
 
-static const struct attribute_group g_sched_sysfs_node_normal_group = {
+static const ka_attribute_group_t g_sched_sysfs_node_normal_group = {
     .attrs = g_sched_sysfs_normal_list,
     .name = "node"
 };
@@ -3063,13 +3068,13 @@ DECLEAR_ESCHED_FS_VFIO_ATTR;
 
 DECLEAR_ESCHED_FS_VFIO_ATTR_LIST(attribute, sysfs);
 
-static const struct attribute_group g_sched_sysfs_node_vfio_group = {
+static const ka_attribute_group_t g_sched_sysfs_node_vfio_group = {
     .attrs = g_sched_sysfs_vfio_attrs,
     .name = "vfio"
 };
 #endif
 
-void sched_sysfs_init(struct device *dev)
+void sched_sysfs_init(ka_device_t *dev)
 {
     int32_t ret;
     int32_t node_id;
@@ -3083,21 +3088,21 @@ void sched_sysfs_init(struct device *dev)
         }
     }
 
-    ret = sysfs_create_group(&dev->kobj, &g_sched_sysfs_node_normal_group);
+    ret = ka_sysfs_create_group(&dev->kobj, &g_sched_sysfs_node_normal_group);
     sched_debug("Show details. (sysfs_create_group=\"%s\"; ret=%d)\n", g_sched_sysfs_node_normal_group.name, ret);
 #ifdef CFG_FEATURE_VFIO
-    ret = sysfs_create_group(&dev->kobj, &g_sched_sysfs_node_vfio_group);
+    ret = ka_sysfs_create_group(&dev->kobj, &g_sched_sysfs_node_vfio_group);
     sched_debug("Show details. (sysfs_create_group=\"%s\"; ret=%d)\n", g_sched_sysfs_node_vfio_group.name, ret);
 #endif
 
     return;
 }
 
-void sched_sysfs_uninit(struct device *dev)
+void sched_sysfs_uninit(ka_device_t *dev)
 {
-    sysfs_remove_group(&dev->kobj, &g_sched_sysfs_node_normal_group);
+    ka_sysfs_remove_group(&dev->kobj, &g_sched_sysfs_node_normal_group);
 #ifdef CFG_FEATURE_VFIO
-    sysfs_remove_group(&dev->kobj, &g_sched_sysfs_node_vfio_group);
+    ka_sysfs_remove_group(&dev->kobj, &g_sched_sysfs_node_vfio_group);
 #endif
 }
 

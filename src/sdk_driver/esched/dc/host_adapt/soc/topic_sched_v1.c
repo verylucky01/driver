@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,12 +11,6 @@
  * GNU General Public License for more details.
  */
 #ifndef EVENT_SCHED_UT
-
-#include <asm/io.h>
-#include <linux/kthread.h>
-#include <linux/slab.h>
-#include <linux/delay.h>
-#include <linux/vmalloc.h>
 
 #include "tsdrv_interface.h"
 #include "comm_kernel_interface.h"
@@ -55,31 +49,31 @@
 #define STARS_TOPIC_HOST_CTRLCPU_INT_MASK_NS(vf_id)                 (0x000A6C + (vf_id) * 0x10000)
 
 /* vf_id: range from 0 to 15 */
-STATIC void topic_sched_host_ccpu_status_report(void __iomem *io_base, u32 mb_id, u32 vf_id, u32 status)
+STATIC void topic_sched_host_ccpu_status_report(void __ka_mm_iomem *io_base, u32 mb_id, u32 vf_id, u32 status)
 {
     u32 vf_id_tmp = ESCHED_DRV_REASSIGN_VFID(vf_id);
     esched_drv_reg_wr(io_base, STARS_TOPIC_VF_HOST_CTRLCPU_STATUS_REPORT_NS(mb_id, vf_id_tmp), status);
 }
 
-STATIC void topic_sched_host_ccpu_errcode_report(void __iomem *io_base, u32 mb_id, u32 vf_id, u32 error_code)
+STATIC void topic_sched_host_ccpu_errcode_report(void __ka_mm_iomem *io_base, u32 mb_id, u32 vf_id, u32 error_code)
 {
     u32 vf_id_tmp = ESCHED_DRV_REASSIGN_VFID(vf_id);
     esched_drv_reg_wr(io_base, STARS_TOPIC_VF_HOST_CTRLCPU_ERRCODE_REPORT_NS(mb_id, vf_id_tmp), error_code);
 }
 
-void topic_sched_host_aicpu_intr_mask_set_v1(void __iomem *io_base, u32 mask_index, u32 vf_id, u32 val)
+void topic_sched_host_aicpu_intr_mask_set_v1(void __ka_mm_iomem *io_base, u32 mask_index, u32 vf_id, u32 val)
 {
     u32 vf_id_tmp = ESCHED_DRV_REASSIGN_VFID(vf_id);
     esched_drv_reg_wr(io_base, STARS_TOPIC_HOST_AICPU_INT_MASK0_NS(mask_index, vf_id_tmp), val);
 }
 
-void topic_sched_host_ctrlcpu_intr_mask_set_v1(void __iomem *io_base, u32 vf_id, u32 val)
+void topic_sched_host_ctrlcpu_intr_mask_set_v1(void __ka_mm_iomem *io_base, u32 vf_id, u32 val)
 {
     u32 vf_id_tmp = ESCHED_DRV_REASSIGN_VFID(vf_id);
     esched_drv_reg_wr(io_base, STARS_TOPIC_HOST_CTRLCPU_INT_MASK_NS(vf_id_tmp), val);
 }
 
-bool topic_sched_host_ccpu_is_mb_valid_v1(const void __iomem *io_base, u32 mb_id, u32 vf_id)
+bool topic_sched_host_ccpu_is_mb_valid_v1(const void __ka_mm_iomem *io_base, u32 mb_id, u32 vf_id)
 {
     u32 val;
 
@@ -89,19 +83,19 @@ bool topic_sched_host_ccpu_is_mb_valid_v1(const void __iomem *io_base, u32 mb_id
     return ((val & 0x1) == 1);
 }
 
-STATIC void topic_sched_host_aicpu_status_report(void __iomem *io_base, u32 mb_id, u32 vf_id, u32 status)
+STATIC void topic_sched_host_aicpu_status_report(void __ka_mm_iomem *io_base, u32 mb_id, u32 vf_id, u32 status)
 {
     u32 vf_id_tmp = ESCHED_DRV_REASSIGN_VFID(vf_id);
     esched_drv_reg_wr(io_base, STARS_TOPIC_VF_HOST_AICPU_STATUS_REPORT_NS(mb_id, vf_id_tmp), status);
 }
 
-STATIC void topic_sched_host_aicpu_errcode_report(void __iomem *io_base, u32 mb_id, u32 vf_id, u32 error_code)
+STATIC void topic_sched_host_aicpu_errcode_report(void __ka_mm_iomem *io_base, u32 mb_id, u32 vf_id, u32 error_code)
 {
     u32 vf_id_tmp = ESCHED_DRV_REASSIGN_VFID(vf_id);
     esched_drv_reg_wr(io_base, STARS_TOPIC_VF_HOST_AICPU_ERRCODE_REPORT_NS(mb_id, vf_id_tmp), error_code);
 }
 
-bool topic_sched_host_aicpu_is_mb_valid_v1(const void __iomem *io_base, u32 mb_id, u32 vf_id)
+bool topic_sched_host_aicpu_is_mb_valid_v1(const void __ka_mm_iomem *io_base, u32 mb_id, u32 vf_id)
 {
     u32 val;
 
@@ -111,49 +105,49 @@ bool topic_sched_host_aicpu_is_mb_valid_v1(const void __iomem *io_base, u32 mb_i
     return ((val & 0x1) == 1);
 }
 
-void topic_sched_host_aicpu_intr_clr_v1(void __iomem *io_base, u32 intr_index, u32 vf_id, u32 val)
+void topic_sched_host_aicpu_intr_clr_v1(void __ka_mm_iomem *io_base, u32 intr_index, u32 vf_id, u32 val)
 {
     u32 vf_id_tmp = ESCHED_DRV_REASSIGN_VFID(vf_id);
     esched_drv_reg_wr(io_base, STARS_TOPIC_HOST_AICPU_INT_CLR0_NS(intr_index, vf_id_tmp), val);
 }
 
-void topic_sched_host_ccpu_intr_clr_v1(void __iomem *io_base, u32 vf_id, u32 val)
+void topic_sched_host_ccpu_intr_clr_v1(void __ka_mm_iomem *io_base, u32 vf_id, u32 val)
 {
     u32 vf_id_tmp = ESCHED_DRV_REASSIGN_VFID(vf_id);
     esched_drv_reg_wr(io_base, STARS_TOPIC_HOST_CTRLCPU_INT_CLR_NS(vf_id_tmp), val);
 }
 
-void topic_sched_host_aicpu_intr_enable_v1(void __iomem *io_base, u32 cpu_index, u32 vf_id)
+void topic_sched_host_aicpu_intr_enable_v1(void __ka_mm_iomem *io_base, u32 cpu_index, u32 vf_id)
 {
     u32 vf_id_tmp = ESCHED_DRV_REASSIGN_VFID(vf_id);
     esched_drv_reg_wr(io_base, STARS_TOPIC_VF_HOST_AICPU_INT_EN_NS(cpu_index, vf_id_tmp), 0x1);
 }
 
-void topic_sched_host_ctrlcpu_intr_enable_v1(void __iomem *io_base, u32 cpu_index, u32 vf_id)
+void topic_sched_host_ctrlcpu_intr_enable_v1(void __ka_mm_iomem *io_base, u32 cpu_index, u32 vf_id)
 {
     u32 vf_id_tmp = ESCHED_DRV_REASSIGN_VFID(vf_id);
     esched_drv_reg_wr(io_base, STARS_TOPIC_VF_HOST_CTRLCPU_INT_EN_NS(cpu_index, vf_id_tmp), 0x1);
 }
 
-void topic_sched_host_aicpu_int_all_status_v1(const void __iomem *io_base, u32 *val, u32 vf_id)
+void topic_sched_host_aicpu_int_all_status_v1(const void __ka_mm_iomem *io_base, u32 *val, u32 vf_id)
 {
     u32 vf_id_tmp = ESCHED_DRV_REASSIGN_VFID(vf_id);
     esched_drv_reg_rd(io_base, STARS_TOPIC_HOST_AICPU_INT_STS_NS(vf_id_tmp), val);
 }
 
-void topic_sched_host_aicpu_intr_all_clr_v1(void __iomem *io_base, u32 val, u32 vf_id)
+void topic_sched_host_aicpu_intr_all_clr_v1(void __ka_mm_iomem *io_base, u32 val, u32 vf_id)
 {
     u32 vf_id_tmp = ESCHED_DRV_REASSIGN_VFID(vf_id);
     esched_drv_reg_wr(io_base, STARS_TOPIC_HOST_AICPU_INT_CLR_NS(vf_id_tmp), val);
 }
 
-void topic_sched_host_aicpu_int_status_v1(const void __iomem *io_base, u32 intr_index, u32 *val, u32 vf_id)
+void topic_sched_host_aicpu_int_status_v1(const void __ka_mm_iomem *io_base, u32 intr_index, u32 *val, u32 vf_id)
 {
     u32 vf_id_tmp = ESCHED_DRV_REASSIGN_VFID(vf_id);
     esched_drv_reg_rd(io_base, STARS_TOPIC_HOST_AICPU_INT_STS0_NS(intr_index, vf_id_tmp), val);
 }
 
-void topic_sched_host_ccpu_int_status_v1(const void __iomem *io_base, u32 *val, u32 vf_id)
+void topic_sched_host_ccpu_int_status_v1(const void __ka_mm_iomem *io_base, u32 *val, u32 vf_id)
 {
     u32 vf_id_tmp = ESCHED_DRV_REASSIGN_VFID(vf_id);
     esched_drv_reg_rd(io_base, STARS_TOPIC_HOST_CTRLCPU_INT_STS_NS(vf_id_tmp), val);
@@ -225,7 +219,7 @@ int esched_drv_host_map_addr_v1(u32 dev_id, struct sched_hard_res *res)
         reg_base += SCHED_HOST_TOPIC_ADDR_OFFSET;
     }
 
-    res->io_base = ioremap(reg_base, size);
+    res->io_base = ka_mm_ioremap(reg_base, size);
     if (res->io_base == NULL) {
         sched_err("Failed to invoke the ioremap. (dev_id=%u; size=0x%x)\n", res->dev_id, (u32)size);
         return -ENOMEM;
@@ -241,7 +235,7 @@ int esched_drv_host_map_addr_v1(u32 dev_id, struct sched_hard_res *res)
     }
 
     res->rsv_mem_pa = rsv_mem_pa;
-    res->rsv_mem_va = ioremap(res->rsv_mem_pa, size);
+    res->rsv_mem_va = ka_mm_ioremap(res->rsv_mem_pa, size);
     if (res->rsv_mem_va == NULL) {
         sched_err("Failed to invoke the ioremap. (dev_id=%u; size=0x%x)\n", res->dev_id, (u32)size);
         ret = -ENOMEM;
@@ -254,7 +248,7 @@ int esched_drv_host_map_addr_v1(u32 dev_id, struct sched_hard_res *res)
     return 0;
 
 iounmap_io_base:
-    iounmap(res->io_base);
+    ka_mm_iounmap(res->io_base);
     res->io_base = NULL;
     return ret;
 #else
@@ -266,17 +260,17 @@ void esched_host_iounmap_v1(struct sched_hard_res *res)
 {
 #ifndef CFG_SOC_PLATFORM_CLOUD_V4
     if (res->io_base != NULL) {
-        iounmap(res->io_base);
+        ka_mm_iounmap(res->io_base);
         res->io_base = NULL;
     }
 
     if (res->int_io_base != NULL) {
-        iounmap(res->int_io_base);
+        ka_mm_iounmap(res->int_io_base);
         res->int_io_base = NULL;
     }
 
     if (res->rsv_mem_va != NULL) {
-        iounmap(res->rsv_mem_va);
+        ka_mm_iounmap(res->rsv_mem_va);
         res->rsv_mem_va = NULL;
     }
 #endif

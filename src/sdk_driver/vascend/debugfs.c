@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,11 +11,7 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/debugfs.h>
-#include <linux/seq_file.h>
-#include <linux/rbtree.h>
-#include <linux/fs.h>
-
+#include "ka_fs_pub.h"
 #include "dvt.h"
 #include "kvmdt.h"
 #include "vfio_ops.h"
@@ -78,16 +74,19 @@ void hw_dvt_debugfs_add_vdavinci(struct hw_vdavinci *vdavinci)
     if (ret < 0) {
         vascend_err(vdavinci_to_dev(vdavinci), "add debugfs failed, "
             "vid: %u, ret: %d\n", vdavinci->id, ret);
-        kfree(name);
-        return;
+        goto out;
     }
 
-    vdavinci->debugfs.debugfs = debugfs_create_dir(name, vdavinci->dvt->debugfs_root);
+    vdavinci->debugfs.debugfs = vdavinci_debugfs_create_dir(name, vdavinci->dvt->debugfs_root);
+    if (vdavinci->debugfs.debugfs == NULL) {
+        goto out;
+    }
 
     debugfs_create_u64("notify_count", 0400, vdavinci->debugfs.debugfs,
         &vdavinci->debugfs.notify_count);
     debugfs_create_file("msix_count", 0400, vdavinci->debugfs.debugfs, vdavinci,
         &vdavinci_msix_count_fops);
+out:
     kfree(name);
 }
 
@@ -96,13 +95,13 @@ void hw_dvt_debugfs_add_vdavinci(struct hw_vdavinci *vdavinci)
  */
 void hw_dvt_debugfs_remove_vdavinci(struct hw_vdavinci *vdavinci)
 {
-    debugfs_remove_recursive(vdavinci->debugfs.debugfs);
+    vdavinci_debugfs_remove(vdavinci->debugfs.debugfs);
     vdavinci->debugfs.debugfs = NULL;
 }
 
 STATIC void hw_dvt_debugfs_release(struct kref *ref)
 {
-    debugfs_remove_recursive(vascend_debugfs_root);
+    vdavinci_debugfs_remove(vascend_debugfs_root);
     vascend_debugfs_root = NULL;
 }
 
@@ -119,7 +118,10 @@ void hw_dvt_debugfs_init(struct hw_dvt *dvt)
     mutex_lock(&debugfs_vascend_lock);
     if (vascend_debugfs_root == NULL) {
         kref_init(&debugfs_ref);
-        vascend_debugfs_root = debugfs_create_dir("vascend", NULL);
+        vascend_debugfs_root = vdavinci_debugfs_create_dir("vascend", NULL);
+        if (vascend_debugfs_root == NULL) {
+            goto debugfs_root;
+        }
     } else {
         kref_get(&debugfs_ref);
     }
@@ -141,7 +143,7 @@ void hw_dvt_debugfs_init(struct hw_dvt *dvt)
         goto free_name;
     }
 
-    dvt->debugfs_root = debugfs_create_dir(name, vascend_debugfs_root);
+    dvt->debugfs_root = vdavinci_debugfs_create_dir(name, vascend_debugfs_root);
     kfree(name);
     return;
 
@@ -158,7 +160,7 @@ debugfs_root:
  */
 void hw_dvt_debugfs_clean(struct hw_dvt *dvt)
 {
-    debugfs_remove_recursive(dvt->debugfs_root);
+    vdavinci_debugfs_remove(dvt->debugfs_root);
     dvt->debugfs_root = NULL;
 
     mutex_lock(&debugfs_vascend_lock);

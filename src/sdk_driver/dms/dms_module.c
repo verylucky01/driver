@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,8 +11,6 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/module.h>
-
 #include "pbl/pbl_feature_loader.h"
 
 #include "dms_init.h"
@@ -23,7 +21,7 @@ static struct sub_module_ops g_sub_table[] = {
     {dms_init, dms_exit},
 };
 
-STATIC int __init dms_module_init(void)
+STATIC int KA_MODULE_INIT dms_module_init(void)
 {
     int index, ret;
     int table_size = sizeof(g_sub_table) / sizeof(struct sub_module_ops);
@@ -43,7 +41,7 @@ out:
     return ret;
 }
 
-STATIC void __exit dms_module_exit(void)
+STATIC void KA_MODULE_EXIT dms_module_exit(void)
 {
     int index;
     int table_size = sizeof(g_sub_table) / sizeof(struct sub_module_ops);

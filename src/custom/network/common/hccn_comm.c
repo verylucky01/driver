@@ -31,7 +31,7 @@ char *hccn_get_g_usr_ip(void)
     return g_hccn_usr_ip;
 }
 
-int hccn_check_usr_identify()
+int hccn_check_usr_identify(void)
 {
     int ret, ret_val;
     struct passwd *pwd = getpwuid(getuid());
@@ -64,7 +64,7 @@ out:
     return ret;
 }
 
-int hccn_get_usr_name()
+int hccn_get_usr_name(void)
 {
     int ret, ret_val;
     struct passwd *pwd = getpwuid(getuid());
@@ -119,7 +119,7 @@ int hccn_get_usr_ip(void)
         return strncpy_s(g_hccn_usr_ip, HCCN_USER_IP_LEN, "Error IP", strlen("Error IP"));
     }
 
-    ret = strncpy_s(g_hccn_usr_ip, HCCN_USER_IP_LEN, usr_ssh_ip, ip_len);
+    ret = strncpy_s(g_hccn_usr_ip, HCCN_USER_IP_LEN, usr_ssh_ip, (size_t)ip_len);
     if (ret) {
         roce_err("strncpy_s g_hccn_usr_ip name failed, ret[%d]", ret);
         goto out;

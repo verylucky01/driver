@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,8 +11,7 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/kernel.h>
-
+#include "ka_common_pub.h"
 #include "ka_task_pub.h"
 #include "ka_system_pub.h"
 #include "ka_base_pub.h"
@@ -29,13 +28,13 @@
 #define UDIS_TIMER_TASK_BACKOFF_FACTOR 10
 struct udis_timer g_udis_timer = {0};
 
-STATIC void udis_period_work_handle(struct work_struct *work_data)
+STATIC void udis_period_work_handle(ka_work_struct_t *work_data)
 {
     int ret;
     int new_expried_cnt, old_expried_cnt;
     struct udis_period_task_node *task_node = NULL;
 
-    task_node = container_of(work_data, struct udis_period_task_node, work);
+    task_node = ka_container_of(work_data, struct udis_period_task_node, work);
 
     old_expried_cnt = ka_base_atomic_read(&task_node->expired_cnt);
     new_expried_cnt = old_expried_cnt * UDIS_TIMER_TASK_BACKOFF_FACTOR;
@@ -57,7 +56,7 @@ out:
     ka_base_atomic_dec(&task_node->queueflag);
 }
 
-STATIC void udis_timer_queue_work(struct workqueue_struct *wq, struct udis_period_task_node *task_node)
+STATIC void udis_timer_queue_work(ka_workqueue_struct_t *wq, struct udis_period_task_node *task_node)
 {
     /* the work of period task node has been in wq*/
     if (ka_base_atomic_read(&task_node->queueflag) != 0) {
@@ -70,9 +69,9 @@ STATIC void udis_timer_queue_work(struct workqueue_struct *wq, struct udis_perio
 #endif
 }
 
-STATIC struct workqueue_struct *udis_timer_alloc_workqueue(const char *name, unsigned int flags, int max_active)
+STATIC ka_workqueue_struct_t *udis_timer_alloc_workqueue(const char *name, unsigned int flags, int max_active)
 {
-    struct workqueue_struct *wq;
+    ka_workqueue_struct_t *wq;
 
 #ifdef DRV_HOST
     flags |= WQ_UNBOUND;
@@ -87,10 +86,10 @@ STATIC struct workqueue_struct *udis_timer_alloc_workqueue(const char *name, uns
     return wq;
 }
 
-STATIC enum hrtimer_restart udis_hrtimer_irq_handle(struct hrtimer *htimer)
+STATIC ka_hrtimer_restart_t udis_hrtimer_irq_handle(ka_hrtimer_t *htimer)
 {
     struct udis_period_task_node *task_node = NULL;
-    struct workqueue_struct *wq = NULL;
+    ka_workqueue_struct_t *wq = NULL;
 
     ka_task_rcu_read_lock();
     ka_list_for_each_entry_rcu(task_node, &g_udis_timer.period_task_list, node) {
@@ -255,7 +254,7 @@ int hal_kernel_unregister_period_task(unsigned int udevid, const char *task_name
 
     g_udis_timer.task_num--;
     ka_list_del_rcu(&task_node->node);
-    synchronize_rcu();
+    ka_system_synchronize_rcu();
 
     if (task_node->workqueue != NULL) {
         ka_task_flush_workqueue(task_node->workqueue);
@@ -296,7 +295,7 @@ void udis_timer_uninit(void)
     struct udis_period_task_node *next = NULL;
     ka_task_mutex_lock(&g_udis_timer.task_list_lock);
     (void)ka_system_hrtimer_cancel(&g_udis_timer.timer);
-    synchronize_rcu();
+    ka_system_synchronize_rcu();
     ka_task_flush_workqueue(g_udis_timer.common_wq);
     ka_task_destroy_workqueue(g_udis_timer.common_wq);
     ka_list_for_each_entry_safe(task_node, next, &g_udis_timer.period_task_list, node) {

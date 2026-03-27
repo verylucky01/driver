@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -24,6 +24,7 @@ void trs_chan_work(ka_work_struct_t *p_work);
 void trs_chan_fetch_wakeup(struct trs_chan *chan);
 void trs_chan_submit_wakeup(struct trs_chan *chan);
 int _trs_chan_to_string(struct trs_chan *chan, char *buff, u32 buff_len);
+void trs_chan_cq_guard_work_proc(struct trs_chan_ts_inst *ts_inst);
 
 #endif
 

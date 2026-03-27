@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -44,12 +44,12 @@ enum trs_s2s_msg_status{
 
 struct shr_id_spod_wlist {
     u32 sdid;
-    pid_t pid;
+    ka_pid_t pid;
 };
 
 struct shr_id_pod_create_info {
     u32 sdid;
-    pid_t pid;
+    ka_pid_t pid;
     int server_abnormal;
     enum trs_s2s_msg_status status;
 };
@@ -169,9 +169,9 @@ STATIC int dbl_get_spod_info_stub(unsigned int udevid, struct spod_info *s)
         trs_err("The hisi,resource_manage is not configured in dts.\n");
         return -EINVAL;
     }
-    ret = of_property_read_u32(node, "chip_id", &chip_id);
+    ret = ka_driver_of_property_read_u32(node, "chip_id", &chip_id);
     if (ret != 0) {
-        of_node_put(node);
+        ka_driver_of_node_put(node);
         trs_err("chip_id get failed. (ret=%d)\n", ret);
         return -EINVAL;
     }
@@ -375,17 +375,18 @@ STATIC int shr_id_query_shadow_node_msg_send(struct shr_id_node_op_attr *attr, u
     return 0;
 }
 
-void shr_id_recycle_work(struct work_struct *p_work);
+void shr_id_recycle_work(ka_work_struct_t *p_work);
 STATIC struct shr_id_spod_info *shr_id_spod_info_create(void *node, struct shr_id_node_op_attr *attr)
 {
-    struct shr_id_spod_info *spod_info = trs_kvzalloc(sizeof(struct shr_id_spod_info), KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
+    struct shr_id_spod_info *spod_info = trs_kvzalloc(sizeof(struct shr_id_spod_info),
+        KA_GFP_ATOMIC | __KA_GFP_ACCOUNT);
     if (spod_info == NULL) {
         return spod_info;
     }
 
     spod_info->node = node;
     spod_info->attr = *attr;
-    INIT_DELAYED_WORK(&spod_info->shrid_recycle_work,  shr_id_recycle_work);
+    KA_TASK_INIT_DELAYED_WORK(&spod_info->shrid_recycle_work,  shr_id_recycle_work);
     ka_base_atomic_set(&spod_info->in_recycling, 0);
     shr_id_node_set_priv(node, (void *)spod_info);
     (void)shr_id_node_get(attr->name, attr->type); // for spod_info get
@@ -427,7 +428,7 @@ STATIC int shr_id_get_recycle_strategy(struct shr_id_node_op_attr *attr, bool se
     return ret;
 }
 
-void shr_id_recycle_work(struct work_struct *p_work)
+void shr_id_recycle_work(ka_work_struct_t *p_work)
 {
     struct shr_id_spod_info *spod_info = ka_container_of(p_work, struct shr_id_spod_info, shrid_recycle_work.work);
     struct shr_id_node_op_attr attr = spod_info->attr;
@@ -468,7 +469,7 @@ void shr_id_recycle_work(struct work_struct *p_work)
 
     ret = shr_id_get_recycle_strategy(&attr, spod_server_abnormal, shadow_node_exist);
     if (ret == TRS_SHADOW_NODE_RETRY) {
-        (void)schedule_delayed_work(&spod_info->shrid_recycle_work, ka_system_msecs_to_jiffies(300));  /* 300 ms */
+        (void)ka_task_schedule_delayed_work(&spod_info->shrid_recycle_work, ka_system_msecs_to_jiffies(300));  /* 300 ms */
     } else if (ret == TRS_SHADOW_NODE_DESTORY) {
         shr_id_node_priv_mutex_lock(shrid_node);
         ka_base_atomic_set(&spod_info->in_recycling, 0);
@@ -720,7 +721,7 @@ STATIC int shr_id_destroy_shadow_node_async(void *node, u32 mode)
     }
     ret = shr_id_get_recycle_strategy(&attr, spod_server_abnormal, shadow_node_exist);
     if (ret == TRS_SHADOW_NODE_RETRY) {
-        (void)schedule_delayed_work(&spod_info->shrid_recycle_work, 0);
+        (void)ka_task_schedule_delayed_work(&spod_info->shrid_recycle_work, 0);
         ret = 0;
     } else if ((ret == TRS_SHADOW_NODE_DESTORY) && (ka_base_atomic_read(&spod_info->in_recycling) == 0)) {
         trs_debug("Destroy shadow. (devid=%u; sdid=%u; name=%s; type=%d; id=%u;)\n",
@@ -741,7 +742,7 @@ STATIC int shr_id_destroy_shadow_node_async(void *node, u32 mode)
 }
 
 /* for pod feature */
-STATIC int _shr_id_pod_find_wlist_index(struct shr_id_spod_info *spod_info, u32 sdid, pid_t pid)
+STATIC int _shr_id_pod_find_wlist_index(struct shr_id_spod_info *spod_info, u32 sdid, ka_pid_t pid)
 {
     int i;
 
@@ -766,7 +767,7 @@ STATIC int _shr_id_pod_get_idle_wlist_index(struct shr_id_spod_info *spod_info)
     return SHR_ID_PID_POD_MAX_NUM;
 }
 
-STATIC int _shr_id_pod_set_pid(struct shr_id_spod_info *spod_info, u32 sdid, pid_t pid)
+STATIC int _shr_id_pod_set_pid(struct shr_id_spod_info *spod_info, u32 sdid, ka_pid_t pid)
 {
     int idx = _shr_id_pod_find_wlist_index(spod_info, sdid, pid);
     if (idx != SHR_ID_PID_POD_MAX_NUM) {
@@ -784,7 +785,7 @@ STATIC int _shr_id_pod_set_pid(struct shr_id_spod_info *spod_info, u32 sdid, pid
     return 0;
 }
 
-STATIC void _shr_id_pod_clear_pid(struct shr_id_spod_info *spod_info, u32 sdid, pid_t pid)
+STATIC void _shr_id_pod_clear_pid(struct shr_id_spod_info *spod_info, u32 sdid, ka_pid_t pid)
 {
     int idx = _shr_id_pod_find_wlist_index(spod_info, sdid, pid);
     if (idx != SHR_ID_PID_POD_MAX_NUM) {
@@ -793,7 +794,7 @@ STATIC void _shr_id_pod_clear_pid(struct shr_id_spod_info *spod_info, u32 sdid, 
     }
 }
 
-STATIC int shr_id_pod_set_pid(struct shr_id_node_op_attr *attr, u32 serverid, u32 sdid, pid_t pid)
+STATIC int shr_id_pod_set_pid(struct shr_id_node_op_attr *attr, u32 serverid, u32 sdid, ka_pid_t pid)
 {
     struct shr_id_spod_info *spod_info = NULL;
     void *shrid_node = NULL;
@@ -806,7 +807,6 @@ STATIC int shr_id_pod_set_pid(struct shr_id_node_op_attr *attr, u32 serverid, u3
 
     shr_id_node_priv_mutex_lock(shrid_node);
     shr_id_node_spin_lock(shrid_node);
-
     if (!shr_id_node_need_wlist(shrid_node)) {
         shr_id_node_spin_unlock(shrid_node);
         shr_id_node_priv_mutex_unlock(shrid_node);
@@ -827,11 +827,11 @@ STATIC int shr_id_pod_set_pid(struct shr_id_node_op_attr *attr, u32 serverid, u3
             return -ENOMEM;
         }
     }
+    shr_id_node_spin_unlock(shrid_node);
 
     ret = _shr_id_pod_set_pid(spod_info, sdid, pid);
     if (ret != 0) {
 #ifndef EMU_ST
-        shr_id_node_spin_unlock(shrid_node);
         shr_id_node_priv_mutex_unlock(shrid_node);
         shr_id_node_put(shrid_node);
 #endif
@@ -857,13 +857,12 @@ STATIC int shr_id_pod_set_pid(struct shr_id_node_op_attr *attr, u32 serverid, u3
         _shr_id_pod_clear_pid(spod_info, sdid, pid);
     }
 
-    shr_id_node_spin_unlock(shrid_node);
     shr_id_node_priv_mutex_unlock(shrid_node);
     shr_id_node_put(shrid_node);
     return ret;
 }
 
-STATIC int _shr_id_set_pod_pid(const char *name, pid_t create_pid, u32 serverid, u32 sdid, pid_t pid)
+STATIC int _shr_id_set_pod_pid(const char *name, ka_pid_t create_pid, u32 serverid, u32 sdid, ka_pid_t pid)
 {
     struct shr_id_node_op_attr attr;
     int ret;
@@ -1013,18 +1012,18 @@ STATIC int shr_id_spod_init(void)
 
     shr_id_register_ioctl_cmd_func(_IOC_NR(SHR_ID_SET_POD_PID), shr_id_set_pod_pid);
 #ifdef CFG_FEATURE_SUPPORT_XCOM
-    devdrv_p2p_msg_send_func = (devdrv_p2p_msg_send_ops)(uintptr_t)__symbol_get(DEVDRV_P2P_MSG_SEND_OPS);
+    devdrv_p2p_msg_send_func = (devdrv_p2p_msg_send_ops)(uintptr_t)__ka_system_symbol_get(DEVDRV_P2P_MSG_SEND_OPS);
     if (devdrv_p2p_msg_send_func == NULL) {
         trs_warn("Lookup symbol: %s not found.\n", DEVDRV_P2P_MSG_SEND_OPS);
         return DRV_ERROR_NONE;
     }
-    devdrv_register_p2p_msg_proc_ops_func = (devdrv_register_p2p_msg_proc_ops)(uintptr_t)__symbol_get(DEVDRV_REGISTER_P2P_MSG_PROC_OPS);
+    devdrv_register_p2p_msg_proc_ops_func = (devdrv_register_p2p_msg_proc_ops)(uintptr_t)__ka_system_symbol_get(DEVDRV_REGISTER_P2P_MSG_PROC_OPS);
     if (devdrv_register_p2p_msg_proc_ops_func == NULL) {
         trs_warn("Lookup symbol: %s not found.\n", DEVDRV_REGISTER_P2P_MSG_PROC_OPS);
         return DRV_ERROR_NONE;
     }
     ret = devdrv_register_p2p_msg_proc_ops_func(devdrv_msg_client_tsdrv, trs_s2s_msg_recv);
-    __symbol_put(DEVDRV_REGISTER_P2P_MSG_PROC_OPS);
+    __ka_system_symbol_put(DEVDRV_REGISTER_P2P_MSG_PROC_OPS);
 #else
     ret = devdrv_register_s2s_msg_proc_func(DEVDRV_S2S_MSG_TRSDRV, trs_s2s_msg_recv);
 #endif
@@ -1046,14 +1045,14 @@ STATIC void shr_id_spod_uninit(void)
 #ifdef CFG_FEATURE_SUPPORT_XCOM
     devdrv_unregister_p2p_msg_proc_ops devdrv_unregister_p2p_msg_proc_ops_func = NULL;
 
-    devdrv_unregister_p2p_msg_proc_ops_func = (devdrv_unregister_p2p_msg_proc_ops)(uintptr_t)__symbol_get(DEVDRV_UNREGISTER_P2P_MSG_PROC_OPS);
+    devdrv_unregister_p2p_msg_proc_ops_func = (devdrv_unregister_p2p_msg_proc_ops)(uintptr_t)__ka_system_symbol_get(DEVDRV_UNREGISTER_P2P_MSG_PROC_OPS);
     if (devdrv_unregister_p2p_msg_proc_ops_func != NULL) {
         (void)devdrv_unregister_p2p_msg_proc_ops_func(devdrv_msg_client_tsdrv);
-        __symbol_put(DEVDRV_UNREGISTER_P2P_MSG_PROC_OPS);
+        __ka_system_symbol_put(DEVDRV_UNREGISTER_P2P_MSG_PROC_OPS);
     }
 
     if (devdrv_p2p_msg_send_func != NULL) {
-        __symbol_put(DEVDRV_P2P_MSG_SEND_OPS);
+        __ka_system_symbol_put(DEVDRV_P2P_MSG_SEND_OPS);
         devdrv_p2p_msg_send_func = NULL;
     }
 #else

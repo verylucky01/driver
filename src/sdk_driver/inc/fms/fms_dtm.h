@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -89,7 +89,9 @@ typedef enum {
     HAL_DMS_DEV_TYPE_CFG_MGR = 0x61A,
     HAL_DMS_DEV_TYPE_DATA_GW = 0x61D,
     HAL_DMS_DEV_TYPE_RESMGR = 0x623,
+    HAL_DMS_DEV_TYPE_MAMI_DEV_CTRL = 0x624,
     HAL_DMS_DEV_TYPE_DRV_KERNEL = 0x625,
+    HAL_DMS_DEV_TYPE_UBCFGLITE = 0x626,
     HAL_DMS_DEV_TYPE_MAX
 } HAL_DMS_DEVICE_NODE_TYPE;
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,7 +11,7 @@
  * GNU General Public License for more details.
  */
 
- #include "ka_memory_pub.h"
+#include "ka_memory_pub.h"
 
 #include "devmm_adapt.h"
 #include "devmm_chan_handlers.h"
@@ -89,34 +89,6 @@ bool devmm_va_is_not_svm_process_addr(const struct devmm_svm_process *svm_proces
 }
 
 #ifndef DRV_UT
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 5, 0)
-static ka_pte_t *devmm_pte_offset_map(ka_pmd_t *pmd, unsigned long addr, ka_pmd_t *pmdvalp)
-{
-    ka_pmd_t pmdval;
-
-    /* rcu_read_lock() to be added later */
-    pmdval = pmdp_get_lockless(pmd);
-    if (pmdvalp) {
-        *pmdvalp = pmdval;
-    }
-    if (ka_unlikely(pmd_none(pmdval) || is_pmd_migration_entry(pmdval))) {
-        goto nomap;
-    }
-    if (ka_unlikely(pmd_trans_huge(pmdval) || pmd_devmap(pmdval))) {
-        goto nomap;
-    }
-    if (ka_unlikely(pmd_bad(pmdval))) {
-        pmd_ERROR(*pmd);
-        pmd_clear(pmd);
-        goto nomap;
-    }
-    return __pte_map(&pmdval, addr);
-
-nomap:
-    /* rcu_read_unlock() to be added later */
-    return NULL;
-}
-#endif
 
 /**
  * @brief get the page table entry of the va
@@ -131,117 +103,18 @@ nomap:
  */
 void *devmm_get_pte(const ka_vm_area_struct_t *vma, u64 va, u64 *kpg_size)
 {
-    ka_pgd_t *pgd = NULL;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
-    p4d_t *p4d = NULL;
-#endif
-    pud_t *pud = NULL;
-    ka_pmd_t *pmd = NULL;
-    ka_pte_t *pte = NULL;
-
     if ((vma == NULL) || (vma->vm_mm == NULL)) {
         devmm_drv_err("Vm_mm none. (va=0x%llx)\n", va);
         return NULL;
     }
-    /* too much log, not print */
-    pgd = ka_mm_pgd_offset(vma->vm_mm, va);
-    if (PXD_JUDGE(pgd) != 0) {
-        return NULL;
-    }
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
-    p4d = ka_mm_p4d_offset(pgd, va);
-    if (PXD_JUDGE(p4d) != 0) {
-        return NULL;
-    }
-
-    /* if kernel version is above 4.11.0,then 5 level pt arrived.
-    pud_offset(pgd,va) changed to pud_offset(p4d,va) for x86
-    but not changed in arm64 */
-    pud = ka_mm_pud_offset(p4d, va);
-#else
-    pud = ka_mm_pud_offset(pgd, va);
-#endif
-    if (PUD_GIANT(pud) != 0) {
-        *kpg_size = DEVMM_GIANT_PAGE_SIZE;
-        return pud;
-    } else {
-        if (PXD_JUDGE(pud) != 0) {
-            return NULL;
-        }
-    }
-
-    pmd = pmd_offset(pud, va);
-    /* huge page pmd can not judge bad flag */
-    if (PMD_HUGE(pmd) != 0) {
-        *kpg_size = KA_HPAGE_SIZE;
-        return pmd;
-    } else {
-        if (PMD_JUDGE(pmd) != 0) {
-            return NULL;
-        }
-    }
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 5, 0)
-    pte = devmm_pte_offset_map(pmd, va, NULL);
-#else
-    pte = ka_mm_pte_offset_map(pmd, va);
-#endif
-    if ((pte == NULL) || (ka_mm_pte_none(*pte) != 0) || (ka_mm_pte_present(*pte) == 0)) {
-        return NULL;
-    }
-    *kpg_size = KA_MM_PAGE_SIZE;
-    return pte;
-}
-
-ka_pmd_t *devmm_get_va_to_pmd(const ka_vm_area_struct_t *vma, unsigned long va) /* To be deleted */
-{
-    ka_pgd_t *pgd = NULL;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
-    p4d_t *p4d = NULL;
-#endif
-    pud_t *pud = NULL;
-    ka_pmd_t *pmd = NULL;
-
-    if ((vma == NULL) || (vma->vm_mm == NULL)) {
-        devmm_drv_err("Vm_mm none. (va=0x%lx)\n", va);
-        return NULL;
-    }
-    /* too much log, not print */
-    pgd = ka_mm_pgd_offset(vma->vm_mm, va);
-    if (PXD_JUDGE(pgd)) {
-        return NULL;
-    }
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
-    p4d = ka_mm_p4d_offset(pgd, va);
-    if (PXD_JUDGE(p4d) != 0) {
-        return NULL;
-    }
-
-    /* if kernel version is above 4.11.0,then 5 level pt arrived.
-    pud_offset(pgd,va) changed to pud_offset(p4d,va) for x86
-    but not changed in arm64 */
-    pud = ka_mm_pud_offset(p4d, va);
-    if (PXD_JUDGE(pud) != 0) {
-        return NULL;
-    }
-#else
-    pud = ka_mm_pud_offset(pgd, va);
-    if (PXD_JUDGE(pud) != 0) {
-        return NULL;
-    }
-#endif
-
-    pmd = pmd_offset(pud, va);
-    return pmd;
+    return ka_mm_get_pte(vma, va, kpg_size);
 }
 
 int devmm_va_to_pmd(const ka_vm_area_struct_t *vma, unsigned long va, int huge_flag, ka_pmd_t **tem_pmd)
 {
     ka_pmd_t *pmd = NULL;
 
-    pmd = devmm_get_va_to_pmd(vma, va);
+    pmd = ka_mm_get_va_to_pmd(vma, va);
     *tem_pmd = pmd;
     if (huge_flag != 0) {
         /* huge page pmd can not judge bad flag */
@@ -287,145 +160,6 @@ int devmm_va_to_pa(const ka_vm_area_struct_t *vma, u64 va, u64 *pa)
     return 0;
 }
 
-STATIC int devmm_va_to_pa_pmd_range(ka_pmd_t *pmd, u64 start, u64 end, u64 *pas, u64 *num)
-{
-    ka_pte_t *pte = NULL;
-    u64 got_num = 0;
-    u64 va = start;
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 5, 0)
-    pte = devmm_pte_offset_map(pmd, va, NULL);
-#else
-    pte = ka_mm_pte_offset_map(pmd, va);
-#endif
-
-    for (; va != end; pte++, va += KA_MM_PAGE_SIZE) {
-        if ((ka_mm_pte_none(*pte) != 0) || (ka_mm_pte_present(*pte) == 0)) {
-            return -ERANGE;
-        }
-
-        pas[got_num] = KA_MM_PFN_PHYS(ka_mm_pte_pfn(*pte));
-        got_num++;
-    }
-
-    *num = got_num;
-    return 0;
-}
-
-STATIC int devmm_va_to_pa_pud_range(pud_t *pud, u64 start, u64 end, u64 *pas, u64 *num)
-{
-    ka_pmd_t *pmd = NULL;
-    u64 got_num = 0;
-    u64 va = start;
-    u64 next;
-
-    pmd = pmd_offset(pud, va);
-    for (; va != end; pmd++, va = next) {
-        int ret;
-        u64 n;
-
-        if (PXD_JUDGE(pmd) != 0) {
-            return -EDOM;
-        }
-
-        next = pmd_addr_end(va, end);
-        ret = devmm_va_to_pa_pmd_range(pmd, va, next, &pas[got_num], &n);
-        if (ret != 0) {
-            return ret;
-        }
-        got_num += n;
-    }
-
-    *num = got_num;
-    return 0;
-}
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
-STATIC int devmm_va_to_pa_p4d_range(p4d_t *p4d, u64 start, u64 end, u64 *pas, u64 *num)
-{
-    pud_t *pud = NULL;
-    u64 got_num = 0;
-    u64 va = start;
-    u64 next;
-
-    pud = ka_mm_pud_offset(p4d, va);
-    for (; va != end; pud++, va = next) {
-        int ret;
-        u64 n;
-
-        if (PXD_JUDGE(pud) != 0) {
-            return -EDOM;
-        }
-
-        next = pud_addr_end(va, end);
-        ret = devmm_va_to_pa_pud_range(pud, va, next, &pas[got_num], &n);
-        if (ret != 0) {
-            return ret;
-        }
-        got_num += n;
-    }
-
-    *num = got_num;
-    return 0;
-}
-
-STATIC int devmm_va_to_pa_pgd_range(ka_pgd_t *pgd, u64 start, u64 end, u64 *pas, u64 *num)
-{
-    p4d_t *p4d = NULL;
-    u64 got_num = 0;
-    u64 va = start;
-    u64 next;
-
-    p4d = ka_mm_p4d_offset(pgd, va);
-    for (; va != end; p4d++, va = next) {
-        int ret;
-        u64 n;
-
-        if (PXD_JUDGE(p4d) != 0) {
-            return -EDOM;
-        }
-
-        next = p4d_addr_end(va, end);
-        ret = devmm_va_to_pa_p4d_range(p4d, va, next, &pas[got_num], &n);
-        if (ret != 0) {
-            return ret;
-        }
-        got_num += n;
-    }
-
-    *num = got_num;
-    return 0;
-}
-#else
-STATIC int devmm_va_to_pa_pgd_range(ka_pgd_t *pgd, u64 start, u64 end, u64 *pas, u64 *num)
-{
-    pud_t *pud = NULL;
-    u64 got_num = 0;
-    u64 va = start;
-    u64 next;
-
-    pud = ka_mm_pud_offset(pgd, va);
-    for (; va != end; pud++, va = next) {
-        int ret;
-        u64 n;
-
-        if (PXD_JUDGE(pud) != 0) {
-            return -EDOM;
-        }
-
-        next = pud_addr_end(va, end);
-        ret = devmm_va_to_pa_pud_range(pud, va, next, &pas[got_num], &n);
-        if (ret != 0) {
-            return ret;
-        }
-        got_num += n;
-    }
-
-    *num = got_num;
-    return 0;
-}
-#endif
-
 int devmm_va_to_pa_range(const ka_vm_area_struct_t *vma, u64 va, u64 num, u64 *pas)
 {
     u64 start, end, len, next;
@@ -448,8 +182,8 @@ int devmm_va_to_pa_range(const ka_vm_area_struct_t *vma, u64 va, u64 num, u64 *p
             return -EDOM;
         }
 
-        next = pgd_addr_end(start, end);
-        ret = devmm_va_to_pa_pgd_range(pgd, start, next, &pas[got_num], &n);
+        next = ka_mm_pgd_addr_end(start, end);
+        ret = ka_mm_va_to_pa_pgd_range(pgd, start, next, &pas[got_num], &n);
         if (ret != 0) {
             return ret;
         }
@@ -549,22 +283,16 @@ int devmm_va_to_palist(const ka_vm_area_struct_t *vma, u64 va, u64 sz, u64 *pa, 
 
 void devmm_zap_vma_ptes(ka_vm_area_struct_t *vma, unsigned long vaddr, unsigned long size)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 18, 0)
     int ret;
-#endif
     if (size == 0) {
         return;
     }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 18, 0)
     ret = ka_mm_zap_vma_ptes(vma, vaddr, size);
     if (ret != 0) {
         devmm_drv_err("Zap_vma_ptes fail. (va=0x%lx; ret=%d; flags=0x%lx; start=0x%lx; end=0x%lx)\n",
                       vaddr, ret, ka_mm_get_vm_flags(vma), ka_mm_get_vm_start(vma), ka_mm_get_vm_end(vma));
     }
-#else
-    ka_mm_zap_vma_ptes(vma, vaddr, size);
-#endif
 }
 
 static u64 devmm_get_mapped_page_num(ka_vm_area_struct_t *vma, u64 vaddr, u64 *paddrs, u64 page_num)
@@ -673,39 +401,40 @@ static bool devmm_try_cont_unmap_page(struct devmm_svm_process *svm_proc,
     devmm_kfree_ex(pa_list);
     return true;
 }
-void devmm_unmap_page_from_vma_owner(struct devmm_svm_process *svm_proc,
-    ka_vm_area_struct_t *vma, u64 vaddr, u64 num)
-{
-    struct devmm_phy_addr_attr attr = {0};
-    u32 stamp = (u32)ka_jiffies;
-    u64 i, temp_addr, paddr;
-    ka_page_t *pg = NULL;
 
-    if (devmm_try_cont_unmap_page(svm_proc, vma, vaddr, num, true) == true) {
-        return;
+void devmm_unmap_page_from_vma_owner(struct devmm_svm_process *svm_proc,	 
+    ka_vm_area_struct_t *vma, u64 vaddr, u64 num)	 
+{	 
+    struct devmm_phy_addr_attr attr = {0};	 
+    u32 stamp = (u32)ka_jiffies;	 
+    u64 i, temp_addr, paddr;	 
+    ka_page_t *pg = NULL;	 
+
+    if (devmm_try_cont_unmap_page(svm_proc, vma, vaddr, num, true) == true) {	 
+        return;	 
+    }	 
+
+    devmm_phy_addr_attr_pack(svm_proc, DEVMM_NORMAL_PAGE_TYPE, 0, false, &attr); 
+
+    for (i = 0; i < num; i++) {	 
+        int ret;	 
+        temp_addr = vaddr + (i << KA_MM_PAGE_SHIFT);	 
+
+        ret = devmm_va_to_pa(vma, temp_addr, &paddr);	 
+        if (ret != 0) {	 
+            continue;	 
+        }	 
+        devmm_zap_vma_ptes(vma, temp_addr, KA_MM_PAGE_SIZE);	 
+        if (devmm_va_is_in_svm_range(temp_addr)) {	 
+            if (devmm_pa_is_remote_addr(paddr)) {	 
+                continue; 
+            } 
+            pg = devmm_pa_to_page(paddr);	 
+            devmm_proc_free_pages(svm_proc, &attr, &pg, 1);	 
+            devmm_try_cond_resched(&stamp);	 
+        }	 
     }
-
-    devmm_phy_addr_attr_pack(svm_proc, DEVMM_NORMAL_PAGE_TYPE, 0, false, &attr);
-
-    for (i = 0; i < num; i++) {
-        int ret;
-        temp_addr = vaddr + (i << KA_MM_PAGE_SHIFT);
-        ret = devmm_va_to_pa(vma, temp_addr, &paddr);
-        if (ret != 0) {
-            continue;
-        }
-        devmm_zap_vma_ptes(vma, temp_addr, KA_MM_PAGE_SIZE);
-        if (devmm_va_is_in_svm_range(temp_addr)) {
-            if (devmm_pa_is_remote_addr(paddr)) {
-                continue;
-            }
-            pg = devmm_pa_to_page(paddr);
-            devmm_proc_free_pages(svm_proc, &attr, &pg, 1);
-            devmm_try_cond_resched(&stamp);
-        }
-    }
-
-    return;
+    return;	 
 }
 
 void devmm_unmap_page_from_vma_custom(struct devmm_svm_process *svm_proc,
@@ -750,22 +479,21 @@ static void _devmm_unmap_pages_owner(struct devmm_svm_process *svm_proc, u64 vad
     devmm_unmap_page_from_vma_owner(svm_proc, vma, vaddr, num);
 }
 
-void devmm_unmap_pages_owner(struct devmm_svm_process *svm_proc, u64 vaddr, u64 num)
-{
-    u32 i;
+void devmm_unmap_pages_owner(struct devmm_svm_process *svm_proc, u64 vaddr, u64 num)	 
+{	 
+    u32 i;	 
+    for (i = 0; i < DEVMM_CUSTOM_PROCESS_NUM; i++) {	 
+        ka_task_mutex_lock(&svm_proc->custom[i].proc_lock);	 
+    } 
+    if (devmm_is_support_double_pgtable() && devmm_is_static_reserve_addr(svm_proc, vaddr)) { 
+        _devmm_unmap_pages_owner(svm_proc, devmm_double_pgtable_get_offset_addr(vaddr), num); 
+    } 
+    _devmm_unmap_pages_owner(svm_proc, vaddr, num); 
+    for (i = 0; i < DEVMM_CUSTOM_PROCESS_NUM; i++) { 
+        ka_task_mutex_unlock(&svm_proc->custom[i].proc_lock); 
+    } 
 
-    for (i = 0; i < DEVMM_CUSTOM_PROCESS_NUM; i++) {
-        ka_task_mutex_lock(&svm_proc->custom[i].proc_lock);
-    }
-    if (devmm_is_support_double_pgtable() && devmm_is_static_reserve_addr(svm_proc, vaddr)) {
-        _devmm_unmap_pages_owner(svm_proc, devmm_double_pgtable_get_offset_addr(vaddr), num);
-    }
-    _devmm_unmap_pages_owner(svm_proc, vaddr, num);
-    for (i = 0; i < DEVMM_CUSTOM_PROCESS_NUM; i++) {
-        ka_task_mutex_unlock(&svm_proc->custom[i].proc_lock);
-    }
-
-    return;
+    return; 
 }
 
 static void devmm_unmap_pages_custom(struct devmm_svm_process *svm_proc, u64 vaddr, u64 num)
@@ -791,10 +519,10 @@ static void devmm_unmap_pages_custom(struct devmm_svm_process *svm_proc, u64 vad
     return;
 }
 
-void devmm_unmap_pages(struct devmm_svm_process *svm_proc, u64 vaddr, u64 page_num)
-{
-    devmm_unmap_pages_custom(svm_proc, vaddr, page_num);
-    devmm_unmap_pages_owner(svm_proc, vaddr, page_num);
+void devmm_unmap_pages(struct devmm_svm_process *svm_proc, u64 vaddr, u64 page_num)	 
+{	 
+    devmm_unmap_pages_custom(svm_proc, vaddr, page_num);	 
+    devmm_unmap_pages_owner(svm_proc, vaddr, page_num);	 
 }
 
 static void _devmm_zap_owner_ptes_range(struct devmm_svm_process *svm_proc, u64 va, u64 page_num)
@@ -835,25 +563,26 @@ static u64 devmm_get_cont_page_num(ka_page_t **inpages, u64 page_num)
 }
 
 int devmm_insert_pages_to_vma_owner(ka_vm_area_struct_t *vma, u64 va,
-    u64 page_num, ka_page_t **inpages, ka_pgprot_t vm_page_prot)
-{
-    u64 i, cont_num;
-    u32 stamp = (u32)ka_jiffies;
-    int ret;
+    u64 page_num, ka_page_t **inpages, ka_pgprot_t vm_page_prot)	 
+{	 
+    u64 i, cont_num;	 
+    u32 stamp = (u32)ka_jiffies;	 
+    int ret;	 
 
-    for (i = 0; i < page_num;) {
-        cont_num = devmm_get_cont_page_num(&inpages[i], page_num - i);
-        ret = ka_mm_remap_pfn_range(vma, va + KA_MM_PAGE_SIZE * i, ka_mm_page_to_pfn(inpages[i]), KA_MM_PAGE_SIZE * cont_num, vm_page_prot);
-        if (ret != 0) {
-            devmm_drv_err("Vm_insert_page failed. (ret=%d; va=0x%llx; i=%llu; cont_num=%llu; page_num=%llu)\n",
-                ret, va, i, cont_num, page_num);
-            devmm_zap_vma_ptes(vma, va, KA_MM_PAGE_SIZE * i);
-            return -ENOMEM;
-        }
-        i += cont_num;
-        devmm_try_cond_resched(&stamp);
-    }
-    return 0;
+    for (i = 0; i < page_num;) {	 
+        cont_num = devmm_get_cont_page_num(&inpages[i], page_num - i);	 
+        ret = ka_mm_remap_pfn_range(vma, va + KA_MM_PAGE_SIZE * i, ka_mm_page_to_pfn(inpages[i]), KA_MM_PAGE_SIZE * cont_num, vm_page_prot);	 
+        if (ret != 0) {	 
+            devmm_drv_err("Vm_insert_page failed. (ret=%d; va=0x%llx; i=%llu; cont_num=%llu; page_num=%llu)\n",	 
+                ret, va, i, cont_num, page_num);	 
+            devmm_zap_vma_ptes(vma, va, KA_MM_PAGE_SIZE * i);	 
+            return -ENOMEM;	 
+        }	 
+        i += cont_num;	 
+        devmm_try_cond_resched(&stamp);	 
+    }	 
+
+    return 0;	 
 }
 
 static int _devmm_pages_remap_owner(struct devmm_svm_process *svm_proc, u64 va, u64 page_num,
@@ -992,25 +721,25 @@ static int devmm_pages_remap_custom(struct devmm_svm_process *svm_proc, u64 va, 
     return ret;
 }
 
-int devmm_pages_remap(struct devmm_svm_process *svm_proc, u64 va, u64 page_num, ka_page_t **inpages, u32 page_prot)
-{
-    int ret;
+int devmm_pages_remap(struct devmm_svm_process *svm_proc, u64 va, u64 page_num, ka_page_t **inpages, u32 page_prot)	 
+{	 
+    int ret;	 
 
-    ret = devmm_pages_remap_owner(svm_proc, va, page_num, inpages, page_prot);
-    if (ret != 0) {
-        devmm_drv_info("Can not devmm_insert_pages_to_vma. (page_num=%llu; ret=%d)\n",
-            page_num, ret);
-        return ret;
+    ret = devmm_pages_remap_owner(svm_proc, va, page_num, inpages, page_prot);	 
+    if (ret != 0) {	 
+        devmm_drv_info("Can not devmm_insert_pages_to_vma. (page_num=%llu; ret=%d)\n",	 
+            page_num, ret);	 
+        return ret;	 
     }
     ret = devmm_pages_remap_custom(svm_proc, va, page_num, inpages, page_prot);
-    if (ret != 0) {
-        devmm_drv_err("Devmm_insert_pages_custom fail. (page_num=%llu; ret=%d)\n",
-            page_num, ret);
-        devmm_zap_owner_ptes_range(svm_proc, va, page_num);
+    if (ret != 0) {	 
+        devmm_drv_err("Devmm_insert_pages_custom fail. (page_num=%llu; ret=%d)\n",	 
+            page_num, ret);	 
+        devmm_zap_owner_ptes_range(svm_proc, va, page_num);	 
         return ret;
-    }
+    }	 
 
-    return 0;
+    return 0;	 
 }
 
 void devmm_zap_normal_pages(struct devmm_svm_process *svm_proc, u64 va, u64 page_num)
@@ -1025,7 +754,7 @@ int devmm_remap_pages(struct devmm_svm_process *svm_proc, u64 va,
     if (pg_type == DEVMM_NORMAL_PAGE_TYPE) {
         return devmm_pages_remap(svm_proc, va, pg_num, pages, 0);   // TO-DO: optimize name later
     } else if (pg_type == DEVMM_HUGE_PAGE_TYPE) {
-        if (devmm_is_giant_page(pages)) { // hbm remap
+        if (devmm_is_giant_page(pages, pg_num)) { // hbm remap
             return devmm_remap_giant_pages(svm_proc, va, pages, pg_num, 0, true);
         } else {
             return devmm_remap_huge_pages(svm_proc, va, pages, pg_num, 0);

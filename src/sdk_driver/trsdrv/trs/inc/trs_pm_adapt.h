@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -40,6 +40,7 @@ int trs_device_get_id_range(struct trs_id_inst *inst, int type, u32 *start, u32 
 int trs_device_get_id_total_num(struct trs_id_inst *inst, int type, u32 *total_num);
 int trs_device_get_id_split(struct trs_id_inst *inst, int type, u32 *split);
 int trs_device_get_id_isolate_num(int type, u32 *isolate_num);
+int trs_device_get_id_range_by_isolate_num(struct id_pool_inst *inst, int type, u32 start, u32 end, u32 req_num, u32 *alloc_num, u32 *id);
 int trs_device_get_id_by_isolate_num(struct id_pool_inst *inst, int type, int req_num, u32 *alloc_num, u32 *id);
 void trs_device_put_id_by_isolate_num(struct id_pool_inst *inst, int type, int batch_num, u32 *free_num, u32 *id);
 
@@ -96,6 +97,7 @@ struct trs_adapt_notice_ops {
     int (*sync_id_proc)(u32 devid, u32 tsid, int type);
     bool (*res_is_belong_to_proc)(u32 devid, u32 tsid, int master_tgid, int res_type, int res_id);
     int (*ts_cq_process)(u32 devid, u32 tsid, int cq_type, u32 cqid, u8 *cqe);
+    int (*notice_proc_release)(u32 devid, u32 tsid, int pid);
 };
 struct trs_adapt_notice_ops *trs_adapt_get_notice_ops(void);
 void trs_adapt_notice_ops_register(struct trs_adapt_notice_ops *register_ops);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,6 +14,8 @@
 #ifndef VIRTMNG_PUBLIC_DEF_H
 #define VIRTMNG_PUBLIC_DEF_H
 
+#include "ka_dfx_pub.h"
+#include "ka_task_pub.h"
 #ifdef EMU_ST
 #ifndef TSDRV_UT
 #include "ut_log.h"
@@ -23,8 +25,6 @@
 #endif
 #include "vmng_kernel_interface.h"
 #include "pbl/pbl_soc_res.h"
-#include "ka_dfx_pub.h"
-#include "ka_task_pub.h"
 
 #ifdef CFG_ENV_HOST
 #define module_vmng "vmng_host"

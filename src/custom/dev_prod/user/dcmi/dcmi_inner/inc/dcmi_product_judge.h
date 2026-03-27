@@ -145,6 +145,11 @@ extern "C"{
 #define DCMI_A_X_910_93_MAIN_BOARD_ID 0X15
 #define DCMI_A900_A3_SUPERPOD_MAIN_BOARD_ID1    0x18
 #define DCMI_A900_A3_SUPERPOD_MAIN_BOARD_ID2    0x19
+// A5 标卡 3种模式
+#define DCMI_910_95_1P_MAINBOARD_ID 0x68
+#define DCMI_910_95_2P_MAINBOARD_ID 0x6A
+#define DCMI_910_95_4P_MAINBOARD_ID 0x6C
+
 #define BOARD_ID_MASK       0xF0
 #define A_X_BOARD_ID        0x50
 #define A_K_OR_POD_BOARD_ID 0x30 // 特别的，A+K与POD共用一种BOARD ID，需要用main区分
@@ -172,6 +177,24 @@ extern "C"{
 #define DCMI_A_K_910_95_UBOE_MAIN_BOARD_ID      0x23    // A+K  2+4 SERVER DAVID NPU节点/port 8 2*UBoE X2
 #define DCMI_A_K_910_95_2_6_MAIN_BOARD_ID       0x25    // A+K  2+6 SERVER DAVID NPU节点/port 8 UB
 #define DCMI_A_K_910_95_2_6_UBOE_MAIN_BOARD_ID  0x27    // A+K  2+6 SERVER DAVID NPU节点/port 8 2*UBoE X2
+
+#define DCMI_A900_A5_MODEL_V100_BIN0_BOARD_ID       0x08
+#define DCMI_A900_A5_MODEL_V100_BIN1_1_BOARD_ID     0x09
+#define DCMI_A900_A5_MODEL_V100_BIN1_2_BOARD_ID     0x0A
+#define DCMI_A900_A5_MODEL_V100_BIN2_1_BOARD_ID     0x0B
+#define DCMI_A900_A5_MODEL_V100_BIN2_2_BOARD_ID     0x0C
+
+#define DCMI_A900_A5_MODEL_V120_BIN0_BOARD_ID       0x28
+#define DCMI_A900_A5_MODEL_V120_BIN1_1_BOARD_ID     0x29
+#define DCMI_A900_A5_MODEL_V120_BIN1_2_BOARD_ID     0x2A
+#define DCMI_A900_A5_MODEL_V120_BIN2_1_BOARD_ID     0x2B
+#define DCMI_A900_A5_MODEL_V120_BIN2_2_BOARD_ID     0x2C
+
+#define DCMI_A900_A5_CARD_V100_BIN1_1_BOARD_ID      0x18
+#define DCMI_A900_A5_CARD_V100_BIN1_2_BOARD_ID     0x19
+#define DCMI_A900_A5_CARD_V100_BIN2_1_BOARD_ID     0x1A
+#define DCMI_A900_A5_CARD_V100_BIN2_2_BOARD_ID     0x1B
+#define DCMI_A900_A5_CARD_V100_BIN11_3_BOARD_ID     0x1C
 
 struct dcmi_product_type_table {
     int product_type;
@@ -213,6 +236,8 @@ int dcmi_board_chip_type_is_ascend_910b(void);
 int dcmi_board_chip_type_is_ascend_910_93(void);
 
 int dcmi_board_chip_type_is_ascend_910_95(void);
+
+int dcmi_board_chip_type_is_ascend_910_95_card(void);
 
 int dcmi_board_chip_type_is_ascend_910b_300i_a2(void);
 

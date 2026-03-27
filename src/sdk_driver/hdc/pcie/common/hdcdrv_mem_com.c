@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,25 +11,17 @@
  * GNU General Public License for more details.
  */
 
-#include "pbl_ka_memory.h"
+#include "ka_system_pub.h"
+#include "ka_compiler_pub.h"
+#include "ka_driver_pub.h"
+#include "ka_list_pub.h"
 #include "ka_memory_pub.h"
+#include "pbl_ka_memory.h"
 #include "hdcdrv_core_com.h"
 #include "comm_kernel_interface.h"
 #include "kernel_version_adapt.h"
 #include "hdcdrv_mem_com.h"
 
-#include "ka_system_pub.h"
-#include "ka_common_pub.h"
-#include "ka_compiler_pub.h"
-#include "ka_driver_pub.h"
-#include "ka_task_pub.h"
-#include "ka_list_pub.h"
-#include "ka_memory_pub.h"
-#include "ka_base_pub.h"
-
-#ifndef DMA_MAPPING_ERROR
-#define DMA_MAPPING_ERROR (~(ka_dma_addr_t)0)
-#endif
 STATIC u32 g_mem_type = HDCDRV_NORMAL_MEM;
 STATIC u32 g_mem_work_flag = 0;
 STATIC u64 g_mem_work_cnt = 0;
@@ -262,7 +254,7 @@ STATIC bool is_alloc_mirror_mem(u32 dev_id, u32 segment)
 
 void free_mem_pool_single(ka_device_t *dev, u32 segment, struct hdcdrv_mem_block_head *buf, ka_dma_addr_t addr)
 {
-    if ((buf == NULL) || (buf->dma_buf == NULL) || (addr == DMA_MAPPING_ERROR) || (dev == NULL)) {
+    if ((buf == NULL) || (buf->dma_buf == NULL) || (addr == KA_DMA_MAPPING_ERROR) || (dev == NULL)) {
         return;
     }
 
@@ -284,6 +276,7 @@ void free_mem_pool_single(ka_device_t *dev, u32 segment, struct hdcdrv_mem_block
     }
     buf->dma_buf = NULL;
     hdcdrv_kvfree((void **)&buf, KA_SUB_MODULE_TYPE_0);
+    buf = NULL;
 }
 
 static inline u32 hdccom_calc_ring_id(u64 ring_cnt, u32 mask, u32 size)
@@ -471,7 +464,7 @@ int hdcdrv_alloc_huge_page(struct hdcdrv_mem_pool *pool, int page_index)
     // huge page init, fill the page index and head of each hdc_mem_block
     buf = ka_mm_page_address(page);
     addr = hal_kernel_devdrv_dma_map_page(pdev_dev, page, 0, KA_HPAGE_SIZE, KA_DMA_BIDIRECTIONAL);
-    if (addr == DMA_MAPPING_ERROR) {
+    if (addr == KA_DMA_MAPPING_ERROR) {
         hdcdrv_free_single_page(page, alloc_flag);
         HDC_LOG_ERR_LIMIT(&g_alloc_huge_page_print_cnt, &g_alloc_huge_page_jiffies, "dma map failed.\n");
         pool->page_list[page_index].valid = HDCDRV_PAGE_NOT_ALLOC;
@@ -552,7 +545,7 @@ int hdccom_get_page_mem(struct hdcdrv_mem_pool *pool, int *page_index, int *bloc
 void free_mem_pool_single_page(ka_device_t *dev, struct hdcdrv_mem_block_head *buf,
     ka_dma_addr_t addr, ka_page_t *page_addr, int alloc_flag)
 {
-    if ((buf != NULL) && (addr != DMA_MAPPING_ERROR) && (page_addr != NULL) && (dev != NULL)) {
+    if ((buf != NULL) && (addr != KA_DMA_MAPPING_ERROR) && (page_addr != NULL) && (dev != NULL)) {
         hal_kernel_devdrv_dma_unmap_page(dev, addr, KA_HPAGE_SIZE, KA_DMA_BIDIRECTIONAL);
         hdcdrv_free_single_page(page_addr, alloc_flag);
     }
@@ -933,7 +926,7 @@ STATIC u64 hdcdrv_get_hash_va(struct hdcdrv_fast_node *fast_node, u64 search_typ
     }
 }
 
-STATIC struct hdcdrv_fast_node *hdcdrv_fast_node_search(ka_task_spinlock_t *lock, ka_rb_root_t *root,
+struct hdcdrv_fast_node *hdcdrv_fast_node_search(ka_task_spinlock_t *lock, ka_rb_root_t *root,
     u64 new_node_hash, struct hdcdrv_node_status *node_status, struct hdcdrv_node_search_info *node_search_info)
 {
     u64 tree_hash;
@@ -1055,350 +1048,24 @@ void hdcdrv_fast_node_free(const struct hdcdrv_fast_node *fast_node)
     hdcdrv_kvfree((void **)&fast_node, KA_SUB_MODULE_TYPE_2);
     fast_node = NULL;
 }
-#ifdef CFG_FEATURE_HDC_REG_MEM
-STATIC u64 hdcdrv_nodes_check(u64 addr_a, u32 len_a, u64 addr_b, u32 len_b)
-{
-    if (addr_a < addr_b) {
-        if ((addr_a + len_a) > addr_b) {
-            return HDCDRV_NODES_INTER_SECTION;
-        }
-    } else {
-        if ((addr_a + len_a) <= (addr_b + len_b)) {
-            return HDCDRV_NODES_SUBSET;
-        } else if (addr_a < (addr_b + len_b)) {
-            return HDCDRV_NODES_INTER_SECTION;
-        } else {
-            return HDCDRV_NODES_EMPTY_SET;
-        }
-    }
-    return HDCDRV_NODES_EMPTY_SET;
-}
 
-/***********************************************
-  confirm new node and tree node have conflict or not:
-  1、if conflict, return the f_node in tree
-  2、if not, return null
-************************************************/
-struct hdcdrv_fast_node *hdcdrv_fast_nodes_conflict(ka_task_spinlock_t *lock,
-    ka_rb_root_t *root, struct hdcdrv_fast_node *new_node)
-{
-    u64 node_check;
-    u64 tree_node_va;
-    u32 data_len = new_node->fast_mem.alloc_len;
-    u64 addr_va = new_node->fast_mem.user_va;
-    ka_rb_node_t *node = NULL;
-    struct hdcdrv_fast_node *fast_node = NULL;
-
-    ka_task_spin_lock_bh(lock);
-
-    node = ka_base_get_rb_root_node(root);
-    while (node != NULL) {
-        fast_node = ka_base_rb_entry(node, struct hdcdrv_fast_node, node);
-        tree_node_va = fast_node->fast_mem.user_va;
-        node_check = hdcdrv_nodes_check(addr_va, data_len, tree_node_va, fast_node->fast_mem.alloc_len);
-        if (node_check != HDCDRV_NODES_EMPTY_SET) {
-            ka_task_spin_unlock_bh(lock);
-            return fast_node;
-        }
-
-        if (addr_va < tree_node_va) {
-            node = node->rb_left;
-        } else {
-            node = node->rb_right;
-        }
-    }
-
-    ka_task_spin_unlock_bh(lock);
-    return NULL;
-}
-
-/***********************************************
-  search node from tree:
-  1、if have exist, return f_node
-  2、if not exist , return null
-************************************************/
-STATIC struct hdcdrv_fast_node *hdcdrv_fast_node_is_exist(ka_task_spinlock_t *lock,
-    ka_rb_root_t *root, struct hdcdrv_fast_node_msg_info *node_info, u32 process_stage)
-{
-    u64 node_va;
-    u64 node_check;
-    u32 data_len = node_info->len;
-    u64 addr_va = node_info->va_addr;
-    ka_rb_node_t *node = NULL;
-    struct hdcdrv_fast_node *fast_node = NULL;
-
-    ka_task_spin_lock_bh(lock);
-    node = ka_base_get_rb_root_node(root);
-    while (node != NULL) {
-        fast_node = ka_base_rb_entry(node, struct hdcdrv_fast_node, node);
-        node_va = fast_node->fast_mem.user_va;
-        node_check = hdcdrv_nodes_check(addr_va, data_len, node_va, fast_node->fast_mem.alloc_len);
-        if (node_check == HDCDRV_NODES_SUBSET) {
-            if (process_stage == HDCDRV_SEARCH_NODE_REGISTER) {
-                ka_task_spin_unlock_bh(lock);
-                return fast_node;
-            }
-            if (process_stage == HDCDRV_SEARCH_NODE_SENDRECV) {
-                if (fast_node->unregister_flag == 1) {
-                    ka_task_spin_unlock_bh(lock);
-                    return NULL;
-                }
-            }
-            hdcdrv_node_status_busy(fast_node);
-            ka_task_spin_unlock_bh(lock);
-            return fast_node;
-        }
-        if (node_check == HDCDRV_NODES_INTER_SECTION) {
-            ka_task_spin_unlock_bh(lock);
-            return NULL;
-        }
-
-        if (addr_va < node_va) {
-            node = node->rb_left;
-        } else {
-            node = node->rb_right;
-        }
-    }
-    ka_task_spin_unlock_bh(lock);
-    return NULL;
-}
-
-STATIC void hdcdrv_get_tree(struct hdcdrv_node_tree_info *tree_info)
-{
-    ka_base_atomic_inc(&tree_info->refcnt);
-}
-
-STATIC void hdcdrv_put_tree(struct hdcdrv_node_tree_info *tree_info, u32 rb_side)
-{
-    struct hdcdrv_node_tree_ctrl *hdc_node_tree = NULL;
-    u64 pid;
-    u32 fid;
-    int idx;
-
-    hdc_node_tree = hdcdrv_get_node_tree();
-    ka_task_write_lock_bh(&hdc_node_tree->lock);
-    if (!ka_base_atomic_dec_and_test(&tree_info->refcnt)) {
-        ka_task_write_unlock_bh(&hdc_node_tree->lock);
-        return;
-    }
-    pid = tree_info->pid;
-    fid = tree_info->fid;
-    idx = tree_info->idx;
-    tree_info->pid = HDCDRV_INVALID_PID;
-    tree_info->fid = HDCDRV_INVALID_FID;
-    ka_task_write_unlock_bh(&hdc_node_tree->lock);
-    hdcdrv_info("node array recycle, (pid=0x%llx; fid=%u; rb_side=%u; idx=%d)\n", pid, fid, rb_side, idx);
-    return;
-}
-
-STATIC void hdcdrv_del_tree(struct hdcdrv_node_tree_info *tree_info, u32 rb_side)
-{
-    hdcdrv_put_tree(tree_info, rb_side);
-}
-
-STATIC int hdcdrv_fast_node_find_get_tree_idx(u64 pid, u32 fid, u32 side)
-{
-    int tree_idx;
-    struct hdcdrv_node_tree_info *tree_info = NULL;
-
-    for (tree_idx = 0; tree_idx < HDCDRV_SUPPORT_MAX_FID_PID; tree_idx++) {
-        tree_info = hdcdrv_get_node_tree_info(tree_idx, side);
-        if ((tree_info->pid == pid) && (tree_info->fid == fid)) {
-            hdcdrv_get_tree(tree_info);
-            return tree_idx;
-        }
-    }
-    return HDCDRV_INVALID_VALUE;
-}
-
-STATIC int hdcdrv_fast_node_get_idle_tree(u32 rb_side, u64 pid, u32 fid)
-{
-    int tree_idx;
-    struct hdcdrv_node_tree_info *tree_info = NULL;
-    for (tree_idx = 0; tree_idx < HDCDRV_SUPPORT_MAX_FID_PID; tree_idx++) {
-        tree_info = hdcdrv_get_node_tree_info(tree_idx, rb_side);
-        if ((tree_info->pid == HDCDRV_INVALID_PID) && (tree_info->fid == HDCDRV_INVALID_FID)) {
-            tree_info->pid = pid;
-            tree_info->fid = fid;
-            hdcdrv_get_tree(tree_info);
-            return tree_idx;
-        }
-    }
-    return HDCDRV_INVALID_VALUE;
-}
-
-STATIC struct hdcdrv_fast_node *_hdcdrv_fast_node_search_from_new_tree(int tree_idx, u32 rb_side,
+struct hdcdrv_fast_node* __attribute__((weak)) hdcdrv_fast_node_search_from_new_tree(u32 rb_side,
     int timeout, struct hdcdrv_fast_node_msg_info *node_info)
 {
-    struct hdcdrv_node_status node_status = {0};
-    struct hdcdrv_dev_fmem *fmem = NULL;
-    ka_rb_root_t *root = NULL;
-    struct hdcdrv_fast_node *fast_node = NULL;
-    struct hdcdrv_node_search_info node_search_info = {0};
-    int loop_cnt = timeout;
-
-    fmem = hdcdrv_get_ctrl_arry_uni_ex(tree_idx, (int)node_info->dev_id, rb_side);
-    /* select tree  */
-    root = hdcdrv_get_rbtree(fmem, rb_side);
-
-    // free&unregister node only have user_va
-    if (node_info->process_stage == HDCDRV_SEARCH_NODE_UNREGISTER ||
-        node_info->process_stage == HDCDRV_SEARCH_NODE_REMOTE) {
-        node_search_info.search_type = HDCDRV_SEARCH_WITH_VA;
-        node_search_info.process_stage = node_info->process_stage;
-        do {
-            fast_node = hdcdrv_fast_node_search(&fmem->rb_lock,
-                root, node_info->va_addr, &node_status, &node_search_info);
-            if (fast_node == NULL) {
-                return NULL;
-            }
-            if (node_status.status == HDCDRV_NODE_IDLE) {
-                return fast_node;
-            }
-
-            if (loop_cnt <= 0) {
-                hdcdrv_limit_exclusive(warn, HDCDRV_LIMIT_LOG_0x10A, "Fast node wait timeout. (hash_va=0x%llx)\n",
-                                       node_info->hash_val);
-                if (node_status.hold_flag == 1) {
-                    fast_node->unregister_flag = 0;
-                }
-                return NULL;
-            }
-            ka_system_usleep_range(HDCDRV_NODE_FREE_SLEEP_TIME, HDCDRV_NODE_FREE_SLEEP_TIME + HDCDRV_NODE_FREE_SLEEP_RANGE);
-            loop_cnt--;
-        } while (1);
-    } else {
-        fast_node = hdcdrv_fast_node_is_exist(&fmem->rb_lock, root, node_info, node_info->process_stage);
-    }
-
-    if (fast_node != NULL) {
-        return fast_node;
-    }
-    return NULL;
-}
-#endif
-
-struct hdcdrv_fast_node *hdcdrv_fast_node_search_from_new_tree(u32 rb_side,
-    int timeout, struct hdcdrv_fast_node_msg_info *node_info)
-{
-#ifdef CFG_FEATURE_HDC_REG_MEM
-    int tree_idx;
-    struct hdcdrv_node_tree_info *tree_info = NULL;
-    struct hdcdrv_fast_node *node = NULL;
-    struct hdcdrv_node_tree_ctrl *hdc_node_tree = NULL;
-
-    hdc_node_tree = hdcdrv_get_node_tree();
-    ka_task_read_lock_bh(&hdc_node_tree->lock);
-    tree_idx = hdcdrv_fast_node_find_get_tree_idx(node_info->pid, node_info->fid, rb_side);
-    ka_task_read_unlock_bh(&hdc_node_tree->lock);
-    if (tree_idx == HDCDRV_INVALID_VALUE) {
-        return NULL;
-    }
-    node = _hdcdrv_fast_node_search_from_new_tree(tree_idx, rb_side, timeout, node_info);
-    tree_info = hdcdrv_get_node_tree_info(tree_idx, rb_side);
-    hdcdrv_put_tree(tree_info, rb_side);
-    return node;
-
-#endif
     return NULL;
 }
 
-int hdcdrv_fast_node_insert_new_tree(int devid, u64 pid, u32 fid, u32 rb_side, struct hdcdrv_fast_node *new_node)
+int __attribute__((weak)) hdcdrv_fast_node_insert_new_tree(int devid, u64 pid, u32 fid, u32 rb_side,
+    struct hdcdrv_fast_node *new_node)
 {
-#ifdef CFG_FEATURE_HDC_REG_MEM
-    long ret;
-    int tree_idx;
-    bool first_node = false;
-    ka_rb_root_t *root = NULL;
-    struct hdcdrv_fast_node *conflict_node = NULL;
-    struct hdcdrv_dev_fmem *fmem = NULL;
-    struct hdcdrv_node_tree_ctrl *hdc_node_tree = NULL;
-    struct hdcdrv_node_tree_info *tree_info = NULL;
-
-    hdc_node_tree = hdcdrv_get_node_tree();
-    /* match pid+fid */
-    ka_task_write_lock_bh(&hdc_node_tree->lock);
-    tree_idx = hdcdrv_fast_node_find_get_tree_idx(pid, fid, rb_side);
-    if (tree_idx != HDCDRV_INVALID_VALUE) {
-        ka_task_write_unlock_bh(&hdc_node_tree->lock);
-    } else {
-        tree_idx = hdcdrv_fast_node_get_idle_tree(rb_side, pid, fid);
-        ka_task_write_unlock_bh(&hdc_node_tree->lock);
-        hdcdrv_info("node array idle tree, (pid=0x%llx; fid=%d; rb_side=%d; idx=%d)\n", pid, fid, rb_side, tree_idx);
-        /* new fid+pid */
-        if (tree_idx == HDCDRV_INVALID_VALUE) {
-            hdcdrv_err("node array exceed max space.\n");
-            return HDCDRV_ERR;
-        }
-        first_node = true;
-    }
-
-    fmem = hdcdrv_get_ctrl_arry_uni_ex(tree_idx, devid, rb_side);
-    /* select tree  */
-    root = hdcdrv_get_rbtree(fmem, rb_side);
-
-    if (!first_node) {
-        /* node conflict confirm */
-        conflict_node = hdcdrv_fast_nodes_conflict(&fmem->rb_lock, root, new_node);
-        if (conflict_node != NULL) {
-            hdcdrv_info("fast node insert conflict. (user_va=0x%pK, alloc_len=%d)\n",
-                (void *)(uintptr_t)conflict_node->fast_mem.user_va, conflict_node->fast_mem.alloc_len);
-            goto insert_fail;
-        }
-    }
-
-    /* insert node to tree */
-    ret = hdcdrv_fast_node_insert(&fmem->rb_lock, root, new_node, HDCDRV_SEARCH_WITH_VA);
-    if (ret != HDCDRV_OK) {
-        hdcdrv_info("fast node insert abnormal. (rb_side=%d, pid=0x%llx, fid=%d)\n",
-            rb_side, pid, fid);
-        goto insert_fail;
-    }
-
-    return HDCDRV_OK;
-
-insert_fail:
-    tree_info = hdcdrv_get_node_tree_info(tree_idx, rb_side);
-    hdcdrv_put_tree(tree_info, rb_side);
-    return HDCDRV_ERR;
-#else
     hdcdrv_err("hdcdrv_fast_node_insert_arry not support\n");
     return HDCDRV_OK;
-#endif
 }
 
-void hdcdrv_fast_node_erase_from_new_tree(u64 pid, u32 fid, int devid, u32 rb_side, struct hdcdrv_fast_node *fast_node)
+void __attribute__((weak)) hdcdrv_fast_node_erase_from_new_tree(u64 pid, u32 fid, int devid, u32 rb_side,
+    struct hdcdrv_fast_node *fast_node)
 {
-#ifdef CFG_FEATURE_HDC_REG_MEM
-    int tree_idx;
-    ka_rb_root_t *root = NULL;
-    struct hdcdrv_dev_fmem *fmem = NULL;
-    struct hdcdrv_node_tree_info *tree_info = NULL;
-    struct hdcdrv_node_tree_ctrl *hdc_node_tree = NULL;
-
-    hdc_node_tree = hdcdrv_get_node_tree();
-    ka_task_read_lock_bh(&hdc_node_tree->lock);
-    tree_idx = hdcdrv_fast_node_find_get_tree_idx(pid, fid, rb_side);
-    ka_task_read_unlock_bh(&hdc_node_tree->lock);
-    if (tree_idx == HDCDRV_INVALID_VALUE) {
-        hdcdrv_err("fast node not find. (pid=0x%llx, fid=%d, rb_side=%d)\n", pid, fid, rb_side);
-        return;
-    }
-
-    tree_info = hdcdrv_get_node_tree_info(tree_idx, rb_side);
-    fmem = hdcdrv_get_ctrl_arry_uni_ex(tree_idx, devid, rb_side);
-    /* select tree  */
-    root = hdcdrv_get_rbtree(fmem, rb_side);
-
-    /* erase node from tree */
-    hdcdrv_fast_node_erase(&fmem->rb_lock, root, fast_node);
-
-    /* decrease tree status, if tree is null, init tree info */
-    hdcdrv_put_tree(tree_info, rb_side);
-    hdcdrv_del_tree(tree_info, rb_side);
-#else
     hdcdrv_err("hdcdrv_fast_node_erase_from_arry not support\n");
-#endif
     return;
 }
 
@@ -1427,35 +1094,9 @@ STATIC u32 hdcdrv_get_rb_side(int type)
     }
 }
 
-STATIC int hdcdrv_save_fast_mem_info(struct hdcdrv_fast_mem *fast_mem,
+int __attribute__((weak)) hdcdrv_save_fast_mem_info(struct hdcdrv_fast_mem *fast_mem,
     u64 send_addr_va, struct hdcdrv_fast_addr_info *addr_info)
 {
-#ifdef CFG_FEATURE_HDC_REG_MEM
-    u64 node_va = fast_mem->user_va;
-    u32 page_size = fast_mem->align_size;
-
-    if ((send_addr_va == 0) || (node_va == 0) || (send_addr_va < node_va)) {
-        hdcdrv_err("update_page_start_idx fail:addr error. hash_va=0x%llx, node_hash=0x%pK, page_size=0x%x\n\n",
-            fast_mem->hash_va, (void *)(uintptr_t)send_addr_va, page_size);
-        return HDCDRV_ERR;
-    }
-
-    // use drvHdcMallocEx, no need calc idx because buffer used from start
-    if (page_size == 0) {
-        addr_info->page_start_idx = 0;
-        addr_info->send_inner_page_offset = 0;
-        return HDCDRV_OK;
-    }
-
-    // use halHdcRegisterMem, calc actually used buff start index and offset
-    addr_info->page_start_idx = (u32)(send_addr_va - (node_va - fast_mem->register_inner_page_offset)) / page_size;
-    addr_info->send_inner_page_offset = send_addr_va % page_size;
-    if (addr_info->page_start_idx >= fast_mem->phy_addr_num) {
-        hdcdrv_err("update_page_start_idx exception:addr error. hash_va=0x%llx, node_hash=0x%pK, page_size=0x%x\n\n",
-            fast_mem->hash_va, (void *)(uintptr_t)send_addr_va, page_size);
-        return HDCDRV_ERR;
-    }
-#endif
     return HDCDRV_OK;
 }
 
@@ -1566,11 +1207,11 @@ STATIC unsigned int hdcdrv_fast_get_alloc_pages_segment(unsigned int len, unsign
     return segment;
 }
 
-STATIC int hdcdrv_dma_map(struct hdcdrv_fast_mem *f_mem, int devid, int flag)
+int __attribute__((weak)) hdcdrv_dma_map(struct hdcdrv_fast_mem *f_mem, int devid, int flag)
 {
-    int i, j, ret;
     ka_device_t* pdev_dev = hdcdrv_get_pdev_dev(devid);
     u32 stamp, cost_time;
+    int ret, i, j;
 
     /* devid has checked outside */
     if (pdev_dev == NULL) {
@@ -1599,7 +1240,6 @@ STATIC int hdcdrv_dma_map(struct hdcdrv_fast_mem *f_mem, int devid, int flag)
             goto dma_unmap;
         }
     }
-
     f_mem->devid = devid;
 
     ret = hdcdrv_send_mem_info(f_mem, devid, flag);
@@ -1642,12 +1282,12 @@ STATIC void hdcdrv_mem_stat_info_show(void)
         alloc_cnt, alloc_len, alloc_normal_len, alloc_dma_len, free_cnt, free_len);
 }
 
-int hdcdrv_dma_unmap(struct hdcdrv_fast_mem *f_mem, u32 devid, int sync, int flag)
+int __attribute__((weak)) hdcdrv_dma_unmap(struct hdcdrv_fast_mem *f_mem, u32 devid, int sync, int flag)
 {
     ka_device_t* pdev_dev = NULL;
+    u32 stamp, cost_time;
     int ret = HDCDRV_OK;
     int i;
-    u32 stamp, cost_time;
 
     if (f_mem->dma_map == 0) {
         hdcdrv_limit_exclusive(info, HDCDRV_LIMIT_LOG_0x10, "Dma memory has not been mapped, no need unmap.\n");
@@ -1681,7 +1321,6 @@ int hdcdrv_dma_unmap(struct hdcdrv_fast_mem *f_mem, u32 devid, int sync, int fla
 
         hal_kernel_devdrv_dma_unmap_page(pdev_dev, f_mem->mem[i].addr, f_mem->mem[i].len, KA_DMA_BIDIRECTIONAL);
     }
-
     f_mem->dma_map = 0;
     f_mem->devid = 0;
 
@@ -1754,32 +1393,50 @@ static inline void hdcdrv_fast_inc_segment_mem_num(int segment_mem_num[], u32 se
     }
 }
 
-STATIC void hdcdrv_fill_fast_mem_info(struct hdcdrv_fast_mem *f_mem, u64 va, u32 len, u32 type)
+void hdcdrv_fill_fast_mem_info(struct hdcdrv_fast_mem *f_mem, u64 va, u32 len, u32 type)
 {
     f_mem->user_va = va;
     f_mem->alloc_len = len;
     f_mem->mem_type = (int)type;
 }
 
-STATIC void hdcdrv_huge_put_page(struct hdcdrv_fast_mem *f_mem)
+int hdcdrv_pin_user_page(unsigned long start, int nr_pages, unsigned int gup_flags, ka_page_t **pages)
+{
+#ifdef CFG_FEATURE_HDC_REG_MEM
+    return ka_mm_get_user_pages_fast(start, nr_pages, gup_flags, pages);
+#else
+    return ka_mm_pin_user_pages_fast(start, nr_pages, gup_flags, pages);
+#endif
+}
+
+void hdcdrv_unpin_user_page(ka_page_t *page)
+{
+#ifdef CFG_FEATURE_HDC_REG_MEM
+    ka_mm_put_page(page);
+#else
+    ka_mm_unpin_user_page(page);
+#endif
+}
+
+void hdcdrv_huge_put_page(struct hdcdrv_fast_mem *f_mem)
 {
     int i;
 
     for (i = 0; i < f_mem->phy_addr_num; i++) {
         if (f_mem->mem[i].page != NULL) {
-            ka_mm_unpin_user_page(f_mem->mem[i].page);
+            hdcdrv_unpin_user_page(f_mem->mem[i].page);
             f_mem->mem[i].page = NULL;
         }
     }
 }
 
-STATIC void hdcdrv_fast_free_mem_node(struct hdcdrv_fast_mem *f_mem)
+void hdcdrv_fast_free_mem_node(struct hdcdrv_fast_mem *f_mem)
 {
     hdcdrv_kvfree((void **)&f_mem->mem, KA_SUB_MODULE_TYPE_2);
     f_mem->mem = NULL;
 }
 
-STATIC void hdcdrv_fast_free_huge_page_mem(struct hdcdrv_fast_mem *f_mem)
+void hdcdrv_fast_free_huge_page_mem(struct hdcdrv_fast_mem *f_mem)
 {
     hdcdrv_huge_put_page(f_mem);
     hdcdrv_fast_free_mem_node(f_mem);
@@ -1802,7 +1459,7 @@ STATIC int hdcdrv_fast_alloc_huge_page_mem(struct hdcdrv_fast_mem *f_mem, u64 va
     }
 
     for (i = 0; i < (u32)f_mem->phy_addr_num; i++) {
-        ret = ka_mm_pin_user_pages_fast(va + (u64)i * KA_HPAGE_SIZE, nr_page, KA_FOLL_WRITE, &f_mem->mem[i].page);
+        ret = hdcdrv_pin_user_page(va + (u64)i * KA_HPAGE_SIZE, nr_page, KA_FOLL_WRITE, &f_mem->mem[i].page);
         if (ret != nr_page) {
             /* In the exception branch, the f_mem->mem[i].page may not be NULL,
                 which causes problem when free huge pages */
@@ -2018,347 +1675,6 @@ STATIC int hdcdrv_fast_alloc_pages(struct hdcdrv_mem_f *mem, u64 va, u32 len, u3
     hdcdrv_fast_mem_continuity_check(len, (u32)i, segment_mem_num, HDCDRV_MEM_ORDER_NUM);
     return HDCDRV_OK;
 }
-
-#ifdef CFG_FEATURE_HDC_REG_MEM
-STATIC void hdcdrv_fast_unpin_mem_normal(struct hdcdrv_fast_mem *f_mem)
-{
-    if (f_mem == NULL) {
-        return;
-    }
-    hdcdrv_huge_put_page(f_mem);
-
-    hdcdrv_fast_free_mem_node(f_mem);
-    hdcdrv_fill_fast_mem_info(f_mem, 0, 0, HDCDRV_FAST_MEM_TYPE_MAX);
-    f_mem->hash_va = 0;
-}
-
-void hdcdrv_fast_register_recycle(const struct hdcdrv_cmd_register_mem *cmd, struct hdcdrv_fast_node *f_node)
-{
-    long res;
-    if ((cmd == NULL) || (f_node == NULL)) {
-        return;
-    }
-
-    hdcdrv_fast_node_erase_from_new_tree(cmd->pid, 0, 0, HDCDRV_RBTREE_SIDE_LOCAL, f_node);
-
-    res = hdcdrv_dma_unmap(&f_node->fast_mem, (u32)cmd->dev_id, HDCDRV_SYNC_NO_CHECK, HDCDRV_DEL_REGISTER_FLAG);
-    if (res != HDCDRV_OK) {
-        hdcdrv_err("Calling hdcdrv_dma_unmap failed. (dev=%d)\n", cmd->dev_id);
-    }
-
-    hdcdrv_fast_unpin_mem_normal(&f_node->fast_mem);
-    hdcdrv_fast_node_free(f_node);
-}
-
-STATIC int hdcdrv_fast_register_check_va_vma(ka_vm_area_struct_t *vma,
-                                             const struct hdcdrv_fast_mem *f_mem)
-{
-    unsigned long size = f_mem->alloc_len;
-    unsigned long addr = f_mem->user_va;
-    unsigned long end = addr + KA_DRIVER_ALIGN(size, HDCDRV_MEM_CACHE_LINE);
-    if ((addr < ka_mm_get_vm_start(vma)) || (addr > ka_mm_get_vm_end(vma)) || (end > ka_mm_get_vm_end(vma)) || (addr >= end)) {
-        hdcdrv_limit_exclusive(warn, HDCDRV_LIMIT_LOG_0x103, "param va invalid. (vma_user_addr=0x%pK; len=%lu; "
-            "start=%lu; end=%lu)\n", (void *)(uintptr_t)addr, size, ka_mm_get_vm_start(vma), ka_mm_get_vm_end(vma));
-        return HDCDRV_PARA_ERR;
-    }
-
-    return HDCDRV_OK;
-}
-
-STATIC int hdcdrv_fast_register_check_va_hugepage(struct hdcdrv_fast_mem *f_mem, bool *is_hugepage, u32 *page_size)
-{
-    int ret;
-    ka_vm_area_struct_t *vma = NULL;
-
-    ka_task_down_write(get_mmap_sem(ka_task_get_current_mm()));
-    vma = ka_mm_find_vma(ka_task_get_current_mm(), f_mem->user_va);
-    if ((vma == NULL) || (ka_mm_get_vm_start(vma) > f_mem->user_va)) {
-        ka_task_up_write(get_mmap_sem(ka_task_get_current_mm()));
-        hdcdrv_err("Find vma failed. (devid=%d; va=0x%pK)\n", f_mem->devid, (void *)(uintptr_t)f_mem->user_va);
-        return HDCDRV_FIND_VMA_FAIL;
-    }
-
-    if ((ka_mm_get_vm_flags(vma) & KA_VM_HUGETLB) != 0) {
-        *is_hugepage = true;
-        *page_size = KA_HPAGE_SIZE;
-    } else {
-        *is_hugepage = false;
-        *page_size = KA_MM_PAGE_SIZE;
-    }
-    ret = hdcdrv_fast_register_check_va_vma(vma, f_mem);
-    ka_task_up_write(get_mmap_sem(ka_task_get_current_mm()));
-
-    return ret;
-}
-
-STATIC int hdcdrv_fast_pin_register_mem(struct hdcdrv_fast_mem *f_mem, u32 page_size, u32 type)
-{
-    u32 i, total_len, first_avail_len;
-    const int nr_page = 1;
-    int ret;
-
-    if (page_size == 0) {
-        hdcdrv_err("page_size error.\n");
-        return HDCDRV_MEM_ALLOC_FAIL;
-    }
-
-    f_mem->register_inner_page_offset = f_mem->user_va % page_size;
-    f_mem->phy_addr_num = (int)((f_mem->alloc_len + f_mem->register_inner_page_offset + page_size - 1) / page_size);
-    if (f_mem->phy_addr_num > HDCDRV_MEM_MAX_PHY_NUM) {
-        hdcdrv_err("phy_addr_num is bigger than expected. (len=%d, page_size=0x%x, phy_addr_num=%d; max_addr_num=%d)\n",
-            f_mem->alloc_len, page_size, f_mem->phy_addr_num, HDCDRV_MEM_MAX_PHY_NUM);
-        return HDCDRV_MEM_ALLOC_FAIL;
-    }
-
-    f_mem->mem = (struct hdcdrv_mem_f *)hdcdrv_kvmalloc((u64)(unsigned int)f_mem->phy_addr_num *
-        sizeof(struct hdcdrv_mem_f), KA_SUB_MODULE_TYPE_2);
-    if (f_mem->mem == NULL) {
-        hdcdrv_err("Calling ka_mm_kmalloc error.\n");
-        return HDCDRV_MEM_ALLOC_FAIL;
-    }
-
-    total_len = 0;
-    first_avail_len = page_size - f_mem->register_inner_page_offset;
-    for (i = 0; i < (u32)f_mem->phy_addr_num; i++) {
-        if ((type == HDCDRV_FAST_MEM_TYPE_TX_DATA) || (type == HDCDRV_FAST_MEM_TYPE_TX_CTRL)) {
-            ret = get_user_pages_fast(f_mem->user_va + total_len, nr_page, 0, &f_mem->mem[i].page);
-        } else {
-            ret = get_user_pages_fast(f_mem->user_va + total_len, nr_page, KA_FOLL_WRITE, &f_mem->mem[i].page);
-        }
-        if (ret != nr_page) {
-            f_mem->mem[i].page = NULL; /* when get page fail, page may be not null */
-            hdcdrv_warn("new node get pages not success . (ret=%d)\n", ret);
-            goto free_put_page;
-        }
-
-        if (i == 0) {
-            f_mem->mem[i].len = ka_base_min(first_avail_len, f_mem->alloc_len);
-            f_mem->mem[i].page_inner_offset = f_mem->user_va % KA_MM_PAGE_SIZE;
-        } else if (i == f_mem->phy_addr_num - 1) {
-            f_mem->mem[i].len = f_mem->alloc_len - total_len;
-        } else {
-            f_mem->mem[i].len = page_size;
-        }
-
-        total_len += f_mem->mem[i].len;
-        f_mem->mem[i].type = HDCDRV_RGISTER_MEM;
-    }
-
-    return HDCDRV_OK;
-
-free_put_page:
-    hdcdrv_fast_free_huge_page_mem(f_mem);
-    return HDCDRV_MEM_ALLOC_FAIL;
-}
-
-STATIC int hdcdrv_fast_register_page_mem(struct hdcdrv_fast_mem *f_mem, u64 va, u32 len, u32 type, u32 devid)
-{
-    u32 cost_time, page_size;
-    int ret;
-    u64 stamp;
-    bool is_hugepage;
-
-    if (f_mem == NULL) {
-        return HDCDRV_PARA_ERR;
-    }
-
-    hdcdrv_fill_fast_mem_info(f_mem, va, len, type);
-
-    page_size = 0;
-    ret = hdcdrv_fast_register_check_va_hugepage(f_mem, &is_hugepage, &page_size);
-    if (ret != HDCDRV_OK) {
-        return ret;
-    }
-    f_mem->align_size = page_size;
-
-    stamp = ka_jiffies;
-    ret = hdcdrv_fast_pin_register_mem(f_mem, page_size, type);
-    if (ret != HDCDRV_OK) {
-        hdcdrv_warn("hdc fast node pin mem not success. (dev=%u; ishuge = %d, addr_bum=%d)\n",
-                   devid, is_hugepage, f_mem->phy_addr_num);
-        return ret;
-    }
-
-    cost_time = ka_system_jiffies_to_msecs(ka_jiffies - stamp);
-    if (cost_time > HDCDRV_MAX_COST_TIME) {
-        ka_task_cond_resched();
-        hdcdrv_limit_exclusive(warn, HDCDRV_LIMIT_LOG_0x104, "cost_time is longer than expected. "
-            "(devid=%u; phy_num=%d; va=0x%pK; len=0x%x; cost_time=%udms)\n",
-            devid, f_mem->phy_addr_num, (void *)(uintptr_t)va, len, cost_time);
-    }
-
-    return HDCDRV_OK;
-}
-
-STATIC int hdcdrv_register_mem_param_check(struct hdcdrv_cmd_register_mem *cmd)
-{
-    int devid = cmd->dev_id;
-    unsigned int type = cmd->type;
-    unsigned int len = cmd->len;
-
-    if (((devid >= hdcdrv_get_max_support_dev()) || (devid < 0))) {
-        hdcdrv_err("Input parameter is error. (devid=%d)\n", devid);
-        return HDCDRV_PARA_ERR;
-    }
-
-    if ((type >= HDCDRV_FAST_MEM_TYPE_MAX) || (len == 0)) {
-        hdcdrv_err("Input parameter is error. (type=%u; len=%u)\n", type, len);
-        return HDCDRV_PARA_ERR;
-    }
-
-    if (((type == HDCDRV_FAST_MEM_TYPE_TX_DATA) || (type == HDCDRV_FAST_MEM_TYPE_RX_DATA) ||
-        (type == HDCDRV_FAST_MEM_TYPE_DVPP) || (type == HDCDRV_FAST_MEM_TYPE_ANY)) &&
-        (len > HDCDRV_MEM_MAX_LEN)) {
-        hdcdrv_err("Fast register data check error. (cmd_type=%u; cmd_len=0x%x)\n", type, len);
-        return HDCDRV_PARA_ERR;
-    }
-
-    if (((type == HDCDRV_FAST_MEM_TYPE_TX_CTRL) || (type == HDCDRV_FAST_MEM_TYPE_RX_CTRL)) &&
-        (len > HDCDRV_CTRL_MEM_REGISTER_MAX_LEN)) {
-        hdcdrv_err("Fast register ctrl check error. (cmd_type=%u; cmd_len=0x%x)\n", type, len);
-        return HDCDRV_PARA_ERR;
-    }
-
-    if (cmd->va != ka_base_round_down(cmd->va, HDCDRV_MEM_CACHE_LINE)) {
-        hdcdrv_err("Fast register address check error. (cmd_va=0x%pK; cmd_len=0x%x)\n",
-            (void *)(uintptr_t)cmd->va, cmd->len);
-        return HDCDRV_PARA_ERR;
-    }
-
-    return HDCDRV_OK;
-}
-
-long hdccom_fast_register_mem(struct hdcdrv_cmd_register_mem *cmd, struct hdcdrv_fast_node **f_node_ret)
-{
-    u64 hash_va;
-    long ret;
-    long res;
-    struct hdcdrv_fast_node_msg_info node_msg = {0};
-    struct hdcdrv_fast_node *f_node = NULL;
-
-    ret = hdcdrv_register_mem_param_check(cmd);
-    if (ret != HDCDRV_OK) {
-        hdcdrv_err("Check fast register addr failed. (devid=%d; addr=0x%pK; len=0x%x; type=%u)\n",
-            cmd->dev_id, (void *)(uintptr_t)cmd->va, cmd->len, cmd->type);
-        return HDCDRV_PARA_ERR;
-    }
-
-    node_msg.dev_id = (u32)cmd->dev_id;
-    hash_va = hdcdrv_get_hash(cmd->va, cmd->pid, HDCDRV_DEFAULT_LOCAL_FID);
-    hdcdrv_node_msg_info_fill((u32)cmd->pid, HDCDRV_DEFAULT_LOCAL_FID, cmd->len, cmd->va,
-        HDCDRV_SEARCH_NODE_REGISTER, &node_msg);
-    f_node = hdcdrv_fast_node_search_from_new_tree(HDCDRV_RBTREE_SIDE_LOCAL, HDCDRV_NODE_WAIT_TIME_MAX, &node_msg);
-    if (f_node != NULL) {
-        hdcdrv_err("fast node repeat register. (va=%pK; hash_va=0x%llx)\n", (void *)(uintptr_t)cmd->va, hash_va);
-        return HDCDRV_BUFF_REPEATED_REGISTER;
-    }
-
-    f_node = (struct hdcdrv_fast_node *)hdcdrv_kvmalloc(sizeof(struct hdcdrv_fast_node), KA_SUB_MODULE_TYPE_2);
-    if (f_node == NULL) {
-        hdcdrv_err("Calling ka_mm_kzalloc for node failed. (dev=%d)\n", cmd->dev_id);
-        return HDCDRV_MEM_ALLOC_FAIL;
-    }
-
-    f_node->pid = (long long)cmd->pid;
-    f_node->fast_mem.page_type = HDCDRV_PAGE_TYPE_REGISTER;
-    f_node->fast_mem.hash_va = hash_va;
-
-    ret = hdcdrv_fast_register_page_mem(&f_node->fast_mem, cmd->va, cmd->len, cmd->type, (u32)cmd->dev_id);
-    if (ret != HDCDRV_OK) {
-        hdcdrv_limit_exclusive(warn, HDCDRV_LIMIT_LOG_0x100, "Calling fast register core operation not success. "
-                               "(dev=%d, va=0x%pK)\n", cmd->dev_id, (void *)(uintptr_t)cmd->va);
-        goto fast_register_page_fail;
-    }
-
-    ret = hdcdrv_dma_map(&f_node->fast_mem, cmd->dev_id, HDCDRV_ADD_REGISTER_FLAG);
-    if (ret != HDCDRV_OK) {
-        hdcdrv_err("Calling dma map failed. (dev=%d, va=0x%pK)\n", cmd->dev_id, (void *)(uintptr_t)cmd->va);
-        goto dma_map_fail;
-    }
-    // first config conflict，then insert new and old table
-    f_node->hash_va = f_node->fast_mem.hash_va;
-    ret = hdcdrv_fast_node_insert_new_tree(cmd->dev_id, cmd->pid, 0, HDCDRV_RBTREE_SIDE_LOCAL, f_node);
-    if (ret != HDCDRV_OK) {
-        hdcdrv_info("Calling hdcdrv_fast_node_insert_to_arry abnormal. (hash=0x%llx, dev=%d)\n",
-            f_node->hash_va, cmd->dev_id);
-        goto node_arry_insert_fail;
-    }
-    *f_node_ret = f_node;
-    hdcdrv_info_limit("hdccom_fast_register_mem success. (hash=0x%llx; len=0x%x; align_size=0x%x, addr_num=%d)\n",
-        f_node->hash_va, cmd->len, f_node->fast_mem.align_size, f_node->fast_mem.phy_addr_num);
-    return HDCDRV_OK;
-node_arry_insert_fail:
-    res = hdcdrv_dma_unmap(&f_node->fast_mem, (u32)cmd->dev_id, HDCDRV_SYNC_NO_CHECK, HDCDRV_DEL_REGISTER_FLAG);
-    if (res != HDCDRV_OK) {
-        hdcdrv_err("Calling hdcdrv_dma_unmap failed. (dev=%d)\n", cmd->dev_id);
-    }
-dma_map_fail:
-    hdcdrv_fast_unpin_mem_normal(&f_node->fast_mem);
-fast_register_page_fail:
-    hdcdrv_fast_node_free(f_node);
-
-    return ret;
-}
-
-long hdcdrv_fast_unregister_mem(const void *ctx, struct hdcdrv_cmd_unregister_mem *cmd)
-{
-    int ret;
-    struct hdcdrv_fast_node *f_node = NULL;
-    struct hdcdrv_fast_node_msg_info node_msg = { 0 };
-
-    if ((cmd->type >= HDCDRV_FAST_MEM_TYPE_MAX)) {
-        hdcdrv_err("Input parameter is error. (type=%d; va=0x%pK)\n", cmd->type, (void *)(uintptr_t)cmd->va);
-        return HDCDRV_PARA_ERR;
-    }
-
-    hdcdrv_node_msg_info_fill((u32)cmd->pid, HDCDRV_DEFAULT_LOCAL_FID, 0, cmd->va,
-        HDCDRV_SEARCH_NODE_UNREGISTER, &node_msg);
-    f_node = hdcdrv_fast_node_search_from_new_tree(HDCDRV_RBTREE_SIDE_LOCAL, HDCDRV_NODE_FREE_WAIT_TIME, &node_msg);
-    if (f_node == NULL) {
-        hdcdrv_limit_exclusive(warn, HDCDRV_LIMIT_LOG_0x105, "not find node. (va=0x%pK; pid=0x%llx)\n",
-                (void *)(uintptr_t)cmd->va, cmd->pid);
-        return HDCDRV_F_NODE_SEARCH_FAIL;
-    }
-
-    if (ctx != f_node->ctx) {
-        hdcdrv_err("ctx not match. (fast_mem_devid=%d; cmd_type=%u)\n", f_node->fast_mem.devid, cmd->type);
-        hdcdrv_node_status_init(f_node);
-        return HDCDRV_PARA_ERR;
-    }
-
-    if (cmd->type != f_node->fast_mem.mem_type) {
-        hdcdrv_err("cmd_type is invalid. (fast_mem_devid=%d; cmd_type=%u; mem_type=%d)\n",
-            f_node->fast_mem.devid, cmd->type, f_node->fast_mem.mem_type);
-        hdcdrv_node_status_init(f_node);
-        return HDCDRV_PARA_ERR;
-    }
-
-    ret = hdcdrv_dma_unmap(&f_node->fast_mem, (u32)f_node->fast_mem.devid, HDCDRV_SYNC_CHECK, HDCDRV_DEL_REGISTER_FLAG);
-    if (ret != HDCDRV_OK) {
-        hdcdrv_err("Calling hdcdrv_dma_unmap failed. (hash_va=0x%llx)\n", f_node->hash_va);
-        hdcdrv_node_status_init(f_node);
-        return ret;
-    }
-    hdcdrv_info_limit("hdcdrv_fast_unregister_mem success. (hash_va=0x%llx, len=0x%x, type=%u)\n",
-        f_node->hash_va, f_node->fast_mem.alloc_len, cmd->type);
-
-    cmd->len = f_node->fast_mem.alloc_len;
-    cmd->page_type = f_node->fast_mem.page_type;
-
-    f_node->fast_mem.alloc_len = 0;
-
-    hdcdrv_fast_node_erase_from_new_tree(cmd->pid, HDCDRV_DEFAULT_LOCAL_FID, 0, HDCDRV_RBTREE_SIDE_LOCAL, f_node);
-    hdcdrv_fast_unpin_mem_normal(&f_node->fast_mem);
-    if (f_node->mem_fd_node != NULL) {
-        f_node->mem_fd_node->async_ctx = NULL;
-    }
-    hdcdrv_unbind_mem_ctx(f_node);
-    hdcdrv_node_status_init(f_node);
-    hdcdrv_fast_node_free(f_node);
-
-    return HDCDRV_OK;
-}
-#endif
 
 STATIC int hdcdrv_fast_alloc_normal_page_mem(struct hdcdrv_fast_mem *f_mem, u64 va, u32 len, u32 type, u32 devid)
 {
@@ -2736,80 +2052,19 @@ void hdcdrv_fast_mem_uninit(ka_task_spinlock_t *lock, ka_rb_root_t *root, int re
                 // This VMA isn't part of HDC and won't release physical memory to prevent serious security issues
                 hdcdrv_node_status_idle(fast_node);
                 hdcdrv_fast_node_free(fast_node);
+                fast_node = NULL;
                 ka_task_spin_lock_bh(lock);
                 continue;
             }
             hdcdrv_fast_free_phy_mem(&fast_node->fast_mem);
             hdcdrv_node_status_idle(fast_node);
             hdcdrv_fast_node_free(fast_node);
+            fast_node = NULL;
             ka_task_spin_lock_bh(lock);
         }
     }
 
     ka_task_spin_unlock_bh(lock);
-}
-
-#endif
-#ifdef CFG_FEATURE_HDC_REG_MEM
-void hdcdrv_fast_mem_uninit(ka_task_spinlock_t *lock, ka_rb_root_t *root, int reset, int flag)
-{
-    ka_rb_node_t *node = NULL;
-    struct hdcdrv_fast_node *fast_node = NULL;
-    int ret = 0;
-
-    /* only uninit free, suspend status not free */
-    if (hdcdrv_get_running_status() != HDCDRV_RUNNING_NORMAL) {
-        return;
-    }
-
-    ka_task_spin_lock_bh(lock);
-
-    while ((node = ka_base_rb_first(root)) != NULL) {
-        fast_node = ka_base_rb_entry(node, struct hdcdrv_fast_node, node);
-        if ((fast_node->pid == hdcdrv_get_pid()) || (reset == HDCDRV_TRUE_FLAG)) {
-            hdcdrv_fast_node_erase(NULL, root, fast_node);
-            ka_task_spin_unlock_bh(lock);
-            ret = hdcdrv_dma_unmap(&fast_node->fast_mem, (u32)fast_node->fast_mem.devid,
-                HDCDRV_SYNC_NO_CHECK, flag);
-            if (ret != HDCDRV_OK) {
-                hdcdrv_err("Dma unmap failed. (dev=%d; pid=%lld)\n", fast_node->fast_mem.devid, fast_node->pid);
-            }
-            hdcdrv_fast_free_phy_mem(&fast_node->fast_mem);
-            hdcdrv_fast_node_free(fast_node);
-            ka_task_spin_lock_bh(lock);
-        }
-    }
-
-    ka_task_spin_unlock_bh(lock);
-}
-
-void hdcdrv_fast_mem_arry_uninit(void)
-{
-    int i;
-    int tree_idx;
-    struct hdcdrv_dev_fmem *fmem = NULL;
-    struct hdcdrv_node_tree_ctrl *hdc_node_tree = NULL;
-    struct hdcdrv_node_tree_info *tree_info = NULL;
-
-    hdc_node_tree = hdcdrv_get_node_tree();
-    for (tree_idx = 0; tree_idx < HDCDRV_SUPPORT_MAX_FID_PID; tree_idx++) {
-        /* local tree free */
-        fmem = hdcdrv_get_ctrl_arry_uni_ex(tree_idx, 0, HDCDRV_RBTREE_SIDE_LOCAL);
-        hdcdrv_fast_mem_uninit(&(fmem->rb_lock), &(fmem->rbtree), HDCDRV_TRUE_FLAG, HDCDRV_DEL_REGISTER_FLAG);
-        fmem->rbtree = KA_RB_ROOT;
-        fmem->rbtree_re = KA_RB_ROOT;
-        tree_info = hdcdrv_get_node_tree_info(tree_idx, HDCDRV_RBTREE_SIDE_LOCAL);
-        hdcdrv_del_tree(tree_info, HDCDRV_RBTREE_SIDE_LOCAL);
-        /* remote tree free */
-        for (i = 0; i < hdcdrv_get_max_support_dev(); i++) {
-            fmem = hdcdrv_get_ctrl_arry_uni_ex(tree_idx, i, HDCDRV_RBTREE_SIDE_REMOTE);
-            hdcdrv_fast_mem_uninit(&(fmem->rb_lock), &(fmem->rbtree_re), HDCDRV_TRUE_FLAG, HDCDRV_DEL_REGISTER_FLAG);
-            fmem->rbtree = KA_RB_ROOT;
-            fmem->rbtree_re = KA_RB_ROOT;
-        }
-        tree_info = hdcdrv_get_node_tree_info(tree_idx, HDCDRV_RBTREE_SIDE_REMOTE);
-        hdcdrv_del_tree(tree_info, HDCDRV_RBTREE_SIDE_REMOTE);
-    }
 }
 #endif
 
@@ -2849,35 +2104,10 @@ void hdcdrv_fast_mem_free_abnormal(const struct hdcdrv_mem_node_info *f_info)
     hdcdrv_fast_free_phy_mem(&fast_node->fast_mem);
     hdcdrv_node_status_init(fast_node);
     hdcdrv_fast_node_free(fast_node);
+    fast_node = NULL;
 }
 
-void hdcdrv_fast_mem_quick_proc(const struct hdcdrv_mem_node_info *f_info)
-{
-#ifdef CFG_FEATURE_HDC_REG_MEM
-    struct hdcdrv_fast_node_msg_info node_msg = { 0 };
-    struct hdcdrv_fast_node *fast_node = NULL;
-    struct hdcdrv_ctx_fmem *async_ctx = NULL;
-    u32 fid;
-
-    fid = (f_info->hash_va >> HDCDRV_FRBTREE_FID_BEG) & HDCDRV_FRBTREE_FID_MASK;
-    hdcdrv_node_msg_info_fill((u32)f_info->pid, fid, (int)f_info->alloc_len, f_info->user_va,
-                              HDCDRV_SEARCH_NODE_SENDRECV, &node_msg);
-    fast_node = hdcdrv_fast_node_search_from_new_tree(HDCDRV_RBTREE_SIDE_LOCAL, HDCDRV_NODE_RELEASE_TIME_MAX,
-                                                        &node_msg);
-    if (fast_node == NULL) {
-        hdcdrv_err("Fast node search failed when release. (pid=%llx)\n", f_info->pid);
-        return;
-    }
-
-    (void)hdcdrv_dma_unmap(&fast_node->fast_mem, (u32)fast_node->fast_mem.devid,
-                           HDCDRV_SYNC_NO_CHECK, HDCDRV_DEL_REGISTER_FLAG);
-    hdcdrv_huge_put_page(&fast_node->fast_mem); // unpin
-
-    async_ctx = fast_node->mem_fd_node->async_ctx;
-    hdcdrv_add_to_async_ctx(async_ctx, fast_node);
-    hdcdrv_node_status_idle(fast_node);
-#endif
-}
+void __attribute__((weak)) hdcdrv_fast_mem_quick_proc(const struct hdcdrv_mem_node_info *f_info) {}
 
 void hdcdrv_release_unmap_failed_fast_mem(struct hdcdrv_ctx_fmem *ctx_fmem)
 {
@@ -2905,7 +2135,11 @@ void hdcdrv_release_unmap_failed_fast_mem(struct hdcdrv_ctx_fmem *ctx_fmem)
         hdcdrv_dma_unmap(&fast_node->fast_mem, fast_node->fast_mem.devid, HDCDRV_SYNC_NO_CHECK, HDCDRV_DEL_FLAG);
         hdcdrv_fast_free_phy_mem(&fast_node->fast_mem);
         hdcdrv_fast_node_free(fast_node);
+#ifndef DRV_UT
+        fast_node = NULL;
         hdcdrv_kfree(entry, KA_SUB_MODULE_TYPE_1);
+        entry = NULL;
+#endif
     }
 }
 
@@ -3052,6 +2286,7 @@ dma_map_fail:
     hdcdrv_fast_free_phy_mem(&f_node->fast_mem);
 fast_alloc_fail:
     hdcdrv_fast_node_free(f_node);
+    f_node = NULL;
 
     return ret;
 }
@@ -3113,6 +2348,7 @@ long hdcdrv_fast_free_mem(const void *ctx, struct hdcdrv_cmd_free_mem *cmd)
     hdcdrv_fast_node_erase(&dev_fmem->rb_lock, &dev_fmem->rbtree, f_node);
     hdcdrv_node_status_idle(f_node);
     hdcdrv_fast_node_free(f_node);
+    f_node = NULL;
 
     return HDCDRV_OK;
 }

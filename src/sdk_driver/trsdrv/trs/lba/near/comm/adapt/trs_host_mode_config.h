@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -20,6 +20,8 @@ int trs_mode_config_to_mia(u32 chip_id);
 int trs_mode_config_by_urd(void *feature, char *in, u32 in_len, char *out, u32 out_len);
 int trs_get_sq_send_mode(u32 udevid);
 int trs_mode_query_by_urd(void *feature, char *in, u32 in_len, char *out, u32 out_len);
+int trs_host_mode_config_init_dev(u32 ts_inst_id);
+void trs_host_mode_config_uninit_dev(u32 ts_inst_id);
 int trs_host_mode_config_init(void);
 void trs_host_mode_config_uninit(void);
 #endif /* TRS_HOST_MODE_CONFIG_H */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -27,7 +27,7 @@ static ka_proc_dir_entry_t *rmo_top_entry;
 
 static int rmo_proc_show(ka_seq_file_t *seq, void *offset)
 {
-    int tgid = (int)(uintptr_t)(seq->private);
+    int tgid = (int)(uintptr_t)(ka_fs_get_seq_file_private(seq));
 
     module_feature_auto_show_task(0, tgid, 0, seq);
     return 0;
@@ -35,29 +35,16 @@ static int rmo_proc_show(ka_seq_file_t *seq, void *offset)
 
 int rmo_proc_open(ka_inode_t *inode, ka_file_t *file)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)
-    return ka_fs_single_open(file, rmo_proc_show, pde_data(inode));
-#else
-    return ka_fs_single_open(file, rmo_proc_show, (*ka_base_pde_data)(inode));
-#endif
+    return ka_fs_single_open(file, rmo_proc_show, ka_base_pde_data(inode));
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 5, 0)
-static const ka_file_operations_t rmo_proc = {
-    .owner = KA_THIS_MODULE,
-    .open    = rmo_proc_open,
-    .read    = ka_fs_seq_read,
-    .llseek  = ka_fs_seq_lseek,
-    .release = ka_fs_single_release,
-};
-#else
 static const ka_procfs_ops_t rmo_proc = {
-    .proc_open    = rmo_proc_open,
-    .proc_read    = ka_fs_seq_read,
-    .proc_lseek   = ka_fs_seq_lseek,
-    .proc_release = ka_fs_single_release,
+    ka_fs_init_pf_owner(KA_THIS_MODULE) \
+    ka_fs_init_pf_open(rmo_proc_open) \
+    ka_fs_init_pf_read(ka_fs_seq_read) \
+    ka_fs_init_pf_lseek(ka_fs_seq_lseek) \
+    ka_fs_init_pf_release(ka_fs_single_release) \
 };
-#endif
 
 ka_proc_dir_entry_t *rmo_proc_fs_add_task(const char *domain, int tgid)
 {
@@ -100,3 +87,7 @@ void rmo_proc_fs_uninit(void)
     }
 }
 
+ka_proc_dir_entry_t *rmo_get_top_entry(void)
+{
+    return rmo_top_entry;
+}

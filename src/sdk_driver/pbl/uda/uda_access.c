@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,39 +11,20 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/mutex.h>
-#include <linux/slab.h>
-#include <linux/vmalloc.h>
-#include <linux/fs.h>
-#include <linux/notifier.h>
+#ifndef DRV_HOST
 #include <linux/profile.h>
-#include <linux/list.h>
-#include <linux/uidgid.h>
-#include <linux/pid.h>
-#include <linux/capability.h>
-#include <linux/sched.h>
-#include <linux/nsproxy.h>
-#include <linux/version.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
-#include <linux/sched/signal.h>
-#include <linux/sched/task.h>
 #endif
-#include <linux/cred.h>
-#include <linux/delay.h>
-#include <linux/cpumask.h>
-#include <linux/device_cgroup.h>
-#include <linux/namei.h>
-#include <linux/mount.h>
 
 #include "pbl/pbl_davinci_api.h"
 
 #include "uda_notifier.h"
 #include "pbl_mem_alloc_interface.h"
+#include "pbl/pbl_runenv_config.h"
 #include "uda_dev.h"
 #ifdef CFG_FEATURE_KA
 #include "pbl_kernel_adapt.h"
 #endif
-#ifdef CFG_FEATURE_ASCEND910_95_STUB
+#ifdef CFG_FEATURE_ASCEND950_STUB
 #include "uda_fops.h"
 #endif
 #include "ka_dfx_pub.h"
@@ -56,6 +37,7 @@
 #include "ka_task_pub.h"
 #include "ka_list_pub.h"
 #include "ka_base_pub.h"
+#include "ka_system_pub.h"
 
 #include "uda_access_adapt.h"
 
@@ -63,23 +45,22 @@
 
 #define FREE_NS_NODE_TRY_COUNT 20
 #define FREE_NS_NODE_INTERVAL_MS 50
-#define PER_BIT_U32            32
 
 struct uda_dev_shared_check {
     u32 udevid;
     u32 share_occupied;
 };
 
-/* CFG_FEATURE_ASCEND910_95_STUB: set dev_num for waiting too long in david pooling device */
+/* CFG_FEATURE_ASCEND950_STUB: set dev_num for waiting too long in david pooling device */
 static u32 uda_detected_dev_num = 1;
 static ka_dev_t uda_dev;
-static struct class *uda_class;
+static ka_class_t *uda_class;
 
-static struct work_struct host_ns_init_work;
-static struct mnt_namespace *host_ns = NULL;
+static ka_work_struct_t host_ns_init_work;
+static ka_mnt_namespace_t *host_ns = NULL;
 
-static struct mutex access_ns_mutex;
-struct list_head access_ns_head;
+static ka_mutex_t access_ns_mutex;
+ka_list_head_t access_ns_head;
 
 static u32 uda_ns_id[UDA_NS_NUM];
 
@@ -89,13 +70,13 @@ static umode_t g_phy_dev_mode = DEV_MODE_PERMISSION;
 
 static u8 g_dev_shared[UDA_MAX_PHY_DEV_NUM];
 
-void uda_init_udev_ns_id(u32 udevid, struct uda_access *access, struct mnt_namespace *ns, u32 ns_id);
-int uda_occupy_dev_by_ns(u32 udevid, struct uda_access *access, struct mnt_namespace *ns);
-void uda_unoccupy_dev_by_ns(u32 udevid, struct uda_access *access, struct mnt_namespace *ns);
-bool uda_is_ns_in_udev_shared_list(struct mnt_namespace *ns, struct uda_access *access);
+void uda_init_udev_ns_id(u32 udevid, struct uda_access *access, ka_mnt_namespace_t *ns, u32 ns_id);
+int uda_occupy_dev_by_ns(u32 udevid, struct uda_access *access, ka_mnt_namespace_t *ns);
+void uda_unoccupy_dev_by_ns(u32 udevid, struct uda_access *access, ka_mnt_namespace_t *ns);
+bool uda_is_ns_in_udev_shared_list(ka_mnt_namespace_t *ns, struct uda_access *access);
 bool uda_tgid_exited(u32 tgid, TASK_TIME_TYPE start_time);
-void uda_ns_node_destroy_work(struct work_struct *p_work);
-u32 uda_get_ns_pid_count(struct mnt_namespace *ns);
+void uda_ns_node_destroy_work(ka_work_struct_t *p_work);
+u32 uda_get_ns_pid_count(ka_mnt_namespace_t *ns);
 static void uda_destroy_ns_node(struct uda_ns_node *ns_node, bool from_work);
 
 static u32 uda_alloc_ns_id(void)
@@ -117,68 +98,46 @@ static void uda_free_ns_id(u32 ns_id)
     uda_ns_id[ns_id] = 0;
 }
 
-static struct mnt_namespace *uda_get_task_ns(struct task_struct *task)
+static ka_mnt_namespace_t *uda_get_task_ns(ka_task_struct_t *task)
 {
     return (task->nsproxy != NULL) ? task->nsproxy->mnt_ns : NULL;
 }
 
-struct mnt_namespace *uda_get_current_ns(void)
+ka_mnt_namespace_t *uda_get_current_ns(void)
 {
     return uda_get_task_ns(current);
 }
 
-static struct mnt_namespace *uda_get_host_ns(void)
+static ka_mnt_namespace_t *uda_get_host_ns(void)
 {
     return host_ns;
 }
 
-static void uda_host_ns_init_work(struct work_struct *work)
+static void uda_host_ns_init_work(ka_work_struct_t *work)
 {
     host_ns = uda_get_current_ns(); /* in some os(centos), init_task mnt_ns may be null, so use kernel work ns */
     uda_info("Ns info. (ns=%pK; init.task ns=%pK)\n", host_ns, init_task.nsproxy->mnt_ns);
 }
 
-static bool uda_is_admin_task(struct task_struct *task)
+static bool uda_is_admin_task(ka_task_struct_t *task)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
-    ka_kernel_cap_t privileged = (ka_kernel_cap_t) {((uint64_t)(KA_SYSTEM_CAP_TO_MASK(CAP_AUDIT_READ + 1) -1) << 32) | (((uint64_t)~0) >> 32)};
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 0)
-    unsigned int i;
-    ka_kernel_cap_t privileged = (ka_kernel_cap_t){{ ~0, (KA_SYSTEM_CAP_TO_MASK(CAP_AUDIT_READ + 1) - 1)}};
-#else
-    unsigned int i;
-    ka_kernel_cap_t privileged = CAP_FULL_SET;
-#endif
-    const struct cred *cred = NULL;
-    u32 user_id, cap, idx;
+    ka_kernel_cap_t privileged = ka_system_get_privileged_kernel_cap();
+    const ka_cred_t *cred = NULL;
+    ka_kernel_cap_t effective;
+    u32 user_id;
 
     ka_task_rcu_read_lock();
-    cred = __task_cred(task); //lint !e1058 !e64 !e666
+    cred = __ka_task_task_cred(task); //lint !e1058 !e64 !e666
+    effective = cred->cap_effective;
     user_id = cred->uid.val;
     ka_task_rcu_read_unlock();
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
-    for (idx = 0; idx < CAP_LAST_CAP; idx++) {
-        if (((privileged.val >> idx) & 0x1) == 0x1) {
-            cap = idx;
-            if (ka_system_capable(cap) == false) {
-                return false;
-            }
-        }
-    }
-#else
-    CAP_FOR_EACH_U32(i) {
-        for (idx = 0; idx < PER_BIT_U32; idx++) {
-            if (((privileged.cap[i] >> idx) & 0x1) == 0x1) {
-                cap = i * PER_BIT_U32 + idx;
-                if (ka_system_capable(cap) == false) {
-                    return false;
-                }
-            }
-        }
+#ifndef EMU_ST
+    if (cred->user_ns != &init_user_ns) {
+        return false;
     }
 #endif
-    return (user_id == 0);
+    return ka_system_kernel_cap_compare(effective, privileged);
 }
 
 bool uda_cur_is_host(void)
@@ -188,7 +147,7 @@ bool uda_cur_is_host(void)
 
 static bool cgroup_mount_is_ro(void)
 {
-    struct path kernel_path;
+    ka_path_t kernel_path;
     int ret;
     bool is_ro = false;
 
@@ -223,11 +182,33 @@ bool uda_cur_is_admin(void)
     return (uda_cur_is_host() || (uda_current_is_admin()));
 }
 
+#if (defined DRV_HOST) && (defined CFG_FEATURE_PROCESS_GROUP)
+static bool uda_process_group_permission_allow(struct uda_dev_inst *dev_inst)
+{
+    ka_file_t *filp = NULL;
+    char dev_name[UDA_DEV_NAME_LEN] = { 0 };
+    unsigned int udevid = dev_inst->udevid;
+    unsigned int char_flag = dev_inst->para.char_flag;
+    unsigned int logic_id = dev_inst->para.logic_id;
+    const char *name = uda_is_phy_dev(udevid) ? UDA_PHY_DEV_NAME : UDA_MIA_DEV_NAME;
+    unsigned int char_id =
+        ((char_flag == UDA_ENABLE_CHAR_NUMBERING) && (logic_id != UDA_INVALID_UDEVID)) ? logic_id : udevid;
+
+    (void)sprintf_s(dev_name, UDA_DEV_NAME_LEN, "/dev/%s%u", name, char_id);
+
+    filp = ka_fs_filp_open(dev_name, O_WRONLY, 0);
+    /* Requires character device to exist */
+    if (KA_IS_ERR_OR_NULL(filp)) {
+        return false;
+    }
+    ka_fs_filp_close(filp, NULL);
+    return true;
+}
+#endif
+
 static bool uda_devcgroup_permission_allow(struct uda_dev_inst *dev_inst)
 {
-    struct file *filp = NULL;
-
-#ifdef CFG_FEATURE_ASCEND910_95_STUB
+#ifdef CFG_FEATURE_ASCEND950_STUB
     if (uda_get_raw_proc_is_contain_flag() == 0) {
         return true;
     }
@@ -235,17 +216,11 @@ static bool uda_devcgroup_permission_allow(struct uda_dev_inst *dev_inst)
     /* devcgroup_check_permission is implemented in the kernel of 5.5, so use kernel open replace it,
        ka_fs_filp_open also check file user, device multi-user configuration can not use */
 #if (defined DRV_HOST) && (defined CFG_FEATURE_PROCESS_GROUP)
-    filp = ka_fs_filp_open(dev_inst->access.name, O_WRONLY, 0);
-    /* Requires character device to exist */
-    if (KA_IS_ERR_OR_NULL(filp)) {
-        return false;
-    }
-    ka_fs_filp_close(filp, NULL);
+    return uda_process_group_permission_allow(dev_inst);
 #else
-    (void)filp;
     (void)dev_inst;
-#endif
     return true;
+#endif
 }
 
 static void uda_init_ns_node_dev(struct uda_ns_node *ns_node, u32 root_tgid, TASK_TIME_TYPE tgid_time)
@@ -253,7 +228,7 @@ static void uda_init_ns_node_dev(struct uda_ns_node *ns_node, u32 root_tgid, TAS
     u32 udevid;
     u32 max_num = uda_cur_is_admin() ? UDA_MAX_PHY_DEV_NUM : UDA_UDEV_MAX_NUM;
 
-#ifdef CFG_FEATURE_ASCEND910_95_STUB
+#ifdef CFG_FEATURE_ASCEND950_STUB
     max_num = (uda_cur_is_host() && (root_tgid != UDA_HOST_ROOT_TGID)) ? UDA_UDEV_MAX_NUM : max_num;
 #endif
     ns_node->root_tgid = root_tgid;
@@ -324,7 +299,7 @@ void uda_for_each_ns_node_safe(void *priv, void (*func)(struct uda_ns_node *ns_n
     ka_task_mutex_unlock(&access_ns_mutex);
 }
 
-static struct uda_ns_node *uda_find_ns_node(struct mnt_namespace *ns, u32 root_tgid)
+static struct uda_ns_node *uda_find_ns_node(ka_mnt_namespace_t *ns, u32 root_tgid)
 {
     struct uda_ns_node *ns_node = NULL, *first_ns_node = NULL;
 
@@ -368,7 +343,7 @@ static bool uda_is_admin_ns_node(struct uda_ns_node *ns_node)
 int uda_set_dev_ns_identify(u32 udevid, u64 identify)
 {
     struct uda_dev_inst *dev_inst = NULL;
-    struct mnt_namespace *ns = NULL;
+    ka_mnt_namespace_t *ns = NULL;
     struct uda_ns_node *ns_node = NULL;
     int ret = -EINVAL;
 
@@ -384,7 +359,7 @@ int uda_set_dev_ns_identify(u32 udevid, u64 identify)
     }
 
     ns = (dev_inst->access.ns != NULL) ? dev_inst->access.ns : uda_get_current_ns();
-    ns_node = uda_find_ns_node(ns, current->tgid);
+    ns_node = uda_find_ns_node(ns, ka_task_get_current_tgid());
     if (ns_node != NULL) {
         ns_node->identify = identify;
         ret = 0;
@@ -414,7 +389,7 @@ int uda_get_dev_ns_identify(u32 udevid, u64 *identify)
     if (dev_inst->access.ns != NULL) {
         struct uda_ns_node *ns_node = NULL;
         ka_task_mutex_lock(&access_ns_mutex);
-        ns_node = uda_find_ns_node(dev_inst->access.ns, current->tgid);
+        ns_node = uda_find_ns_node(dev_inst->access.ns, ka_task_get_current_tgid());
         if (ns_node != NULL) {
             *identify = ns_node->identify;
             ret = 0;
@@ -439,7 +414,7 @@ int uda_get_cur_ns_id(u32 *ns_id)
     }
 
     ka_task_mutex_lock(&access_ns_mutex);
-    ns_node = uda_find_ns_node(uda_get_current_ns(), current->tgid);
+    ns_node = uda_find_ns_node(uda_get_current_ns(), ka_task_get_current_tgid());
     if (ns_node != NULL) {
         *ns_id = (ns_node->ns_id > UDA_NS_NUM)? UDA_NS_NUM : ns_node->ns_id;
         ret = 0;
@@ -450,6 +425,23 @@ int uda_get_cur_ns_id(u32 *ns_id)
 }
 KA_EXPORT_SYMBOL(uda_get_cur_ns_id);
 
+int uda_get_container_docker_id(u32 *docker_id)
+{
+    int ret;
+    if (!run_in_normal_docker()) {
+        *docker_id = UDA_NS_NUM;
+        return 0;
+    }
+
+    ret = uda_get_cur_ns_id(docker_id);
+    if (ret != 0) {
+        uda_err("Query ns id failed\n");
+        return ret;
+    }
+    return 0;
+}
+KA_EXPORT_SYMBOL(uda_get_container_docker_id);
+
 static bool uda_dev_is_occupied(struct uda_access *access)
 {
     struct uda_ns_node *ns_node = NULL;
@@ -458,14 +450,14 @@ static bool uda_dev_is_occupied(struct uda_access *access)
     if (access->ns == NULL) {
         return false;
     }
-    ns_node = uda_find_ns_node(access->ns, current->tgid);
+    ns_node = uda_find_ns_node(access->ns, ka_task_get_current_tgid());
     if (ns_node == NULL) {
         uda_info("not found access ns ns_node.(name=%s)\n", access->name);
         return false;
     }
     if (!uda_tgid_exited(ns_node->root_tgid, ns_node->tgid_time)) {
         uda_info("ns_node already exist. (ns=%pK; ns_node->ns_id=%u; ns_node->root_tgid=%d; current_tgid=%d)\n",
-            ns_node->ns, ns_node->ns_id, ns_node->root_tgid, current->tgid);
+            ns_node->ns, ns_node->ns_id, ns_node->root_tgid, ka_task_get_current_tgid());
         return true;
     }
     /* pre container none root tgid would exit after root tgid, wait then all exited */
@@ -518,7 +510,7 @@ void uda_release_idle_ns_by_vdev_id(unsigned int phy_id, unsigned int vdev_id)
 }
 KA_EXPORT_SYMBOL_GPL(uda_release_idle_ns_by_vdev_id);
 
-static struct uda_ns_node *uda_create_ns_node(struct mnt_namespace *ns)
+static struct uda_ns_node *uda_create_ns_node(ka_mnt_namespace_t *ns)
 {
     static u32 ns_id = UDA_NS_NUM;
     struct uda_ns_node *ns_node = dbl_kzalloc(sizeof(struct uda_ns_node), KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
@@ -564,7 +556,7 @@ int uda_ns_node_devid_to_udevid(u32 devid, u32 *udevid)
     struct uda_ns_node *ns_node = NULL;
 
     ka_task_mutex_lock(&access_ns_mutex);
-    ns_node = uda_find_ns_node(uda_get_current_ns(), current->tgid);
+    ns_node = uda_find_ns_node(uda_get_current_ns(), ka_task_get_current_tgid());
     if (ns_node == NULL) {
         ka_task_mutex_unlock(&access_ns_mutex);
         return -EAGAIN;
@@ -704,7 +696,7 @@ int uda_udevid_to_devid(u32 udevid, u32 *devid)
     return 0;
 }
 
-static bool uda_is_admin_ns(struct task_struct *task)
+static bool uda_is_admin_ns(ka_task_struct_t *task)
 {
     struct uda_ns_node *ns_node = NULL;
     bool is_admin = false;
@@ -723,9 +715,9 @@ static bool uda_is_admin_ns(struct task_struct *task)
     return is_admin;
 }
 
-static bool uda_task_access_judge_ok(struct task_struct *task, struct uda_access *access)
+static bool uda_task_access_judge_ok(ka_task_struct_t *task, struct uda_access *access)
 {
-    struct mnt_namespace *ns = uda_get_task_ns(task);
+    ka_mnt_namespace_t *ns = uda_get_task_ns(task);
 
     if (ns == uda_get_host_ns()) {
         return true;
@@ -746,7 +738,7 @@ static bool uda_task_access_judge_ok(struct task_struct *task, struct uda_access
     return false;
 }
 
-static bool uda_task_can_access_udevid(struct task_struct *task, u32 udevid)
+static bool uda_task_can_access_udevid(ka_task_struct_t *task, u32 udevid)
 {
     bool ret = false;
     struct uda_dev_inst *dev_inst = uda_dev_inst_get(udevid);
@@ -760,8 +752,8 @@ static bool uda_task_can_access_udevid(struct task_struct *task, u32 udevid)
 
 bool uda_proc_can_access_udevid(int tgid, u32 udevid)
 {
-    struct task_struct *task = NULL;
-    struct pid *pid = NULL;
+    ka_task_struct_t *task = NULL;
+    ka_struct_pid_t *pid = NULL;
     bool ret;
 
     pid = ka_task_find_get_pid(tgid);
@@ -792,7 +784,7 @@ bool uda_can_access_udevid(u32 udevid)
 KA_EXPORT_SYMBOL(uda_can_access_udevid);
 
 /* if udevid belong to task namespace or it's split davinci belong to, both return true(can access) */
-bool uda_task_can_access_udevid_inherit(struct task_struct *task, u32 udevid)
+bool uda_task_can_access_udevid_inherit(ka_task_struct_t *task, u32 udevid)
 {
     struct uda_ns_node *ns_node = NULL;
     u32 devid;
@@ -887,7 +879,7 @@ static void uda_try_to_add_udev_to_ns_node(struct uda_access *access)
     uda_for_each_ns_node_safe((void *)access, uda_add_udev_to_admin_ns_node);
 }
 
-static struct uda_access_share_node *uda_find_udev_shared_node(struct mnt_namespace *ns, struct uda_access *access)
+static struct uda_access_share_node *uda_find_udev_shared_node(ka_mnt_namespace_t *ns, struct uda_access *access)
 {
     struct uda_access_share_node *share_node = NULL;
 
@@ -900,12 +892,12 @@ static struct uda_access_share_node *uda_find_udev_shared_node(struct mnt_namesp
     return NULL;
 }
 
-bool uda_is_ns_in_udev_shared_list(struct mnt_namespace *ns, struct uda_access *access)
+bool uda_is_ns_in_udev_shared_list(ka_mnt_namespace_t *ns, struct uda_access *access)
 {
     return (uda_find_udev_shared_node(ns, access) != NULL);
 }
 
-void uda_init_udev_ns_id(u32 udevid, struct uda_access *access, struct mnt_namespace *ns, u32 ns_id)
+void uda_init_udev_ns_id(u32 udevid, struct uda_access *access, ka_mnt_namespace_t *ns, u32 ns_id)
 {
     if (ns_id >= UDA_NS_NUM) {
         return;
@@ -925,7 +917,7 @@ void uda_init_udev_ns_id(u32 udevid, struct uda_access *access, struct mnt_names
 static int uda_flush_invalid_share_occupy(struct uda_access *access)
 {
     unsigned int node_num = 0;
-    struct list_head *pos;
+    ka_list_head_t *pos;
     struct uda_access_share_node *share_node = NULL, *share_node_n = NULL;
 
     ka_list_for_each(pos, &access->share_head) {
@@ -948,7 +940,7 @@ static int uda_flush_invalid_share_occupy(struct uda_access *access)
     return -ESRCH;
 }
 
-static int uda_occupy_shared_dev(u32 udevid, struct uda_access *access, struct mnt_namespace *ns)
+static int uda_occupy_shared_dev(u32 udevid, struct uda_access *access, ka_mnt_namespace_t *ns)
 {
     struct uda_access_share_node *share_node = NULL;
     int ret;
@@ -973,7 +965,7 @@ static int uda_occupy_shared_dev(u32 udevid, struct uda_access *access, struct m
     return 0;
 }
 
-static void uda_unoccupy_shared_dev(struct uda_access *access, struct mnt_namespace *ns)
+static void uda_unoccupy_shared_dev(struct uda_access *access, ka_mnt_namespace_t *ns)
 {
     struct uda_access_share_node *share_node = uda_find_udev_shared_node(ns, access);
     if (share_node != NULL) {
@@ -982,7 +974,7 @@ static void uda_unoccupy_shared_dev(struct uda_access *access, struct mnt_namesp
     }
 }
 
-int uda_occupy_dev_by_ns(u32 udevid, struct uda_access *access, struct mnt_namespace *ns)
+int uda_occupy_dev_by_ns(u32 udevid, struct uda_access *access, ka_mnt_namespace_t *ns)
 {
     if (uda_is_dev_shared(udevid)) {
         return uda_occupy_shared_dev(udevid, access, ns);
@@ -1010,7 +1002,7 @@ int uda_occupy_dev_by_ns(u32 udevid, struct uda_access *access, struct mnt_names
     return -EBUSY;
 }
 
-void uda_unoccupy_dev_by_ns(u32 udevid, struct uda_access *access, struct mnt_namespace *ns)
+void uda_unoccupy_dev_by_ns(u32 udevid, struct uda_access *access, ka_mnt_namespace_t *ns)
 {
     ka_task_mutex_lock(&access->mutex);
     if (uda_is_dev_shared(udevid)) {
@@ -1034,14 +1026,14 @@ static int uda_occupy_dev(struct uda_dev_inst *dev_inst)
     return uda_occupy_dev_by_ns(dev_inst->udevid, access, uda_get_current_ns());
 }
 
-static void uda_refresh_dev_ownership(struct inode *inode)
+static void uda_refresh_dev_ownership(ka_inode_t *inode)
 {
     g_phy_dev_uid = inode->i_uid;
     g_phy_dev_gid = inode->i_gid;
     g_phy_dev_mode = inode->i_mode;
 }
 
-static int uda_access_open(struct inode *inode, struct file *file)
+static int uda_access_open(ka_inode_t *inode, ka_file_t *file)
 {
     u32 udevid = ka_fs_iminor(inode);
     int ret = 0;
@@ -1072,22 +1064,22 @@ static int uda_access_open(struct inode *inode, struct file *file)
 }
 
 /* when all process in namespace exit, clear udevid ns, then the udevid can be used by another namespace */
-static int uda_access_release(struct inode *inode, struct file *file)
+static int uda_access_release(ka_inode_t *inode, ka_file_t *file)
 {
     u32 udevid = ka_fs_iminor(inode);
     uda_debug("Cdev release. (udevid=%u)\n", udevid);
     return 0;
 }
 
-static const struct file_operations uda_access_fops = {
-    .owner = KA_THIS_MODULE,
-    .open = uda_access_open,
-    .release = uda_access_release,
+static const ka_file_operations_t uda_access_fops = {
+    ka_fs_init_f_owner(KA_THIS_MODULE)
+    ka_fs_init_f_open(uda_access_open)
+    ka_fs_init_f_release(uda_access_release)
 };
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
-static char *uda_devnode(const struct device *dev, umode_t *mode, ka_kuid_t *uid, ka_kgid_t *gid)
+static char *uda_devnode(const ka_device_t *dev, umode_t *mode, ka_kuid_t *uid, ka_kgid_t *gid)
 #else
-static char *uda_devnode(struct device *dev, umode_t *mode, ka_kuid_t *uid, ka_kgid_t *gid)
+static char *uda_devnode(ka_device_t *dev, umode_t *mode, ka_kuid_t *uid, ka_kgid_t *gid)
 #endif
 {
     if (dev != NULL) {
@@ -1107,23 +1099,23 @@ static char *uda_devnode(struct device *dev, umode_t *mode, ka_kuid_t *uid, ka_k
     return NULL;
 }
 
-const struct device_type uda_type = {
+const ka_device_type_t uda_type = {
     .devnode = uda_devnode,
 };
 
-static void uda_device_release(struct device *dev)
+static void uda_device_release(ka_device_t *dev)
 {
     uda_debug("Free dev mem. (udevid=%u)\n", KA_DRIVER_MINOR(dev->devt));
     dbl_kfree(dev);
 }
 
-static void uda_cdev_set_parent(struct cdev *cdev, struct kobject *kobj)
+static void uda_cdev_set_parent(ka_cdev_t *cdev, ka_kobject_t *kobj)
 {
     cdev->kobj.parent = kobj;
 }
 
 /* old kernel has no cdev_device_add. cdev_device_add has a bug: if device_add failed, cdev will be double free */
-static int uda_cdev_device_add(struct cdev *cdev, struct device *dev)
+static int uda_cdev_device_add(ka_cdev_t *cdev, ka_device_t *dev)
 {
     int ret;
 
@@ -1138,19 +1130,20 @@ static int uda_cdev_device_add(struct cdev *cdev, struct device *dev)
     return ka_fs_device_add(dev); /* ka_fs_cdev_add and ka_fs_cdev_alloc are Rollback by ka_fs_cdev_del */
 }
 
-static void uda_cdev_device_del(struct cdev *cdev, struct device *dev)
+static void uda_cdev_device_del(ka_cdev_t *cdev, ka_device_t *dev)
 {
     ka_fs_device_del(dev);
     ka_fs_cdev_del(cdev);
 }
 
-static int uda_create_cdev(u32 udevid, struct uda_access *access)
+static int uda_create_cdev(u32 udevid, u32 logic_id, struct uda_access *access)
 {
     const char *name = uda_is_phy_dev(udevid) ? UDA_PHY_DEV_NAME : UDA_MIA_DEV_NAME;
-    struct device *dev = NULL;
+    ka_device_t *dev = NULL;
     int ret;
+    unsigned int char_id = (logic_id != UDA_INVALID_UDEVID) ? logic_id : udevid;
 
-    (void)sprintf_s(access->name, UDA_DEV_NAME_LEN, "/dev/%s%u", name, udevid);
+    (void)sprintf_s(access->name, UDA_DEV_NAME_LEN, "/dev/%s%u", name, char_id);
     access->devno = KA_DRIVER_MKDEV(KA_DRIVER_MAJOR(uda_dev), udevid);
     access->ns = NULL;
     access->ns_id = UDA_NS_NUM;
@@ -1163,7 +1156,7 @@ static int uda_create_cdev(u32 udevid, struct uda_access *access)
     /* init cdev */
     access->cdev = ka_fs_cdev_alloc();
     if (access->cdev == NULL) {
-        uda_err("Alloc cdev failed. (udevid=%u)\n", udevid);
+        uda_err("Alloc cdev failed. (udevid=%u; char_id=%u)\n", udevid, char_id);
         return -ENOMEM;
     }
     access->cdev->owner = KA_THIS_MODULE;
@@ -1173,7 +1166,7 @@ static int uda_create_cdev(u32 udevid, struct uda_access *access)
     dev = dbl_kzalloc(sizeof(*dev), KA_GFP_KERNEL);
     if (dev == NULL) {
         ka_fs_cdev_del(access->cdev);
-        uda_err("Alloc dev failed. (udevid=%u)\n", udevid);
+        uda_err("Alloc dev failed. (udevid=%u; char_id=%u)\n", udevid, char_id);
         return -ENOMEM;
     }
     ka_base_device_initialize(dev);
@@ -1181,7 +1174,7 @@ static int uda_create_cdev(u32 udevid, struct uda_access *access)
     dev->class = uda_class;
     dev->type = &uda_type;
     dev->release = uda_device_release;
-    (void)ka_fs_kobject_set_name(&dev->kobj, "%s%u", name, udevid);
+    (void)ka_fs_kobject_set_name(&dev->kobj, "%s%u", name, char_id);
     access->dev = dev;
 
     /* attach device to cdev */
@@ -1189,7 +1182,7 @@ static int uda_create_cdev(u32 udevid, struct uda_access *access)
     if (ret != 0) {
         ka_fs_cdev_del(access->cdev);
         dbl_kfree(access->dev);
-        uda_err("Cdev add device failed. (udevid=%u; ret=%d)\n", udevid, ret);
+        uda_err("Cdev add device failed. (udevid=%u; char_id=%u; ret=%d)\n", udevid, char_id, ret);
         return ret;
     }
 
@@ -1215,9 +1208,9 @@ static void uda_remove_share_list(struct uda_access *access)
     }
 }
 
-int uda_access_add_dev(u32 udevid, struct uda_access *access)
+int uda_access_add_dev(u32 udevid, u32 logic_id, struct uda_access *access)
 {
-    return uda_create_cdev(udevid, access);
+    return uda_create_cdev(udevid, logic_id, access);
 }
 
 /* hotrest device is force remove mode */
@@ -1280,7 +1273,7 @@ u32 uda_get_cur_ns_dev_num(void)
     u32 dev_num = 0;
 
     ka_task_mutex_lock(&access_ns_mutex);
-    ns_node = uda_find_ns_node(uda_get_current_ns(), current->tgid);
+    ns_node = uda_find_ns_node(uda_get_current_ns(), ka_task_get_current_tgid());
     if (ns_node != NULL) {
         dev_num = ns_node->dev_num;
     }
@@ -1296,7 +1289,7 @@ int uda_get_cur_ns_udevids(u32 udevids[], u32 num)
     u32 devid;
 
     ka_task_mutex_lock(&access_ns_mutex);
-    ns_node = uda_find_ns_node(uda_get_current_ns(), current->tgid);
+    ns_node = uda_find_ns_node(uda_get_current_ns(), ka_task_get_current_tgid());
     if (ns_node != NULL) {
         for (devid = 0; (devid < ns_node->dev_num) && (devid < num); devid++) {
             udevids[devid] = ns_node->devid_to_udevid[devid];
@@ -1422,7 +1415,7 @@ static void uda_wait_all_phy_startup(void)
 #endif
 }
 
-static int _uda_setup_ns_node(struct mnt_namespace *ns, u32 root_tgid, TASK_TIME_TYPE tgid_time, u32 dev_num)
+static int _uda_setup_ns_node(ka_mnt_namespace_t *ns, u32 root_tgid, TASK_TIME_TYPE tgid_time, u32 dev_num)
 {
     struct uda_ns_node *ns_node = NULL;
 
@@ -1462,10 +1455,10 @@ static int _uda_setup_ns_node(struct mnt_namespace *ns, u32 root_tgid, TASK_TIME
     return 0;
 }
 
-static int uda_find_ns_root_pid(struct mnt_namespace *ns, u32 *tgid, TASK_TIME_TYPE *tgid_time)
+static int uda_find_ns_root_pid(ka_mnt_namespace_t *ns, u32 *tgid, TASK_TIME_TYPE *tgid_time)
 {
 #ifndef EMU_ST
-    struct task_struct *task = NULL;
+    ka_task_struct_t *task = NULL;
     int ret = -EFAULT;
 
     ka_task_rcu_read_lock();
@@ -1474,28 +1467,28 @@ static int uda_find_ns_root_pid(struct mnt_namespace *ns, u32 *tgid, TASK_TIME_T
             continue;
         }
 
-        task_lock(task);
+        ka_task_task_lock(task);
         if ((task->nsproxy != NULL) && (task->nsproxy->mnt_ns == ns)) {
             *tgid = task->tgid;
             *tgid_time = task->start_time;
             ret = 0;
-            task_unlock(task);
+            ka_task_task_unlock(task);
             break;
         }
-        task_unlock(task);
+        ka_task_task_unlock(task);
     }
     ka_task_rcu_read_unlock();
 
     return ret;
 #else
-    *tgid = current->tgid;
+    *tgid = ka_task_get_current_tgid();
     return 0;
 #endif
 }
 
-u32 uda_get_ns_pid_count(struct mnt_namespace *ns)
+u32 uda_get_ns_pid_count(ka_mnt_namespace_t *ns)
 {
-    struct task_struct *task = NULL;
+    ka_task_struct_t *task = NULL;
     u32 count = 0;
 
 #ifndef EMU_ST
@@ -1504,11 +1497,11 @@ u32 uda_get_ns_pid_count(struct mnt_namespace *ns)
         if (task == NULL) {
             continue;
         }
-        task_lock(task);
+        ka_task_task_lock(task);
         if ((task->nsproxy != NULL) && (task->nsproxy->mnt_ns == ns)) {
             count++;
         }
-        task_unlock(task);
+        ka_task_task_unlock(task);
     }
     ka_task_rcu_read_unlock();
 #endif
@@ -1564,20 +1557,20 @@ static void uda_recycle_idle_ns_node(void)
 static void uda_recycle_idle_ns_node_single_immediately(struct uda_ns_node *ns_node, void *priv)
 {
     u32 pid_count;
- 
+
     if (ns_node->root_tgid == UDA_HOST_ROOT_TGID) {
         return;
     }
- 
+
     if (!uda_tgid_exited(ns_node->root_tgid, ns_node->tgid_time)) {
         return;
     }
- 
+
     pid_count = uda_get_ns_pid_count(ns_node->ns);
     if (pid_count != 0) {
         return;
     }
- 
+
     uda_uninit_ns_node_dev(ns_node);
     uda_destroy_ns_node(ns_node, false);
 }
@@ -1604,7 +1597,7 @@ int uda_setup_ns_node(u32 dev_num)
     TASK_TIME_TYPE tgid_time;
     int ret;
     static int first_flag = 1;
-    struct mnt_namespace *ns = uda_get_current_ns();
+    ka_mnt_namespace_t *ns = uda_get_current_ns();
     if (ns == NULL) {
         uda_err("Name space is null.\n");
         return -EFAULT;
@@ -1619,7 +1612,7 @@ int uda_setup_ns_node(u32 dev_num)
     if (uda_cur_is_host()) {
         if (uda_cur_task_is_added_to_dev_cgroup()) {
             /* Create an independent ns node for the process is added to the dev cgroup. */
-            root_tgid = current->tgid;
+            root_tgid = ka_task_get_current_tgid();
             tgid_time = current->start_time;
         }
     } else {
@@ -1640,8 +1633,8 @@ int uda_setup_ns_node(u32 dev_num)
 
 bool uda_tgid_exited(u32 tgid, TASK_TIME_TYPE start_time)
 {
-    struct task_struct *tsk = NULL;
-    struct pid *pid;
+    ka_task_struct_t *tsk = NULL;
+    ka_struct_pid_t *pid;
 
 #ifndef EMU_ST
     ka_task_rcu_read_lock();
@@ -1656,10 +1649,10 @@ bool uda_tgid_exited(u32 tgid, TASK_TIME_TYPE start_time)
         return true;
     }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0)	 
     if (start_time == tsk->start_time) {
-        ka_task_put_task_struct(tsk);
-        return false;
+        ka_task_put_task_struct(tsk);	 
+        return false;	 
     }
 #else
     if (timespec_equal(&start_time, &tsk->start_time)) {
@@ -1674,7 +1667,7 @@ bool uda_tgid_exited(u32 tgid, TASK_TIME_TYPE start_time)
 #endif
 }
 
-void uda_ns_node_destroy_work(struct work_struct *p_work)
+void uda_ns_node_destroy_work(ka_work_struct_t *p_work)
 {
     struct uda_ns_node *ns_node = ka_container_of(p_work, struct uda_ns_node, wait_destroy_work.work);
     u32 pid_count;
@@ -1714,7 +1707,7 @@ void uda_ns_node_destroy_work(struct work_struct *p_work)
     ka_task_mutex_unlock(&access_ns_mutex);
 }
 
-static void uda_cleanup_ns_node(struct mnt_namespace *ns, struct task_struct *task)
+static void uda_cleanup_ns_node(ka_mnt_namespace_t *ns, ka_task_struct_t *task)
 {
     struct uda_ns_node *ns_node = NULL;
 
@@ -1744,9 +1737,9 @@ void uda_recycle_ns_node(void)
     uda_for_each_ns_node_safe(NULL, uda_recycle_ns_node_single);
 }
 
-static int uda_task_exit_notify(struct notifier_block *self, unsigned long val, void *data)
+static int uda_task_exit_notify(ka_notifier_block_t *self, unsigned long val, void *data)
 {
-    struct task_struct *task = (struct task_struct *)data;
+    ka_task_struct_t *task = (ka_task_struct_t *)data;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)
     if ((task != NULL) && (task->tgid != 0) && (task->tgid == task->pid)) {
 #else
@@ -1759,25 +1752,27 @@ static int uda_task_exit_notify(struct notifier_block *self, unsigned long val, 
     return 0;
 }
 
-static struct notifier_block uda_task_exit_nb = {
+static ka_notifier_block_t uda_task_exit_nb = {
     .notifier_call = uda_task_exit_notify,
 };
 
 static void uda_task_exit_reg(void)
 {
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)) && defined(DRV_HOST)
-    (void)uda_task_exit_nb;
-#else
+#ifdef DRV_HOST
     (void)ka_dfx_profile_event_register(KA_PROFILE_TASK_EXIT, &uda_task_exit_nb);
+#else
+    /* Use the native kernel interfaces on the device */
+    (void)profile_event_register(PROFILE_TASK_EXIT, &uda_task_exit_nb);
 #endif
 }
 
 static void uda_task_exit_unreg(void)
 {
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)) && defined(DRV_HOST)
-    (void)uda_task_exit_nb;
-#else
+#ifdef DRV_HOST
     (void)ka_dfx_profile_event_unregister(KA_PROFILE_TASK_EXIT, &uda_task_exit_nb);
+#else
+    /* Use the native kernel interfaces on the device */
+    (void)profile_event_unregister(PROFILE_TASK_EXIT, &uda_task_exit_nb);
 #endif
 }
 

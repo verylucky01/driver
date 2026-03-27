@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -12,6 +12,7 @@
  */
 #include "securec.h"
 #include "soc_adapt.h"
+#include "pbl/pbl_uda.h"
 
 #include "ascend_kernel_hal.h"
 #include "trs_chan.h"
@@ -78,7 +79,7 @@ int trs_chan_config(struct trs_id_inst *inst)
     chan_ops = trs_soc_chan_get_stars_adapt_ops(inst);
     chan_ops->sqe_update = trs_sec_eh_chan_sqe_update;
     chan_ops->sqcq_query = trs_sec_eh_chan_stars_ops_query_sqcq;
-    ret = trs_chan_ts_inst_register(inst, trs_soc_get_hw_type(inst->devid), chan_ops);
+    ret = trs_chan_ts_inst_register(inst, trs_soc_get_hw_type(inst->devid), UDA_REMOTE, chan_ops);
     if (ret != 0) {
         trs_soc_chan_stars_ops_uninit(inst);
     }

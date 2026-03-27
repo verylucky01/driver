@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -46,17 +46,17 @@ enum shr_id_pod_msg_cmd {
 
 struct shr_id_pod_create_msg {
     struct shr_id_node_op_attr attr;
-    pid_t pid;
+    ka_pid_t pid;
 };
 
 struct shr_id_pod_set_pid_msg {
     char name[SHR_ID_NSM_NAME_SIZE];
-    pid_t pid;
+    ka_pid_t pid;
 };
 
 struct shr_id_pod_destroy_msg {
     char name[SHR_ID_NSM_NAME_SIZE];
-    pid_t pid;
+    ka_pid_t pid;
 };
 
 struct shr_id_pod_query_msg {

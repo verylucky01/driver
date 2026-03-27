@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -358,10 +358,16 @@ STATIC int devmm_ioctl_get_svm_proc_from_file(ka_file_t *file, u32 cmd, struct d
             (devmm_get_end_type() == DEVMM_END_HOST && cmd != DEVMM_SVM_INIT_PROCESS &&
             ((*svm_proc)->inited != DEVMM_SVM_INITED_FLAG ||
             (*svm_proc)->process_id.hostpid != devmm_get_current_pid()))) {
-            devmm_drv_err("Invalid svm_proc states.\n");
+#ifndef EMU_ST
+            devmm_drv_err("Invalid svm_proc states. (cmd=%u; end_type=%u; svm_proc_is_null=%d; inited=%u; hostpid=%u)\n",
+                cmd, devmm_get_end_type(), (*svm_proc == NULL),
+                ((*svm_proc == NULL) ? 0 : (*svm_proc)->inited),
+                ((*svm_proc == NULL) ? 0 : (*svm_proc)->process_id.hostpid));
+#endif
             return -EINVAL;
         }
     }
+
     return 0;
 }
 

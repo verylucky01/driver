@@ -968,7 +968,7 @@ STATIC int dcmi_get_hex_single_value_by_key(const char *info_line, const char *i
     char *end_ptr = NULL;
     size_t key_len = strlen(info_key);
     if (strncmp(info_line, info_key, key_len) == 0) {
-        *info_value = strtol(info_line + key_len, &end_ptr, DCMI_HEX_TO_STR_BASE);
+        *info_value = (int)strtol(info_line + key_len, &end_ptr, DCMI_HEX_TO_STR_BASE);
         return DCMI_OK;
     }
     return DCMI_ERR_CODE_INNER_ERR;

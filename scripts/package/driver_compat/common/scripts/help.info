@@ -1,0 +1,7 @@
+  --run                            Install run mode
+    --docker-root=<docker root fs directory>    Specify the path of docker root
+    --install-path=<path>           Install product to specific dir path
+    --install-for-all               Install for all user
+  --uninstall                       Uninstall product
+    --docker-root=<path>            Specify the path of docker root
+    --install-path=<path>           Uninstall product to specific dir path

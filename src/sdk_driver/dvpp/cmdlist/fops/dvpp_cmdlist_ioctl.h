@@ -20,7 +20,7 @@
 #include "ka_task_pub.h"
 #include "ka_common_pub.h"
 #include "dvpp_cmdlist_sqe.h"
-#include "dvpp_cmdlist_ioctl_interface.h"
+#include "dvpp_cmdlist_interface.h"
 
 typedef struct {
     ka_rw_semaphore_t rw_sem;

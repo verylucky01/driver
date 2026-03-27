@@ -47,7 +47,7 @@ struct uda_devid_trans {
 #define UDA_DEVID_TO_UDEVID         _IOWR('U', 4, struct uda_devid_trans) /* logic devid to unique devid */
 #define UDA_LUDEVID_TO_RUDEVID      _IOWR('U', 5, struct uda_devid_trans) /* local udevid to remote udevid */
 #define UDA_RUDEVID_TO_LUDEVID      _IOWR('U', 6, struct uda_devid_trans) /* remote udevid to local udevid */
-#ifdef CFG_FEATURE_ASCEND910_95_STUB
+#ifdef CFG_FEATURE_ASCEND950_STUB
 #define UDA_SET_RAW_PROC_IS_CONTAIN_FLAG      _IOWR('U', 7, unsigned int)
 #define UDA_GET_RAW_PROC_IS_CONTAIN_FLAG      _IOWR('U', 8, unsigned int)
 #define UDA_MAX_CMD        10

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,16 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
-#include <linux/time.h>
-#include <linux/hrtimer.h>
-#include <linux/jiffies.h>
-#include <linux/notifier.h>
-#include <linux/version.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
-#include <linux/panic_notifier.h>
-#endif
-
+#include "ka_common_pub.h"
 #include "ka_system_pub.h"
 #include "ka_task_pub.h"
 #include "devdrv_common.h"
@@ -46,10 +37,10 @@ struct hb_write_block {
 };
 
 struct hb_write_timer {
-    struct hrtimer timer;
-    struct work_struct work;
-    struct timespec64 last_write_time;
-    struct timespec64 last_normal_time;
+    ka_hrtimer_t timer;
+    ka_work_struct_t work;
+    ka_timespec64_t last_write_time;
+    ka_timespec64_t last_normal_time;
     unsigned long long forget_count; /* number of times heartbeat was not written for more than 12 seconds */
     int write_ret;
 };
@@ -88,7 +79,7 @@ int hb_update_heartbeat_count(void)
     return 0;
 }
 
-static bool hb_write_work_abnormal_check(struct hb_write_timer *timer_info, struct timespec64 current_time)
+static bool hb_write_work_abnormal_check(struct hb_write_timer *timer_info, ka_timespec64_t current_time)
 {
     unsigned long interval;
 
@@ -101,14 +92,14 @@ static bool hb_write_work_abnormal_check(struct hb_write_timer *timer_info, stru
     return false;
 }
 
-static enum hrtimer_restart heart_beat_write_count(struct hrtimer *htr)
+static ka_hrtimer_restart_t heart_beat_write_count(ka_hrtimer_t *htr)
 {
     int ret;
     bool abnormal = false;
     struct hb_write_timer *info = NULL;
-    struct timespec64 current_time;
+    ka_timespec64_t current_time;
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 6, 0)
-    struct timespec tmp_current_time;
+    ka_timespec_t tmp_current_time;
 #endif
 
     if (htr == NULL) {
@@ -116,7 +107,7 @@ static enum hrtimer_restart heart_beat_write_count(struct hrtimer *htr)
         return KA_HRTIMER_RESTART;
     }
 
-    info = container_of(htr, struct hb_write_timer, timer);
+    info = ka_container_of(htr, struct hb_write_timer, timer);
     ret = hb_update_heartbeat_count();
     if (ret != 0) {
         if (ret == SHM_NOT_INIT) {
@@ -151,11 +142,11 @@ static enum hrtimer_restart heart_beat_write_count(struct hrtimer *htr)
     return KA_HRTIMER_RESTART;
 }
 
-STATIC void heart_beart_write_dfx_handler(struct work_struct *work)
+STATIC void heart_beart_write_dfx_handler(ka_work_struct_t *work)
 {
     struct hb_write_timer *timer_info = NULL;
 
-    timer_info = container_of(work, struct hb_write_timer, work);
+    timer_info = ka_container_of(work, struct hb_write_timer, work);
     soft_drv_warn("Don't write heartbeat for a long time."
         "(write heartbeat ret=%d; tatol forget count=%llu; last normal write time =%llds; last write time=%llds)\n",
         timer_info->write_ret, timer_info->forget_count, timer_info->last_normal_time.tv_sec, timer_info->last_write_time.tv_sec);

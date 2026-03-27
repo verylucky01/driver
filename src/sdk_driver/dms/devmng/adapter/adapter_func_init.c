@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,6 +14,7 @@
 #include "ka_base_pub.h"
 #include "ka_task_pub.h"
 #include "adpater_def.h"
+#include "dms_define.h"
 
 static inline void *get_symbol_objective_func(const struct kernel_symbol *sym, const char *synname)
 {
@@ -26,20 +27,27 @@ static inline void *get_symbol_objective_func(const struct kernel_symbol *sym, c
 }
 
  
-void init_module_func(const struct module *mod, const struct symbol_list *fun_name_list,
+void init_module_func(const ka_module_t *mod, const struct symbol_list *fun_name_list,
     unsigned int count, struct bus_adpater_stu *adapt)
 {
     unsigned int i, j;
     void *fn = NULL;
     uintptr_t *addr = NULL;
+    bool found = false;
     ka_task_down_write(&adapt->rw_lock);
-    for (i = 0; i < mod->num_syms; i++) {
-        for (j = 0; j < count; j++) {
-            fn = get_symbol_objective_func(&mod->syms[i], fun_name_list[j].name);
+    for (i = 0; i < count; i++) {
+        found = false;
+        for (j = 0; j < mod->num_syms; j++) {
+            fn = get_symbol_objective_func(&mod->syms[j], fun_name_list[i].name);
             if (fn != NULL) {
-                addr = (uintptr_t *)((uintptr_t)adapt + fun_name_list[j].offset);
+                addr = (uintptr_t *)((uintptr_t)adapt + fun_name_list[i].offset);
                 *addr = (uintptr_t)fn;
+                found = true;
+                break;
             }
+        }
+        if (!found) {
+            dms_warn("Cannot find symbol objective func. (func_name=%s)\n", fun_name_list[i].name);
         }
     }
     ka_task_up_write(&adapt->rw_lock);

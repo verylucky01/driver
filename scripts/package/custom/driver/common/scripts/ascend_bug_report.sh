@@ -26,6 +26,7 @@ PCIE_BDF_310P="19e5:d500"
 PCIE_BDF_910="19e5:d801"
 PCIE_BDF_910B="19e5:d802"
 PCIE_BDF_910_93="19e5:d803"
+PCIE_BDF_910_95="19e5:d806"
 DEVICE_LIST="0"
 MAX_NETWORK_ID=7
 
@@ -46,6 +47,7 @@ NETWORK_INFO_MODE=1
 CHIP_NUM_910=$(lspci | grep -E "d801" | wc -l)
 CHIP_NUM_910B=$(lspci | grep -E "d802" | wc -l)
 CHIP_NUM_910_93=$(lspci | grep -E "d803" | wc -l)
+CHIP_NUM_910_95=$(lspci | grep -E "d806" | wc -l)
 
 #additional functions in this list
 g_func_list=(
@@ -204,6 +206,12 @@ get_chip_type() {
         let "CHIP_TYPE=$CHIP_TYPE|16"
         return 0
     fi
+
+    CHIP_NUM_910_95=$(lspci | grep d806 | wc -l)
+    if [ $CHIP_NUM_910_95 -ne 0 ]; then
+        let "CHIP_TYPE=$CHIP_TYPE|32"
+        return 0
+    fi
 }
 
 get_install_variable() {
@@ -214,6 +222,7 @@ get_install_variable() {
     DEVICE_BDFS_910=$(lspci -D -d $PCIE_BDF_910 | awk '{print $1}')
     DEVICE_BDFS_910B=$(lspci -D -d $PCIE_BDF_910B | awk '{print $1}')
     DEVICE_BDFS_910_93=$(lspci -D -d $PCIE_BDF_910_93 | awk '{print $1}')
+    DEVICE_BDFS_910_95=$(lspci -D -d $PCIE_BDF_910_95 | awk '{print $1}')
 }
 
 show_title() {
@@ -304,6 +313,13 @@ get_pcie_info() {
         echo "Asecnd910_93 nums: $CHIP_NUM_910_93"
         lspci | grep d803
     fi
+
+    let "tmp=$CHIP_TYPE&32"
+    if [ $tmp -ne 0 ]; then
+        echo "Asecnd910_95 nums: $CHIP_NUM_910_95"
+        lspci | grep d806
+    fi
+
     echo "\`\`\`"
 
     lspci -tv >> $LOG_DIR/$HOST_INFO_DIR/pcie_topology.log 2> /dev/null
@@ -443,7 +459,7 @@ get_path_dir() {
 
 get_sysfs_info() {
     echo "[toc]"
-    DEVICE_BDFS=${DEVICE_BDFS_310}${DEVICE_BDFS_310P}${DEVICE_BDFS_910}${DEVICE_BDFS_910B}${DEVICE_BDFS_910_93}
+    DEVICE_BDFS=${DEVICE_BDFS_310}${DEVICE_BDFS_310P}${DEVICE_BDFS_910}${DEVICE_BDFS_910B}${DEVICE_BDFS_910_93}${DEVICE_BDFS_910_95}
     for i in $DEVICE_BDFS
     do
         show_title 1 "pci_bdf --> $i"
@@ -533,7 +549,19 @@ get_build_os_info() {
 }
 
 get_A2A3_network_info() {
-    if [ $NETWORK_INFO_MODE -eq 0 ] || [ $CHIP_NUM_910 -eq 0 ]; then
+    if [ $NETWORK_INFO_MODE -eq 0 ]; then
+        return 0
+    fi
+
+    which hccn_tool > /dev/null 2>&1
+    if [ $? -eq 0 ]; then
+        echo "Collecting network info..."
+        mkdir -p $LOG_DIR/$NETWORK_INFO_DIR
+        cd $LOG_DIR/$NETWORK_INFO_DIR
+        get_device_network_info >> network.md
+    fi
+
+    if [ $CHIP_NUM_910 -ne 0 ]; then
         return 0
     fi
 
@@ -545,7 +573,7 @@ get_A2A3_network_info() {
     elif [ $product_803 -ne 0 ];then
         npu_nums=16
     else
-        exit
+        return 0
     fi
     npu_nums=$((npu_nums - 1))
 
@@ -641,14 +669,6 @@ get_A2A3_network_info() {
         echo "====> $i" >> extra_network.log;timeout 10s hccn_tool -i $i -stat_extra -g &>> extra_network.log;
         echo "-----------collect stat info success---------------"
     done
-
-    which hccn_tool > /dev/null 2>&1
-    if [ $? -eq 0 ]; then
-        echo "Collecting network info..."
-        mkdir -p $LOG_DIR/$NETWORK_INFO_DIR
-        cd $LOG_DIR/$NETWORK_INFO_DIR
-        get_device_network_info >> network.md
-    fi
 
     # get_device_info_log
     #收集device os、host os的日志

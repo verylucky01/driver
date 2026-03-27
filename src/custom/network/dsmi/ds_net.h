@@ -541,9 +541,9 @@ bool is_ATLAS_900_A3_SUPERPOD(unsigned int mainboard_id);
 bool is_ATLAS_9000_A3_SUPERPOD(unsigned int mainboard_id);
 
 #define DSMI_SET_TRANS_DATA(_trans_data, _cmd, _inbuf, _size_in, _outbuf, _size_out) do { \
-    (_trans_data).cmd = (_cmd); \
+    (_trans_data).cmd = (enum ds_net_opcode_type)(_cmd); \
     (_trans_data).inbuf = (_inbuf); \
-    (_trans_data).size_in = (_size_in); \
+    (_trans_data).size_in = (unsigned int)(_size_in); \
     (_trans_data).outbuf = (_outbuf); \
     (_trans_data).size_out = (_size_out); \
     (_trans_data).result = (-1); \

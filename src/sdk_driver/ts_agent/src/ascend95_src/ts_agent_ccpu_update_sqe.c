@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -114,6 +114,11 @@ int32_t tsagent_sqe_update(uint32_t devid, uint32_t tsid, struct trs_sqe_update_
         ts_agent_debug("sqe no need update, sqe_type=%u, devid=%u, stream_id=%u, task_id=%u, pid=%d.",
             sqe->type, devid, sqe->stream_id, sqe->task_id, update_info->pid);
         return EOK;
+    }
+
+    if (update_info->sqid == U32_MAX) {
+        ts_agent_debug("tsagent_sqe_update: stream_id=%u, sqe_type=%u, devid=%u, task_id=%u, pid=%d.",
+        sqe->stream_id, sqe->type, devid, sqe->task_id, update_info->pid);
     }
 
     ret = proc_fn(devid, tsid, update_info->pid, update_info->sqid, sqe);

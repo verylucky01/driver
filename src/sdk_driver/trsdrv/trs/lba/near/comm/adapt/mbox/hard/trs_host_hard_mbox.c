@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -69,7 +69,7 @@ static int trs_ts_mbox_irq_setup(struct trs_ts_mbox *ts_mbox)
     int ret;
 
     /* name allocated inside of kasprintf with kmalloc. name should be freed with kfree */
-    name = kasprintf(KA_GFP_KERNEL, "trs-mbox-%u-%u", ts_mbox->inst.devid, ts_mbox->inst.tsid);
+    name = ka_base_kasprintf(KA_GFP_KERNEL, "trs-mbox-%u-%u", ts_mbox->inst.devid, ts_mbox->inst.tsid);
     if (name == NULL) {
         trs_err("Irq name pack fail.\n");
         return -ENOMEM;

@@ -8,7 +8,7 @@ dcmi目录下提供了一系列DCMI接口样例，包括配置、查询、复位
 | --------- | -------------------------------------------------- | ------------------------------------------------------------ |
 | configure | [0_configure_manager](./dcmi/0_configure_manager/) | 本样例展示了从DCMI初始化到用户配置，设备共享状态配置等。         |
 | query     | [1_query_npuinfo](./dcmi/1_query_npuinfo/)         | 本样例展示了DCMI查询PCIE信息，Board信息，Flash信息等。       |
-| reset     | [2_chip_reset](./dcmi/2_chip_reset/)               | 本样例展示了DCMI复位：通过PCIE标准热复位流程复位昇腾AI处理器，包含带内和带外复位模式。 |                              |
+| reset     | [2_chip_reset](./dcmi/2_chip_reset/)               | 本样例展示了DCMI复位：通过PCIE标准热复位流程复位昇腾AI处理器，包含带内和带外复位模式。 |
 
 ## 环境准备
 

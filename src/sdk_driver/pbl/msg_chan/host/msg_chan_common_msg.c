@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,8 +11,8 @@
  * GNU General Public License for more details.
  */
 
-#include "msg_chan_main.h"
 #include "ka_kernel_def_pub.h"
+#include "msg_chan_main.h"
 
 STATIC int devdrv_set_common_msg_client(const struct devdrv_common_msg_client *msg_client, bool register_flag)
 {
@@ -80,7 +80,7 @@ int devdrv_common_msg_send(u32 devid, void *data, u32 in_data_len, u32 out_data_
     dev_ops = devdrv_add_ops_ref();
     if (dev_ops == NULL) {
         devdrv_err("Msg chan send common msg fail.\n");
-        return -EINVAL;
+        return -ENODEV;
     }
     index_id = devdrv_get_index_id_by_devid(devid);
     ret = dev_ops->ops.common_msg_send(index_id, data, in_data_len, out_data_len, real_out_len, msg_type);

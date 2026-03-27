@@ -124,7 +124,7 @@ static QUEUE_DEPLOYMENT_TYPE queue_get_deployment_type(void)
 }
 
 #ifdef CFG_FEATURE_QUE_SUPPORT_UB
-int que_get_inter_dev_status(unsigned int dev_id, unsigned int qid, int *inter_dev_state, int *peer_deploy_flag, char *share_que_name)
+int que_get_inter_dev_status(unsigned int dev_id, unsigned int qid, int *inter_dev_state, char *share_que_name)
 {
     struct queue_manages *que_manage = NULL;
 
@@ -151,7 +151,6 @@ int que_get_inter_dev_status(unsigned int dev_id, unsigned int qid, int *inter_d
     }
 
     *inter_dev_state = que_manage->inter_dev_state;
-    *peer_deploy_flag = que_manage->peer_deploy_flag;
     if (share_que_name != NULL) {
         (void)memcpy_s(share_que_name, SHARE_QUEUE_NAME_LEN, que_manage->share_queue_name, SHARE_QUEUE_NAME_LEN);
     }
@@ -159,37 +158,42 @@ int que_get_inter_dev_status(unsigned int dev_id, unsigned int qid, int *inter_d
     queue_put(qid);
     return DRV_ERROR_NONE;
 }
-#endif
 
-int que_get_inter_dev_deploy_type(unsigned int dev_id, unsigned int qid, QUEUE_DEPLOYMENT_TYPE *type)
+static int que_get_inter_dev_deploy_type(unsigned int dev_id, unsigned int qid, QUEUE_OP_SUPPORT_TYPE op_type, QUEUE_DEPLOYMENT_TYPE *type)
 {
-#ifdef CFG_FEATURE_QUE_SUPPORT_UB
     int ret;
-    int peer_deploy_flag = 0;
     int inter_dev_state = QUEUE_STATE_DISABLED;
 
-    ret = que_get_inter_dev_status(dev_id, qid, &inter_dev_state, &peer_deploy_flag, NULL);
+    ret = que_get_inter_dev_status(dev_id, qid, &inter_dev_state, NULL);
     if (ret != DRV_ERROR_NONE) {
         return ret;
     }
 
-    if ((inter_dev_state == QUEUE_STATE_UNEXPORTED) || (inter_dev_state == QUEUE_STATE_UNIMPORTED)) {
-        *type = INVALID_INTER_DEV_QUEUE;
+    if (inter_dev_state == QUEUE_STATE_DISABLED) {
+        return DRV_ERROR_NONE;
     }
 
-    if (((inter_dev_state == QUEUE_STATE_EXPORTED) || (inter_dev_state == QUEUE_STATE_IMPORTED)) &&
-        (peer_deploy_flag == 1)) {
+    if ((op_type == BOTH_SUPPORT) &&
+        ((inter_dev_state == QUEUE_STATE_EXPORTED) || (inter_dev_state == QUEUE_STATE_IMPORTED))) {
         *type = INTER_DEV_QUEUE;
+        return DRV_ERROR_NONE;
     }
-#endif
-    (void)dev_id;
-    (void)qid;
-    (void)type;
+
+    if (((op_type == EXPORT_SUPPORT) && (inter_dev_state == QUEUE_STATE_EXPORTED)) ||
+        ((op_type == IMPORT_SUPPORT) && (inter_dev_state == QUEUE_STATE_IMPORTED))) {
+        *type = INTER_DEV_QUEUE;
+        return DRV_ERROR_NONE;
+    }
+    *type = INVALID_INTER_DEV_QUEUE;
+    QUEUE_LOG_INFO("not support curr que state. (op_type=%u; state=%d)\n", (unsigned int)op_type, inter_dev_state);
+
     return DRV_ERROR_NONE;
 }
-
-static QUEUE_DEPLOYMENT_TYPE que_get_deploy_type_for_peer(unsigned int dev_id, unsigned int qid)
+#endif
+QUEUE_DEPLOYMENT_TYPE que_get_deploy_type_for_inter_dev(unsigned int dev_id, unsigned int qid, QUEUE_OP_SUPPORT_TYPE op_type)
 {
+    (void)dev_id;
+    (void)op_type;
     QUEUE_DEPLOYMENT_TYPE type = LOCAL_QUEUE;
     if (g_default_client_queue == true) {
         if (g_enable_local_queue == true) {
@@ -199,53 +203,12 @@ static QUEUE_DEPLOYMENT_TYPE que_get_deploy_type_for_peer(unsigned int dev_id, u
         }
     }
 
-    if (type == LOCAL_QUEUE) {
-        unsigned int actualqid = queue_get_actual_qid(qid);
-        (void)que_get_inter_dev_deploy_type(dev_id, actualqid, &type);
-    }
-    return type;
-}
-
-int que_get_inter_dev_que_type(unsigned int dev_id, unsigned int qid, QUEUE_DEPLOYMENT_TYPE *type)
-{
 #ifdef CFG_FEATURE_QUE_SUPPORT_UB
-    int ret, peer_deploy_flag;
-    int inter_dev_state = QUEUE_STATE_DISABLED;
-
-    ret = que_get_inter_dev_status(dev_id, qid, &inter_dev_state, &peer_deploy_flag, NULL);
-    if (ret != DRV_ERROR_NONE) {
-        return ret;
-    }
-
-    if ((inter_dev_state == QUEUE_STATE_UNEXPORTED) || (inter_dev_state == QUEUE_STATE_UNIMPORTED)) {
-        *type = INVALID_INTER_DEV_QUEUE;
-    }
-
-    if ((inter_dev_state == QUEUE_STATE_EXPORTED) || (inter_dev_state == QUEUE_STATE_IMPORTED)) {
-        *type = INTER_DEV_QUEUE;
-    }
-#endif
-    (void)dev_id;
-    (void)qid;
-    (void)type;
-    return DRV_ERROR_NONE;
-}
-
-static QUEUE_DEPLOYMENT_TYPE que_get_deploy_type_for_pub(unsigned int dev_id, unsigned int qid)
-{
-    QUEUE_DEPLOYMENT_TYPE type = LOCAL_QUEUE;
-    if (g_default_client_queue == true) {
-        if (g_enable_local_queue == true) {
-            type = (qid < CLIENT_QID_OFFSET) ? CLIENT_QUEUE : LOCAL_QUEUE;
-        } else {
-            type = CLIENT_QUEUE;
-        }
-    }
-
     if (type == LOCAL_QUEUE) {
         unsigned int actualqid = queue_get_actual_qid(qid);
-        (void)que_get_inter_dev_que_type(dev_id, actualqid, &type);
+        (void)que_get_inter_dev_deploy_type(dev_id, actualqid, op_type, &type);
     }
+#endif
     return type;
 }
 
@@ -463,7 +426,7 @@ drvError_t halQueueDestroy(unsigned int devId, unsigned int qid)
 
 drvError_t halQueueReset(unsigned int devId, unsigned int qid)
 {
-    QUEUE_DEPLOYMENT_TYPE type = que_get_deploy_type_for_pub(devId, qid);
+    QUEUE_DEPLOYMENT_TYPE type = que_get_deploy_type_for_inter_dev(devId, qid, BOTH_NOT_SUPPORT);
     unsigned int actualqid = queue_get_actual_qid(qid);
     if (que_unlikely((devId >= MAX_DEVICE) || (actualqid >= MAX_SURPORT_QUEUE_NUM))) {
         QUEUE_LOG_ERR("invalid para. (devid=%u; max_devid=%u; qid=%u; actualqid=%u; max_qid=%u)\n",
@@ -481,7 +444,7 @@ drvError_t halQueueReset(unsigned int devId, unsigned int qid)
 
 drvError_t halQueueEnQueue(unsigned int devId, unsigned int qid, void *mbuf)
 {
-    QUEUE_DEPLOYMENT_TYPE type = que_get_deploy_type_for_pub(devId, qid);
+    QUEUE_DEPLOYMENT_TYPE type = que_get_deploy_type_for_inter_dev(devId, qid, IMPORT_SUPPORT);
     unsigned int actual_qid = queue_get_actual_qid(qid);
 
     if (queue_comm_interface[type] != NULL && queue_comm_interface[type]->queue_en_queue != NULL) {
@@ -494,7 +457,7 @@ drvError_t halQueueEnQueue(unsigned int devId, unsigned int qid, void *mbuf)
 
 drvError_t halQueueDeQueue(unsigned int devId, unsigned int qid, void **mbuf)
 {
-    QUEUE_DEPLOYMENT_TYPE type = que_get_deploy_type_for_peer(devId, qid);
+    QUEUE_DEPLOYMENT_TYPE type = que_get_deploy_type_for_inter_dev(devId, qid, EXPORT_SUPPORT);
     unsigned int actual_qid = queue_get_actual_qid(qid);
 
     if (queue_comm_interface[type] != NULL && queue_comm_interface[type]->queue_de_queue != NULL) {
@@ -507,7 +470,7 @@ drvError_t halQueueDeQueue(unsigned int devId, unsigned int qid, void **mbuf)
 
 drvError_t halQueueSubscribe(unsigned int devId, unsigned int qid, unsigned int groupId, int type)
 {
-    QUEUE_DEPLOYMENT_TYPE deploy_type = que_get_deploy_type_for_pub(devId, qid);
+    QUEUE_DEPLOYMENT_TYPE deploy_type = que_get_deploy_type_for_inter_dev(devId, qid, BOTH_NOT_SUPPORT);
     unsigned int actual_qid = queue_get_actual_qid(qid);
 
     if (queue_comm_interface[deploy_type] != NULL && queue_comm_interface[deploy_type]->queue_subscribe != NULL) {
@@ -520,7 +483,7 @@ drvError_t halQueueSubscribe(unsigned int devId, unsigned int qid, unsigned int 
 
 drvError_t halQueueUnsubscribe(unsigned int devId, unsigned int qid)
 {
-    QUEUE_DEPLOYMENT_TYPE type = que_get_deploy_type_for_pub(devId, qid);
+    QUEUE_DEPLOYMENT_TYPE type = que_get_deploy_type_for_inter_dev(devId, qid, BOTH_NOT_SUPPORT);
     unsigned int actual_qid = queue_get_actual_qid(qid);
 
     if (queue_comm_interface[type] != NULL && queue_comm_interface[type]->queue_unsubscribe != NULL) {
@@ -533,7 +496,7 @@ drvError_t halQueueUnsubscribe(unsigned int devId, unsigned int qid)
 
 drvError_t halQueueSubF2NFEvent(unsigned int devId, unsigned int qid, unsigned int groupId)
 {
-    QUEUE_DEPLOYMENT_TYPE type = que_get_deploy_type_for_pub(devId, qid);
+    QUEUE_DEPLOYMENT_TYPE type = que_get_deploy_type_for_inter_dev(devId, qid, BOTH_NOT_SUPPORT);
     unsigned int actual_qid = queue_get_actual_qid(qid);
 
     if (queue_comm_interface[type] != NULL && queue_comm_interface[type]->queue_sub_f_to_nf_event != NULL) {
@@ -546,7 +509,7 @@ drvError_t halQueueSubF2NFEvent(unsigned int devId, unsigned int qid, unsigned i
 
 drvError_t halQueueUnsubF2NFEvent(unsigned int devId, unsigned int qid)
 {
-    QUEUE_DEPLOYMENT_TYPE type = que_get_deploy_type_for_pub(devId, qid);
+    QUEUE_DEPLOYMENT_TYPE type = que_get_deploy_type_for_inter_dev(devId, qid, BOTH_NOT_SUPPORT);
     unsigned int actual_qid = queue_get_actual_qid(qid);
 
     if (queue_comm_interface[type] != NULL && queue_comm_interface[type]->queue_unsub_f_to_nf_event != NULL) {
@@ -560,13 +523,15 @@ drvError_t halQueueUnsubF2NFEvent(unsigned int devId, unsigned int qid)
 drvError_t halQueueSubEvent(struct QueueSubPara *subPara)
 {
     QUEUE_DEPLOYMENT_TYPE type;
+    QUEUE_OP_SUPPORT_TYPE op_type;
 
     if (que_unlikely(subPara == NULL)) {
         QUEUE_LOG_ERR("subPara is NULL.\n");
         return DRV_ERROR_PARA_ERROR;
     }
 
-    type = que_get_deploy_type_for_pub(subPara->devId, subPara->qid);
+    op_type = (subPara->eventType == QUEUE_F2NF_EVENT) ? IMPORT_SUPPORT : EXPORT_SUPPORT;
+    type = que_get_deploy_type_for_inter_dev(subPara->devId, subPara->qid, op_type);
     subPara->qid = queue_get_actual_qid(subPara->qid);
 
     if (que_unlikely((subPara->devId >= MAX_DEVICE) || (subPara->qid >= MAX_SURPORT_QUEUE_NUM) ||
@@ -588,13 +553,15 @@ drvError_t halQueueSubEvent(struct QueueSubPara *subPara)
 drvError_t halQueueUnsubEvent(struct QueueUnsubPara *unsubPara)
 {
     QUEUE_DEPLOYMENT_TYPE type;
+    QUEUE_OP_SUPPORT_TYPE op_type;
 
     if (que_unlikely(unsubPara == NULL)) {
         QUEUE_LOG_ERR("sub_para is NULL.\n");
         return DRV_ERROR_PARA_ERROR;
     }
 
-    type = que_get_deploy_type_for_pub(unsubPara->devId, unsubPara->qid);
+    op_type = (unsubPara->eventType == QUEUE_F2NF_EVENT) ? IMPORT_SUPPORT : EXPORT_SUPPORT;
+    type = que_get_deploy_type_for_inter_dev(unsubPara->devId, unsubPara->qid, op_type);
     unsubPara->qid = queue_get_actual_qid(unsubPara->qid);
 
     if (que_unlikely((unsubPara->devId >= MAX_DEVICE) || (unsubPara->qid >= MAX_SURPORT_QUEUE_NUM) ||
@@ -615,7 +582,7 @@ drvError_t halQueueUnsubEvent(struct QueueUnsubPara *unsubPara)
 
 drvError_t halQueueQueryInfo(unsigned int devId, unsigned int qid, QueueInfo *queInfo)
 {
-    QUEUE_DEPLOYMENT_TYPE type = que_get_deploy_type_for_peer(devId, qid);
+    QUEUE_DEPLOYMENT_TYPE type = que_get_deploy_type_for_inter_dev(devId, qid, BOTH_SUPPORT);
     unsigned int actualqid = queue_get_actual_qid(qid);
     drvError_t ret;
 
@@ -651,7 +618,7 @@ drvError_t halQueueGetStatus(unsigned int devId, unsigned int qid, QUEUE_QUERY_I
         }
         type = INTER_DEV_QUEUE;
     } else {
-        type = que_get_deploy_type_for_peer(devId, qid);
+        type = que_get_deploy_type_for_inter_dev(devId, qid, BOTH_SUPPORT);
     }
 
     if (que_unlikely((devId >= MAX_DEVICE)  || (len > EVENT_PROC_RSP_LEN) || (data == NULL)
@@ -746,6 +713,38 @@ static drvError_t queue_query_deploy_type(QueueQueryInputPara *in_put, QueueQuer
     return DRV_ERROR_NONE;
 }
 
+static drvError_t queue_query_support_inter_dev_que(QueueQueryOutputPara *out_put)
+{
+#ifdef DRV_HOST
+#ifndef EMU_ST
+    drvError_t ret;
+    int64_t val;
+    QueQuerySupportInterDevQue *out_buff = (QueQuerySupportInterDevQue *)out_put->outBuff;
+
+    if ((out_put->outLen < sizeof(QueQuerySupportInterDevQue))) {
+        QUEUE_LOG_ERR("para is invalid. (out_len=%u)\n", out_put->outLen);
+        return DRV_ERROR_PARA_ERROR;
+    }
+
+    ret = dms_get_connect_type(&val);
+    if (ret != DRV_ERROR_NONE) {
+        QUEUE_LOG_ERR("dms_get_connect_type failed. (ret=%d)\n", ret);
+        return ret;
+    }
+
+    if (val == HOST_DEVICE_CONNECT_TYPE_UB) {
+        out_buff->value = 1; /* 1:support */
+    } else {
+        out_buff->value = 0; /* 0:not support */
+    }
+#endif
+
+    return DRV_ERROR_NONE;
+#endif
+
+    return DRV_ERROR_NOT_SUPPORT;
+}
+
 static void queue_query_update_input(QueueQueryCmdType cmd, QueueQueryInputPara *in_put)
 {
     QueueQueryInput *in_buff = (QueueQueryInput *)(in_put->inBuff);
@@ -800,6 +799,10 @@ drvError_t halQueueQuery(unsigned int devId, QueueQueryCmdType cmd, QueueQueryIn
         return queue_query_deploy_type(inPut, outPut);
     }
 
+    if (cmd == QUEUE_QUERY_SUPPORT_INTER_DEV_QUE) {
+        return queue_query_support_inter_dev_que(outPut);
+    }
+
     type = queue_get_deployment_type();
     if (queue_comm_interface[type] != NULL && queue_comm_interface[type]->queue_query != NULL) {
         queue_query_update_input(cmd, inPut);
@@ -817,7 +820,7 @@ drvError_t halQueueQuery(unsigned int devId, QueueQueryCmdType cmd, QueueQueryIn
 drvError_t halQueuePeekData(unsigned int devId, unsigned int qid, unsigned int flag,
     QueuePeekDataType type, void **mbuf)
 {
-    QUEUE_DEPLOYMENT_TYPE deploy_type = que_get_deploy_type_for_peer(devId, qid);
+    QUEUE_DEPLOYMENT_TYPE deploy_type = que_get_deploy_type_for_inter_dev(devId, qid, EXPORT_SUPPORT);
     unsigned int actual_qid = queue_get_actual_qid(qid);
     if ((devId >= MAX_DEVICE) || (actual_qid >= MAX_SURPORT_QUEUE_NUM) || (mbuf == NULL)) {
         QUEUE_LOG_ERR("input param is invalid. (devId=%u; deploy_type=%u; in_qid=%u; actual_qid=%u; mbuf_is_null=%d)\n",
@@ -882,19 +885,19 @@ static void queueSetUpdateInput(QueueSetCmdType cmd, QueueSetInputPara *input)
 
 drvError_t halQueueSet(unsigned int devId, QueueSetCmdType cmd, QueueSetInputPara *input)
 {
-    QUEUE_DEPLOYMENT_TYPE type = queue_get_deployment_type();
     QueueSetInput *in_buff = NULL;
+    QUEUE_DEPLOYMENT_TYPE type = queue_get_deployment_type();
     if (cmd == QUEUE_ENABLE_LOCAL_QUEUE) {
         return queue_enable_local_queue();
     } else if (cmd == QUEUE_ENABLE_CLIENT_EVENT_MCAST) {
         type = CLIENT_QUEUE; /* Only clent queue deploy supports multicast */
     } else if (cmd == QUEUE_SET_WORK_MODE) {
-        if ((type == LOCAL_QUEUE) && (input != NULL)) {
-            in_buff = (QueueSetInput *)(input->inBuff);
-            if (in_buff != NULL) {
-                type = que_get_deploy_type_for_peer(devId, in_buff->queSetWorkMode.qid);
-            }
-        }
+         if ((type == LOCAL_QUEUE) && (input != NULL)) { 
+             in_buff = (QueueSetInput *)(input->inBuff); 
+             if (in_buff != NULL) { 
+                 type = que_get_deploy_type_for_inter_dev(devId, in_buff->queSetWorkMode.qid, EXPORT_SUPPORT);
+             } 
+         }
     }
 
     if (queue_comm_interface[type] != NULL && queue_comm_interface[type]->queue_set != NULL) {
@@ -909,7 +912,7 @@ drvError_t halQueueSet(unsigned int devId, QueueSetCmdType cmd, QueueSetInputPar
 void clear_inter_dev_queue(unsigned int dev_id)
 {
 #ifdef CFG_FEATURE_QUE_SUPPORT_UB
-    int ret, qid_idx, inter_qid, peer_deploy_flag;
+    int ret, qid_idx, inter_qid;
     int inter_dev_state = QUEUE_STATE_DISABLED;
     struct shareQueInfo que_info = {0};
     unsigned int local_dev_id;
@@ -922,7 +925,7 @@ void clear_inter_dev_queue(unsigned int dev_id)
     local_dev_id = dev_id;
 #endif
     for (qid_idx = 0; qid_idx < CLIENT_QID_OFFSET; qid_idx++) {
-        ret = que_get_inter_dev_status(local_dev_id, qid_idx, &inter_dev_state, &peer_deploy_flag, que_info.shareQueName);
+        ret = que_get_inter_dev_status(local_dev_id, qid_idx, &inter_dev_state, que_info.shareQueName);
         if (ret != DRV_ERROR_NONE) {
             continue;
         }

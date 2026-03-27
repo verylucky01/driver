@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -12,9 +12,8 @@
  */
 #ifndef __DMC_LOG_EVENT_WRITE_H__
 #define __DMC_LOG_EVENT_WRITE_H__
-#include <linux/spinlock.h>
-#include <linux/wait.h>
-#include <linux/atomic.h>
+#include "ka_base_pub.h"
+#include "ka_task_pub.h"
 
 #define LOG_PRINT_LEN         0x400     // 1024 Bytes
 
@@ -22,9 +21,9 @@ typedef struct log_drv_fault_mng {
     unsigned int buf_read;
     unsigned int buf_write;
     unsigned int buf_size;
-    spinlock_t spinlock;
-    wait_queue_head_t wq;
-    atomic_t status;
+    ka_task_spinlock_t spinlock;
+    ka_wait_queue_head_t wq;
+    ka_atomic_t status;
     char printk_buf[LOG_PRINT_LEN];
     unsigned char *vir_addr; // Log Ring Buffer
     unsigned char *temp_buf;

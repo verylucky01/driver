@@ -43,7 +43,7 @@ static int32_t MsnGetResult(const ArgInfo *argInfo, char *resultBuf, uint32_t bu
         argInfo->deviceId, (int32_t)msnReq->cmdType, msnReq->subCmd, msnReq->valueLen, (int32_t)msnReq->valueLen,
         msnReq->value);
 
-    const uint32_t timeout = 30 * 1000; // timeout 30s
+    const uint32_t timeout = 120 * 1000; // timeout 120s
     int32_t ret = AdxDevCommShortLink(HDC_SERVICE_TYPE_IDE_FILE_TRANS, req, resultBuf, bufLen, timeout);
     MsnFree(req);
     ONE_ACT_ERR_LOG(ret != IDE_DAEMON_OK, return EN_ERROR,
@@ -51,10 +51,25 @@ static int32_t MsnGetResult(const ArgInfo *argInfo, char *resultBuf, uint32_t bu
     return EN_OK;
 }
 
+STATIC bool IsHaveRootPermission(void)
+{
+#if (OS_TYPE == LINUX)
+    return geteuid() == 0;
+#else
+    return false;
+#endif
+}
 int32_t MsnConfig(const ArgInfo *argInfo)
 {
     ONE_ACT_ERR_LOG(argInfo == NULL, return EN_ERROR, "argInfo is NULL");
     ONE_ACT_ERR_LOG(argInfo->cmdType == INVALID_CMD, return EN_ERROR, "cmdType is INVALID_CMD");
+    if (argInfo->cmdType == CONFIG_SET) {
+        if (!IsHaveRootPermission()) {
+            SELF_LOG_ERROR("Not have permission to set configurations.");
+            MSNPU_PRINT_ERROR("Not have permission to set configurations.");
+            return EN_ERROR;
+        }
+    }
 
     char resultBuf[MSG_MAX_LEN] = {0};
     int32_t ret = MsnGetResult(argInfo, resultBuf, MSG_MAX_LEN);

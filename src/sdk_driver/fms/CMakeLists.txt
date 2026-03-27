@@ -7,7 +7,7 @@
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 # ------------------------------------------------------------------------------------------------------------
-set(asdrv_fms_depends drv_seclib_host asdrv_pbl drv_pcie_host)
+set(asdrv_fms_depends drv_seclib_host ascend_kernel_open_adapt asdrv_pbl drv_pcie_host)
 
 list(APPEND MAKE_ARGS
     KBUILD_MODPOST_WARN=1

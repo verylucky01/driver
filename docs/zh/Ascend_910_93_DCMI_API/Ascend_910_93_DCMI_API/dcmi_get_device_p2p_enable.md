@@ -145,7 +145,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001206467200_zh-cn_topic_0000001223414455_zh-cn_topic_0000001148246279_toc533412083"></a>**
 
-```c
+```
 int ret = 0;
 int card_id = 0;
 int device_id = 0;
@@ -157,3 +157,4 @@ if (ret != 0) {
 }
 …
 ```
+

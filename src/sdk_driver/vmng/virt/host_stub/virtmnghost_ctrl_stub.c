@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,12 +11,11 @@
  * GNU General Public License for more details.
  */
 
-#include "vmng_kernel_interface.h"
-#include "virtmng_public_def.h"
 #include "ka_pci_pub.h"
 #include "ka_memory_pub.h"
-#include "ka_base_pub.h"
 #include "ka_kernel_def_pub.h"
+#include "vmng_kernel_interface.h"
+#include "virtmng_public_def.h"
 
 #define PCI_VENDOR_ID_HUAWEI 0x19e5
 #define HISI_EP_DEVICE_ID_MINIV1 0xd100
@@ -36,7 +35,9 @@ static const ka_pci_device_id_t g_vmng_stub_tbl[] = {{ KA_PCI_VDEVICE(HUAWEI, HI
                                                    { 0x203F, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
                                                    { 0x20C6, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
                                                    { 0x203F, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
-						   {}};
+                                                   { 0x20E9, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+                                                   { 0x20E9, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+                                                   {}};
 KA_MODULE_DEVICE_TABLE(pci, g_vmng_stub_tbl);
 
 

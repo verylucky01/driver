@@ -952,7 +952,7 @@ int dsmi_get_vdevice_info(__attribute__((unused)) unsigned int devid, __attribut
     return DRV_ERROR_NOT_SUPPORT;
 }
 
-#if defined CFG_SOC_PLATFORM_CLOUD || defined CFG_FEATURE_ECC_DDR
+#if defined CFG_SOC_PLATFORM_CLOUD || defined CFG_FEATURE_ECC_DDR || defined CFG_SOC_PLATFORM_CLOUD_V4
 STATIC int dsmi_cmd_get_multi_ecc_time_info(int device_id, struct dsmi_multi_ecc_time_data *multi_ecc_time_data)
 {
     DM_COMMAND_BIGIN(DEV_MON_CMD_GET_MULTI_ECC_TIME_INFO, device_id, sizeof(unsigned char),
@@ -978,7 +978,7 @@ STATIC int dsmi_cmd_get_multi_ecc_record_info(int device_id, int data_index, uns
 
 int dsmi_get_multi_ecc_time_info(int device_id, struct dsmi_multi_ecc_time_data *multi_ecc_time_data)
 {
-#if defined CFG_SOC_PLATFORM_CLOUD || defined CFG_FEATURE_ECC_DDR
+#if defined CFG_SOC_PLATFORM_CLOUD || defined CFG_FEATURE_ECC_DDR || defined CFG_SOC_PLATFORM_CLOUD_V4
     int ret;
 
     if (multi_ecc_time_data == NULL) {
@@ -1001,7 +1001,7 @@ int dsmi_get_multi_ecc_time_info(int device_id, struct dsmi_multi_ecc_time_data 
 int dsmi_get_multi_ecc_record_info(int device_id, unsigned int *ecc_count, unsigned char read_type,
     unsigned char module_type, struct dsmi_ecc_common_data *ecc_common_data_s)
 {
-#if defined CFG_SOC_PLATFORM_CLOUD || defined CFG_FEATURE_ECC_DDR
+#if defined CFG_SOC_PLATFORM_CLOUD || defined CFG_FEATURE_ECC_DDR || defined CFG_SOC_PLATFORM_CLOUD_V4
     int ret;
     unsigned int data_index = 0;
     unsigned int record_count = 0;
@@ -1230,4 +1230,11 @@ int dsmi_get_custom_op_secverify_cert_show_info(unsigned int device_id, const ch
 #else
     return DRV_ERROR_NOT_SUPPORT;
 #endif
+}
+
+int dsmi_get_ub_bandwidth(int device_id __attribute__((unused)), int udie_id __attribute__((unused)), 
+                          int port_id __attribute__((unused)), unsigned int time_interval __attribute__((unused)),
+                          struct ub_bandwidth_t *bw __attribute__((unused)))
+{
+    return DRV_ERROR_NOT_SUPPORT;
 }

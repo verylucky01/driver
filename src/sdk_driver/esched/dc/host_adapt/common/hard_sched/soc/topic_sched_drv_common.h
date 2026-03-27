@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -31,5 +31,6 @@ int esched_get_real_pid(struct topic_sched_mailbox *mb, u32 devid, u32 pid);
 bool esched_drv_check_dst_is_support(u32 dst_engine);
 int esched_drv_get_ccpu_flag(u32 dst_engine);
 void esched_drv_flush_mb_mbid(u8 *mb_id_ptr, u8 mb_id);
+int esched_convert_src_pid_to_cp_pid(struct topic_sched_mailbox *mb, u32 devid, int cp_type);
 
 #endif

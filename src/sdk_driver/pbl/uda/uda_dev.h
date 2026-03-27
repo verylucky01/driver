@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,7 +14,8 @@
 #ifndef UDA_DEV_H
 #define UDA_DEV_H
 
-#include <linux/kref.h>
+#include "ka_base_pub.h"
+#include "ka_task_pub.h"
 
 #include "securec.h"
 
@@ -29,9 +30,18 @@
 
 #define UDA_REORDER_GROUP_DEV_MAX_NUM 4
 #define UDA_GUID_LEN 4
+#define UDA_UDEVID_REORDER_WORK_FINISH 1
+
+#define UDA_ALL_DEV_UP_WORK_FINISH 1
+#define UDA_ENABLE_CHAR_NUMBERING 1
+#ifdef CFG_FEATURE_CHAR_NUMBERING_BY_LOGIC_ID
+#   define UDA_WAIT_ALL_DEV_UP_FLAG true
+#else
+#   define UDA_WAIT_ALL_DEV_UP_FLAG false
+#endif
 
 struct uda_dev_inst {
-    struct kref ref;
+    ka_kref_t ref;
     u32 udevid;
     u32 inst_id;
     u32 status;
@@ -45,10 +55,14 @@ struct uda_dev_inst {
 };
 
 struct uda_reorder_insts {
+    unsigned int udevid;
+    unsigned int logic_id;
     unsigned int dev_add_num;
-    struct work_struct udevid_reorder_work;
+    unsigned int wait_all_dev_work_state;
+    ka_work_struct_t wait_all_dev_work;
     struct uda_dev_type dev_type;
     struct uda_dev_para *dev_para;
+    ka_mutex_t work_mutex;
 };
 
 static inline bool uda_is_init_status(u32 status)
@@ -183,5 +197,7 @@ void uda_module_id_sort(unsigned int start, unsigned int end);
 int uda_dev_init(void);
 void uda_dev_uninit(void);
 
+u32 uda_get_dev_num_all(void);
+u32 uda_get_dev_num_local(void);
 #endif
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -18,8 +18,8 @@
 
 void queue_proc_fs_add_process(struct queue_context *ctx);
 void queue_proc_fs_del_process(struct queue_context *ctx);
-void queue_proc_fs_add_qid(struct queue_qid_status *status, struct proc_dir_entry *parent);
-void queue_proc_fs_del_qid(struct queue_qid_status *status, struct proc_dir_entry *parent);
+void queue_proc_fs_add_qid(struct queue_qid_status *status, ka_proc_dir_entry_t *parent);
+void queue_proc_fs_del_qid(struct queue_qid_status *status, ka_proc_dir_entry_t *parent);
 void queue_proc_fs_init(void);
 void queue_proc_fs_uninit(void);
 #endif

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,22 +10,17 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
-#include <linux/time.h>
-#include <linux/jiffies.h>
-#include <linux/notifier.h>
-#include <linux/hrtimer.h>
-#include <linux/moduleparam.h>
+#include "ka_base_pub.h"
+#include "ka_common_pub.h"
+#include "ka_kernel_def_pub.h"
+#include "ka_fs_pub.h"
+#include "ka_system_pub.h"
+#include "ka_task_pub.h"
 
 #include "davinci_interface.h"
 #include "pbl/pbl_davinci_api.h"
 #include "soft_fault_define.h"
 #include "heart_beat.h"
-#include "ka_kernel_def_pub.h"
-#include "ka_fs_pub.h"
-#include "ka_system_pub.h"
-#include "ka_base_pub.h"
-#include "ka_task_pub.h"
 #include "hb_read.h"
 
 #ifdef CFG_ENV_FPGA
@@ -37,11 +32,11 @@
 #endif
 
 struct hb_read_timer {
-    struct hrtimer timer;
-    struct work_struct hb_read_work; /* work for read the heart beat count */
-    struct workqueue_struct *hb_read_wq;
-    struct timespec64 last_normal_record;
-    struct timespec64 last_time_record;
+    ka_hrtimer_t timer;
+    ka_work_struct_t hb_read_work; /* work for read the heart beat count */
+    ka_workqueue_struct_t *hb_read_wq;
+    ka_timespec64_t last_normal_record;
+    ka_timespec64_t last_time_record;
     unsigned long long miss_count;
 };
 
@@ -162,6 +157,7 @@ void hb_read_one_device_count(unsigned int dev_id)
     int ret;
     unsigned int max_lost_count = KA_UINT_MAX;
     struct devdrv_manager_info *manager_info = devdrv_get_manager_info();
+    static unsigned int hb_read_fail_count[ASCEND_DEV_MAX_NUM] = {0};
 
     if (!check_is_need_read(dev_id, manager_info, hb_read_item)) {
         return;
@@ -172,8 +168,11 @@ void hb_read_one_device_count(unsigned int dev_id)
         return;
     }
 
-    ret = hb_get_heart_beat_count(dev_id, &cur_count);
+    ret = hb_get_heart_beat_count(dev_id, &cur_count, &hb_read_fail_count[dev_id]);
     if (ret != 0) {
+        if (hb_read_fail_count[dev_id] == max_lost_count) {	 
+ 	        goto HEARTBEAT_LOST;
+ 	    }
         return;
     }
     cur_time = ka_system_ktime_get_raw_ns();
@@ -184,30 +183,34 @@ void hb_read_one_device_count(unsigned int dev_id)
     hb_read_item->last_read_time = cur_time;
 
     if (check_is_heart_beat_lost(hb_read_item, cur_count, max_lost_count)) {
-        soft_drv_err(
-            "Heartbeat lost! (device_id=%u; old_count=%llu; current_count=%llu; lost_count=%d; "
-            "total_lost_count=%llu; miss_read_count=%llu).\n",
-            dev_id, hb_read_item->old_count, cur_count, hb_read_item->lost_count,
-            hb_read_item->total_lost_count, hb_read_item->miss_read_count);
-        manager_info->device_status[dev_id] = DRV_STATUS_COMMUNICATION_LOST;
-        hb_read_item_work_stop(dev_id, hb_read_item);
-        ka_task_queue_work(hb_read_item->hb_lost_wq, &hb_read_item->hb_lost_work);
+        goto HEARTBEAT_LOST;
     } else {
         hb_read_item->old_count = cur_count;
     }
+    return;
+ HEARTBEAT_LOST:	 
+ 	soft_drv_err(
+ 	    "Heartbeat lost! (device_id=%u; old_count=%llu; current_count=%llu; lost_count=%d; "
+ 	    "total_lost_count=%llu; miss_read_count=%llu; hb_read_fail_count=%u).\n",
+ 	    dev_id, hb_read_item->old_count, cur_count, hb_read_item->lost_count,
+ 	    hb_read_item->total_lost_count, hb_read_item->miss_read_count, hb_read_fail_count[dev_id]);
+ 	manager_info->device_status[dev_id] = DRV_STATUS_COMMUNICATION_LOST;
+ 	hb_read_item_work_stop(dev_id, hb_read_item);
+ 	ka_task_queue_work(hb_read_item->hb_lost_wq, &hb_read_item->hb_lost_work);
+ 	return;
 }
 
-static void heart_beat_read_work(struct work_struct *hb_read_work)
+static void heart_beat_read_work(ka_work_struct_t *hb_read_work)
 {
     unsigned int dev_id;
 
-    for (dev_id = 0; dev_id < DEVICE_NUM_MAX; dev_id++) {
+    for (dev_id = 0; dev_id < ASCEND_DEV_MAX_NUM; dev_id++) {
         hb_read_one_device_count(dev_id);
     }
     return;
 }
 
-static enum hrtimer_restart hb_read_timer_irq_handler(struct hrtimer *htr)
+static ka_hrtimer_restart_t hb_read_timer_irq_handler(ka_hrtimer_t *htr)
 {
     ka_task_queue_work(g_hb_read_timer.hb_read_wq, &g_hb_read_timer.hb_read_work);
     ka_system_hrtimer_forward_now(htr, ka_system_ktime_set(HEART_BEAT_READ_TIMER_EXPIRE_SEC, 0));
@@ -215,11 +218,11 @@ static enum hrtimer_restart hb_read_timer_irq_handler(struct hrtimer *htr)
 }
 #endif
 
-static void heart_beat_lost_work(struct work_struct *hb_lost_work)
+static void heart_beat_lost_work(ka_work_struct_t *hb_lost_work)
 {
     int ret;
     unsigned int dev_id;
-    struct hb_read_block *hb_read_item = container_of(hb_lost_work, struct hb_read_block, hb_lost_work);
+    struct hb_read_block *hb_read_item = ka_container_of(hb_lost_work, struct hb_read_block, hb_lost_work);
 
     dev_id = hb_read_item->dev_id;
     ret = hb_report_heart_beat_lost_event(dev_id);

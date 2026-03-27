@@ -185,6 +185,7 @@ struct que_rx {
 
     unsigned long long copied_iovec_size;
     unsigned long long total_iovec_size;
+    unsigned long long total_copy_size;
 
     struct que_rx_mbuf rx_mbuf;
 
@@ -245,6 +246,7 @@ struct que_ini_proc {
     int sn        : 8;
     int tgt_time  : 24;
     unsigned int cnt[INI_CNT_MAX];
+    unsigned int d2d_flag;
 };
 
 struct que_tgt_proc {
@@ -270,6 +272,7 @@ struct que_tgt_proc {
     unsigned int total_iovec_num;
     uint64_t *timestamp;
     unsigned int cnt[TGT_CNT_MAX];
+    unsigned int d2d_flag;
 };
 
 struct que_chan {
@@ -430,6 +433,8 @@ struct que_inter_dev_export_import_in_msg {
     unsigned int peer_dev_id;
     char share_queue_name[SHARE_QUEUE_NAME_MAX_LEN];
     unsigned int qid;
+    pid_t devpid;
+    unsigned int grpid;
 };
 
 struct que_inter_dev_import_out_msg {
@@ -438,6 +443,8 @@ struct que_inter_dev_import_out_msg {
     int work_mode;
     int flow_ctrl_flag;
     unsigned int flow_ctrl_drop_time;
+    pid_t devpid;
+    unsigned int grpid;
 };
 
 #define QUE_MAX_QUE_LIST_NUM (50)

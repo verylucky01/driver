@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -41,6 +41,8 @@ typedef enum {
     ABL_PATCH_IMG_ID,
     TSFW_PATCH_IMG_ID,
     TSFW_PLUGIN_IMG_ID,
+    TSFW_BIN_IMG_ID,
+    RMO_RES_CFG_FILE_IMG_ID,
     IMAGE_ID_MAX
 } HAL_IMG_ID;
 

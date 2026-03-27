@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -21,6 +21,12 @@
 #undef CONFIG_DEBUG_BUGVERBOSE
 #endif
 
+#include "ka_kernel_def_pub.h"
+#include "ka_compiler_pub.h"
+#include "ka_fs_pub.h"
+#include "ka_barrier_pub.h"
+#include "ka_driver_pub.h"
+#include "ka_base_pub.h"
 #include "pbl/pbl_uda.h"
 #ifdef CFG_FEATURE_PCIE_PROTO_DIP /* Dependency Inversion Principle */
 #include "pbl/pbl_soc_res_sync.h"
@@ -43,11 +49,6 @@
 #include "devdrv_pci.h"
 #include "devdrv_mem_alloc.h"
 #include "devdrv_adapt.h"
-#include "ka_kernel_def_pub.h"
-#include "ka_fs_pub.h"
-#include "ka_barrier_pub.h"
-#include "ka_driver_pub.h"
-#include "ka_base_pub.h"
 
 #ifdef CFG_FEATURE_PCIE_SENTRY
 #include "devdrv_sentry.h"
@@ -564,7 +565,7 @@ STATIC int devdrv_init_interrupt(struct devdrv_pci_ctrl *pci_ctrl)
 
 STATIC bool devdrv_msix_can_disable(ka_pci_dev_t *pdev)
 {
-    struct msi_desc *entry = NULL;
+    ka_msi_desc_t *entry = NULL;
     int action_num = 0;
     u32 i;
 
@@ -609,7 +610,7 @@ int devdrv_uninit_interrupt(struct devdrv_pci_ctrl *pci_ctrl)
     /* for later version: devdrv_msix_can_disable
      * for earlier version: devdrv_can_disable_msix
      */
-    devdrv_is_msix_can_disable = ka_base_register_func_by_pdev(devdrv_msix_can_disable, 
+    devdrv_is_msix_can_disable = ka_base_register_func_by_pdev(devdrv_msix_can_disable,
         devdrv_can_disable_msix);
     if (devdrv_is_msix_can_disable(pci_ctrl->pdev) == true) {
         ka_pci_disable_msix(pci_ctrl->pdev);
@@ -909,7 +910,6 @@ static int devdrv_sync_soc_res(u32 udevid, struct res_sync_target *target, char 
         return -EINVAL;
     }
 
-    devdrv_info("devdrv_sync_soc_res. (udevid=%u, index_id=%u)\n", udevid, index_id);
     pci_ctrl = devdrv_pci_ctrl_get(index_id);
     if (pci_ctrl != NULL) {
         ret = _devdrv_sync_soc_res(pci_ctrl, target, buf, buf_len);
@@ -942,6 +942,7 @@ static int devdrv_pack_master_id_to_uda(u32 index_id, struct uda_dev_para *uda_p
 STATIC int devdrv_add_davinci_notifier_func(u32 udevid, enum uda_notified_action action)
 {
     int ret = 0;
+    u32 index_id;
 
     if (udevid >= MAX_DEV_CNT) {
         devdrv_err("Invalid para. (udevid=%u)\n", udevid);
@@ -959,7 +960,10 @@ STATIC int devdrv_add_davinci_notifier_func(u32 udevid, enum uda_notified_action
             return ret;
         }
     }
-    devdrv_info("add_davinci_notifier_func success. (udevid=%u; action=%d; ret=%d)\n", udevid, (u32)action, ret);
+
+    (void)uda_udevid_to_add_id(udevid, &index_id);
+    devdrv_info("add_davinci_notifier_func success. (udevid=%u; index_id=%u; action=%d; ret=%d)\n",
+        udevid, index_id, (u32)action, ret);
 
     return 0;
 }
@@ -1242,7 +1246,7 @@ void devdrv_set_resmng_hccs_link_status_and_group_id(struct devdrv_pci_ctrl *pci
 
 void devdrv_set_resmng_host_phy_match_flag(struct devdrv_pci_ctrl *pci_ctrl)
 {
-    void __iomem *base = NULL;
+    void __ka_mm_iomem *base = NULL;
     int ret;
     u32 host_flag;
 
@@ -1618,7 +1622,7 @@ int devdrv_cfg_pdev(ka_pci_dev_t *pdev)
 #if defined(ASCEND910_93_EX) && defined(ENABLE_BUILD_PRODUCT)
     pos = ka_pci_get_aer_cap(pdev);
     if (pos){
-        devdrv_info("cleanup_aer_error_status.\n");
+        devdrv_info("cleanup_aer_status.\n");
         ka_pci_read_config_dword(pdev, pos + PCI_ERR_COR_STATUS, &status);
         ka_pci_write_config_dword(pdev, pos + PCI_ERR_COR_STATUS, status);
 
@@ -1749,10 +1753,10 @@ STATIC int devdrv_pcie_p2p_attr_op(struct devdrv_base_comm_p2p_attr *p2p_attr)
 
     switch (p2p_attr->op) {
         case DEVDRV_BASE_P2P_ADD:
-            ret = devdrv_enable_p2p(ka_task_get_current_tgid(), p2p_attr->devid, p2p_attr->peer_dev_id);
+            ret = devdrv_enable_p2p(ka_task_get_current_tgid(), p2p_attr->devid, p2p_attr->peer_dev_id, p2p_attr->type);
             break;
         case DEVDRV_BASE_P2P_DEL:
-            ret = devdrv_disable_p2p(ka_task_get_current_tgid(), p2p_attr->devid, p2p_attr->peer_dev_id);
+            ret = devdrv_disable_p2p(ka_task_get_current_tgid(), p2p_attr->devid, p2p_attr->peer_dev_id, p2p_attr->type);
             break;
         case DEVDRV_BASE_P2P_QUERY:
             if (devdrv_is_p2p_enabled(p2p_attr->devid, p2p_attr->peer_dev_id)) {
@@ -1897,6 +1901,40 @@ struct devdrv_comm_ops g_drv_pcie_ops = {
     .add_pasid = devdrv_pcie_process_pasid_add,
     .del_pasid = devdrv_pcie_process_pasid_del,
     .urma_copy = NULL,
+    .dma_sync_copy = devdrv_pci_dma_sync_copy,
+    .dma_async_copy = devdrv_pci_dma_async_copy,
+    .dma_sync_link_copy = devdrv_pci_dma_sync_link_copy,
+    .dma_async_link_copy = devdrv_pci_dma_async_link_copy,
+    .dma_sync_copy_plus = devdrv_pci_dma_sync_copy_plus,
+    .dma_async_copy_plus = devdrv_pci_dma_async_copy_plus,
+    .dma_sync_link_copy_plus = devdrv_pci_dma_sync_link_copy_plus,
+    .dma_async_link_copy_plus = devdrv_pci_dma_async_link_copy_plus,
+    .dma_sync_link_copy_extend = devdrv_pci_dma_sync_link_copy_extend,
+    .dma_sync_link_copy_plus_extend = devdrv_pci_dma_sync_link_copy_plus_extend,
+    .dma_done_schedule = devdrv_pci_dma_done_schedule,
+    .dma_get_sq_cq_desc_size = devdrv_pci_dma_get_sq_cq_desc_size,
+    .dma_fill_desc_of_sq = devdrv_pci_dma_fill_desc_of_sq,
+    .dma_fill_desc_of_sq_ext = devdrv_pci_dma_fill_desc_of_sq_ext,
+    .dma_link_prepare = devdrv_pci_dma_link_prepare,
+    .dma_link_free = devdrv_pci_dma_link_free,
+    .dma_sqcq_desc_check = devdrv_pci_dma_sqcq_desc_check,
+    .dma_prepare_alloc_sq_addr = devdrv_pci_dma_prepare_alloc_sq_addr,
+    .dma_prepare_free_sq_addr = devdrv_pci_dma_prepare_free_sq_addr,
+    .devdrv_dma_alloc_coherent = devdrv_pci_dma_alloc_coherent,
+    .devdrv_dma_zalloc_coherent = devdrv_pci_dma_zalloc_coherent,
+    .devdrv_dma_free_coherent = devdrv_pci_dma_free_coherent,
+    .devdrv_dma_map_single = devdrv_pci_dma_map_single,
+    .devdrv_dma_unmap_single = devdrv_pci_dma_unmap_single,
+    .devdrv_dma_map_page = devdrv_pci_dma_map_page,
+    .devdrv_dma_unmap_page = devdrv_pci_dma_unmap_page,
+    .devdrv_dma_map_resource = devdrv_pci_dma_map_resource,
+    .devdrv_dma_unmap_resource = devdrv_pci_dma_unmap_resource,
+ #ifdef CFG_FEATURE_S2S
+    .register_s2s_msg = devdrv_pci_register_s2s_msg_proc_func,
+    .unregister_s2s_msg = devdrv_pci_unregister_s2s_msg_proc_func,
+    .send_s2s_msg = devdrv_pci_s2s_msg_send,
+    .recv_s2s_async_msg = devdrv_pci_s2s_async_msg_recv,
+#endif
 };
 
 STATIC int devdrv_probe(ka_pci_dev_t *pdev, const ka_pci_device_id_t *data, int dev_index)
@@ -2032,7 +2070,8 @@ STATIC int drv_pcie_probe(ka_pci_dev_t *pdev, const ka_pci_device_id_t *data)
         (ka_pci_get_subsystem_vendor_id(pdev) != DEVDRV_PCI_SUBSYS_PRIVATE_VENDOR) &&
         (ka_pci_get_subsystem_vendor_id(pdev) != DEVDRV_PCI_SUBSYS_PRIVATE_VENDOR_HX) &&
         (ka_pci_get_subsystem_vendor_id(pdev) != DEVDRV_PCI_SUBSYS_PRIVATE_VENDOR_HK) &&
-        (ka_pci_get_subsystem_vendor_id(pdev) != DEVDRV_PCI_SUBSYS_PRIVATE_VENDOR_KL)) {
+        (ka_pci_get_subsystem_vendor_id(pdev) != DEVDRV_PCI_SUBSYS_PRIVATE_VENDOR_KL) &&
+        (ka_pci_get_subsystem_vendor_id(pdev) != DEVDRV_PCI_SUBSYS_PRIVATE_VENDOR_CJ)) {
         devdrv_err("subsystem_vendor is invalid. (subsystem_device=0x%x; "
             "subsystem_vendor=0x%x)\n", ka_pci_get_subsystem_device_id(pdev), ka_pci_get_subsystem_vendor_id(pdev));
         return -EPERM;
@@ -2144,7 +2183,7 @@ STATIC void devdrv_load_probe_free(struct devdrv_pci_ctrl *pci_ctrl)
 
     if (pci_ctrl->bbox_resv_dmaPages != NULL) {
         if (pci_ctrl->bbox_resv_dmaAddr != 0) {
-            hal_kernel_devdrv_dma_unmap_page(ka_pci_get_dev(pdev), (ka_dma_addr_t)pci_ctrl->bbox_resv_dmaAddr, pci_ctrl->bbox_resv_size,
+            devdrv_pci_dma_unmap_page(ka_pci_get_dev(pdev), (ka_dma_addr_t)pci_ctrl->bbox_resv_dmaAddr, pci_ctrl->bbox_resv_size,
                 KA_DMA_BIDIRECTIONAL);
         }
         __devdrv_free_pages(pci_ctrl->bbox_resv_dmaPages, DEVDRV_BBOX_RESVED_MEM_ALLOC_PAGES_ORDER);
@@ -2302,9 +2341,11 @@ void devdrv_init_dev_num(void)
             dev_num += devdrv_get_pdev_davinci_dev_num(g_devdrv_tbl[i].device, ka_pci_get_subsystem_device_id(pdev));
         } while (1);
 
-        devdrv_info("Find out device. (index=%d; device=%x; dev_num=%d)\n",
-                    i, g_devdrv_tbl[i].device, dev_num);
-        dev_num_total += dev_num;
+        if (dev_num > 0) {
+            devdrv_info("Find out device. (index=%d; device=%x; dev_num=%d)\n",
+                        i, g_devdrv_tbl[i].device, dev_num);
+            dev_num_total += dev_num;
+        }
     }
 
     g_pci_manage_device_num = dev_num_total;
@@ -2382,7 +2423,7 @@ STATIC int pcie_host_notifier_func(u32 udevid, enum uda_notified_action action)
     return 0;
 }
 
-STATIC int __init devdrv_init_module(void)
+STATIC int __ka_init devdrv_init_module(void)
 {
     struct uda_dev_type uda_type;
     int ret;
@@ -2477,7 +2518,7 @@ unregister_ops:
 }
 ka_module_init(devdrv_init_module);
 
-STATIC void __exit devdrv_exit_module(void)
+STATIC void __ka_exit devdrv_exit_module(void)
 {
     struct devdrv_pci_ctrl *pci_ctrl = NULL;
     struct devdrv_ctrl *ctrl = NULL;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,8 +10,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
-#include <linux/slab.h>
 
 #include "uda_dev.h"
 #include "pbl_mem_alloc_interface.h"
@@ -63,7 +61,7 @@ static int uda_single_notifier_call(struct uda_notifier_node *nf, u32 udevid, en
     return ret;
 }
 
-static int uda_single_pri_notifier_call(struct list_head *nf_head, u32 udevid, enum uda_notified_action action)
+static int uda_single_pri_notifier_call(ka_list_head_t *nf_head, u32 udevid, enum uda_notified_action action)
 {
     struct uda_notifier_node *nf = NULL;
 
@@ -112,7 +110,7 @@ static struct uda_notifier_node *uda_find_notifier_node(struct uda_notifiers *no
     int i;
 
     for (i = 0; i < UDA_PRI_MAX; i++) {
-        struct list_head *nf_head = &notifiers->pri_head[i];
+        ka_list_head_t *nf_head = &notifiers->pri_head[i];
         struct uda_notifier_node *nf = NULL;
 
         ka_list_for_each_entry(nf, nf_head, node) {
@@ -322,7 +320,7 @@ static void _uda_notifiers_uninit(struct uda_dev_type *type, struct uda_notifier
     int i;
 
     for (i = 0; i < UDA_PRI_MAX; i++) {
-        struct list_head *nf_head = &notifiers->pri_head[i];
+        ka_list_head_t *nf_head = &notifiers->pri_head[i];
         struct uda_notifier_node *nf = NULL, *n = NULL;
 
         ka_list_for_each_entry_safe(nf, n, nf_head, node) {

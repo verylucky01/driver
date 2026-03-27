@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,15 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
-
-#include <linux/errno.h>
-#include <linux/slab.h>
-#include <linux/sched.h>
-#include <linux/kthread.h>
-#include <linux/kfifo.h>
-#include <linux/delay.h>
-#include <linux/time.h>
+#include "ka_system_pub.h"
 #include "dms/dms_devdrv_manager_comm.h"
 #include "comm_kernel_interface.h"
 #include "vmng_kernel_interface.h"
@@ -178,7 +170,7 @@ STATIC int get_hotreset_task_flag(unsigned int dev_id)
     return ka_base_test_bit(HOTRESET_TASK_FLAG_BIT, &g_device_task_info[dev_id]->task_flag);
 }
 
-STATIC int dms_power_hotreset_notifier_handle(struct notifier_block *self, unsigned long event, void *data)
+STATIC int dms_power_hotreset_notifier_handle(ka_notifier_block_t *self, unsigned long event, void *data)
 {
     struct devdrv_info *dev_info = NULL;
 
@@ -194,7 +186,7 @@ STATIC int dms_power_hotreset_notifier_handle(struct notifier_block *self, unsig
     return KA_NOTIFY_DONE;
 }
 
-static struct notifier_block dms_power_hotreset_notifier = {
+static ka_notifier_block_t dms_power_hotreset_notifier = {
     .notifier_call = dms_power_hotreset_notifier_handle,
 };
 
@@ -280,8 +272,11 @@ int dms_power_check_phy_mach(unsigned int dev_id)
         dms_err("Devdrv_get_host_phy_mach_flag return value error. (devid=%u; ret=0x%x)\n", dev_id, ret);
         return ret;
     }
-
+#ifdef ENABLE_BUILD_PRODUCT
     if (host_flag != DEVDRV_HOST_PHY_MACH_FLAG && host_flag != 0) {
+#else
+    if (host_flag != DEVDRV_HOST_PHY_MACH_FLAG) {
+#endif
         dms_err("Device not phy mach. (devid=%u; host_flag=0x%x)\n", dev_id, host_flag);
         return -EPERM;
     }
@@ -420,7 +415,7 @@ STATIC int devdrv_get_brother_udevid(u32 udevid, u32 *bro_udevid)
         return ret;
     }
 
-    for (i = 0; i < DEVDRV_PF_DEV_MAX_NUM; i++) {
+    for (i = 0; i < ASCEND_PDEV_MAX_NUM; i++) {
         if (i == udevid) {
             continue;
         }
@@ -764,7 +759,7 @@ STATIC void dms_hotreset_dev_inform(void *feature, unsigned int dev_id)
         }
 
         dms_hotreset_one_dev_inform(feature, dev_id);
-        msleep(DEVDRV_HOTRESET_INFORM_DELAY);
+        ka_system_msleep(DEVDRV_HOTRESET_INFORM_DELAY);
         return;
     }
 
@@ -780,7 +775,7 @@ STATIC void dms_hotreset_dev_inform(void *feature, unsigned int dev_id)
         }
         dms_hotreset_one_dev_inform(feature, i);
     }
-    msleep(DEVDRV_HOTRESET_INFORM_DELAY);
+    ka_system_msleep(DEVDRV_HOTRESET_INFORM_DELAY);
 }
 #endif
 

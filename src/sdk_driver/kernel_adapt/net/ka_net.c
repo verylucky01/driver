@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -26,12 +26,12 @@ ka_net_device_t *ka_net_alloc_netdev(int sizeof_priv, const char *ndev_name)
 }
 EXPORT_SYMBOL_GPL(ka_net_alloc_netdev);
 
-void ka_net_netif_napi_add(ka_net_device_t *dev, ka_napi_struct_t *napi, int (*poll)(ka_napi_struct_t *, int), int weight)
+void ka_net_netif_napi_add(ka_net_device_t *ndev, ka_napi_struct_t *napi, int (*poll)(ka_napi_struct_t *, int), int weight)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
-    netif_napi_add_weight(dev, napi, poll, weight);
+    netif_napi_add_weight(ndev, napi, poll, weight);
 #else
-    netif_napi_add(dev, napi, poll, weight);
+    netif_napi_add(ndev, napi, poll, weight);
 #endif
 }
 EXPORT_SYMBOL_GPL(ka_net_netif_napi_add);

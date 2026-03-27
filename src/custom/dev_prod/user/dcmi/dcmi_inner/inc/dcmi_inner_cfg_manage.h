@@ -138,11 +138,10 @@ int dcmi_check_device_share_config_recover_mode_is_permitted(const char *operate
 int dcmi_set_npu_device_info(int card_id, int device_id, enum dcmi_main_cmd main_cmd, unsigned int sub_cmd,
     const void *buf, unsigned int buf_size);
 
-int dcmi_set_custom_op_secverify_enable(int card_id, int device_id, const char *config_name, unsigned int buf_size,
-    unsigned char *buf);
+int dcmi_set_custom_op_secverify_enable(int card_id, int device_id, const char *config_name,
+    unsigned char *buf, unsigned int buf_size);
 
-int dcmi_set_custom_op_secverify_mode(int card_id, int device_id, enum dcmi_main_cmd main_cmd, unsigned int sub_cmd,
-    const void *buf, unsigned int buf_size);
+int dcmi_set_custom_op_secverify_mode(int card_id, int device_id, const void *buf, unsigned int buf_size);
 
 int dcmi_set_device_share_for_910_93(int card_id, enum dcmi_unit_type device_type, enum dcmi_main_cmd main_cmd,
     unsigned int sub_cmd, const void *buf, unsigned int buf_size);

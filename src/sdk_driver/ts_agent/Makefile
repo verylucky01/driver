@@ -48,7 +48,7 @@ ifeq ($(ENABLE_OPEN_SRC), y)
         EXTRA_CFLAGS += -DCFG_SOC_PLATFORM_CLOUD_V2
         ts_agent-objs := src/ts_agent_module.o \
                 src/ts_agent_update_sqe.o
-    else ifneq ($(filter $(PRODUCT), ascend910_95 ascend910_95esl),)
+    else ifneq ($(filter $(PRODUCT), ascend950 ascend950esl),)
         EXTRA_CFLAGS += -Iinclude/linux
         EXTRA_CFLAGS += -DCFG_SOC_PLATFORM_DAVID
         EXTRA_CFLAGS += -DSTARS_CTRL_CPU
@@ -107,7 +107,7 @@ else
         EXTRA_CFLAGS += -DCFG_SOC_PLATFORM_CLOUD_V2
         EXTRA_CFLAGS += -DCFG_SOC_PLATFORM_STARS
         STARS_FLAG = y
-    else ifneq ($(filter $(PRODUCT), ascend910_95 ascend910_95esl),)
+    else ifneq ($(filter $(PRODUCT), ascend950 ascend950esl),)
         EXTRA_CFLAGS += -isystem $(shell $(CC) -print-file-name=include)
         EXTRA_CFLAGS += -Iinclude/linux
         EXTRA_CFLAGS += -DCFG_SOC_PLATFORM_DAVID

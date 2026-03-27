@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -34,16 +34,25 @@
 #include "trs_host_comm.h"
 
 #ifdef CFG_FEATURE_SUPPORT_RMO
-static int trs_mem_dispatch_to_ts(u32 devid, u64 addr, u64 len)
+static int trs_mem_dispatch_to_ts(u32 devid, struct rmo_mem_raw_addr *addr, u64 len)
 {
     struct trs_mem_dispatch_msg mbox_data = {0};
     struct trs_id_inst inst;
     int ret;
 
     trs_mbox_init_header(&mbox_data.header, TRS_MBOX_MEM_DISPATCH);
-    mbox_data.paddr = addr;
     mbox_data.size = len;
     mbox_data.hostpid = ka_task_get_current_tgid();
+
+    /* NULL means mem disable, others enable */
+    if (addr != NULL) {
+        mbox_data.flag = 1;
+        mbox_data.is_addr_ext = (addr->raw_addr_len <= sizeof(u64)) ? 0: 1;
+        mbox_data.addr = (mbox_data.is_addr_ext) ? addr->raw_addr : (void *)(uintptr_t)(*((u64 *)(addr->raw_addr)));
+        mbox_data.addr_len = addr->raw_addr_len;
+    } else {
+        mbox_data.flag = 0;
+    }
 
     trs_id_inst_pack(&inst, devid, 0);
     ret = trs_mbox_send(&inst, 0, &mbox_data, sizeof(struct trs_mem_dispatch_msg), 3000); // timeout: 3000 ms
@@ -195,7 +204,7 @@ int trs_host_ras_report(struct trs_id_inst *inst)
 {
     struct trs_msg_data msg;
     int ret;
- 
+
     msg.header.tsid = inst->tsid;
     msg.header.valid = TRS_MSG_SEND_MAGIC;
     msg.header.cmdtype = TRS_MSG_RAS_REPORT;
@@ -207,6 +216,32 @@ int trs_host_ras_report(struct trs_id_inst *inst)
             inst->devid, inst->tsid, ret, msg.header.result);
         return ret;
     }
+    return 0;
+}
+
+int trs_host_res_num_query(struct trs_id_inst *inst, struct trs_res_query_para *para)
+{
+    struct trs_res_query_para *query_para = NULL;
+    struct trs_msg_data msg;
+    int ret;
+
+    msg.header.tsid = inst->tsid;
+    msg.header.valid = TRS_MSG_SEND_MAGIC;
+    msg.header.cmdtype = TRS_MSG_RES_NUM_QUERY;
+    msg.header.result = 0;
+    query_para = (struct trs_res_query_para *)msg.payload;
+    query_para->type = para->type;
+
+    ret = trs_host_msg_send(inst->devid, &msg, sizeof(struct trs_msg_data));
+    if (ret != 0) {
+        if (ret != -EOPNOTSUPP) {
+            trs_err("Msg send fail. (devid=%u; tsid=%u; ret=%d; result=%d)\n",
+                inst->devid, inst->tsid, ret, msg.header.result);
+        }
+        return ret;
+    }
+
+    para->alloc_num = query_para->alloc_num;
     return 0;
 }
 
@@ -251,6 +286,19 @@ int trs_host_get_connect_protocol(struct trs_id_inst *inst)
             return TRS_CONNECT_PROTOCOL_UNKNOWN;
 #endif
     }
+}
+
+int trs_get_host_mach_flag(struct trs_id_inst *inst, u32 *host_flag)
+{
+    int ret;
+
+    ret = devdrv_get_host_phy_mach_flag(inst->devid, host_flag);
+    if (ret != 0) {
+        trs_err("Failed to get host phy mach flag. (ret=%d; devid=%u)\n", ret, inst->devid);
+        return ret;
+    }
+    trs_debug("Get success. (devid=%u; host_flag=0x%x)\n", inst->devid, *host_flag);
+    return 0;
 }
 
 int trs_host_request_irq(struct trs_id_inst *inst, struct trs_adapt_irq_attr *attr,

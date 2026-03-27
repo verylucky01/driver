@@ -124,7 +124,7 @@
 
 **调用示例<a name="section184903171142"></a>**
 
-```c
+```
 … 
 unsigned int state = 0;
 int ret = dcmi_get_custom_op_config_recover_mode(&state);
@@ -134,3 +134,4 @@ if (ret != 0) {
 }
 …
 ```
+

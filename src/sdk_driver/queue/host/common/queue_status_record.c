@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,13 +10,12 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-#include <linux/list.h>
-#include <linux/slab.h>
 #include "securec.h"
-
 #include "queue_module.h"
 #include "queue_dma.h"
 #include "queue_status_record.h"
+#include "ka_list_pub.h"
+#include "ka_fs_pub.h"
 
 #define PER_STATUS_SIZE        sizeof(struct queue_qid_status)
 #define TIME_RECODE_SIZE       (sizeof(long long int) * TIME_RECORD_TYPE_MAX)
@@ -24,8 +23,8 @@
 #define MAX_PERF_STATUS_CNT    1000
 
 struct que_status_record_mng {
-    spinlock_t lock;
-    struct list_head list;
+    ka_task_spinlock_t lock;
+    ka_list_head_t list;
     u32 cur_record_cnt;
 };
 
@@ -47,9 +46,9 @@ void queue_status_record_mng_init(void)
     u32 type;
 
     for (type = RECORD_EXCEPT; type < RECORD_MAX; type++) {
-        spin_lock_init(&status_record_mng[type].lock);
+        ka_task_spin_lock_init(&status_record_mng[type].lock);
         status_record_mng[type].cur_record_cnt = 0;
-        INIT_LIST_HEAD(&status_record_mng[type].list);
+        KA_INIT_LIST_HEAD(&status_record_mng[type].list);
     }
 }
 
@@ -77,14 +76,14 @@ static struct queue_qid_status *queue_create_qid_status(struct queue_context *ct
 {
     struct queue_qid_status *status = NULL;
 
-    status = (struct queue_qid_status *)queue_drv_kzalloc(sizeof(struct queue_qid_status), GFP_ATOMIC | __GFP_ACCOUNT);
+    status = (struct queue_qid_status *)queue_drv_kzalloc(sizeof(struct queue_qid_status), KA_GFP_ATOMIC | __KA_GFP_ACCOUNT);
     if (status == NULL) {
         return NULL;
     }
     ctx->qid_status[qid] = (void *)status;
     status->pid = ctx->pid;
     status->qid = qid;
-    atomic_set(&status->qid_dir_exit, QID_DIR_NO_EXIT);
+    ka_base_atomic_set(&status->qid_dir_exit, QID_DIR_NO_EXIT);
     status->is_finish = false;
 
     return status;
@@ -98,16 +97,16 @@ struct queue_qid_status *queue_create_or_get_exit_qid_status(struct queue_contex
         return NULL;
     }
 
-    spin_lock(&ctx->qid_status_lock);
+    ka_task_spin_lock(&ctx->qid_status_lock);
     status = (struct queue_qid_status *)ctx->qid_status[qid];
     if (status != NULL) {
         queue_reinit_qid_status(status);
-        spin_unlock(&ctx->qid_status_lock);
+        ka_task_spin_unlock(&ctx->qid_status_lock);
         return status;
     }
 
     status = queue_create_qid_status(ctx, qid);
-    spin_unlock(&ctx->qid_status_lock);
+    ka_task_spin_unlock(&ctx->qid_status_lock);
 
     return status;
 }
@@ -126,7 +125,7 @@ void queue_free_ctx_all_qid_status(struct queue_context *ctx)
     struct queue_qid_status *status = NULL;
     u32 qid;
 
-    spin_lock(&ctx->qid_status_lock);
+    ka_task_spin_lock(&ctx->qid_status_lock);
     for (qid = 0; qid < MAX_SURPORT_QUEUE_NUM; qid++) {
         status = ctx->qid_status[qid];
         if (status == NULL) {
@@ -140,7 +139,7 @@ void queue_free_ctx_all_qid_status(struct queue_context *ctx)
         ctx->qid_status[qid] = NULL;
         queue_drv_kfree(status);
     }
-    spin_unlock(&ctx->qid_status_lock);
+    ka_task_spin_unlock(&ctx->qid_status_lock);
 
     return;
 }
@@ -192,25 +191,25 @@ STATIC void queue_collect_qid_status(struct queue_qid_status *except_status, STA
         return;
     }
 
-    spin_lock_bh(&status_record_mng[type].lock);
+    ka_task_spin_lock_bh(&status_record_mng[type].lock);
     if (status_record_mng[type].cur_record_cnt >= max_record_cnt[type]) {
-        old_status = list_first_entry(&status_record_mng[type].list, struct queue_qid_status, list);
-        list_del(&old_status->list);
+        old_status = ka_list_first_entry(&status_record_mng[type].list, struct queue_qid_status, list);
+        ka_list_del(&old_status->list);
         queue_drv_kfree(old_status);
         status_record_mng[type].cur_record_cnt--;
     }
 
-    new_status = (struct queue_qid_status *)queue_drv_kzalloc(sizeof(struct queue_qid_status), GFP_ATOMIC | __GFP_ACCOUNT);
+    new_status = (struct queue_qid_status *)queue_drv_kzalloc(sizeof(struct queue_qid_status), KA_GFP_ATOMIC | __KA_GFP_ACCOUNT);
     if (new_status == NULL) {
-        spin_unlock_bh(&status_record_mng[type].lock);
+        ka_task_spin_unlock_bh(&status_record_mng[type].lock);
         return;
     }
 
     (void)memcpy_s(new_status, PER_STATUS_SIZE, except_status, PER_STATUS_SIZE);
-    list_add_tail(&new_status->list, &status_record_mng[type].list);
+    ka_list_add_tail(&new_status->list, &status_record_mng[type].list);
     status_record_mng[type].cur_record_cnt++;
 
-    spin_unlock_bh(&status_record_mng[type].lock);
+    ka_task_spin_unlock_bh(&status_record_mng[type].lock);
 }
 
 #ifndef EMU_ST
@@ -220,16 +219,16 @@ void queue_set_perf_switch(bool set_value, u32 time_threshold)
     g_perf_time_threshold = time_threshold;
 }
 
-void queue_show_perf_switch(struct seq_file *seq)
+void queue_show_perf_switch(ka_seq_file_t *seq)
 {
-    seq_printf(seq, "perf_switch=%u time_threshold=%u ms\n", perf_switch, g_perf_time_threshold);
+    ka_fs_seq_printf(seq, "perf_switch=%u time_threshold=%u ms\n", perf_switch, g_perf_time_threshold);
 }
 #endif
-void queue_show_one_qid_status(struct seq_file *seq, struct queue_qid_status *per_status)
+void queue_show_one_qid_status(ka_seq_file_t *seq, struct queue_qid_status *per_status)
 {
     long long int *time_record = per_status->time_record;
 #ifndef EMU_ST
-    seq_printf(seq, "serial_num:%llu, pid:%d, qid:%d, is_finish:%d, subevent_id:%u\n"
+    ka_fs_seq_printf(seq, "serial_num:%llu, pid:%d, qid:%d, is_finish:%d, subevent_id:%u\n"
         "mem_size:%llu, dma_node_num:%llu\n"
         "host_time_show:\n"
         "    make_dma_list: start-%lldus end-%lldus cost-%lldus \n"
@@ -269,12 +268,12 @@ void queue_show_one_qid_status(struct seq_file *seq, struct queue_qid_status *pe
 #endif
 }
 
-void queue_show_all_qid_status(struct seq_file *seq, STATUS_RECORD_TYPE type)
+void queue_show_all_qid_status(ka_seq_file_t *seq, STATUS_RECORD_TYPE type)
 {
     struct queue_qid_status *all_status = NULL;
     struct queue_qid_status *per_status = NULL;
-    struct list_head *pos = NULL;
-    struct list_head *n = NULL;
+    ka_list_head_t *pos = NULL;
+    ka_list_head_t *n = NULL;
     u32 i, j;
 
     if (type >= RECORD_MAX) {
@@ -287,10 +286,10 @@ void queue_show_all_qid_status(struct seq_file *seq, STATUS_RECORD_TYPE type)
     }
 
     j = 0;
-    spin_lock_bh(&status_record_mng[type].lock);
-    if (list_empty_careful(&status_record_mng[type].list) == 0) {
-        list_for_each_safe(pos, n, &status_record_mng[type].list) {
-            per_status = list_entry(pos, struct queue_qid_status, list);
+    ka_task_spin_lock_bh(&status_record_mng[type].lock);
+    if (ka_list_empty_careful(&status_record_mng[type].list) == 0) {
+        ka_list_for_each_safe(pos, n, &status_record_mng[type].list) {
+            per_status = ka_list_entry(pos, struct queue_qid_status, list);
             (void)memcpy_s(&all_status[j], PER_STATUS_SIZE, per_status, PER_STATUS_SIZE);
             j++;
             if (j >= max_record_cnt[type]) {
@@ -298,7 +297,7 @@ void queue_show_all_qid_status(struct seq_file *seq, STATUS_RECORD_TYPE type)
             }
         }
     }
-    spin_unlock_bh(&status_record_mng[type].lock);
+    ka_task_spin_unlock_bh(&status_record_mng[type].lock);
 
     for (i = 0; i < j; i++) {
         queue_show_one_qid_status(seq, &all_status[i]);
@@ -310,19 +309,19 @@ void queue_show_all_qid_status(struct seq_file *seq, STATUS_RECORD_TYPE type)
 void queue_free_one_type_qid_status(STATUS_RECORD_TYPE type)
 {
     struct queue_qid_status *status = NULL;
-    struct list_head *pos = NULL;
-    struct list_head *n = NULL;
+    ka_list_head_t *pos = NULL;
+    ka_list_head_t *n = NULL;
 
-    spin_lock_bh(&status_record_mng[type].lock);
-    if (list_empty_careful(&status_record_mng[type].list) == 0) {
-        list_for_each_safe(pos, n, &status_record_mng[type].list) {
-            status = list_entry(pos, struct queue_qid_status, list);
-            list_del(&status->list);
+    ka_task_spin_lock_bh(&status_record_mng[type].lock);
+    if (ka_list_empty_careful(&status_record_mng[type].list) == 0) {
+        ka_list_for_each_safe(pos, n, &status_record_mng[type].list) {
+            status = ka_list_entry(pos, struct queue_qid_status, list);
+            ka_list_del(&status->list);
             queue_drv_kfree(status);
         }
     }
     status_record_mng[type].cur_record_cnt = 0;
-    spin_unlock_bh(&status_record_mng[type].lock);
+    ka_task_spin_unlock_bh(&status_record_mng[type].lock);
 }
 
 void queue_free_all_type_qid_status(void)

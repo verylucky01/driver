@@ -625,15 +625,89 @@ int dsmi_get_device_voltage(int device_id, unsigned int *pvoltage)
     return ret;
 }
 
-STATIC int udis_get_davinci_lp_info(int device_id, const char *name , unsigned int *result_data)
+STATIC int udis_get_davinci_lp_info(int device_id, const char *name, unsigned int *result_data)
 {
     return udis_get_lp_info(device_id, name, result_data, sizeof(unsigned int));
+}
+
+STATIC int dsmi_get_hbm_size_from_udis(int device_id, struct dsmi_hbm_info_stru *pdevice_hbm_info)
+{
+    int ret = 0;
+    struct udis_dev_info udis_hbm_info = {0};
+    unsigned long long total_size, free_size;
+
+    udis_hbm_info.module_type = 0;
+    ret = strcpy_s(udis_hbm_info.name, UDIS_MAX_NAME_LEN, "hbm_mem_info");
+    if (ret != 0) {
+        DEV_MON_ERR("strcpy hbm mem info failed. (device_id=%d; ret=%d)\n", device_id, ret);
+        return ret;
+    }
+    ret = udis_get_device_info((unsigned int)device_id, &udis_hbm_info);
+    if (ret != 0) {
+        return ret;
+    }
+
+    total_size = ((struct udis_mem_info *)(udis_hbm_info.data))->medium_mem_info.total_size;
+    free_size = ((struct udis_mem_info *)(udis_hbm_info.data))->medium_mem_info.free_size;
+
+    pdevice_hbm_info->memory_size = total_size;
+    pdevice_hbm_info->memory_usage = total_size - free_size;
+
+    return ret;
+}
+
+#define PERCENT_VALUE 100
+STATIC int udis_get_hbm_rate(int device_id, const char *name, unsigned int *result_data)
+{
+    int ret = 0;
+    struct dsmi_hbm_info_stru hbm_info = {0};
+    (void)name;
+
+    ret = dsmi_get_hbm_size_from_udis(device_id, &hbm_info);
+    if (ret != 0) {
+        DEV_MON_DEBUG("failed udis get hbm info. (device_id=%d; ret=%d)\n", device_id, ret);
+        return ret;
+    }
+
+    if (hbm_info.memory_size == 0) {
+        DEV_MON_ERR("failed udis get hbm info, mamory size is zero. (device_id=%d; ret=%d)\n", device_id, ret);
+        return DRV_ERROR_INVALID_VALUE;
+    }
+
+    *result_data = (unsigned int)(hbm_info.memory_usage * PERCENT_VALUE / hbm_info.memory_size);
+    return ret;
+}
+
+STATIC int dsmi_udis_get_hbm_size(unsigned int device_id, void *buf, unsigned int *size)
+{
+    int ret = 0;
+    struct dsmi_hbm_info_stru hbm_info = {0};
+    struct dsmi_memory_info *memory_info_out;
+
+    if (buf == NULL || *size < sizeof(struct dsmi_memory_info)) {
+        DEV_MON_ERR("The input parameters are incorrect. (dev_id=%u; buf_is_null=%d; size=%u)\n",
+            device_id, buf == NULL, *size);
+        return DRV_ERROR_PARA_ERROR;
+    }
+
+    ret = dsmi_get_hbm_size_from_udis((int)device_id, &hbm_info);
+    if (ret != 0) {
+        return ret;
+    }
+
+    memory_info_out = (struct dsmi_memory_info *)buf;
+    memory_info_out->total_size = (unsigned int)hbm_info.memory_size;
+    memory_info_out->used_size = (unsigned int)hbm_info.memory_usage;
+    *size = sizeof(struct dsmi_memory_info);
+
+    return 0;
 }
 
 static struct udis_davinci_info_adapter g_udis_get_davinci_info_table[] = {
     {REQ_D_INFO_DEV_TYPE_AICORE0, REQ_D_INFO_INFO_TYPE_FREQ, "aic0_freq", udis_get_davinci_lp_info},
     {REQ_D_INFO_DEV_TYPE_AICORE1, REQ_D_INFO_INFO_TYPE_FREQ, "aic1_freq", udis_get_davinci_lp_info},
     {REQ_D_INFO_DEV_TYPE_HBM, REQ_D_INFO_INFO_TYPE_FREQ, "hbm_freq", udis_get_davinci_lp_info},
+    {REQ_D_INFO_DEV_TYPE_HBM, REQ_D_INFO_INFO_TYPE_RATE, "hbm_rate", udis_get_hbm_rate},
 };
 
 int dsmi_get_davinchi_info(int device_id, int device_type, int info_type, unsigned int *result_data)
@@ -788,32 +862,6 @@ STATIC int dsmi_get_hbm_temp(int device_id, int *temp)
     *temp = sensor_info.uchar;
 
     return 0;
-}
-
-STATIC int dsmi_get_hbm_size_from_udis(int device_id, struct dsmi_hbm_info_stru *pdevice_hbm_info)
-{
-    int ret = 0;
-    struct udis_dev_info udis_hbm_info = {0};
-    unsigned long long total_size, free_size;
-
-    udis_hbm_info.module_type = 0;
-    ret = strcpy_s(udis_hbm_info.name, UDIS_MAX_NAME_LEN, "hbm_mem_info");
-    if (ret != 0) {
-        DEV_MON_ERR("strcpy hbm mem info failed. (device_id=%d; ret=%d)\n", device_id, ret);
-        return ret;
-    }
-    ret = udis_get_device_info((unsigned int)device_id, &udis_hbm_info);
-    if (ret != 0) {
-        return ret;
-    }
-
-    total_size = ((struct udis_mem_info *)(udis_hbm_info.data))->medium_mem_info.total_size;
-    free_size = ((struct udis_mem_info *)(udis_hbm_info.data))->medium_mem_info.free_size;
-
-    pdevice_hbm_info->memory_size = total_size;
-    pdevice_hbm_info->memory_usage = total_size - free_size;
-
-    return ret;
 }
 
 STATIC int dsmi_get_hbm_size(int device_id, struct dsmi_hbm_info_stru *pdevice_hbm_info)
@@ -1216,7 +1264,7 @@ int dsmi_set_device_ip_address(int device_id, int port_type, int port_id, ip_add
     return dsmi_cmd_set_device_ip_address(device_id, port_para, ip_addr, mask_addr);
 }
 
-STATIC int dsmi_get_device_ip_address_from_udis(int device_id, DSMI_PORT_PARA *port_para, IPADDR_ST *ip_addr,
+int dsmi_get_device_ip_address_from_udis(int device_id, DSMI_PORT_PARA *port_para, IPADDR_ST *ip_addr,
     IPADDR_ST *netmask)
 {
     int ret = 0;
@@ -1262,8 +1310,7 @@ int dsmi_get_device_ip_address(int device_id, int port_type, int port_id, ip_add
     DSMI_PORT_PARA port_para = { 0 };
     IPADDR_ST mask_addr = { 0 };
     IPADDR_ST ip_addr = { 0 };
-    int ret;
-    int i;
+    int ret, i;
 
     if (ip_address == NULL || mask_address == NULL) {
         DEV_MON_ERR("Parameter is invalid. (devid=%d; ip_is_null=%d; mask_is_null=%d)\n",
@@ -1291,14 +1338,10 @@ int dsmi_get_device_ip_address(int device_id, int port_type, int port_id, ip_add
     port_para.card_info.fields.ip_type = (unsigned char)ip_address->ip_type;
 #pragma GCC diagnostic pop
 
-    ret = dsmi_get_device_ip_address_from_udis(device_id, &port_para, &ip_addr, &mask_addr);
+    ret = dsmi_cmd_get_device_ip_address(device_id, port_para, &ip_addr, &mask_addr);
     if (ret != 0) {
-        ret = dsmi_cmd_get_device_ip_address(device_id, port_para, &ip_addr, &mask_addr);
-        if (ret != 0) {
-            DEV_MON_EX_NOTSUPPORT_ERR(ret,
-                "Dsmi cmd get device ip address error! (devid=%d; ret=%d)\n", device_id, ret);
-            return ret;
-        }
+        DEV_MON_EX_NOTSUPPORT_ERR(ret, "Dsmi cmd get device ip address error! (devid=%d; ret=%d)\n", device_id, ret);
+        return ret;
     }
 
     ret = memcpy_s(&ip_address->u_addr, sizeof(IPADDR_ST), &ip_addr, sizeof(IPADDR_ST));
@@ -1679,9 +1722,17 @@ int dsmi_get_device_boot_status(int device_id, enum dsmi_boot_status *boot_statu
 int dsmi_get_soc_sensor_info(int device_id, int sensor_id, TAG_SENSOR_INFO *tsensor_info)
 {
     unsigned char sensorid;
-
-    DRV_CHECK_RETV(((sensor_id >= 0) && (sensor_id < (int)INVALID_TSENSOR_ID)), DRV_ERROR_PARA_ERROR);
+    int ret;
+    signed short chip_temp_data;
+    DRV_CHECK_RETV(((sensor_id >= 0) && (sensor_id < (int)INVALID_TSENSOR_ID) && (tsensor_info != NULL)), DRV_ERROR_PARA_ERROR);
     sensorid = (unsigned char)sensor_id;
+    if (sensorid == SOC_TEMP_ID) {
+        ret = udis_get_lp_info(device_id, "soc_max_temp", &chip_temp_data, sizeof(chip_temp_data));
+        if (ret == 0) {
+            tsensor_info->iint = (signed int)chip_temp_data;
+            return 0;
+        }
+    }
     return dsmi_cmd_get_soc_sensor_info(device_id, sensorid, tsensor_info);
 }
 
@@ -3311,6 +3362,14 @@ int dsmi_cmd_get_flash_info(unsigned int device_id, DSMI_MAIN_CMD main_cmd, unsi
 int dsmi_get_device_info(unsigned int device_id, DSMI_MAIN_CMD main_cmd, unsigned int sub_cmd,
     void *buf, unsigned int *size)
 {
+    int ret = 0;
+    if ((main_cmd == DSMI_MAIN_CMD_MEMORY) && (sub_cmd == DSMI_SUB_CMD_HBM_MEMORY)) {
+        ret = dsmi_udis_get_hbm_size(device_id, buf, size);
+        if (ret == 0) {
+            return 0;
+        }
+    }
+
     return _dsmi_get_device_info(device_id, main_cmd, sub_cmd, buf, size);
 }
 

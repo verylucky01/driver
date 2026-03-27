@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -21,6 +21,9 @@
 #undef CONFIG_DEBUG_BUGVERBOSE
 #endif
 
+#include "ka_list_pub.h"
+#include "ka_kernel_def_pub.h"
+#include "ka_barrier_pub.h"
 #include "devdrv_dma.h"
 #include "devdrv_ctrl.h"
 #include "devdrv_common_msg.h"
@@ -33,9 +36,6 @@
 #include "devdrv_mem_alloc.h"
 #include "devdrv_adapt.h"
 #include "pbl/pbl_uda.h"
-#include "ka_list_pub.h"
-#include "ka_kernel_def_pub.h"
-#include "ka_barrier_pub.h"
 
 static struct {
     char str[DEVDRV_STR_NAME_LEN];
@@ -290,7 +290,7 @@ STATIC int devdrv_msg_alloc_host_sq(struct devdrv_msg_chan *chan, u32 depth, u32
     u32 size = depth * bd_size;
 
     if (chan->chan_id != 0) {
-        chan->sq_info.desc_h = hal_kernel_devdrv_dma_zalloc_coherent(chan->msg_dev->dev, size, &chan->sq_info.dma_handle,
+        chan->sq_info.desc_h = devdrv_pci_dma_zalloc_coherent(chan->msg_dev->dev, size, &chan->sq_info.dma_handle,
             KA_GFP_KERNEL | __KA_GFP_DMA);
         if (chan->sq_info.desc_h == NULL) {
             devdrv_err("msg_alloc_sq failed. (dev_id=%u)\n", chan->msg_dev->pci_ctrl->dev_id);
@@ -318,7 +318,7 @@ STATIC int devdrv_msg_free_host_sq(struct devdrv_msg_chan *msg_chan)
     if (msg_chan->sq_info.desc_h != NULL) {
         free_size = msg_chan->sq_info.desc_size * msg_chan->sq_info.depth;
         if (msg_chan->chan_id != 0) {
-            hal_kernel_devdrv_dma_free_coherent(msg_chan->msg_dev->dev, free_size,
+            devdrv_pci_dma_free_coherent(msg_chan->msg_dev->dev, free_size,
                 msg_chan->sq_info.desc_h, msg_chan->sq_info.dma_handle);
         } else {
             devdrv_admin_msg_chan_free_host_sq(msg_chan, free_size);
@@ -333,7 +333,7 @@ STATIC int devdrv_msg_alloc_host_cq(struct devdrv_msg_chan *chan, int depth, int
 {
     u32 alloc_size = (u32)(depth * bd_size);
 
-    chan->cq_info.desc_h = hal_kernel_devdrv_dma_zalloc_coherent(chan->msg_dev->dev, alloc_size, &chan->cq_info.dma_handle,
+    chan->cq_info.desc_h = devdrv_pci_dma_zalloc_coherent(chan->msg_dev->dev, alloc_size, &chan->cq_info.dma_handle,
                                                KA_GFP_KERNEL | __KA_GFP_DMA);
 
     if (chan->cq_info.desc_h == NULL) {
@@ -356,7 +356,7 @@ STATIC int devdrv_msg_free_host_cq(struct devdrv_msg_chan *msg_chan)
 
     if (msg_chan->cq_info.desc_h != NULL) {
         free_size = msg_chan->cq_info.desc_size * msg_chan->cq_info.depth;
-        hal_kernel_devdrv_dma_free_coherent(msg_chan->msg_dev->dev, free_size, msg_chan->cq_info.desc_h,
+        devdrv_pci_dma_free_coherent(msg_chan->msg_dev->dev, free_size, msg_chan->cq_info.desc_h,
             msg_chan->cq_info.dma_handle);
         msg_chan->cq_info.desc_h = NULL;
     }
@@ -1162,7 +1162,7 @@ STATIC void devdrv_non_trans_rx_msg_handle(struct devdrv_msg_chan *msg_chan)
         resq_time = ka_system_jiffies_to_msecs(ka_jiffies - call_start);
         if (resq_time > DEVDRV_NON_TRANS_CB_TIME) {
             devdrv_info("Get resq_time. (dev_id=%u; msg_type=\"%s\"; resq_time=%llums; cpu=%d)\n",
-                dev_id, devdrv_msg_type_str(msg_type_tmp, bd_desc->msg_type), resq_time, ka_system_smp_processor_id());
+                dev_id, devdrv_msg_type_str(msg_type_tmp, bd_desc->msg_type), resq_time, ka_system_raw_smp_processor_id());
         }
 
         if (devdrv_device_status_abnormal_check_inner(msg_chan) != 0) {
@@ -1200,7 +1200,7 @@ STATIC void devdrv_non_trans_rx_msg_handle(struct devdrv_msg_chan *msg_chan)
     /* copy the execution result to shared reserved memory pointed to by cq desc_h */
     if ((bd_desc->status == DEVDRV_MSG_CMD_FINISH_SUCCESS) && (bd_desc->real_out_len > 0)) {
         /* copy data */
-        ka_mm_memcpy_toio((void __iomem *)bd_desc_d->data, (void *)bd_desc->data, bd_desc->real_out_len);
+        ka_mm_memcpy_toio((void __ka_mm_iomem *)bd_desc_d->data, (void *)bd_desc->data, bd_desc->real_out_len);
         ka_wmb();
     }
 
@@ -1582,7 +1582,7 @@ STATIC int devdrv_sync_non_trans_msg_copy_bd(struct devdrv_msg_chan *msg_chan,
     bd_desc->seq_num = msg_chan->chan_stat.tx_total_cnt;
     bd_desc->status = DEVDRV_MSG_CMD_BEGIN;
 
-    ka_mm_memcpy_toio((void __iomem *)bd_desc->data, (void *)data, in_data_len);
+    ka_mm_memcpy_toio((void __ka_mm_iomem *)bd_desc->data, (void *)data, in_data_len);
 
     return 0;
 }

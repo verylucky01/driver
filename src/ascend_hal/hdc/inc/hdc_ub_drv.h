@@ -40,16 +40,20 @@ struct hdc_query_info {
     int grp_type_flag;  // input: query for drv_thread or hdc_thread
 };
 
+#ifdef CFG_PLATFORM_ESL
+#define HDC_TIMEOUT_CQE_STATUS URMA_CR_REM_ACCESS_ABORT_ERR
+#else
+#define HDC_TIMEOUT_CQE_STATUS URMA_CR_RNR_RETRY_CNT_EXC_ERR
+#endif
+
 #if defined(CFG_PLATFORM_ESL) || defined(CFG_PLATFORM_FPGA)
 #define HDC_CONN_WAIT_TIMEOUT 100000                   // 100s
 #define HDC_SET_SESSION_OWNER_WAIT_TIMEOUT 600000   // 600s
 #define HDC_SESSION_CLOSE_WAIT_TIMEOUT 15000        // 15s
-#define HDC_TIMEOUT_CQE_STATUS URMA_CR_REM_ACCESS_ABORT_ERR
 #else
 #define HDC_CONN_WAIT_TIMEOUT 30000                    // 30s
 #define HDC_SET_SESSION_OWNER_WAIT_TIMEOUT 60000    // 60s
 #define HDC_SESSION_CLOSE_WAIT_TIMEOUT 5000         // 5s
-#define HDC_TIMEOUT_CQE_STATUS URMA_CR_RNR_RETRY_CNT_EXC_ERR
 #endif
 
 #define HDC_UB_VALID 1
@@ -69,6 +73,7 @@ typedef struct hdc_urma_info {
     urma_context_t *urma_ctx;
     urma_device_attr_t dev_attr;
     urma_token_id_t *token_id;
+    urma_target_seg_t *tseg;
     int cnt;
 } hdc_urma_info_t;
 
@@ -141,6 +146,7 @@ struct hdc_remote_close_thread_para {
     unsigned int remote_session;
     int session_close_state;
     unsigned int unique_val;
+    struct hdc_time_record_for_remote_close record;
 };
 
 #define HDC_RX_LIST_LEN (HDC_URMA_MAX_JFR_DEPTH + 1)
@@ -227,6 +233,89 @@ struct hdc_event_wait_info {
     unsigned int tid;
 };
 
+typedef struct hdc_ub_accept_info {
+    unsigned long long query_gid;
+    unsigned long long conn_wait;
+    unsigned long long res_init;
+    unsigned long long alloc_session;
+    unsigned long long pre_init;
+    unsigned long long urma_init;
+    unsigned long long add_ctrl;
+    unsigned long long submit_event;
+    unsigned long long accept;
+} hdc_ub_accept_info_t;
+
+typedef struct hdc_ub_connect_info {
+    unsigned long long link_pre_init;
+    unsigned long long gid_query;
+    unsigned long long mem_res_init;
+    unsigned long long alloc_session;
+    unsigned long long pre_init;
+    unsigned long long alloc_tid;
+    unsigned long long create_ub_ctx;
+    unsigned long long get_res_info_and_add_ctrl;
+    unsigned long long fill_event_msg;
+    unsigned long long submit_event;
+    unsigned long long wait_reply;
+    unsigned long long check_reply;
+    unsigned long long free_tid_and_fill_jetty_info;
+    unsigned long long connect_end;
+} hdc_ub_connect_info_t;
+
+typedef struct hdc_urma_init_info {
+    unsigned long long ctx_calloc;
+    unsigned long long get_token_val;
+    unsigned long long attr_calloc;
+    unsigned long long create_ctx;
+    unsigned long long alloc_token_id;
+    unsigned long long register_share_seg;
+    unsigned long long urma_init_end;
+    unsigned long long register_own_seg;
+    unsigned long long create_jfce;
+    unsigned long long create_jfc;
+    unsigned long long rearm_jfc;
+    unsigned long long create_jfs;
+    unsigned long long create_jfr;
+    unsigned long long post_jfr_wr;
+    unsigned long long res_init_end;
+    unsigned long long lock_init;
+    unsigned long long get_tp_list;
+    unsigned long long import_jfr;
+    unsigned long long get_dev_info;
+} hdc_urma_init_info_t;
+
+typedef struct hdc_ub_close_info {
+    unsigned long long timecost_close;
+    unsigned long long del_jfs;  //remote_close
+    unsigned long long del_jfcs; //remote_close
+
+    unsigned long long del_recv_epoll;
+    unsigned long long sub_close_event;
+    unsigned long long del_data_epoll;
+    unsigned long long unimport_jetty;
+
+    unsigned long long del_jfr;         //urma_uninit
+    unsigned long long wait_data_fin;
+    unsigned long long del_jfcr;
+    unsigned long long del_jfs_1;
+    unsigned long long del_jfcs_1;
+    unsigned long long own_unreg;   //urma_uninit
+
+    unsigned long long share_unreg;
+    unsigned long long free_token_id;
+    unsigned long long del_ctx;//urma_uninit
+
+    unsigned long long del_urma;
+    unsigned long long close_kernel;
+    unsigned long long mem_uninit;
+    unsigned long long wake_recv;
+    unsigned long long close_notify;
+
+    unsigned long long write_file;  //remote_close
+    unsigned long long session_free;   //user_close
+    unsigned long long del_close_epoll;//user_close
+} hdc_ub_close_info_t;
+
 int hdc_fill_event_for_drv_grp(struct event_summary *event_submit, struct hdcdrv_sync_event_msg *msg,
     struct hdc_ub_session *session, enum hdcdrv_notify_type notify_type, DRV_SUBEVENT_ID subevent_id);
 
@@ -236,23 +325,26 @@ void hdc_fill_event_for_own_grp(struct event_summary *event_submit, struct hdcdr
 void hdc_ub_fill_dfx_info(hdc_ub_dbg_stat_t *dbg_stat, struct hdc_ub_session *session);
 void hdc_jfc_dbg_fill(int tx_rx_flag, struct hdc_ub_session *session, enum drv_hdc_ub_op op);
 void hdc_ub_init_dfx_info(hdc_ub_dbg_stat_t *dbg_stat);
-int hdc_dfx_query_handle(int devId, struct hdc_ub_session *session, struct hdcdrv_event_dfx *dfx_msg);
+int hdc_dfx_query_handle(int dev_id, struct hdc_ub_session *session, struct hdcdrv_event_dfx *dfx_msg);
 unsigned int hdc_get_jfc_id_by_type(hdcdrv_jetty_info_t *jetty_info, int tx_rx_flag);
 
 void hdc_touch_close_notify(int dev_id, unsigned long long peer_pid, int service_type);
 void hdc_touch_connect_notify(int dev_id, unsigned long long peer_pid, int service_type);
 void hdc_touch_data_in_notify(int dev_id, int service_type);
-int hdc_session_alive_check(int devId, int l_id, unsigned int unique_val);
+int hdc_session_alive_check(int dev_id, int l_id, unsigned int unique_val);
 bool hdc_has_data_in_thread(int service_type);
-void hdc_ub_notiy_init(struct hdcConfig *hdcConfig);
+void hdc_ub_notiy_init(struct hdcConfig *hdc_config);
 void hdc_ack_jfc(hdc_urma_jfc_t *hdc_jfc);
 int hdc_rearm_jfc(hdc_urma_jfc_t *hdc_jfc, struct hdc_ub_session *session, int tx_rx_flag);
 
-void hdc_get_time_record(struct timeval *time_val, int *fail_count);
-unsigned long long hdc_get_time_cost(struct timeval *start_tval, struct timeval *end_tval);
+void hdc_get_time_record(struct timespec *time_val, int *fail_count);
+unsigned long long hdc_get_time_cost(struct timespec *start_tval, struct timespec *end_tval);
 void hdc_get_recv_time_cost(struct hdc_time_record_for_single_recv *recv_record, struct hdc_ub_session *session);
 void hdc_get_send_time_cost(struct hdc_time_record_for_single_send *send_record, struct hdc_ub_session *session);
-void hdc_get_accept_time_cost(struct hdc_time_record_for_accept *accept_record, struct hdc_ub_session *session);
+void hdc_get_accept_time_cost(struct hdc_time_record_for_accept *accept_record, struct hdc_ub_session *session,
+    bool succ_flag);
+void hdc_get_connect_time_cost(struct hdc_time_record_for_connect *connect_record, struct hdc_ub_session *session);
+void hdc_get_close_time_cost(struct hdc_time_record_for_close *close_record);
 int hdc_ub_wait_reply(struct event_info *event_back, struct hdcdrv_sync_event_msg *wait_event,
     struct hdc_ub_session *session, int msg_type, struct hdc_event_wait_info *wait_info);
 
@@ -280,6 +372,8 @@ void hdc_update_session_recv_record(struct hdc_ub_rx_buf *buf, struct hdc_time_r
     } while (0)
 #endif
 
+void hdc_fill_event_summary_dst_engine(struct event_summary *event_submit);
+void hdc_fill_event_msg_dst_engine(struct hdcdrv_sync_event_msg *msg);
 void hdc_recv_data_in_event_handle(struct hdc_ub_epoll_node *node);
 int hdc_ub_epoll_thread_init(void);
 void hdc_ub_epoll_thread_uninit(void);
@@ -289,6 +383,13 @@ int hdc_poll_jfc(hdc_urma_jfc_t *hdc_jfc, urma_cr_t *cr, struct hdc_ub_session *
     int service_type);
 void hdc_ack_jfc(hdc_urma_jfc_t *hdc_jfc);
 uint8_t hdc_ub_get_jfs_priority_by_type(int service_type);
+int hdc_mem_res_init(struct hdc_mem_res_info *mem_info, int service_type);
+void hdc_mem_res_uninit(struct hdc_mem_res_info *mem_info, unsigned int dev_id);
+int hdc_register_share_urma_seg(struct hdcConfig *hdc_config, unsigned int dev_id, unsigned int token_val);
+void hdc_unregister_share_urma_seg(urma_target_seg_t *tseg);
+int hdc_register_own_urma_seg(hdc_ub_context_t *ctx, unsigned long long len, unsigned long long va, int service_type);
+void hdc_unregister_own_urma_seg(urma_target_seg_t *tseg, int service_type);
+
 // used for EMU_ST
 #ifdef EMU_ST
 int hdc_mem_res_init_stub(int fd, unsigned long long *user_va, unsigned long size);
@@ -298,56 +399,56 @@ void hdc_mem_res_uninit_stub(int fd, unsigned long long *user_va);
 #endif // CFG_FEATURE_SUPPORT_UB
 
 signed int __attribute__((weak)) hdc_ub_get_session_attr(mmProcess handle,
-    const struct hdc_session *pSession, int attr, int *value);
-signed int __attribute__((weak)) hdc_ub_server_create(mmProcess handle, signed int devId, signed int serviceType,
-    unsigned int *grpId, struct hdc_server_head *pHead);
-hdcError_t __attribute__((weak)) hdc_ub_server_destroy(struct hdc_server_head *pServ,
-    signed int devId, signed int serviceType);
+    const struct hdc_session *p_session, int attr, int *value);
+signed int __attribute__((weak)) hdc_ub_server_create(mmProcess handle, signed int dev_id, signed int service_type,
+    unsigned int *grp_id, struct hdc_server_head *p_head);
+hdcError_t __attribute__((weak)) hdc_ub_server_destroy(struct hdc_server_head *p_serv,
+    signed int dev_id, signed int service_type);
 signed int __attribute__((weak)) hdc_ub_client_destroy(mmProcess handle, signed int devId, signed int serviceType);
-signed int __attribute__((weak)) hdc_ub_accept(struct hdc_server_head *pServ, signed int devId, signed int serviceType,
-    struct hdc_session *pSession);
-signed int __attribute__((weak)) hdc_ub_connect(signed int devId, struct hdc_client_head *pHead, signed int peerpid,
-    struct hdc_session *pSession);
+signed int __attribute__((weak)) hdc_ub_accept(struct hdc_server_head *p_serv, signed int dev_id, signed int service_type,
+    struct hdc_session *p_session);
+signed int __attribute__((weak)) hdc_ub_connect(signed int dev_id, struct hdc_client_head *p_head, signed int peer_pid,
+    struct hdc_session *p_session);
 mmProcess __attribute__((weak)) hdc_ub_open(void);
 void __attribute__((weak)) hdc_ub_close(mmProcess handle);
-signed int __attribute__((weak)) hdc_ub_session_close(unsigned int devId, struct hdc_session *pSession, int close_state,
+signed int __attribute__((weak)) hdc_ub_session_close(unsigned int dev_id, struct hdc_session *p_session, int close_state,
     int close_flag);
-signed int __attribute__((weak)) hdc_ub_send(const struct hdc_session *pSession,
-    struct drvHdcMsg *pMsg, signed int wait, unsigned int timeout);
-signed int __attribute__((weak)) hdc_ub_recv_peek(const struct hdc_session *pSession, signed int *len,
-    struct hdc_recv_config *recvConfig);
-signed int __attribute__((weak)) hdc_ub_recv(const struct hdc_session *pSession,
-    char *buf, signed int len, signed int *outLen, struct hdc_recv_config *recvConfig);
-signed int __attribute__((weak)) hdc_ub_set_session_owner(const struct hdc_session *pSession);
+signed int __attribute__((weak)) hdc_ub_send(const struct hdc_session *p_session,
+    struct drvHdcMsg *p_msg, signed int wait, unsigned int timeout);
+signed int __attribute__((weak)) hdc_ub_recv_peek(const struct hdc_session *p_session, signed int *len,
+    struct hdc_recv_config *recv_config);
+signed int __attribute__((weak)) hdc_ub_recv(const struct hdc_session *p_session,
+    char *buf, signed int len, signed int *out_len, struct hdc_recv_config *recv_config);
+signed int __attribute__((weak)) hdc_ub_set_session_owner(const struct hdc_session *p_session);
 signed int __attribute__((weak)) HdcUbGetSessionUid(mmProcess handle,
     const struct hdc_session *pSession, int *root_privilege);
 
-void __attribute__((weak)) hdc_ub_init(struct hdcConfig *hdcConfig);
-void __attribute__((weak)) hdc_ub_uninit(struct hdcConfig *hdcConfig);
-drvError_t __attribute__((weak)) hdc_sync_event_proc(uint32_t devId, const void *msg, int msg_len,
+void __attribute__((weak)) hdc_ub_init(struct hdcConfig *hdc_config);
+void __attribute__((weak)) hdc_ub_uninit(struct hdcConfig *hdc_config);
+drvError_t __attribute__((weak)) hdc_sync_event_proc(uint32_t dev_id, const void *msg, int msg_len,
     struct drv_event_proc_rsp *rsp);
-drvError_t __attribute__((weak)) hdc_connect_event_proc(uint32_t devId, const void *msg, int msg_len,
+drvError_t __attribute__((weak)) hdc_connect_event_proc(uint32_t dev_id, const void *msg, int msg_len,
     struct drv_event_proc_rsp *rsp);
-drvError_t __attribute__((weak)) hdc_dfx_query_event_proc(uint32_t devId, const void *msg, int msg_len,
+drvError_t __attribute__((weak)) hdc_dfx_query_event_proc(uint32_t dev_id, const void *msg, int msg_len,
     struct drv_event_proc_rsp *rsp);
 void __attribute__((weak)) hdc_release_remote_session(void);
-signed int __attribute__((weak)) hdc_event_thread_init(unsigned int devId, bool isServer);
-void __attribute__((weak)) hdc_event_thread_uninit(unsigned int devId);
+signed int __attribute__((weak)) hdc_event_thread_init(unsigned int dev_id, bool is_server);
+void __attribute__((weak)) hdc_event_thread_uninit(unsigned int dev_id);
 signed int __attribute__((weak)) hdc_tid_pool_init(void);
-signed int __attribute__((weak)) hdc_link_event_pre_init(unsigned int devId, bool isServer);
-void __attribute__((weak)) hdc_link_event_pre_uninit(signed int devId, bool isServer);
+signed int __attribute__((weak)) hdc_link_event_pre_init(unsigned int dev_id, bool is_server);
+void __attribute__((weak)) hdc_link_event_pre_uninit(signed int dev_id, bool is_server);
 const char* __attribute__((weak)) hdc_get_sevice_str(int service_type);
-drvError_t __attribute__((weak)) hdc_remote_close_proc(void *msg, uint32_t devId);
-int __attribute__((weak)) hdc_get_lock_index(int devId, int sessionId);
+drvError_t __attribute__((weak)) hdc_remote_close_proc(void *msg, uint32_t dev_id);
+int __attribute__((weak)) hdc_get_lock_index(int dev_id, int session_id);
 struct hdc_ub_session* __attribute__((weak)) hdc_find_session_in_list(unsigned int fd, int dev_id, uint32_t unique_val);
-int __attribute__((weak)) hdc_ub_get_session_dfx(unsigned int devId, struct hdc_ub_session *session);
+int __attribute__((weak)) hdc_ub_get_session_dfx(unsigned int dev_id, struct hdc_ub_session *session);
 void __attribute__((weak)) hdc_fill_query_info(struct hdc_query_info *info, int pid, int query_type, int grp_type_flag);
-int __attribute__((weak)) hdc_event_query_gid(unsigned int devId, unsigned int *grpId, struct hdc_query_info *info);
+int __attribute__((weak)) hdc_event_query_gid(unsigned int dev_id, unsigned int *grp_id, struct hdc_query_info *info);
 signed int __attribute__((weak)) hdc_alloc_tid(void);
 signed int __attribute__((weak)) hdc_free_tid(int tid);
 void __attribute__((weak)) hdc_ub_fill_jetty_info(hdcdrv_jetty_info_t *info, struct hdc_ub_session *session);
 hdcError_t __attribute__((weak)) hdc_ub_notify_register(int service_type, struct HdcSessionNotify *notify);
 void __attribute__((weak)) hdc_ub_notify_unregister(int service_type);
-signed int __attribute__((weak)) hdc_ub_get_peer_devId(mmProcess handle, signed int devId, signed int *peerDevId);
-signed int __attribute__((weak)) hdc_ub_ioctl(mmProcess handle, signed int ioctl_code, union hdcdrv_cmd *hdcCmd);
+signed int __attribute__((weak)) hdc_ub_get_peer_devId(mmProcess handle, signed int dev_id, signed int *peer_dev_id);
+signed int __attribute__((weak)) hdc_ub_ioctl(mmProcess handle, signed int ioctl_code, union hdcdrv_cmd *hdc_cmd);
 #endif

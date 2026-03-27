@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,18 +14,15 @@
 #ifndef _PCIVNIC_MAIN_H_
 #define _PCIVNIC_MAIN_H_
 
+#include "ka_net_pub.h"
+#include "ka_memory_pub.h"
+#include "ka_system_pub.h"
+#include "ka_driver_pub.h"
 #include "dmc_kernel_interface.h"
 #include "comm_kernel_interface.h"
 #include "pcivnic_config.h"
 #include "vnic_cmd_msg.h"
 #include "pcivnic_adapt.h"
-#include "ka_base_pub.h"
-#include "ka_net_pub.h"
-#include "ka_task_pub.h"
-#include "ka_memory_pub.h"
-#include "ka_common_pub.h"
-#include "ka_system_pub.h"
-#include "ka_driver_pub.h"
 
 #ifdef DRV_UT
 #define STATIC
@@ -339,5 +336,5 @@ extern void pcivnic_init_msgchan_cq_desc(void *msg_chan);
 
 extern int pcivnic_device_status_abnormal(const void *msg_chan);
 extern bool pcivnic_get_sysfs_creat_group_capbility(ka_device_t *dev, int dev_id);
-void pcivnic_net_timeout_new(ka_net_device_t *dev, unsigned int txqueue);
+void pcivnic_net_timeout_new(ka_net_device_t *ndev, unsigned int txqueue);
 #endif  // _DEVDRV_MAIN_H_

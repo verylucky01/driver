@@ -31,7 +31,7 @@ ifneq ($(filter $(PRODUCT), ascend910B),)
     EXTRA_CFLAGS += -DCFG_FEATURE_SRIOV
 endif
 
-ifneq ($(filter $(PRODUCT), ascend910_95),)
+ifneq ($(filter $(PRODUCT), ascend950),)
     EXTRA_CFLAGS += -DCFG_FEATURE_HOST_LOG
     EXTRA_CFLAGS += -DCFG_FEATURE_SRIOV
 endif

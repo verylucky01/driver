@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -29,7 +29,7 @@ STATIC int devdrv_dma_pasid_node_insert(ka_task_spinlock_t *lock, ka_rb_root_t *
     u64 new_node_hash, tree_hash;
 
     ka_task_spin_lock_bh(lock);
-    new_node = &(root->rb_node);
+    new_node = ka_base_get_rb_root_node_addr(root);
     new_node_hash = dma_pasid_node->hash_va;
 
     /* Figure out where to put new node */
@@ -67,7 +67,7 @@ STATIC struct devdrv_dma_pasid_rbtree_node *devdrv_dma_pasid_node_search(ka_task
     if (lock != NULL) {
         ka_task_spin_lock_bh(lock);
     }
-    node = root->rb_node;
+    node = ka_base_get_rb_root_node(root);;
     while (node != NULL) {
         dma_pasid_node = ka_base_rb_entry(node, struct devdrv_dma_pasid_rbtree_node, node);
         tree_hash = dma_pasid_node->hash_va;

@@ -9,6 +9,10 @@
  */
 
 #include "dms_user_common.h"
+#include "ascend_dev_num.h"
+#include "dms_device_info.h"
+#include "dms_p2p_com.h"
+#include "pbl_uda_user.h"
 
 #ifndef __linux
     #pragma comment(lib, "libc_sec.lib")
@@ -408,7 +412,7 @@ drvError_t dmsCloseRestoreHandler(uint32_t devid, halDevCloseIn *in)
     UNUSED(in);
     dms_close_intf();
     mmProcess fd = DMS_INVALID_PID_OR_FD;
- 
+
     if (access(DMS_DEVICE_FILE_NAME, R_OK | W_OK) != 0) {
         return DRV_ERROR_NO_DEVICE;
     }
@@ -426,5 +430,79 @@ drvError_t dmsCloseRestoreHandler(uint32_t devid, halDevCloseIn *in)
         return ret;
     }
     drvClearBareTgid();
+    return ret;
+}
+
+drvError_t dms_res_rollback_p2p(u32 target_dev_id, u32 target_peer_id, u32 tmp_cnt)
+{
+    u32 remaining_cnt, ret, dev_id, peer_phy_id;
+    u32 p2p_type;
+
+    for (dev_id = target_dev_id; dev_id != UINT32_MAX; --dev_id) {
+        for (peer_phy_id = target_peer_id; peer_phy_id != UINT32_MAX; --peer_phy_id) {
+            (void)dms_get_p2p_restore_info(dev_id, peer_phy_id, &remaining_cnt, &p2p_type);
+
+            if ((dev_id == target_dev_id) && (peer_phy_id == target_peer_id)) {
+                remaining_cnt -= tmp_cnt;
+            }
+
+            while (remaining_cnt > 0) {
+                ret = DmsDisableP2P(dev_id, peer_phy_id, p2p_type);
+                if (ret != 0) {
+                    DMS_ERR("p2p resotre rollback fail. (dev_id=%u; peer_phy_id=%u; ret=%d)\n",
+                        dev_id, peer_phy_id, ret);
+                    return ret;
+                }
+                remaining_cnt--;
+            }
+        }
+    }
+    DMS_INFO("p2p restore rollback success.\n");
+
+    return DRV_ERROR_NONE;
+}
+
+drvError_t dms_res_enable_p2p(u32 dev_num)
+{
+    u32 dev_id, peer_phy_id, remaining_cnt = 0;
+    u32 p2p_type;
+    int ret;
+
+    for (dev_id = 0; dev_id < dev_num; ++dev_id) {
+        for (peer_phy_id = 0; peer_phy_id < ASCEND_PDEV_MAX_NUM; ++peer_phy_id) {
+            (void)dms_get_p2p_restore_info(dev_id, peer_phy_id, &remaining_cnt, &p2p_type);
+
+            while (remaining_cnt > 0) {
+                ret = DmsEnableP2P(dev_id, peer_phy_id, p2p_type);
+                if (ret != 0) {
+                    DMS_ERR("p2p resotre enable fail, ready to rollback. (dev_id=%u; peer_phy_id=%u; ret=%d)\n",
+                        dev_id, peer_phy_id, ret);
+                    (void)dms_res_rollback_p2p(dev_id, peer_phy_id, remaining_cnt);
+                    return ret;
+                }
+                remaining_cnt--;
+            }
+        }
+    }
+    DMS_INFO("p2p resotre success.\n");
+
+    return DRV_ERROR_NONE;
+}
+
+drvError_t dmsProcResRestoreHandler(halProcResRestoreInfo *info)
+{
+    unsigned int dev_num;
+    int ret;
+    (void)info;
+
+    ret = drvGetDevNum(&dev_num);
+    if (ret != 0) {
+        return ret;
+    }
+
+    dms_set_p2p_restore_info_flag(DMS_RES_FLAG_DISABLE);
+    ret = dms_res_enable_p2p(dev_num);
+    dms_set_p2p_restore_info_flag(DMS_RES_FLAG_ENABLE);
+
     return ret;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -22,7 +22,7 @@
 #include "dms_dtm_init.h"
 #include "dms_smf_init.h"
 
-#ifndef CFG_HOST_ENV
+#ifndef CFG_EDGE_HOST
 #include "fpdc_init.h"
 #endif
 

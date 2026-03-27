@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,28 +13,32 @@
 
 #ifndef DEVDRV_MANAGER_H
 #define DEVDRV_MANAGER_H
-
+#include "ka_memory_pub.h"
+#include "ka_list_pub.h"
+#include "ka_system_pub.h"
+#include "ka_common_pub.h"
+#include "ka_base_pub.h"
+#include "ka_task_pub.h"
 #include "devdrv_manager_common.h"
 #include "comm_kernel_interface.h"
 #include "securec.h"
-#include <linux/gfp.h>
 #include "kernel_version_adapt.h"
 
-#ifndef __GFP_ACCOUNT
+#ifndef __KA_GFP_ACCOUNT
 #ifdef __GFP_KMEMCG
-#define __GFP_ACCOUNT __GFP_KMEMCG /* for linux version 3.10 */
+#define __KA_GFP_ACCOUNT __GFP_KMEMCG /* for linux version 3.10 */
 #endif
 
 #ifdef __GFP_NOACCOUNT
-#define __GFP_ACCOUNT 0 /* for linux version 4.1 */
+#define __KA_GFP_ACCOUNT 0 /* for linux version 4.1 */
 #endif
 #endif
 
 void *devdrv_manager_get_no_trans_chan(u32 dev_id);
 
 struct devdrv_exception {
-    struct timespec stamp;
-    struct list_head list;
+    ka_timespec_t stamp;
+    ka_list_head_t list;
     u32 code;
     u32 devid;
 
@@ -55,8 +59,8 @@ struct devdrv_exception {
 #define DEVDRV_IPC_NODE_OPENED (1 << 3)
 #define DEVDRV_IPC_NODE_CLOSED (1 << 4)
 
-#define DEVDRV_INIT_INSTANCE_TIMEOUT (4 * HZ)
-#define DEVDRV_INIT_RESOURCE_TIMEOUT (180 * (HZ))
+#define DEVDRV_INIT_INSTANCE_TIMEOUT (4 * KA_HZ)
+#define DEVDRV_INIT_RESOURCE_TIMEOUT (180 * (KA_HZ))
 
 #define DEVDRV_VMCORE_MAX_SIZE   0xFFFFFFFF   /* 4GB - 1 */
 
@@ -88,19 +92,19 @@ struct ipc_notify_info {
     u32 create_fd_num;
 
     /* created node list head */
-    struct list_head create_list_head;
-    struct list_head open_list_head;
+    ka_list_head_t create_list_head;
+    ka_list_head_t open_list_head;
 
-    struct mutex info_mutex;
+    ka_mutex_t info_mutex;
 };
 
 struct devdrv_manager_context {
-    pid_t pid;
-    pid_t tgid;
-    pid_t current_tgid;
+    ka_pid_t pid;
+    ka_pid_t tgid;
+    ka_pid_t current_tgid;
     u32 docker_id;
-    struct mnt_namespace *mnt_ns;
-    struct pid_namespace *pid_ns;
+    ka_mnt_namespace_t *mnt_ns;
+    ka_pid_namespace_t *pid_ns;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0)
     u64 start_time;
     u64 real_start_time;
@@ -109,11 +113,11 @@ struct devdrv_manager_context {
     u64 start_time;
     u64 real_start_time;
 #else
-    struct timespec start_time;
-    struct timespec real_start_time;
+    ka_timespec_t start_time;
+    ka_timespec_t real_start_time;
 #endif
 #endif
-    struct task_struct *task;
+    ka_task_struct_t *task;
     struct ipc_notify_info *ipc_notify_info;
 };
 
@@ -148,7 +152,7 @@ u32 devdrv_manager_get_ts_num(struct devdrv_info *dev_info);
 #endif
 int devdrv_manager_send_msg(struct devdrv_info *dev_info, struct devdrv_manager_msg_info *dev_manager_msg_info,
     int *out_len);
-extern struct task_struct init_task;
+extern ka_task_struct_t init_task;
 extern int devdrv_get_pcie_id_info(u32 devid, struct devdrv_pcie_id_info *pcie_id_info);
 int devdrv_agent_sync_msg_send(u32 dev_id, struct devdrv_manager_msg_info *msg_info, u32 payload_len, u32 *out_len);
 u32 devdrv_manager_get_devnum(void);
@@ -156,7 +160,7 @@ struct tsdrv_drv_ops *devdrv_manager_get_drv_ops(void);
 struct devdrv_info *devdrv_get_devdrv_info_array(u32 dev_id);
 int devmng_get_vdavinci_info(u32 vdev_id, u32 *phy_id, u32 *vfid);
 int dev_mnt_vdevice_add_inform(unsigned int vdev_id,
-    vdev_action action, struct mnt_namespace *ns, u64 container_id);
+    vdev_action action, ka_mnt_namespace_t *ns, u64 container_id);
 void dev_mnt_vdevice_inform(void);
 
 int devdrv_manager_check_capability(u32 dev_id, devdrv_capability_type type);
@@ -169,10 +173,6 @@ void devdrv_manager_unregister(struct devdrv_info *dev_info);
 
 int devdrv_manager_get_amp_smp_mode(u32 *amp_or_smp);
 int devdrv_manager_shm_info_check(struct devdrv_info *dev_info);
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
-ssize_t devdrv_load_file_read(struct file *file, loff_t *pos, char *addr, size_t count);
-#endif
 
 int devmng_dms_get_event_code(u32 devid, u32 *health_code, u32 health_len,
     struct shm_event_code *event_code, u32 event_len);
@@ -190,7 +190,12 @@ int devdrv_manager_devlog_dump(struct devdrv_bbox_logdump *in);
 #ifdef CFG_FEATURE_PCIE_BBOX_DUMP
 int devdrv_dma_bbox_dump(struct bbox_dma_dump *dma_dump);
 #endif
-void devdrv_check_pid_map_process_sign(pid_t tgid, u64 start_time);
+void devdrv_check_pid_map_process_sign(ka_pid_t tgid, u64 start_time);
 void devdrv_pid_map_init(void);
 void devdrv_pid_map_uninit(void);
+int devdrv_manager_device_ready(void *msg, u32 *ack_len);
+int dms_get_device_startup_status_form_device(struct devdrv_info *dev_info,
+    unsigned int *dmp_started, unsigned int *device_process_status);
+int devdrv_manager_get_accounting_pid(u32 phyid, u32 vfid, struct devdrv_resource_info *dinfo);
+void devdrv_manager_context_uninit(struct devdrv_manager_context *dev_manager_context);
 #endif /* __DEVDRV_MANAGER_H */

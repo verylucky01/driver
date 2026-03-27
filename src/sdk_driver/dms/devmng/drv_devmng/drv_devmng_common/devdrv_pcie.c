@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,10 +10,10 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
-#include <linux/fs.h>
-#include <linux/delay.h>
-#include <linux/kernel.h>
+#include "ka_system_pub.h"
+#include "ka_memory_pub.h"
+#include "ka_common_pub.h"
+#include "ka_base_pub.h"
 
 #include "devdrv_pcie.h"
 
@@ -32,7 +32,7 @@ int devdrv_manager_check_permission(void)
 {
     u32 root;
 
-    root = (u32)(current->cred->euid.val);
+    root = (u32)(ka_task_get_current_cred_euid());
     if (root != 0) {
         devdrv_drv_err("Only the root user can invoke the function.\n");
 #ifdef CFG_FEATURE_ERRORCODE_ON_NEW_CHIPS
@@ -42,7 +42,7 @@ int devdrv_manager_check_permission(void)
 #endif
     }
 
-    if ((devdrv_manager_container_is_in_container() == true) || !capable(CAP_SYS_ADMIN)) {
+    if ((devdrv_manager_container_is_in_container() == true) || !ka_system_capable(KA_CAP_SYS_ADMIN)) {
 #ifdef CFG_FEATURE_ERRORCODE_ON_NEW_CHIPS
         return -EOPNOTSUPP;
 #else
@@ -281,7 +281,7 @@ STATIC int drv_pcie_read_proc(struct devdrv_pcie_read_para* para)
     return 0;
 }
 
-int drv_pcie_read(struct file *filep, unsigned int cmd, unsigned long arg)
+int drv_pcie_read(ka_file_t *filep, unsigned int cmd, unsigned long arg)
 {
     struct devdrv_pcie_read_para pcie_read_para = {0};
     u32 phys_id;
@@ -322,7 +322,7 @@ int drv_pcie_read(struct file *filep, unsigned int cmd, unsigned long arg)
 #ifdef CFG_FEATURE_LOG_DUMP_FROM_PCIE
 STATIC int drv_pcir_log_size_check(struct devdrv_bbox_pcie_logdump *in, unsigned int len_ev)
 {
-    if ((U32_MAX - in->offset <= in->len) || (in->offset + in->len > len_ev)) {
+    if ((KA_U32_MAX - in->offset <= in->len) || (in->offset + in->len > len_ev)) {
         devdrv_drv_err("Failed to verify the log length. (dev_id=%u; offset=%u; len=%u; log_type=%u)\n",
             in->devid, in->offset, in->len, len_ev);
         return -EINVAL;
@@ -335,9 +335,9 @@ STATIC int drv_pcie_log_dump_check(struct devdrv_bbox_pcie_logdump *in)
 {
     int ret = 0;
 
-    if (in->devid >= DEVDRV_PF_DEV_MAX_NUM || in->type >= DEVDRV_MAX_PCIE_READ_TYPE || in->len == 0) {
+    if (in->devid >= ASCEND_PDEV_MAX_NUM || in->type >= DEVDRV_MAX_PCIE_READ_TYPE || in->len == 0) {
         devdrv_drv_err("Invalid parameter. (dev_id=%u; dev_maxnum=%d; log_type=%u; logtype_maxnum=%d; len=%u)\n",
-            in->devid, DEVDRV_PF_DEV_MAX_NUM, in->type, DEVDRV_MAX_PCIE_READ_TYPE, in->len);
+            in->devid, ASCEND_PDEV_MAX_NUM, in->type, DEVDRV_MAX_PCIE_READ_TYPE, in->len);
         return -EINVAL;
     }
 
@@ -366,7 +366,7 @@ int devdrv_pcie_devlog_dump(struct devdrv_bbox_pcie_logdump *in)
     u32 addr_type;
     u64 phy_addr;
     size_t phy_addr_size;
-    void __iomem *vir_addr = NULL;
+    void __ka_mm_iomem *vir_addr = NULL;
 
     ret = drv_pcie_log_dump_check(in);
     if (ret != 0) {
@@ -386,13 +386,13 @@ int devdrv_pcie_devlog_dump(struct devdrv_bbox_pcie_logdump *in)
         return ret;
     }
 
-    if ((U32_MAX - in->offset <= in->len) || (in->offset + in->len > phy_addr_size)) {
+    if ((KA_U32_MAX - in->offset <= in->len) || (in->offset + in->len > phy_addr_size)) {
         devdrv_drv_err("Para offset len check failed. (dev_id=%u; log_type=%d; offset=%u; len=%u; max_offset=%lu)\n",
             in->devid, in->type, in->offset, in->len, phy_addr_size);
         return -EINVAL;
     }
 
-    vir_addr = ioremap(phy_addr + in->offset, in->len);
+    vir_addr = ka_mm_ioremap(phy_addr + in->offset, in->len);
     if (vir_addr == NULL) {
         devdrv_drv_err("Failed to invoke the ioremap. (dev_id=%u)\n", in->devid);
         return -ENOMEM;
@@ -403,7 +403,7 @@ int devdrv_pcie_devlog_dump(struct devdrv_bbox_pcie_logdump *in)
         devdrv_drv_err("copy_to_user_safe failed. (dev_id=%u; ret=%d)\n", in->devid, ret);
     }
 
-    iounmap(vir_addr);
+    ka_mm_iounmap(vir_addr);
     vir_addr = NULL;
     return ret;
 }
@@ -461,7 +461,7 @@ int drv_pcie_write_proc(struct devdrv_pcie_write_para* para)
 }
 #endif
 
-int drv_pcie_write(struct file *filep, unsigned int cmd, unsigned long arg)
+int drv_pcie_write(ka_file_t *filep, unsigned int cmd, unsigned long arg)
 {
 #ifdef CFG_FEATURE_BBOX_KDUMP
     struct devdrv_pcie_write_para pcie_write_para = {0};
@@ -522,7 +522,7 @@ int drv_pcie_bbox_imu_ddr_read_proc(struct devdrv_pcie_imu_ddr_read_para* para)
 }
 
 /* bbox imu ddr in bar0 ATU12 */
-int drv_pcie_bbox_imu_ddr_read(struct file *filep, unsigned int cmd, unsigned long arg)
+int drv_pcie_bbox_imu_ddr_read(ka_file_t *filep, unsigned int cmd, unsigned long arg)
 {
 #ifdef CFG_SOC_PLATFORM_CLOUD
     struct devdrv_pcie_imu_ddr_read_para imu_ddr_read_para = {0};
@@ -560,7 +560,7 @@ int drv_pcie_bbox_imu_ddr_read(struct file *filep, unsigned int cmd, unsigned lo
 #define DEVDRV_CONFIG_FAIL 1
 #define DEVDRV_CONFIG_NO_MATCH 1
 
-int drv_get_device_boot_status(struct file *filep, unsigned int cmd, unsigned long arg)
+int drv_get_device_boot_status(ka_file_t *filep, unsigned int cmd, unsigned long arg)
 {
     int ret = 0;
     u32 phys_id;
@@ -608,7 +608,7 @@ STATIC bool devdrv_manager_check_is_vf(unsigned int dev_id, unsigned int vfid)
     return false;
 }
 
-int devdrv_manager_pcie_rescan(struct file *filep, unsigned int cmd, unsigned long arg)
+int devdrv_manager_pcie_rescan(ka_file_t *filep, unsigned int cmd, unsigned long arg)
 {
     int ret;
     u32 udevid = 0;
@@ -643,7 +643,7 @@ int devdrv_manager_pcie_rescan(struct file *filep, unsigned int cmd, unsigned lo
 #endif
 }
 
-int devdrv_manager_pcie_pre_reset(struct file *filep, unsigned int cmd, unsigned long arg)
+int devdrv_manager_pcie_pre_reset(ka_file_t *filep, unsigned int cmd, unsigned long arg)
 {
     int ret;
     u32 phys_id = 0;
@@ -702,7 +702,7 @@ int devdrv_manager_pcie_pre_reset(struct file *filep, unsigned int cmd, unsigned
 #endif
 }
 
-int devdrv_manager_get_host_phy_mach_flag(struct file *filep, unsigned int cmd, unsigned long arg)
+int devdrv_manager_get_host_phy_mach_flag(ka_file_t *filep, unsigned int cmd, unsigned long arg)
 {
     struct devdrv_get_host_phy_mach_flag_para para = {0};
     u32 phys_id = 0;
@@ -739,7 +739,7 @@ int devdrv_manager_get_host_phy_mach_flag(struct file *filep, unsigned int cmd, 
 bool devdrv_manager_is_pf_device(unsigned int dev_id)
 {
 #ifdef CFG_FEATURE_SRIOV
-#ifdef CFG_FEATURE_ASCEND910_95_API_ADAPT_STUB
+#ifdef CFG_FEATURE_ASCEND950_API_ADAPT_STUB
     if (uda_is_phy_dev(dev_id) == false) {
         return false;
     }

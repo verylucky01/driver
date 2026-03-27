@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,20 +13,8 @@
 #ifndef LOG_DRV_AGENT_H
 #define LOG_DRV_AGENT_H
 
-#include <linux/types.h>
-#include <linux/spinlock.h>
-
 #include "log_drv_agent_alloc_interface.h"
 #include "dmc_kernel_interface.h"
-
-#ifndef __GFP_ACCOUNT
-#ifdef __GFP_KMEMCG
-#define __GFP_ACCOUNT __GFP_KMEMCG /* for linux version 3.10 */
-#endif
-#ifdef __GFP_NOACCOUNT
-#define __GFP_ACCOUNT 0 /* for linux version 4.1 */
-#endif
-#endif
 
 #define LOG_LEVEL_OFFSET      2U
 #define DATATIME_MAXLEN       50U
@@ -40,16 +28,16 @@
 #define slog_err_printk(level, module, fmt, ...) \
     (void)printk(level "[ascend] [ERROR] [%s] [%s %d] " fmt, module, __func__, __LINE__, ##__VA_ARGS__)
 #define slog_printk(level, module, fmt, ...) \
-    (void)printk(level "[ascend] [%s] [%s %d] " fmt, module, __func__, __LINE__, ##__VA_ARGS__)
+    (void)ka_dfx_printk(level "[ascend] [%s] [%s %d] " fmt, module, __func__, __LINE__, ##__VA_ARGS__)
 
-#define slog_err(module, fmt...) slog_err_printk(KERN_NOTICE, module, fmt)
-#define slog_info(module, fmt...) slog_printk(KERN_INFO, module, fmt)
+#define slog_err(module, fmt...) slog_err_printk(KA_KERN_ERR, module, fmt)
+#define slog_info(module, fmt...) slog_printk(KA_KERN_INFO, module, fmt)
 
 #ifndef LOG_UNIT_TEST
 #define slog_drv_err(fmt, ...)   \
-    slog_err(MODULE_HOST_LOG, "<%s:%d,%d> " fmt, current->comm, current->tgid, current->pid, ##__VA_ARGS__)
+    slog_err(MODULE_HOST_LOG, "<%s:%d,%d> " fmt, ka_task_get_current()->comm, ka_task_get_current()->tgid, ka_task_get_current()->pid, ##__VA_ARGS__)
 #define slog_drv_info(fmt, ...)  \
-    slog_info(MODULE_HOST_LOG, "<%s:%d,%d> " fmt, current->comm, current->tgid, current->pid, ##__VA_ARGS__)
+    slog_info(MODULE_HOST_LOG, "<%s:%d,%d> " fmt, ka_task_get_current()->comm, ka_task_get_current()->tgid, ka_task_get_current()->pid, ##__VA_ARGS__)
 #else
 #define slog_drv_err(fmt, ...)   printf(fmt, ##__VA_ARGS__)
 #define slog_drv_info(fmt, ...)  printf(fmt, ##__VA_ARGS__)
@@ -65,7 +53,7 @@ typedef struct {
     char *log_buf;
     u32 point;
     u32 size;
-    spinlock_t logbuf_lock;
+    ka_task_spinlock_t logbuf_lock;
     char printk_buf[LOG_PRINT_LEN];  /* temporary log_buf */
 } log_ring_buf_t;
 

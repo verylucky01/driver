@@ -10,6 +10,13 @@
 #ifndef DEVDRV_HCCL_H
 #define DEVDRV_HCCL_H
 #include "ascend_hal_define.h"
+
+#ifdef STATIC_SKIP
+#define STATIC
+#else
+#define STATIC static
+#endif
+
 struct tsdrv_shrid_remote_ops {
     int (*shrid_config)(uint32_t devId, struct drvShrIdInfo *info);
     int (*shrid_deconfig)(uint32_t devId, struct drvShrIdInfo *info);

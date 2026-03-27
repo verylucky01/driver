@@ -38,6 +38,14 @@ enum que_inter_dev_state {
     QUEUE_STATE_BUTT,
 };
 
+typedef enum queue_op_support_type {
+    BOTH_SUPPORT = 0,
+    EXPORT_SUPPORT,
+    IMPORT_SUPPORT,
+    BOTH_NOT_SUPPORT,
+    QUEUE_SUPPORT_BUTT,
+} QUEUE_OP_SUPPORT_TYPE;
+
 /* QUEUE_DEPLOYMENT_TYPE common interface_list */
 struct queue_comm_interface_list {
     drvError_t (*queue_dc_init)(unsigned int dev_id);
@@ -86,9 +94,9 @@ void queue_set_comm_interface(QUEUE_DEPLOYMENT_TYPE type, struct queue_comm_inte
 unsigned int queue_get_virtual_qid(unsigned int actual_qid, QUEUE_DEPLOYMENT_TYPE type);
 unsigned int queue_get_actual_qid(unsigned int virtual_qid);
 QUEUE_DEPLOYMENT_TYPE queue_get_deployment_type_by_qid(unsigned int qid);
-int que_get_inter_dev_deploy_type(unsigned int dev_id, unsigned int qid, QUEUE_DEPLOYMENT_TYPE *type);
+QUEUE_DEPLOYMENT_TYPE que_get_deploy_type_for_inter_dev(unsigned int dev_id, unsigned int qid, QUEUE_OP_SUPPORT_TYPE op_type);
 #ifdef CFG_FEATURE_QUE_SUPPORT_UB
-int que_get_inter_dev_status(unsigned int dev_id, unsigned int qid, int *inter_dev_state, int *peer_deploy_flag, char *share_que_name);
+int que_get_inter_dev_status(unsigned int dev_id, unsigned int qid, int *inter_dev_state, char *share_que_name);
 #endif
 int que_get_inter_dev_que_type(unsigned int dev_id, unsigned int qid, QUEUE_DEPLOYMENT_TYPE *type);
 void clear_inter_dev_queue(unsigned int dev_id);

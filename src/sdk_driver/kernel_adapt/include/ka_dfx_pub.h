@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -47,6 +47,10 @@ typedef enum con_flush_mode ka_con_flush_mode_t;
 
 typedef struct raw_notifier_head ka_raw_notifier_head_t;
 
+#define KA_SYS_RESTART          SYS_RESTART
+#define KA_SYS_HALT             SYS_HALT
+#define KA_SYS_POWER_OFF        SYS_POWER_OFF
+
 #define KA_KERN_SOH             KERN_SOH       /* ASCII Start Of Header */
 #define KA_KERN_SOH_ASCII       KERN_SOH_ASCII
 #define KA_KERN_EMERG           KERN_EMERG     /* system is unusable */
@@ -80,6 +84,7 @@ typedef struct raw_notifier_head ka_raw_notifier_head_t;
 
 #define KA_NOTIFY_BAD           NOTIFY_BAD
 #define KA_NOTIFY_DONE          NOTIFY_DONE
+#define KA_NOTIFY_OK            NOTIFY_OK
 
 #define KA_DFX_ATOMIC_INIT_NOTIFIER_HEAD(nb_head) ATOMIC_INIT_NOTIFIER_HEAD(nb_head)
 
@@ -99,12 +104,19 @@ void ka_dfx_atomic_notifier_panic_chain_unregister(ka_notifier_block_t *nb);
 int ka_dfx_vprintk_emit(int facility, int level, const char *fmt, va_list args);
 unsigned long ka_dfx_kallsyms_lookup_name(const char *name);
 
+#define KA_DFX_RAW_NOTIFIER_HEAD(nh) RAW_NOTIFIER_HEAD(nh)
 #define ka_dfx_raw_notifier_call_chain(nh, val, v) raw_notifier_call_chain(nh, val, v)
 #define ka_dfx_raw_notifier_chain_register(nh, nb) raw_notifier_chain_register(nh, nb)
 #define ka_dfx_raw_notifier_chain_unregister(nh, nb) raw_notifier_chain_unregister(nh, nb)
 #define ka_dfx_atomic_notifier_call_chain(nh, val,v) atomic_notifier_call_chain(nh, val,v)
 #define ka_dfx_atomic_notifier_chain_register(nh, nb) atomic_notifier_chain_register(nh, nb)
 #define ka_dfx_atomic_notifier_chain_unregister(nh, nb) atomic_notifier_chain_unregister(nh, nb)
+#define ka_dfx_register_module_notifier(nb) register_module_notifier(nb)
+#define ka_dfx_unregister_module_notifier(nb) unregister_module_notifier(nb)
+#define KA_DFX_BLOCKING_NOTIFIER_HEAD(name) BLOCKING_NOTIFIER_HEAD(name)
+#define ka_dfx_blocking_notifier_call_chain(nh, val, v) blocking_notifier_call_chain(nh, val, v)
+#define ka_dfx_blocking_notifier_chain_register(nh, nb) blocking_notifier_chain_register(nh, nb)
+#define ka_dfx_blocking_notifier_chain_unregister(nh, nb) blocking_notifier_chain_unregister(nh, nb)
 
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(5, 16, 0)
 typedef enum profile_type ka_profile_type_t;
@@ -134,7 +146,7 @@ static inline int ka_dfx_profile_event_unregister(ka_profile_type_t type, ka_not
 }
 #endif
 
-#define KA_DFX_TRACE_EVENT(name, proto, args, struct, assign, print) TRACE_EVENT(name, proto, args, struct, assign, print)
+#define KA_DFX_TRACE_EVENT TRACE_EVENT
 #define KA_DFX_TP_PROTO TP_PROTO
 #define KA_DFX_TP_ARGS TP_ARGS
 #define KA_DFX_TP_STRUCT__entry TP_STRUCT__entry
@@ -145,4 +157,7 @@ static inline int ka_dfx_profile_event_unregister(ka_profile_type_t type, ka_not
 #define __ka_dfx_assign_str(dst, src) __assign_str(dst, src)
 #define __ka_entry __entry
 #define __ka_dfx_get_str(field) __get_str(field)
+
+#define ka_dfx_notifier_from_errno(err) notifier_from_errno(err)
+#define ka_dfx_notifier_to_errno(ret) notifier_to_errno(ret)
 #endif

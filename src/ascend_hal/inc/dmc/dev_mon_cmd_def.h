@@ -175,4 +175,8 @@
 
 #define DEV_MON_CMD_D_SET_NPU_STATUS    0xA4
 
+/* 0xD6 and 0xD7 are occupied by driver. */
+#define DEV_MON_CMD_GET_UB_LINK_STATUS  0xD6
+#define DEV_MON_CMD_GET_UB_PORT_STATUS  0xD7
+
 #endif

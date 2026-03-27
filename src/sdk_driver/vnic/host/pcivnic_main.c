@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -21,22 +21,17 @@
 #undef CONFIG_DEBUG_BUGVERBOSE
 #endif
 
+#include "ka_system_pub.h"
+#include "ka_errno_pub.h"
+#include "ka_driver_pub.h"
+#include "ka_compiler_pub.h"
+#include "ka_barrier_pub.h"
 #include "ka_net_pub.h"
 #include "ka_fs_pub.h"
 #include "ka_memory_pub.h"
 #include "pcivnic_mem_alloc.h"
 #include "pbl/pbl_spod_info.h"
 #include "pcivnic_main.h"
-#include "ka_system_pub.h"
-#include "ka_memory_pub.h"
-#include "ka_task_pub.h"
-#include "ka_common_pub.h"
-#include "ka_fs_pub.h"
-#include "ka_errno_pub.h"
-#include "ka_net_pub.h"
-#include "ka_driver_pub.h"
-#include "ka_compiler_pub.h"
-#include "ka_barrier_pub.h"
 
 #define PCIVNIC_COUNT 64
 #define CHAR_ARRAY_MAX_LEN 20
@@ -102,30 +97,30 @@ STATIC void pcivnic_get_ethtool_stats(ka_net_device_t *net_dev, ka_ethtool_stats
     struct pcivnic_netdev *vnic_dev = ka_net_netdev_priv(net_dev);
     int i = 0;
 
-    devdrv_info("%s: pcivnic_get_ethtool_stats\n", vnic_dev->ndev->name);
-    stats[i++] = net_dev->stats.rx_packets;
-    stats[i++] = net_dev->stats.tx_packets;
-    stats[i++] = net_dev->stats.rx_bytes;
-    stats[i++] = net_dev->stats.tx_bytes;
-    stats[i++] = net_dev->stats.rx_errors;
-    stats[i++] = net_dev->stats.tx_errors;
-    stats[i++] = net_dev->stats.rx_dropped;
-    stats[i++] = net_dev->stats.tx_dropped;
-    stats[i++] = net_dev->stats.multicast;
-    stats[i++] = net_dev->stats.collisions;
-    stats[i++] = net_dev->stats.rx_length_errors;
-    stats[i++] = net_dev->stats.rx_over_errors;
-    stats[i++] = net_dev->stats.rx_crc_errors;
-    stats[i++] = net_dev->stats.rx_frame_errors;
-    stats[i++] = net_dev->stats.rx_fifo_errors;
-    stats[i++] = net_dev->stats.rx_missed_errors;
-    stats[i++] = net_dev->stats.tx_aborted_errors;
-    stats[i++] = net_dev->stats.tx_carrier_errors;
-    stats[i++] = net_dev->stats.tx_fifo_errors;
-    stats[i++] = net_dev->stats.tx_heartbeat_errors;
-    stats[i++] = net_dev->stats.tx_window_errors;
-    stats[i++] = net_dev->stats.rx_compressed;
-    stats[i++] = net_dev->stats.tx_compressed;
+    devdrv_info("%s: pcivnic_get_ethtool_stats\n", ka_net_netdev_get_name(vnic_dev->ndev));
+    stats[i++] = ka_net_netdev_get_stats_rx_packets(net_dev);
+    stats[i++] = ka_net_netdev_get_stats_tx_packets(net_dev);
+    stats[i++] = ka_net_netdev_get_stats_rx_bytes(net_dev);
+    stats[i++] = ka_net_netdev_get_stats_tx_bytes(net_dev);
+    stats[i++] = ka_net_netdev_get_stats_rx_errors(net_dev);
+    stats[i++] = ka_net_netdev_get_stats_tx_errors(net_dev);
+    stats[i++] = ka_net_netdev_get_stats_rx_dropped(net_dev);
+    stats[i++] = ka_net_netdev_get_stats_tx_dropped(net_dev);
+    stats[i++] = ka_net_netdev_get_stats_multicast(net_dev);
+    stats[i++] = ka_net_netdev_get_stats_collisions(net_dev);
+    stats[i++] = ka_net_netdev_get_stats_rx_length_errors(net_dev);
+    stats[i++] = ka_net_netdev_get_stats_rx_over_errors(net_dev);
+    stats[i++] = ka_net_netdev_get_stats_rx_crc_errors(net_dev);
+    stats[i++] = ka_net_netdev_get_stats_rx_frame_errors(net_dev);
+    stats[i++] = ka_net_netdev_get_stats_rx_fifo_errors(net_dev);
+    stats[i++] = ka_net_netdev_get_stats_rx_missed_errors(net_dev);
+    stats[i++] = ka_net_netdev_get_stats_tx_aborted_errors(net_dev);
+    stats[i++] = ka_net_netdev_get_stats_tx_carrier_errors(net_dev);
+    stats[i++] = ka_net_netdev_get_stats_tx_fifo_errors(net_dev);
+    stats[i++] = ka_net_netdev_get_stats_tx_heartbeat_errors(net_dev);
+    stats[i++] = ka_net_netdev_get_stats_tx_window_errors(net_dev);
+    stats[i++] = ka_net_netdev_get_stats_rx_compressed(net_dev);
+    stats[i++] = ka_net_netdev_get_stats_tx_compressed(net_dev);
 }
 
 STATIC void pcivnic_irqs_enable(struct pcivnic_netdev *vnic_dev)
@@ -140,34 +135,34 @@ STATIC void pcivnic_irqs_disable(struct pcivnic_netdev *vnic_dev)
     ka_net_skb_queue_purge(&vnic_dev->skbq);
 }
 
-STATIC int pcivnic_net_open(ka_net_device_t *dev)
+STATIC int pcivnic_net_open(ka_net_device_t *ndev)
 {
-    struct pcivnic_netdev *vnic_dev = ka_net_netdev_priv(dev);
+    struct pcivnic_netdev *vnic_dev = ka_net_netdev_priv(ndev);
 
-    ka_net_netif_carrier_off(dev);
+    ka_net_netif_carrier_off(ndev);
     pcivnic_irqs_enable(vnic_dev);
-    ka_net_netif_carrier_on(dev);
+    ka_net_netif_carrier_on(ndev);
 
-    ka_net_netif_start_queue(dev);
+    ka_net_netif_start_queue(ndev);
 
     vnic_dev->status |= BIT_STATUS_LINK;
 
-    devdrv_info("%s: pcivnic_net_open\n", vnic_dev->ndev->name);
+    devdrv_info("%s: pcivnic_net_open\n", ka_net_netdev_get_name(vnic_dev->ndev));
 
     /* Notify the other side that we're open will be next iteration */
     return 0;
 }
 
-STATIC int pcivnic_net_close(ka_net_device_t *dev)
+STATIC int pcivnic_net_close(ka_net_device_t *ndev)
 {
-    struct pcivnic_netdev *vnic_dev = ka_net_netdev_priv(dev);
+    struct pcivnic_netdev *vnic_dev = ka_net_netdev_priv(ndev);
 
     pcivnic_irqs_disable(vnic_dev);
-    ka_net_netif_carrier_off(dev);
-    ka_net_netif_stop_queue(dev);
+    ka_net_netif_carrier_off(ndev);
+    ka_net_netif_stop_queue(ndev);
     vnic_dev->status &= ~BIT_STATUS_LINK;
 
-    devdrv_info("%s: pcivnic_net_close\n", vnic_dev->ndev->name);
+    devdrv_info("%s: pcivnic_net_close\n", ka_net_netdev_get_name(vnic_dev->ndev));
 
     /* Notify the other side that we're closed will be next iteration */
     return 0;
@@ -398,8 +393,8 @@ STATIC void pcivnic_s2s_send_work(ka_work_struct_t *p_work)
         if (ret != 0) {
             ka_net_dev_kfree_skb_any(skb);
             ka_task_spin_lock_bh(&vnic_dev->lock);
-            vnic_dev->ndev->stats.tx_dropped++;
-            vnic_dev->ndev->stats.tx_fifo_errors++;
+            ka_net_netdev_tx_dropped_add(vnic_dev->ndev);
+            ka_net_netdev_tx_fifo_errors_add(vnic_dev->ndev);
             ka_task_spin_unlock_bh(&vnic_dev->lock);
             continue;
         }
@@ -407,8 +402,8 @@ STATIC void pcivnic_s2s_send_work(ka_work_struct_t *p_work)
         /* update netdev */
         if (vnic_dev->ndev != NULL) {
             ka_task_spin_lock_bh(&vnic_dev->lock);
-            vnic_dev->ndev->stats.tx_packets++;
-            vnic_dev->ndev->stats.tx_bytes += skb->len;
+            ka_net_netdev_tx_packets_add(vnic_dev->ndev);
+            ka_net_netdev_tx_bytes_add(vnic_dev->ndev, skb->len);
             ka_net_netdev_sent_queue(vnic_dev->ndev, skb->len);
             ka_task_spin_unlock_bh(&vnic_dev->lock);
         }
@@ -422,7 +417,7 @@ STATIC void pcivnic_s2s_send_work(ka_work_struct_t *p_work)
     pcivnic_netdev_completed_queue(pcidev, &bytes_compl, &pkts_compl);
 }
 
-STATIC int pcivnic_pciedev_s2s_send(ka_sk_buff_t *skb, struct pcivnic_pcidev *pcidev, ka_net_device_t *dev)
+STATIC int pcivnic_pciedev_s2s_send(ka_sk_buff_t *skb, struct pcivnic_pcidev *pcidev, ka_net_device_t *ndev)
 {
     struct sdid_parse_info sdid_info = {0};
     u32 chan_idx;
@@ -433,7 +428,7 @@ STATIC int pcivnic_pciedev_s2s_send(ka_sk_buff_t *skb, struct pcivnic_pcidev *pc
         return KA_NETDEV_TX_OK;
     }
 
-    if ((skb == NULL) || (dev == NULL)) {
+    if ((skb == NULL) || (ndev == NULL)) {
         devdrv_warn("skb or dev is null.(devid=%u)\n", pcidev->dev_id);
         return KA_NETDEV_TX_OK;
     }
@@ -449,8 +444,8 @@ STATIC int pcivnic_pciedev_s2s_send(ka_sk_buff_t *skb, struct pcivnic_pcidev *pc
     chan_idx = sdid_info.server_id * PCIVNIC_S2S_ONE_SERVER_DEV_NUM + sdid_info.udevid;
     ret = pcivnic_s2s_sk_buff_enqueue(&pcidev->s2s_send_queue[chan_idx], skb);
     if (ret != 0) {
-        dev->stats.tx_dropped++;
-        dev->stats.tx_fifo_errors++;
+        ka_net_netdev_tx_dropped_add(ndev);
+        ka_net_netdev_tx_fifo_errors_add(ndev);
         return KA_NETDEV_TX_BUSY;
     }
 
@@ -514,7 +509,7 @@ STATIC int pcidev_s2s_send_queue_init(struct pcivnic_pcidev *pcidev)
 }
 #endif
 
-STATIC int pcivnic_pciedev_send(ka_sk_buff_t *skb, struct pcivnic_pcidev *pcidev, ka_net_device_t *dev)
+STATIC int pcivnic_pciedev_send(ka_sk_buff_t *skb, struct pcivnic_pcidev *pcidev, ka_net_device_t *ndev)
 {
     struct pcivnic_netdev *vnic_dev = (struct pcivnic_netdev *)pcidev->netdev;
     struct pcivnic_sq_desc *sq_desc = NULL;
@@ -537,10 +532,10 @@ STATIC int pcivnic_pciedev_send(ka_sk_buff_t *skb, struct pcivnic_pcidev *pcidev
 
     /* tx queue full */
     if (ka_unlikely(pcidev->status & BIT_STATUS_TQ_FULL)) {
-        if (dev != NULL) {
-            ka_net_netif_stop_queue(dev);
-            dev->stats.tx_dropped++;
-            dev->stats.tx_fifo_errors++;
+        if (ndev != NULL) {
+            ka_net_netif_stop_queue(ndev);
+            ka_net_netdev_tx_dropped_add(ndev);
+            ka_net_netdev_tx_fifo_errors_add(ndev);
         } else {
             ka_net_dev_kfree_skb_any(skb);
             skb = NULL;
@@ -548,17 +543,17 @@ STATIC int pcivnic_pciedev_send(ka_sk_buff_t *skb, struct pcivnic_pcidev *pcidev
         ka_task_spin_unlock_bh(&pcidev->lock);
         pcidev->stat.tx_full++;
         devdrv_info("device %d tx queue full, flag %d, stop tx queue\n",
-            pcidev->dev_id, (dev == NULL) ? 0 : 1);
+            pcidev->dev_id, (ndev == NULL) ? 0 : 1);
         return KA_NETDEV_TX_BUSY;
     }
 
     /* update netdev */
-    if (dev != NULL) {
+    if (ndev != NULL) {
         ka_task_spin_lock_bh(&vnic_dev->lock);
-        ka_net_netdev_set_trans_start(dev);
-        dev->stats.tx_packets++;
-        dev->stats.tx_bytes += skb->len;
-        ka_net_netdev_sent_queue(dev, skb->len);
+        ka_net_netdev_set_trans_start(ndev);
+        ka_net_netdev_tx_packets_add(ndev);
+        ka_net_netdev_tx_bytes_add(ndev, skb->len);
+        ka_net_netdev_sent_queue(ndev, skb->len);
         ka_task_spin_unlock_bh(&vnic_dev->lock);
     }
 
@@ -592,10 +587,10 @@ STATIC int pcivnic_pciedev_send(ka_sk_buff_t *skb, struct pcivnic_pcidev *pcidev
     pcidev->tx[tail].addr = addr;
     pcidev->tx[tail].skb = skb;
     pcidev->tx[tail].len = (int)skb->len;
-    pcidev->tx[tail].netdev = (void *)dev;
-    if (dev != NULL) {
+    pcidev->tx[tail].netdev = (void *)ndev;
+    if (ndev != NULL) {
         ka_task_spin_lock_bh(&vnic_dev->lock);
-        pcidev->tx[tail].tx_seq = dev->stats.tx_packets;
+        pcidev->tx[tail].tx_seq = ka_net_netdev_get_stats_tx_packets(ndev);
         pcidev->tx[tail].timestamp = (unsigned long)(ka_jiffies / KA_HZ);
         ka_task_spin_unlock_bh(&vnic_dev->lock);
     }
@@ -615,10 +610,10 @@ STATIC int pcivnic_pciedev_send(ka_sk_buff_t *skb, struct pcivnic_pcidev *pcidev
     return KA_NETDEV_TX_OK;
 
 error:
-    if (dev != NULL) {
+    if (ndev != NULL) {
         ka_task_spin_lock_bh(&vnic_dev->lock);
-        dev->stats.tx_dropped++;
-        dev->stats.tx_fifo_errors++;
+        ka_net_netdev_tx_dropped_add(ndev);
+        ka_net_netdev_tx_fifo_errors_add(ndev);
         ka_task_spin_unlock_bh(&vnic_dev->lock);
     }
     ka_net_dev_kfree_skb_any(skb);
@@ -626,9 +621,9 @@ error:
     return ret;
 }
 
-STATIC ka_netdev_tx_t pcivnic_net_xmit(ka_sk_buff_t *skb, ka_net_device_t *dev)
+STATIC ka_netdev_tx_t pcivnic_net_xmit(ka_sk_buff_t *skb, ka_net_device_t *ndev)
 {
-    struct pcivnic_netdev *vnic_dev = ka_net_netdev_priv(dev);
+    struct pcivnic_netdev *vnic_dev = ka_net_netdev_priv(ndev);
     ka_sk_buff_t *skb_cp = NULL;
     int ret = 0;
     int next_hop;
@@ -643,7 +638,7 @@ STATIC ka_netdev_tx_t pcivnic_net_xmit(ka_sk_buff_t *skb, ka_net_device_t *dev)
     next_hop = pcivnic_down_get_next_hop((unsigned char *)ka_net_skb_mac_header(skb));
     if (next_hop == PCIVNIC_NEXT_HOP_S2S) {
 #ifdef CFG_FEATURE_S2S
-        ret = pcivnic_pciedev_s2s_send(skb, vnic_dev->pcidev[0], dev);
+        ret = pcivnic_pciedev_s2s_send(skb, vnic_dev->pcidev[0], ndev);
             if (ret != 0) {
             goto free_skb;
         }
@@ -659,7 +654,7 @@ STATIC ka_netdev_tx_t pcivnic_net_xmit(ka_sk_buff_t *skb, ka_net_device_t *dev)
             goto free_skb;
         }
 
-        ret = pcivnic_pciedev_send(skb, vnic_dev->pcidev[next_hop], dev);
+        ret = pcivnic_pciedev_send(skb, vnic_dev->pcidev[next_hop], ndev);
     } else {
         next_hop = pcivnic_get_next_valid_pcidev(vnic_dev, begin);
         if (next_hop < 0) {
@@ -670,7 +665,7 @@ STATIC ka_netdev_tx_t pcivnic_net_xmit(ka_sk_buff_t *skb, ka_net_device_t *dev)
 
         /* Broadcast transmission only counts once */
         skb_cp = ka_net_skb_copy(skb, KA_GFP_ATOMIC);
-        ret = pcivnic_pciedev_send(skb, vnic_dev->pcidev[next_hop], dev);
+        ret = pcivnic_pciedev_send(skb, vnic_dev->pcidev[next_hop], ndev);
         while (skb_cp != NULL) {
             next_hop = pcivnic_get_next_valid_pcidev(vnic_dev, begin);
             if (next_hop < 0) {
@@ -694,8 +689,8 @@ STATIC ka_netdev_tx_t pcivnic_net_xmit(ka_sk_buff_t *skb, ka_net_device_t *dev)
 
 free_skb:
     ka_task_spin_lock_bh(&vnic_dev->lock);
-    dev->stats.tx_errors++;
-    dev->stats.tx_dropped++;
+    ka_net_netdev_tx_errors_add(ndev);
+    ka_net_netdev_tx_dropped_add(ndev);
     ka_task_spin_unlock_bh(&vnic_dev->lock);
     ka_net_dev_kfree_skb_any(skb);
     return KA_NETDEV_TX_OK;
@@ -729,8 +724,8 @@ STATIC void pcivnic_tx_free_and_cqsq_update(struct pcivnic_pcidev *pcidev, struc
     if ((cq_desc != NULL) && (cq_desc->status != 0)) {
         if (pcidev->tx[tx_head].netdev) {
             ka_task_spin_lock_bh(&vnic_dev->lock);
-            ndev->stats.tx_errors++;
-            ndev->stats.tx_carrier_errors++;
+            ka_net_netdev_tx_errors_add(ndev);
+            ka_net_netdev_tx_carrier_errors_add(ndev);
             ka_task_spin_unlock_bh(&vnic_dev->lock);
         }
     }
@@ -844,7 +839,7 @@ STATIC void pcivnic_response_cq(struct pcivnic_pcidev *pcidev, u32 sq_head, u32 
 }
 
 /* napi receive polling callback function */
-static int pcivnic_napi(ka_napi_struct_t *napi, int budget)
+STATIC int pcivnic_napi(ka_napi_struct_t *napi, int budget)
 {
     struct pcivnic_netdev *vnic_dev = ka_container_of(napi, struct pcivnic_netdev, napi);
     int work_done = 0;
@@ -876,9 +871,10 @@ void pcivnic_rx_packet(ka_sk_buff_t *skb, struct pcivnic_netdev *vnic_dev, u32 d
 
     ka_task_spin_lock_bh(&vnic_dev->lock);
     if ((vnic_dev->status & BIT_STATUS_LINK) == 0) {
-        ndev->stats.rx_dropped++;
+        ka_net_netdev_rx_dropped_add(ndev);
         ka_task_spin_unlock_bh(&vnic_dev->lock);
-	if ((ndev->stats.rx_dropped % PCIVNIC_LINKDOWN_NUM == 0) && (pcivnic_is_register_netdev(dev_id) == true)) {
+	if ((ka_net_netdev_get_stats_rx_dropped(ndev) % PCIVNIC_LINKDOWN_NUM == 0) &&
+        (pcivnic_is_register_netdev(dev_id) == true)) {
             devdrv_info("rx drop packet.(len=%d, dev_id=%u)\n", skb->len, dev_id);
         }
         ka_net_dev_consume_skb_any(skb);
@@ -886,8 +882,8 @@ void pcivnic_rx_packet(ka_sk_buff_t *skb, struct pcivnic_netdev *vnic_dev, u32 d
     }
 
     /* update stats */
-    ndev->stats.rx_packets++;
-    ndev->stats.rx_bytes += skb->len;
+    ka_net_netdev_rx_packets_add(ndev);
+    ka_net_netdev_rx_bytes_add(ndev, skb->len);
 
     ka_task_spin_unlock_bh(&vnic_dev->lock);
 
@@ -1220,7 +1216,7 @@ STATIC void pcivnic_net_timeout_work(ka_work_struct_t *p_work)
 {
     ka_delayed_work_t *delayed_work = ka_container_of(p_work, ka_delayed_work_t, work);
     struct pcivnic_netdev *vnic_dev = ka_container_of(delayed_work, struct pcivnic_netdev, timeout);
-    ka_net_device_t *dev = vnic_dev->ndev;
+    ka_net_device_t *ndev = vnic_dev->ndev;
     struct pcivnic_pcidev *pcidev = NULL;
     u16 tx_head = 0;
     int dev_id = 0;
@@ -1236,8 +1232,8 @@ find_next:
 
     /* find out */
     if (tx_seq == (unsigned long)-1) {
-        devdrv_info("net dev %s watchdog timeout num %d, cur_timestamp %lu, tx finish!\n", dev->name, timeout_num,
-                    cur_timestamp);
+        devdrv_info("net dev %s watchdog timeout num %d, cur_timestamp %lu, tx finish!\n",
+            ka_net_netdev_get_name(ndev), timeout_num, cur_timestamp);
         return;
     }
 
@@ -1248,7 +1244,7 @@ find_next:
     ka_task_spin_lock_bh(&pcidev->lock);
     if ((pcidev->status & BIT_STATUS_LINK) == 0) {
         ka_task_spin_unlock_bh(&pcidev->lock);
-        devdrv_info("net dev %s watchdog, pcidev->status=%d.\n", dev->name, pcidev->status);
+        devdrv_info("net dev %s watchdog, pcidev->status=%d.\n", ka_net_netdev_get_name(ndev), pcidev->status);
         return;
     }
     ka_task_spin_unlock_bh(&pcidev->lock);
@@ -1264,7 +1260,7 @@ find_next:
             ka_task_spin_unlock_bh(&pcidev->lock);
             pcivnic_pause_free_queue(vnic_dev, pcidev);
             devdrv_err("Set device pause, free queue. (netdev=%s; dev=%d; cur_timestamp=%lu)\n",
-                dev->name, dev_id, cur_timestamp);
+                ka_net_netdev_get_name(ndev), dev_id, cur_timestamp);
             return;
         }
 
@@ -1276,12 +1272,12 @@ find_next:
     }
 
     devdrv_info("net dev %s watchdog, timeout_num=%d, timeout_cnt=%u, cur_timestamp=%lu, tx_head=%d.\n",
-        dev->name, timeout_num, pcidev->timeout_cnt, cur_timestamp, tx_head);
+        ka_net_netdev_get_name(ndev), timeout_num, pcidev->timeout_cnt, cur_timestamp, tx_head);
 }
 
-STATIC void pcivnic_net_timeout(ka_net_device_t *dev)
+STATIC void pcivnic_net_timeout(ka_net_device_t *ndev)
 {
-    struct pcivnic_netdev *vnic_dev = ka_net_netdev_priv(dev);
+    struct pcivnic_netdev *vnic_dev = ka_net_netdev_priv(ndev);
     struct pcivnic_pcidev *pcidev = NULL;
     struct pcivnic_cq_desc *cq_desc = NULL;
     u16 tx_head = 0;
@@ -1322,34 +1318,35 @@ STATIC void pcivnic_net_timeout(ka_net_device_t *dev)
     (void)ka_task_schedule_delayed_work(&vnic_dev->timeout, PCIVNIC_DELAYWORK_TIME * KA_HZ);
 
 reset_queue:
-    if (ka_net_netif_queue_stopped(dev)) {
-        ka_net_netif_wake_queue(dev);
+    if (ka_net_netif_queue_stopped(ndev)) {
+        ka_net_netif_wake_queue(ndev);
     }
 
-    devdrv_warn("net dev %s tx_seq=%ld, cur_timestamp=%lu, timestamp=%lu\n", dev->name, tx_seq, cur_timestamp, timestamp);
+    devdrv_warn("net dev %s tx_seq=%ld, cur_timestamp=%lu, timestamp=%lu\n", ka_net_netdev_get_name(ndev),
+        tx_seq, cur_timestamp, timestamp);
 }
 
-void pcivnic_net_timeout_new(ka_net_device_t *dev, unsigned int txqueue)
+void pcivnic_net_timeout_new(ka_net_device_t *ndev, unsigned int txqueue)
 {
-    pcivnic_net_timeout(dev);
+    pcivnic_net_timeout(ndev);
 }
 
 #ifndef RHEL_RELEASE_CODE
-STATIC int pcivnic_net_change_mtu(ka_net_device_t *dev, int new_mtu)
+STATIC int pcivnic_net_change_mtu(ka_net_device_t *ndev, int new_mtu)
 {
     if ((new_mtu < PCIVNIC_MTU_LOW) || (new_mtu > PCIVNIC_MTU_HIGH)) {
         devdrv_err("mtu value is invalid!\n");
         return -EINVAL;
     }
-    ka_net_netdev_set_mtu(dev, (unsigned int)new_mtu);
+    ka_net_netdev_set_mtu(ndev, (unsigned int)new_mtu);
 
     return 0;
 }
 #endif
 
-STATIC ka_net_device_stats_t *pcivnic_net_get_stats(ka_net_device_t *dev)
+STATIC ka_net_device_stats_t *pcivnic_net_get_stats(ka_net_device_t *ndev)
 {
-    return &dev->stats;
+    return ka_net_netdev_get_stats(ndev);
 }
 
 ka_ethtool_ops_t g_pcivnic_ethtools_ops = {
@@ -1525,7 +1522,7 @@ int pcivnic_register_netdev(struct pcivnic_netdev *vnic_dev)
     if (vnic_dev->ndev_register == PCIVNIC_INVALID) {
         ret = ka_net_register_netdev(vnic_dev->ndev);
         if (ret != 0) {
-            devdrv_err("%s, dma register_ndev failed!\n", vnic_dev->ndev->name);
+            devdrv_err("%s, dma register_ndev failed!\n", ka_net_netdev_get_name(vnic_dev->ndev));
             return ret;
         }
 
@@ -1601,9 +1598,10 @@ ssize_t pcivnic_get_dev_stat_inner(ka_device_t *dev, char *buf)
         "\nnet dev stat:\n    send_pkt: %llu\n    recv_pkt: %llu\n    tx_packets: %llu\n    tx_dropped: %llu\n"
         "    tx_fifo_errors: %llu\n    tx_errors: %llu\n    tx_carrier_errors: %llu\n    rx_dropped: %llu\n"
         "    rx_packets: %llu\n",
-        vnic_dev->stat.send_pkt, vnic_dev->stat.recv_pkt,  vnic_dev->ndev->stats.tx_packets,
-        vnic_dev->ndev->stats.tx_dropped, vnic_dev->ndev->stats.tx_fifo_errors, vnic_dev->ndev->stats.tx_errors,
-        vnic_dev->ndev->stats.tx_carrier_errors, vnic_dev->ndev->stats.rx_dropped, vnic_dev->ndev->stats.rx_packets);
+        vnic_dev->stat.send_pkt, vnic_dev->stat.recv_pkt, ka_net_netdev_get_stats_tx_packets(vnic_dev->ndev),
+        ka_net_netdev_get_stats_tx_dropped(vnic_dev->ndev), ka_net_netdev_get_stats_tx_fifo_errors(vnic_dev->ndev),
+        ka_net_netdev_get_stats_tx_errors(vnic_dev->ndev), ka_net_netdev_get_stats_tx_carrier_errors(vnic_dev->ndev),
+        ka_net_netdev_get_stats_rx_dropped(vnic_dev->ndev), ka_net_netdev_get_stats_rx_packets(vnic_dev->ndev));
     if (ret >= 0) {
         offset += ret;
     }
@@ -1649,7 +1647,7 @@ static const ka_attribute_group_t g_pcivnic_sysfs_group = {
     ka_fs_init_ag_name("vnic")
 };
 
-static void pcivnic_init_pcidev(struct pcivnic_pcidev *pcidev)
+STATIC void pcivnic_init_pcidev(struct pcivnic_pcidev *pcidev)
 {
     pcidev->timeout_cnt = 0;
     if (memset_s((void *)&pcidev->stat, sizeof(struct pcivnic_dev_stat), 0, sizeof(struct pcivnic_dev_stat)) != 0) {
@@ -1842,6 +1840,7 @@ struct pcivnic_netdev *pcivnic_alloc_netdev(const char *ndev_name, int ndev_name
     struct pcivnic_pcidev *pcidev = NULL;
     ka_net_device_t *ndev = NULL;
     u32 i, j;
+    int watchdog_timeo;
 
     (void)ndev_name_len;
     pcidev = pcivnic_alloc_pcidevs(NETDEV_PCIDEV_NUM);
@@ -1862,15 +1861,15 @@ struct pcivnic_netdev *pcivnic_alloc_netdev(const char *ndev_name, int ndev_name
     vnic_dev->ndev_register = PCIVNIC_INVALID;
     vnic_dev->ndev = ndev;
 
-    ndev->netdev_ops = &g_pcivnic_netdev_ops;
-    ndev->ethtool_ops = &g_pcivnic_ethtools_ops;
-
-    ndev->watchdog_timeo = PCIVNIC_WATCHDOG_TIME * KA_HZ;
-    ndev->hw_features |= KA_NETIF_F_GRO;
-    ndev->features |= KA_NETIF_F_HIGHDMA | KA_NETIF_F_GSO;
+    watchdog_timeo = PCIVNIC_WATCHDOG_TIME * KA_HZ;
+    ka_net_netdev_set_netdev_ops(ndev, &g_pcivnic_netdev_ops);
+    ka_net_netdev_set_ethtool_ops(ndev, &g_pcivnic_ethtools_ops);
+    ka_net_netdev_set_watchdog_timeo(ndev, watchdog_timeo);
+    ka_net_netdev_set_hw_features(ndev, KA_NETIF_F_GRO);
+    ka_net_netdev_set_features(ndev, KA_NETIF_F_HIGHDMA | KA_NETIF_F_GSO);
 #ifdef CFG_FEATURE_S2S
     if (pcivnic_get_addr_mode() == AGENTDRV_ADMODE_FULL_MATCH) {
-        ndev->max_mtu = PCIVNIC_MTU_HIGH;
+        ka_net_netdev_set_max_mtu(ndev, PCIVNIC_MTU_HIGH);
     }
 #endif
     vnic_dev->status &= ~BIT_STATUS_LINK;

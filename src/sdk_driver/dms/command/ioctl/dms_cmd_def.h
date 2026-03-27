@@ -378,4 +378,11 @@ struct dms_eid_query_info {
     unsigned int num;
     unsigned int min_idx;    // Currently, only choose the smallest eid, record the idx
 };
+
+struct dms_get_phy_dev_info_out {
+    unsigned int chip_id;
+    unsigned int die_id;
+    unsigned int reserved[32];
+};
+
 #endif

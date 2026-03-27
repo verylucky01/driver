@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,6 +14,9 @@
 #ifndef _HDCDRV_MAIN_H_
 #define _HDCDRV_MAIN_H_
 
+#include "ka_memory_pub.h"
+#include "ka_list_pub.h"
+#include "ka_system_pub.h"
 #include "dmc_kernel_interface.h"
 #include "comm_kernel_interface.h"
 #include "vmng_kernel_interface.h"
@@ -24,12 +27,6 @@
 #include "hdcdrv_core_com.h"
 #include "hdcdrv_cmd_msg.h"
 #include "hdcdrv_mem_com.h"
-#include "ka_base_pub.h"
-#include "ka_common_pub.h"
-#include "ka_memory_pub.h"
-#include "ka_task_pub.h"
-#include "ka_list_pub.h"
-#include "ka_system_pub.h"
 
 #ifdef CFG_FEATURE_VFIO
 #include "hdcdrv_adapter.h"
@@ -182,44 +179,6 @@ enum {
     HDC_MEM_POOL_LEVEL_4,
     HDC_MEM_POOL_LEVEL_INVALID
 };
-
-#define HDCDRV_SQ_RESV_LEN 2
-
-/* dma payload is 128 bytes; cq/sq must aligned with 128, not within same cacheline */
-/* sq cq description */
-struct hdcdrv_sq_desc {
-    int local_session;
-    int remote_session;
-    u64 src_data_addr;
-    u64 dst_data_addr;
-    u64 src_ctrl_addr;
-    u64 dst_ctrl_addr;
-    u32 offset;         // src data addr seque offset, used for CFG_FEATURE_OVER_XCOM
-    int data_len;
-    int ctrl_len;
-    u32 src_pid;
-    u32 src_fid;
-#ifdef CFG_FEATURE_PFSTAT
-    u32 trans_id;
-#endif
-    u32 inner_checker;
-    u32 desc_crc;
-    u32 valid;
-} __attribute__((aligned(128)));
-
-#define HDCDRV_SQ_DESC_SIZE sizeof(struct hdcdrv_sq_desc)
-#define HDCDRV_SQ_DESC_CRC_LEN ka_offsetof(struct hdcdrv_sq_desc, desc_crc)
-
-struct hdcdrv_cq_desc {
-    int status; /* if status > 0  is pcie err, other hdc err */
-    u32 sq_head;
-    int session;
-    u32 desc_crc;
-    u32 valid;
-} __attribute__((aligned(128)));
-
-#define HDCDRV_CQ_DESC_SIZE sizeof(struct hdcdrv_cq_desc)
-#define HDCDRV_CQ_DESC_CRC_LEN ka_offsetof(struct hdcdrv_cq_desc, desc_crc)
 
 struct hdcdrv_fast_page_info {
     u32 send_inner_page_offset;
@@ -523,8 +482,8 @@ struct hdcdrv_msg_chan {
     int sq_head;
     int dma_need_submit_flag;
     int is_allocated;
-    u32 dfx_rx_stamp; /* period print rx statistic */
-    u32 dfx_tx_stamp; /* period print tx statistic */
+    u64 dfx_rx_stamp; /* period print rx statistic */
+    u64 dfx_tx_stamp; /* period print tx statistic */
     enum devdrv_dma_data_type data_type;
     struct hdcdrv_stats stat;
     struct hdcdrv_dbg_stats dbg_stat;
@@ -660,7 +619,7 @@ struct hdcdrv_session {
     struct hdcdrv_session_normal_rx normal_rx;
     struct hdcdrv_session_fast_rx fast_rx;
     ka_wait_queue_head_t wq_mem_release_event;
-    struct kfifo mem_release_fifo;
+    ka_kfifo_t mem_release_fifo;
     ka_task_spinlock_t mem_release_lock;
     u32 mem_release_wait_flag;
     int pid_flag;
@@ -956,6 +915,7 @@ extern void hdcdrv_set_running_status(int status);
 int vmng_bandwidth_limit_check(struct vmng_bandwidth_check_info *info);
 void hdcdrv_rx_msg_schedule_task(struct hdcdrv_msg_chan *msg_chan);
 int hdcdrv_get_link_status(struct devdrv_pcie_link_info_para *link_info);
+int hdcdrv_get_p2p_com_status(void *out, unsigned int out_len, unsigned int *real_out);
 int hdcdrv_force_link_down(void);
 long hdcdrv_get_spec_devid(struct hdcdrv_cmd_get_spec_devid *cmd);
 /*
@@ -970,5 +930,6 @@ int hdcdrv_session_free_check(int show_log);
 int hdcdrv_peer_fault_notify(u32 status);
 int hdcdrv_get_peer_id_by_devid(u32 devid, u32 *peer_id);
 int hdcdrv_get_devid_by_peer_id(u32 peer_id, u32 *devid);
+struct hdcdrv_node_tree_ctrl *hdcdrv_new_tree_init(void);
 
 #endif  // _DEVDRV_MAIN_H_

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -20,35 +20,24 @@
 #include "ka_fs_pub.h"
 #include "ka_task_pub.h"
 #include "ka_base_pub.h"
-
-#include <linux/fs.h>
-#include <linux/proc_fs.h>
-#include <linux/uaccess.h>
-#include <linux/version.h>
+#include "ka_common_pub.h"
 
 #define ASCEND_DRV_BASE_FILE_NAME "ascend_drv"
 #define ASCEND_DRV_LOG_LEVEL_FILE_NAME "log_level"
 int console_log_level = 3;   /* default log level */
-struct proc_dir_entry *file_base_path = NULL;
-struct proc_dir_entry *log_level_file = NULL;
+ka_proc_dir_entry_t *file_base_path = NULL;
+ka_proc_dir_entry_t *log_level_file = NULL;
 char console_log_level_info[LOG_LEVEL_FILE_INFO_LEN];
-struct mutex log_level_mutex;
+ka_mutex_t log_level_mutex;
 
-ssize_t log_level_file_read(struct file *file, char __ka_user *data, size_t len, loff_t *off);
-ssize_t log_level_file_write(struct file *file, const char __ka_user *data, size_t len, loff_t *off);
+ssize_t log_level_file_read(ka_file_t *file, char __ka_user *data, size_t len, loff_t *off);
+ssize_t log_level_file_write(ka_file_t *file, const char __ka_user *data, size_t len, loff_t *off);
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0)
-struct proc_ops log_level_file_ops = {
-    .proc_read = log_level_file_read,
-    .proc_write = log_level_file_write,
+ka_procfs_ops_t log_level_file_ops = {
+    ka_fs_init_pf_owner(KA_THIS_MODULE)
+    ka_fs_init_pf_read(log_level_file_read)
+    ka_fs_init_pf_write(log_level_file_write)
 };
-#else
-struct file_operations log_level_file_ops = {
-    .owner = KA_THIS_MODULE,
-    .read = log_level_file_read,
-    .write = log_level_file_write,
-};
-#endif
 
 char *module_str = "drv_log";
 void log_level_file_remove(void)
@@ -65,7 +54,7 @@ void log_level_file_remove(void)
     drv_event(module_str, "log_level_file has been removed!!!\n");
 }
 
-ssize_t log_level_file_read(struct file *file, char __ka_user *data, size_t len, loff_t *off)
+ssize_t log_level_file_read(ka_file_t *file, char __ka_user *data, size_t len, loff_t *off)
 {
     char *ptr = NULL;
     int count = 0;
@@ -80,7 +69,7 @@ ssize_t log_level_file_read(struct file *file, char __ka_user *data, size_t len,
         return 0;
     }
 
-    ptr = ka_base_pde_data(file_inode(file));
+    ptr = ka_base_pde_data(ka_fs_file_inode(file));
     if (len < (size_t)(LOG_LEVEL_FILE_INFO_LEN - (*off))) {
         count = len + *off;
     } else {
@@ -99,7 +88,7 @@ ssize_t log_level_file_read(struct file *file, char __ka_user *data, size_t len,
     return len;
 }
 
-ssize_t log_level_file_write(struct file *file, const char __ka_user *data, size_t len, loff_t *off)
+ssize_t log_level_file_write(ka_file_t *file, const char __ka_user *data, size_t len, loff_t *off)
 {
     char tmp[LOG_LEVEL_FILE_INFO_LEN];
     char *ptr = NULL;
@@ -122,7 +111,7 @@ ssize_t log_level_file_write(struct file *file, const char __ka_user *data, size
 
     ka_task_mutex_lock(&log_level_mutex);
 
-    ptr = ka_base_pde_data(file_inode(file));
+    ptr = ka_base_pde_data(ka_fs_file_inode(file));
 
     ret = ka_base_copy_from_user(tmp, data, len);
     if (ret != DRV_ERROR_NONE) {
@@ -158,11 +147,11 @@ int log_level_get(void)
 int log_level_info_creat(char *proc_info_in, const char *format, ...)
 {
     int ret = 0;
-    va_list args;
+    ka_va_list args;
 
-    va_start(args, format);
+    ka_va_start(args, format);
     ret = vsnprintf_s(proc_info_in, LOG_LEVEL_FILE_INFO_LEN, LOG_LEVEL_FILE_INFO_LEN - 1, format, args);
-    va_end(args);
+    ka_va_end(args);
 
     return ret;
 }

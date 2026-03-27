@@ -168,7 +168,6 @@ struct queue_manages {
     unsigned int tjfr_valid_flag;  /* 0: invalid; 1: valid */
     urma_token_t token;
 #endif
-    unsigned int peer_deploy_flag; /* 0: local used; 1: remote used  */
 };
 
 struct queue_local_info {

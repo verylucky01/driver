@@ -12,7 +12,7 @@ obj-m += asdrv_dpa.o
 asdrv_dpa-objs := dpa_init.o
 
 # apm/dp_proc_mng
-ifneq ($(filter $(PRODUCT), ascend910_95),)
+ifneq ($(filter $(PRODUCT), ascend950),)
 	include ${DRIVER_KERNEL_DIR}/dpa/apm/apm.mk
 else ifneq ($(filter $(PRODUCT), ascend910B),)
 	include ${DRIVER_KERNEL_DIR}/dpa/dp_proc_mng/master/pmaster/dp_proc_mng_host.mk

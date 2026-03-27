@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -57,7 +57,7 @@ void os_reset_report(u32 devid)
 
 STATIC int os_dev_node_config(unsigned int user_id, struct soft_dev *s_dev)
 {
-    int pid = current->tgid;
+    int pid = ka_task_get_current_tgid();
     struct dms_node_operations *soft_ops = soft_get_ops();
     struct dms_node s_node = SOFT_NODE_DEF(HAL_DMS_DEV_TYPE_OS_LINUX, "OS Linux", s_dev->dev_id,
         s_dev->node_id, soft_ops);
@@ -151,7 +151,7 @@ int os_device_notifier_func(u32 devid)
 {
     int ret = 0;
 
-    if (devid >= DEVDRV_PF_DEV_MAX_NUM) {
+    if (devid >= ASCEND_PDEV_MAX_NUM) {
         return 0;
     }
     ret = os_dev_register(devid);

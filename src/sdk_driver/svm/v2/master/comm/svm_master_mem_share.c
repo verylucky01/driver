@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -638,7 +638,6 @@ static struct devmm_share_phy_addr_agent_blk *devmm_share_agent_blk_get(u32 devi
     node = devmm_rb_search(&dev_res_mng->share_agent_blk_mng.rbtree, (u64)share_id,
         rb_handle_of_share_agent_blk_node);
     if (node == NULL) {
-        devmm_drv_err("Share handle doesn't exist. (share_id=%u; devid=%u)\n", share_id, devid);
         goto get_from_dev_fail;
     }
 
@@ -675,7 +674,7 @@ int devmm_share_agent_blk_put_with_share_id(u32 share_devid, int share_id, int h
     blk = devmm_share_agent_blk_get(share_devid, share_id);
     if (blk == NULL) {
         devmm_dev_res_mng_put(dev_res_mng);
-        devmm_drv_err("Share handle doesn't exist. (share_id=%u; devid=%u)\n", share_id, share_devid);
+        devmm_drv_err("Share handle doesn't exist. (share_id=%d; devid=%u)\n", share_id, share_devid);
         return -EFAULT;
     }
 
@@ -1153,6 +1152,7 @@ static int devmm_ioctl_mem_import_local_server(struct devmm_svm_process *svm_pro
 
     blk = devmm_share_agent_blk_get(share_devid, para->share_id);
     if (blk == NULL) {
+        devmm_drv_err("Share handle doesn't exist. (devid=%u; share_id=%d)\n", share_devid, para->share_id);
         return -EFAULT;
     }
 
@@ -1201,6 +1201,7 @@ static int devmm_ioctl_mem_import_local_server(struct devmm_svm_process *svm_pro
     para->pg_num = blk->pg_num;
     para->pg_type = blk->pg_type;
     para->side = (info.devid == uda_get_host_id()) ? MEM_HOST_SIDE : MEM_DEV_SIDE;
+    para->mem_type = blk->mem_type;
     devmm_share_agent_blk_put(blk);
     devmm_drv_debug("Mem import success. (devid=%u; share_devid=%u; share_id=%d; id=%d)\n",
         arg->head.devid, share_devid, para->share_id, id);
@@ -1402,6 +1403,7 @@ static int devmm_ioctl_mem_import_remote_server(struct devmm_svm_process *svm_pr
     para->pg_num = share_info.pg_num;
     para->pg_type = share_info.pg_type;
     para->side = (info.devid == uda_get_host_id()) ? MEM_HOST_SIDE : MEM_DEV_SIDE;
+    para->mem_type = share_info.mem_type;
 
     return 0;
 }
@@ -1688,6 +1690,7 @@ int devmm_ioctl_mem_set_pid(struct devmm_svm_process *svm_proc, struct devmm_ioc
 
     blk = devmm_share_agent_blk_get(arg->head.devid, para->share_id);
     if (blk == NULL) {
+        devmm_drv_err("Share handle doesn't exist. (devid=%u; share_id=%d)\n", arg->head.devid, para->share_id);
         /* EFAULT can't change, user will get invalid handle err code. */
         ret = -EFAULT;
         goto free_pid_list;
@@ -1765,7 +1768,7 @@ int devmm_ioctl_mem_set_attr(struct devmm_svm_process *svm_proc, struct devmm_io
 
     blk = devmm_share_agent_blk_get(arg->head.devid, para->share_id);
     if (blk == NULL) {
-        devmm_drv_err("Share handle doesn't exist. (share_id=%u; devid=%u)\n", arg->head.devid, para->share_id);
+        devmm_drv_err("Share handle doesn't exist. (devid=%u; share_id=%d)\n", arg->head.devid, para->share_id);
         return -EFAULT;
     }
 
@@ -1817,7 +1820,7 @@ int devmm_ioctl_mem_get_attr(struct devmm_svm_process *svm_proc, struct devmm_io
 
     blk = devmm_share_agent_blk_get(share_devid, para->share_id);
     if (blk == NULL) {
-        devmm_drv_err("Share handle doesn't exist. (share_id=%u; devid=%u)\n", share_devid, para->share_id);
+        devmm_drv_err("Share handle doesn't exist. (devid=%u; share_id=%u)\n", share_devid, para->share_id);
         return -EFAULT;
     }
 
@@ -1845,7 +1848,7 @@ int devmm_ioctl_mem_get_info(struct devmm_svm_process *svm_proc, struct devmm_io
 
     blk = devmm_share_agent_blk_get(share_devid, para->share_id);
     if (blk == NULL) {
-        devmm_drv_err("Share handle doesn't exist. (share_id=%u; devid=%u)\n", share_devid, para->share_id);
+        devmm_drv_err("Share handle doesn't exist. (devid=%u; share_id=%d)\n", share_devid, para->share_id);
         return -EFAULT;
     }
 

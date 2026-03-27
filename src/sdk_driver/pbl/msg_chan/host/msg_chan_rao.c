@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,8 +11,8 @@
  * GNU General Public License for more details.
  */
 
-#include "msg_chan_main.h"
 #include "ka_kernel_def_pub.h"
+#include "msg_chan_main.h"
 
 int devdrv_rao_read(u32 dev_id, enum devdrv_rao_client_type type, u64 offset, u64 len)
 {
@@ -21,7 +21,7 @@ int devdrv_rao_read(u32 dev_id, enum devdrv_rao_client_type type, u64 offset, u6
     struct devdrv_comm_dev_ops *dev_ops = devdrv_add_ops_ref();
     if (dev_ops == NULL) {
         devdrv_err("Get rao dev_ops fail. (dev_id=%u; type=%d)\n", dev_id, type);
-        return -EINVAL;
+        return -ENODEV;
     }
     (void)uda_udevid_to_add_id(dev_id, &index_id);
 
@@ -38,7 +38,7 @@ int devdrv_rao_write(u32 dev_id, enum devdrv_rao_client_type type, u64 offset, u
     struct devdrv_comm_dev_ops *dev_ops = devdrv_add_ops_ref();
     if (dev_ops == NULL) {
         devdrv_err("Get rao dev_ops fail. (dev_id=%u; type=%d)\n", dev_id, type);
-        return -EINVAL;
+        return -ENODEV;
     }
     (void)uda_udevid_to_add_id(dev_id, &index_id);
 

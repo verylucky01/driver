@@ -281,8 +281,9 @@ STATIC int SetLogType(ArgInfo *opts)
         "Option -t is used alone, no need to specify option -d.");
     const char *arg = mmGetOptArg();
     const char *typeStr[MAX_TYPE_NUM] = {"0", "1", "2", "3", "4", "5"}; // match to MsnLogType
+    int typeNum = 6;
 
-    for (int32_t i = 0; i < MAX_TYPE_NUM; ++i) {
+    for (int32_t i = 0; i < typeNum; ++i) {
         if (strcmp(arg, typeStr[i]) == 0) {
             opts->cmdType = REPORT;
             opts->subCmd = REPORT_TYPE;
@@ -453,6 +454,14 @@ STATIC int GetOptions(int argc, char **argv, ArgInfo *opts)
     return EN_OK;
 }
 
+STATIC bool IsHaveOptPermission(void)
+{
+#if (OS_TYPE == LINUX)
+    return geteuid() == 0;
+#else
+    return false;
+#endif
+}
 /**
  * @brief process command
  * @param [in]argInfo: command info
@@ -460,6 +469,11 @@ STATIC int GetOptions(int argc, char **argv, ArgInfo *opts)
  */
 STATIC int RequestHandle(const ArgInfo *argInfo)
 {
+    if (argInfo->cmdType == CONFIG_SET && !IsHaveOptPermission()) {
+        SELF_LOG_ERROR("Not have permission to set configurations.");
+        MSNPU_ERR("Not have permission to set configurations.");
+        return EN_ERROR;
+    }
     // set or get device log level
     char logLevelResult[MAX_LOG_LEVEL_RESULT_LEN + 1] = { 0 };
     int32_t logLevelResultLength = MAX_LOG_LEVEL_RESULT_LEN + 1;

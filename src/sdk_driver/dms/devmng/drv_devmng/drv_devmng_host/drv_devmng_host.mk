@@ -60,6 +60,16 @@ asdrv_dms-y += $(BUILD_PREFIX_DIR)/devdrv_manager_container.o
 asdrv_dms-y += $(BUILD_PREFIX_DIR)/devdrv_device_online.o
 asdrv_dms-y += $(BUILD_PREFIX_DIR)/drv_log.o
 asdrv_dms-y += $(BUILD_PREFIX_DIR)/tsdrv_status.o
+asdrv_dms-y += $(BUILD_PREFIX_DIR)/devdrv_chan_msg_process.o
+asdrv_dms-y += $(BUILD_PREFIX_DIR)/devdrv_manager_ioctl.o
+asdrv_dms-y += $(BUILD_PREFIX_DIR)/devdrv_pci_info.o
+asdrv_dms-y += $(BUILD_PREFIX_DIR)/devdrv_black_box_dump.o
+asdrv_dms-y += $(BUILD_PREFIX_DIR)/devdrv_core_info.o
+asdrv_dms-y += $(BUILD_PREFIX_DIR)/devdrv_resource_info.o
+asdrv_dms-y += $(BUILD_PREFIX_DIR)/devdrv_device_status.o
+asdrv_dms-y += $(BUILD_PREFIX_DIR)/devdrv_vdev_info.o
+asdrv_dms-y += $(BUILD_PREFIX_DIR)/devdrv_ipc_notify.o
+asdrv_dms-y += $(BUILD_PREFIX_DIR)/devdrv_shm_info.o
 
 EXTRA_CFLAGS += -I$(DRIVER_MODULE_DEVMNG_DIR)/dc/drv_devmng
 EXTRA_CFLAGS += -isystem $(shell $(CC) -print-file-name=include)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,16 +14,16 @@
 #ifndef _DEVDRV_PCI_H_
 #define _DEVDRV_PCI_H_
 
-#include "devdrv_device_load.h"
-#include "devdrv_atu.h"
-#include "devdrv_dma.h"
-#include "securec.h"
 #include "ka_base_pub.h"
 #include "ka_pci_pub.h"
 #include "ka_system_pub.h"
 #include "ka_common_pub.h"
 #include "ka_task_pub.h"
 #include "ka_memory_pub.h"
+#include "devdrv_device_load.h"
+#include "devdrv_atu.h"
+#include "devdrv_dma.h"
+#include "securec.h"
 
 #define PCI_VENDOR_ID_HUAWEI 0x19e5
 #define PCI_VENDOR_ID_HX 0x2092
@@ -103,6 +103,7 @@
 #define DEVDRV_PCI_SUBSYS_PRIVATE_VENDOR_HX   0X2092UL
 #define DEVDRV_PCI_SUBSYS_PRIVATE_VENDOR_HK   0X20C6UL
 #define DEVDRV_PCI_SUBSYS_PRIVATE_VENDOR_KL   0X203FUL
+#define DEVDRV_PCI_SUBSYS_PRIVATE_VENDOR_CJ   0X20E9UL
 #define DEVDRV_PCI_SUBSYS_DEV_MASK_BIT     4
 
 #define DEVDRV_DAVINCI_DEV_NUM_1PF1P 1
@@ -261,10 +262,10 @@ struct devdrv_link_info {
 };
 
 struct devdrv_res_info {
-    void __iomem *phy_match_flag_addr;
-    void __iomem *nvme_db_base;
-    void __iomem *nvme_pf_ctrl_base;
-    void __iomem *load_sram_base;
+    void __ka_mm_iomem *phy_match_flag_addr;
+    void __ka_mm_iomem *nvme_db_base;
+    void __ka_mm_iomem *nvme_pf_ctrl_base;
+    void __ka_mm_iomem *load_sram_base;
 
     phys_addr_t rsv_phy_addr;
 
@@ -370,14 +371,14 @@ struct devdrv_pci_ctrl {
     struct devdrv_dma_test *dma_test;
     ka_pci_dev_t *pdev;
     struct devdrv_pgtab_info *pgtab_info;
-    struct devdrv_shr_para __iomem *shr_para;
+    struct devdrv_shr_para __ka_mm_iomem *shr_para;
     struct devdrv_res_info res;
     struct devdrv_dev_ops ops;
-    void __iomem *io_base; /* pcie io bar base */
-    void __iomem *msi_base; /* pcie msg db base */
-    void __iomem *mem_base; /* pcie msg sqcq base */
-    void __iomem *local_reserve_mem_base; /* local reserve mem base */
-    void __iomem *rc_reg_base;
+    void __ka_mm_iomem *io_base; /* pcie io bar base */
+    void __ka_mm_iomem *msi_base; /* pcie msg db base */
+    void __ka_mm_iomem *mem_base; /* pcie msg sqcq base */
+    void __ka_mm_iomem *local_reserve_mem_base; /* local reserve mem base */
+    void __ka_mm_iomem *rc_reg_base;
     phys_addr_t io_phy_base;
     u64 io_phy_size;
     phys_addr_t mem_phy_base;

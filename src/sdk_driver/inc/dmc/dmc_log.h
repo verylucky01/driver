@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -15,11 +15,8 @@
 #define DMC_LOG_H
 
 #ifndef DVPP_UTST
-#include <linux/types.h>
-#include <linux/mm_types.h>
-#include <linux/sched.h>
-#include <linux/mm.h>
-#include <linux/preempt.h>
+#include "ka_dfx_pub.h"
+#include "ka_base_pub.h"
 #endif
 
 #define LOG_LEVEL_INFO_INPUT_LEN                (2U)
@@ -42,13 +39,13 @@ typedef struct log_buf_info {
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define drv_pr_debug(module, fmt, ...) \
-    pr_debug("[ascend] [%s] [%s %d] " fmt, module, __func__, __LINE__, ##__VA_ARGS__)
+    ka_dfx_pr_debug("[ascend] [%s] [%s %d] " fmt, module, __func__, __LINE__, ##__VA_ARGS__)
 
 #ifdef CFG_FEATURE_LOG_GROUPING
 #define DRV_FACILITY ((int)86)
 int __attribute__((weak)) drv_vprintk_emit(int level, const char *fmt, ...)
 {
-    va_list args;
+    ka_va_list args;
     int r;
 
     va_start(args, fmt);
@@ -61,11 +58,11 @@ int __attribute__((weak)) drv_vprintk_emit(int level, const char *fmt, ...)
 #define drv_printk(level, module, fmt, ...) \
     (void)drv_vprintk_emit(level, "[ascend] [%s] [%s %d] " fmt, module, __func__, __LINE__, ##__VA_ARGS__)
 
-#define drv_err(module, fmt...) drv_printk(LOGLEVEL_ERR, module, fmt)
-#define drv_warn(module, fmt, ...) drv_printk(LOGLEVEL_WARNING, module, fmt, ##__VA_ARGS__)
-#define drv_info(module, fmt, ...) drv_printk(LOGLEVEL_INFO, module, fmt, ##__VA_ARGS__)
-#define drv_debug(module, fmt, ...) drv_printk(LOGLEVEL_DEBUG, module, fmt, ##__VA_ARGS__)
-#define drv_event(module, fmt, ...) drv_printk(LOGLEVEL_NOTICE, module, fmt, ##__VA_ARGS__)
+#define drv_err(module, fmt...) drv_printk(KA_LOGLEVEL_ERR, module, fmt)
+#define drv_warn(module, fmt, ...) drv_printk(KA_LOGLEVEL_WARNING, module, fmt, ##__VA_ARGS__)
+#define drv_info(module, fmt, ...) drv_printk(KA_LOGLEVEL_INFO, module, fmt, ##__VA_ARGS__)
+#define drv_debug(module, fmt, ...) drv_printk(KA_LOGLEVEL_DEBUG, module, fmt, ##__VA_ARGS__)
+#define drv_event(module, fmt, ...) drv_printk(KA_LOGLEVEL_NOTICE, module, fmt, ##__VA_ARGS__)
 #else
 #ifdef CFG_FEATURE_HOST_LOG
 #define drv_log_print(kern_level, level, module, fmt, ...) \
@@ -73,43 +70,43 @@ int __attribute__((weak)) drv_vprintk_emit(int level, const char *fmt, ...)
         module, level, __func__, __LINE__, ##__VA_ARGS__)
 
 #define drv_err(module, fmt, ...) \
-    log_to_printk_and_ringbuf(KERN_NOTICE "[ascend] [ERROR] [%s] [%s %d] " fmt, \
+    log_to_printk_and_ringbuf(KA_KERN_NOTICE "[ascend] [ERROR] [%s] [%s %d] " fmt, \
         module, __func__, __LINE__, ##__VA_ARGS__)
-#define drv_warn(module, fmt, ...) drv_log_print(KERN_WARNING, "WARN", module, fmt, ##__VA_ARGS__)
-#define drv_info(module, fmt, ...) drv_log_print(KERN_INFO, "INFO", module, fmt, ##__VA_ARGS__)
-#define drv_event(module, fmt, ...) drv_log_print(KERN_NOTICE, "NOTICE", module, fmt, ##__VA_ARGS__)
+#define drv_warn(module, fmt, ...) drv_log_print(KA_KERN_WARNING, "WARN", module, fmt, ##__VA_ARGS__)
+#define drv_info(module, fmt, ...) drv_log_print(KA_KERN_INFO, "INFO", module, fmt, ##__VA_ARGS__)
+#define drv_event(module, fmt, ...) drv_log_print(KA_KERN_NOTICE, "NOTICE", module, fmt, ##__VA_ARGS__)
 #define drv_debug(module, fmt, ...) \
-    (void)printk(KERN_DEBUG "[ascend] [%s] [%s %d] " fmt, module, __func__, __LINE__, ##__VA_ARGS__)
+    (void)ka_dfx_printk(KA_KERN_DEBUG "[ascend] [%s] [%s %d] " fmt, module, __func__, __LINE__, ##__VA_ARGS__)
 #else
 
 #define drv_printk(level, module, fmt, ...) \
-    (void)printk(level "[ascend] [%s] [%s %d] " fmt, module, __func__, __LINE__, ##__VA_ARGS__)
+    (void)ka_dfx_printk(level "[ascend] [%s] [%s %d] " fmt, module, __func__, __LINE__, ##__VA_ARGS__)
 
 #if (defined(LOG_UT) || defined(CFG_FEATURE_DRV_LOG_ERR))
-#define drv_err(module, fmt...) drv_printk(KERN_ERR, module, fmt)
+#define drv_err(module, fmt...) drv_printk(KA_KERN_ERR, module, fmt)
 #else
 #define logflow_printk(level, module, fmt, ...) \
-    (void)printk(level "[ascend] [ERROR] [%s] [%s %d] " fmt, module, __func__, __LINE__, ##__VA_ARGS__)
+    (void)ka_dfx_printk(level "[ascend] [ERROR] [%s] [%s %d] " fmt, module, __func__, __LINE__, ##__VA_ARGS__)
 /* drv_err is KERN_NOTICE level to avoid too much serial print cause system watchdog reset.
  * if you want to change this, you must call SE to check this */
 #ifdef DAVINCI_DEVICE
-#define drv_err(module, fmt...) logflow_printk(KERN_ERR, module, fmt)
+#define drv_err(module, fmt...) logflow_printk(KA_KERN_ERR, module, fmt)
 #else
-#define drv_err(module, fmt...) logflow_printk(KERN_NOTICE, module, fmt)
+#define drv_err(module, fmt...) logflow_printk(KA_KERN_NOTICE, module, fmt)
 #endif
 
 #endif
 
 void log_drv_get_date(char *date, unsigned int len);
 void log_user_write_fault_mng(const char *module, int pid, const char *comm, const char *date, const char *file, int line, const char *fmt, ...);
-#define drv_warn(module, fmt, ...) drv_printk(KERN_WARNING, module, fmt, ##__VA_ARGS__)
-#define drv_info(module, fmt, ...) drv_printk(KERN_INFO, module, fmt, ##__VA_ARGS__)
-#define drv_debug(module, fmt, ...) drv_printk(KERN_DEBUG, module, fmt, ##__VA_ARGS__)
-#define drv_event(module, fmt, ...) drv_printk(KERN_NOTICE, module, fmt, ##__VA_ARGS__)
+#define drv_warn(module, fmt, ...) drv_printk(KA_KERN_WARNING, module, fmt, ##__VA_ARGS__)
+#define drv_info(module, fmt, ...) drv_printk(KA_KERN_INFO, module, fmt, ##__VA_ARGS__)
+#define drv_debug(module, fmt, ...) drv_printk(KA_KERN_DEBUG, module, fmt, ##__VA_ARGS__)
+#define drv_event(module, fmt, ...) drv_printk(KA_KERN_NOTICE, module, fmt, ##__VA_ARGS__)
 #define drv_slog_event(module, fmt, ...) do { \
     char date[64] = { 0 }; \
     log_drv_get_date(date, sizeof(date)); \
-    log_user_write_fault_mng(module, (int)current->pid, current->comm, date, FILENAME, __LINE__, fmt, ##__VA_ARGS__);\
+    log_user_write_fault_mng(module, (int)ka_task_get_current()->pid, ka_task_get_current()->comm, date, FILENAME, __LINE__, fmt, ##__VA_ARGS__);\
 } while (0) 
 
 #endif
@@ -122,10 +119,10 @@ void log_user_write_fault_mng(const char *module, int pid, const char *comm, con
 #define drv_event_spinlock(module, fmt, ...) drv_event(module, fmt, ##__VA_ARGS__)
 
 #define drv_printk_ratelimited(level, module, fmt, ...) \
-    printk_ratelimited(level "[ascend] [%s] [%s %d] " fmt, module, __func__, __LINE__, ##__VA_ARGS__)
+    ka_dfx_printk_ratelimited(level "[ascend] [%s] [%s %d] " fmt, module, __func__, __LINE__, ##__VA_ARGS__)
 
-#define drv_info_ratelimited(module, fmt, ...) drv_printk_ratelimited(KERN_INFO, module, fmt, ##__VA_ARGS__)
-#define drv_err_ratelimited(module, fmt, ...) drv_printk_ratelimited(KERN_ERR, module, fmt, ##__VA_ARGS__)
+#define drv_info_ratelimited(module, fmt, ...) drv_printk_ratelimited(KA_KERN_INFO, module, fmt, ##__VA_ARGS__)
+#define drv_err_ratelimited(module, fmt, ...) drv_printk_ratelimited(KA_KERN_ERR, module, fmt, ##__VA_ARGS__)
 
 /**
  * Description of log interfaces used in special scenarios
@@ -158,7 +155,7 @@ void log_user_write_fault_mng(const char *module, int pid, const char *comm, con
 #define drv_err_log_save(module, fmt, ...) do { \
     if (buf_info.log_size < (LOG_BUF_SIZE_MAX - 1)) { \
         if (buf_info.log_size == 0) { \
-            DRV_LOG_SAVE(KERN_NOTICE, module, fmt, ##__VA_ARGS__); \
+            DRV_LOG_SAVE(KA_KERN_NOTICE, module, fmt, ##__VA_ARGS__); \
         } else { \
             DRV_LOG_SAVE("", module, fmt, ##__VA_ARGS__); \
         } \
@@ -167,7 +164,7 @@ void log_user_write_fault_mng(const char *module, int pid, const char *comm, con
 
 #define drv_log_output() do { \
     if (buf_info.log_size > 0) { \
-        (void)printk(buf_info.log_buf); \
+        (void)ka_dfx_printk(buf_info.log_buf); \
         buf_info.log_size = 0; \
     } \
 } while (0)

@@ -12,6 +12,7 @@
 
 import os
 import sys
+import subprocess
 import argparse
 import traceback
 import csv
@@ -79,7 +80,6 @@ def get_compress_cmd(pkg_args: Namespace,
 
 
 def make_parse_option(args_: argparse.Namespace) -> ParseOption:
-
     return ParseOption(
         args_.os_arch, args_.pkg_version,
         args_.build_type,
@@ -291,6 +291,68 @@ def generate_version_info(version_info: VersionInfo,
     )
 
 
+def do_copy(target_conf=None,
+            delivery_dir='',
+            release_dir='',
+            config_relpath=None,
+            package_name=None):
+    copy_type = target_conf.get('copy_type')
+    if copy_type == 'delivery':
+        src_target = os.path.join(
+            delivery_dir,
+            target_conf['src_path'],
+            target_conf.get('value')
+        )
+    elif copy_type == 'source':
+        src_target = os.path.join(
+            pkg_utils.TOP_DIR,
+            target_conf['src_path'],
+            target_conf.get('value')
+        )
+    else:
+        CommLog.cilog_error(THIS_FILE_NAME, "copy_type %s is not support for src_target %s!", copy_type, src_target)
+        return FAIL
+
+    target_name = get_target_name(target_conf)
+    dst_path = os.path.join(release_dir, target_conf.get('dst_path', ''))
+    pkg_mod = target_conf.get('pkg_mod', '')
+    rename = target_conf.get('rename')
+
+    cmd = ''
+    if not os.path.exists(dst_path):
+        cmd += ' '.join(['mkdir', '-p', dst_path, '&&'])
+
+    dst_fullpath = os.path.join(dst_path, target_name)
+
+    if rename:
+        dst_path = os.path.join(dst_path, rename)
+
+    if 'dereference' in target_conf:
+        dereference_flag = 'L'
+    else:
+        dereference_flag = ''
+
+    cmd += ' '.join([f'cp -rf{dereference_flag}', src_target, dst_path])
+    status = subprocess.run(['/bin/bash', '-c', cmd], stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE, universal_newlines=True, shell=False)
+    if status.returncode != SUCCESS:
+        CommLog.cilog_error("do_copy(%s) failed!", cmd)
+        CommLog.cilog_error("output: %s, error: %s", status.stdout, status.stderr)
+        CommLog.cilog_error("please check package config \"%s\"!", config_relpath)
+        return FAIL
+
+    if pkg_mod:
+        cmd = f'chmod -R {pkg_mod} {dst_fullpath}'
+        status = subprocess.run(['/bin/bash', '-c', cmd], stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, universal_newlines=True, shell=False)
+        if status.returncode != SUCCESS:
+            CommLog.cilog_error(THIS_FILE_NAME, "chmod(%s) failed! %s", cmd, cmd)
+            CommLog.cilog_error(THIS_FILE_NAME, "output: %s, error: %s", status.stdout, status.stderr)
+            return FAIL
+
+    return SUCCESS
+
+
 def execute_repack_process(xml_config: XmlConfig,
                            delivery_dir: str,
                            pkg_args: Namespace,
@@ -305,7 +367,19 @@ def execute_repack_process(xml_config: XmlConfig,
             return FAIL
 
     if xml_config.package_attr.get('gen_version_info'):
-        generate_version_info(xml_config.version_info, package_name, delivery_dir)
+        if pkg_args.pkg_name == 'driver_compat':
+            generate_version_info(xml_config.version_info, package_name, delivery_dir)
+        else:
+            generate_version_info(xml_config.version_info, package_name, release_dir)
+
+    for item in chain(xml_config.package_content_list, xml_config.move_content_list):
+        # Copying files through XML configuration
+        if do_copy(item,
+                   delivery_dir,
+                   release_dir,
+                   xml_config.xml_relpath,
+                   package_name):
+            return FAIL
 
     if pkg_args.check_size == "True":
         limit_list, tag = processing_csv_file(
@@ -534,53 +608,7 @@ def generate_config_inc(package_attr: Dict):
     os.chmod(config_inc, 0o500)
 
 
-def driver_compat(args_: argparse.Namespace):
-    args_.pkg_name = "driver_compat"
-
-    delivery_dir = os.path.join(TOP_DIR, "build")
-    if not os.path.exists(delivery_dir):
-        return FAIL
-
-    config_relative_path = get_pkg_xml_relative_path(args_)
-    pkg_xml_file = os.path.join(pkg_utils.TOP_SOURCE_DIR, config_relative_path)
-    parse_option = make_parse_option(args_)
-
-    try:
-        xml_config = parse_xml_config(
-            pkg_xml_file, delivery_dir, parse_option, args_
-        )
-    except ContainAsteriskError as ex:
-        CommLog.cilog_error(f"Value contain '*' in {config_relative_path}. value is '{ex.value}'.")
-        return FAIL
-
-    version_info = xml_config.version_info
-    if xml_config.package_attr.get('gen_version_info'):
-        if version_info.version_xml:
-            requires = version_info.version_xml.collect_requires(package_name.func_name)
-        else:
-            requires = []
-
-        for item in version_info.itf_versions:
-            label = item.split('=')[0]
-            value = item.split('=')[1]
-            if label == "ascendhal_version":
-                itf_version_info = item
-
-        version_info_file = VersionInfoFile(
-            version_info.version, itf_version_info, requires, None,
-            timestamp=version_info.timestamp
-        )
-        version_info_file.save(
-            os.path.join(delivery_dir, "version.info")
-        )
-    return SUCCESS
-
-
 def main(pkg_name='', xml_file='', main_args=None):
-
-    if main_args.pkg_name == "driver_compat":
-        driver_compat(main_args)
-
     delivery_dir = os.path.join(TOP_DIR, DELIVERY_PATH)
     if not os.path.exists(delivery_dir):
         return FAIL
@@ -591,7 +619,7 @@ def main(pkg_name='', xml_file='', main_args=None):
 
     try:
         xml_config = parse_xml_config(
-            pkg_xml_file, delivery_dir, parse_option, main_args
+            pkg_xml_file, config_relative_path, delivery_dir, parse_option, main_args
         )
     except ContainAsteriskError as ex:
         CommLog.cilog_error(f"Value contain '*' in {config_relative_path}. value is '{ex.value}'.")
@@ -663,6 +691,8 @@ def args_parse():
     parser.add_argument('-b', '--build_type', metavar='build_type', required=False, dest='build_type', nargs='?',
                         const='',
                         default='debug', help="This parameter define release type of package")
+    parser.add_argument('--feature_list', metavar='feature_list', nargs='?', const=None,
+                        default=None, help="Package feature list file.")
     parser.add_argument('-x', '--xml', metavar='xml_file', required=False, dest='xml_file', nargs='?', const='',
                         default='', help="This parameter define xml file")
     parser.add_argument('--chip_name', metavar='chip_name', required=False, dest='chip_name', nargs='?', const=None,

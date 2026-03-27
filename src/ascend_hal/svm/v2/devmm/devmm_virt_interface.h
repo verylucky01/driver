@@ -233,13 +233,10 @@ struct devmm_virt_heap_mgmt {
 
     virt_addr_t host_pin_start; /* Host pin range 5T ~ 8T */
     virt_addr_t host_pin_end;   /* Host pin range 5T ~ 8T */
- 
-    virt_addr_t uvm_start;
-    virt_addr_t uvm_end;
- 
+
     virt_addr_t soma_start;
     virt_addr_t soma_end;
- 
+
     virt_addr_t svm_start;
     virt_addr_t svm_end;
 
@@ -253,6 +250,7 @@ struct devmm_virt_heap_mgmt {
     uint32_t svm_page_size;
     uint32_t local_page_size;
     uint32_t huge_page_size;
+
     bool support_bar_mem[DEVMM_MAX_PHY_DEVICE_NUM];
     bool support_dev_read_only[DEVMM_MAX_PHY_DEVICE_NUM];
     bool support_dev_mem_map_host[DEVMM_MAX_PHY_DEVICE_NUM];

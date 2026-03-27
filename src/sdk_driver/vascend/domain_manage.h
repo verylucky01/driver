@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,7 +14,6 @@
 #ifndef _DVT_DOMAIN_MANAGE_H_
 #define _DVT_DOMAIN_MANAGE_H_
 
-#include <linux/iova.h>
 #include "dma_pool_map.h"
 
 #define DOMAIN_PIN_STATUS_INVALID    0x0

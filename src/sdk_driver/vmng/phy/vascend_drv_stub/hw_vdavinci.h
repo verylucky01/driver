@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,8 +14,6 @@
 #ifndef HW_VDAVINCI_H_
 #define HW_VDAVINCI_H_
 
-#include "ka_common_pub.h"
-#include "ka_base_pub.h"
 #include "ka_memory_pub.h"
 
 #define RESERVE_SIZE 40

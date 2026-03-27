@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,22 +11,22 @@
  * GNU General Public License for more details.
  */
 
-#include "virtmng_public_def.h"
-#include "virtmngagent_vpc_unit.h"
 #include "ka_memory_pub.h"
 #include "ka_system_pub.h"
+#include "virtmng_public_def.h"
+#include "virtmngagent_vpc_unit.h"
 
-void vmnga_bar_wr(void __iomem *io_base, u32 offset, u32 val)
+void vmnga_bar_wr(void __ka_mm_iomem *io_base, u32 offset, u32 val)
 {
     ka_mm_writel(val, io_base + offset);
 }
 
-void vmnga_bar_rd(const void __iomem *io_base, u32 offset, u32 *val)
+void vmnga_bar_rd(const void __ka_mm_iomem *io_base, u32 offset, u32 *val)
 {
     *val = ka_mm_readl(io_base + offset);
 }
 
-void vmnga_set_doorbell(void __iomem *io_base, u32 db_id, u32 val)
+void vmnga_set_doorbell(void __ka_mm_iomem *io_base, u32 db_id, u32 val)
 {
     vmnga_bar_wr(io_base, db_id * VMNG_DOORBELL_ADDR_SIZE, val);
 }

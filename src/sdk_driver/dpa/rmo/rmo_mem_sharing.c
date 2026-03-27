@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -26,20 +26,46 @@
 #include "rmo_kern_log.h"
 #include "rmo_ioctl.h"
 #include "rmo_fops.h"
+#include "rmo_sched.h"
+#include "rmo_mem_sharing_ctx.h"
 #include "rmo_mem_sharing.h"
 
 #define RMO_MEM_SHARING_MAX_SIZE 4096  /* 4KB */
 
+static struct task_ctx_domain *res_mem_sharing_ops_domain = NULL;
+
+static inline void rmo_pack_mem_attr(u64 addr, u64 size, struct ka_mem_attr *mem_attr)
+{
+    mem_attr->addr = addr;
+    mem_attr->size = size;
+    mem_attr->cp_only_flag = false; /* host mem, not cp */
+    mem_attr->raw_pa_flag = true; /* host mem should return raw pa */
+}
+
 static int rmo_mem_get_pa_list(u32 devid, u64 addr, u64 size, u64 *pa_list)
 {
-    u32 pa_num = 1; /* continuous physical memory */
-    return hal_kernel_get_mem_pa_list(devid, current->tgid, addr, size, pa_num, pa_list);
+    struct ka_pa_wraper pa_wraper = {0};
+    struct ka_mem_attr mem_attr = {0};
+    u64 pa_num = 1; /* continuous physical memory */
+    int ret = 0;
+
+    rmo_pack_mem_attr(addr, size, &mem_attr);
+    ret = hal_kernel_get_mem_pa_list(devid, ka_task_get_current_tgid(), &mem_attr, &pa_num, &pa_wraper);
+    if (ret == 0) {
+        *pa_list = pa_wraper.pa;
+    }
+
+    return ret;
 }
 
 static int rmo_mem_put_pa_list(u32 devid, u64 addr, u64 size, u64 *pa_list)
 {
-    u32 pa_num = 1; /* continuous physical memory */
-    return hal_kernel_put_mem_pa_list(devid, current->tgid, addr, size, pa_num, pa_list);
+    struct ka_pa_wraper pa_wraper = {.pa = pa_list[0], .size = size};
+    struct ka_mem_attr mem_attr = {0};
+    u64 pa_num = 1; /* continuous physical memory */
+
+    rmo_pack_mem_attr(addr, size, &mem_attr);
+    return hal_kernel_put_mem_pa_list(devid, ka_task_get_current_tgid(), &mem_attr, pa_num, &pa_wraper);
 }
 
 static int (*const rmo_mem_get_func[ACCESSOR_MAX])(u32 devid, u64 addr, u64 size, u64 *pa_list) = {
@@ -70,84 +96,129 @@ void rmo_mem_sharing_unregister(accessMember_t accessor)
 }
 KA_EXPORT_SYMBOL_GPL(rmo_mem_sharing_unregister);
 
-static int rmo_mng_addr_update(u32 devid, u64 *addr, u64 size)
+static int rmo_mem_sharing_func_proc(u32 devid, struct rmo_mem_raw_addr *raw_addr,
+    struct rmo_cmd_mem_sharing *mem_sharing)
 {
-    phys_addr_t paddr = (phys_addr_t)(*addr);
-    ka_dma_addr_t dma_addr;
-    ka_device_t *dev = NULL;
+    int ret;
 
-    dev = hal_kernel_devdrv_get_pci_dev_by_devid(devid);
-    if (dev == NULL) {
-        rmo_err("Get dev failed. (devid=%u)\n", devid);
+    if (g_mem_sharing_func[mem_sharing->accessor] == NULL) {
+        rmo_err("Not register. (devid=%u; accessor=%u)\n", devid, mem_sharing->accessor);
         return -ENODEV;
     }
 
-    dma_addr = hal_kernel_devdrv_dma_map_page(dev, ka_mm_pfn_to_page(KA_MM_PFN_DOWN(paddr)), 0, size,
-                                              KA_DMA_BIDIRECTIONAL);
-    if (ka_mm_dma_mapping_error(dev, dma_addr)) {
-        rmo_err("Dma_map_page failed. (devid=%u; error=%d; size=%llu)\n",
-            devid, ka_mm_dma_mapping_error(dev, dma_addr), size);
-        return -ENOMEM;
+    ret = g_mem_sharing_func[mem_sharing->accessor](devid, raw_addr, mem_sharing->size);
+    if (ret != 0) {
+        rmo_err("Failed to share. (ret=%d; devid=%u; accessor=%u; len=%llu; enable_flag=%u)\n",
+            ret, devid, mem_sharing->accessor, mem_sharing->size, mem_sharing->enable_flag);
     }
-    *addr = (u64)dma_addr;
+    return ret;
+}
+
+static int rmo_mem_sharing_enable(struct rmo_cmd_mem_sharing *mem_sharing)
+{
+    struct rmo_mem_sharing_info info = {0};
+    struct rmo_mem_map_addr convert_addr = {0};
+    u32 devid = mem_sharing->devid;
+    u32 id = uda_get_host_id();
+    int tgid = ka_task_get_current_tgid();
+    u64 paddr;
+    int ret;
+
+    ret = rmo_mem_get_func[mem_sharing->accessor](id, (u64)(uintptr_t)mem_sharing->ptr, mem_sharing->size, &paddr);
+    if (ret != 0) {
+        rmo_err("Failed to get addr. (ret=%d; devid=%u; accessor=%u; tgid=%d)\n",
+            ret, id, mem_sharing->accessor, tgid);
+        return ret;
+    }
+
+    ret = rmo_mem_addr_map(devid, paddr, mem_sharing->size, &convert_addr);
+    if (ret != 0) {
+        rmo_err("Failed to update addr. (ret=%d; devid=%u; accessor=%u; tgid=%d)\n",
+            ret, devid, mem_sharing->accessor, tgid);
+        goto err_to_put;
+    }
+
+    ret = rmo_mem_sharing_func_proc(devid, &convert_addr.raw_addr, mem_sharing);
+    if (ret != 0) {
+        rmo_err("Failed to share. (ret=%d; devid=%u; accessor=%u; len=%llu; tgid=%d)\n",
+            ret, devid, mem_sharing->accessor, mem_sharing->size, tgid);
+        goto err_to_unmap;
+    }
+
+    info.sharing_pa = paddr;
+    info.convert_addr = convert_addr;
+    info.mem_shr = *mem_sharing;
+    ret = rmo_mem_sharing_add_node(res_mem_sharing_ops_domain, tgid, &info);
+    if (ret != 0) {
+        rmo_err("Failed to add node. (ret=%d; tgid=%d; devid=%u; accessor=%u; tgid=%d)\n",
+            ret, tgid, devid, mem_sharing->accessor, tgid);
+        goto err_to_func;
+    }
+
+    rmo_debug("Enable success. (devid=%u; accessor=%u; len=%llu; enable_flag=%u; tgid=%d)\n",
+        devid, mem_sharing->accessor, mem_sharing->size, mem_sharing->enable_flag, tgid);
+    return 0;
+
+err_to_func:
+    (void)rmo_mem_sharing_func_proc(devid, NULL, mem_sharing);
+err_to_unmap:
+    (void)rmo_mem_addr_unmap(devid, &convert_addr, mem_sharing->size);
+err_to_put:
+    (void)rmo_mem_put_func[mem_sharing->accessor](id, (u64)(uintptr_t)mem_sharing->ptr, mem_sharing->size, &paddr);
+    return ret;
+}
+
+static int rmo_mem_sharing_disable(struct rmo_cmd_mem_sharing *mem_sharing)
+{
+    struct rmo_mem_sharing_info info;
+    int tgid = ka_task_get_current_tgid();
+    u32 devid = mem_sharing->devid;
+    u32 id = uda_get_host_id();
+    int ret;
+
+    info.mem_shr = *mem_sharing;
+    ret = rmo_mem_sharing_query_node(res_mem_sharing_ops_domain, tgid, &info);
+    if (ret != 0) {
+        rmo_err("Failed to find node. (ret=%d; devid=%u; accessor=%u; len=%llu; tgid=%d)\n",
+            ret, devid, mem_sharing->accessor, mem_sharing->size, tgid);
+        return ret;
+    }
+
+    ret = rmo_mem_sharing_del_node(res_mem_sharing_ops_domain, tgid, &info);
+    if (ret != 0) {
+        rmo_err("Failed to del node. (ret=%d; devid=%u; accessor=%u; len=%llu; tgid=%d)\n",
+            ret, devid, mem_sharing->accessor, mem_sharing->size, tgid);
+        return ret;
+    }
+
+    ret = rmo_mem_sharing_func_proc(devid, NULL, mem_sharing);
+    if (ret != 0) {
+        (void)rmo_mem_sharing_add_node(res_mem_sharing_ops_domain, tgid, &info);
+        rmo_err("Failed to share. (ret=%d; devid=%u; accessor=%u; len=%llu; tgid=%d)\n",
+            ret, devid, mem_sharing->accessor, mem_sharing->size, tgid);
+        return ret;
+    }
+
+    (void)rmo_mem_addr_unmap(devid, &info.convert_addr, mem_sharing->size);
+    ret = rmo_mem_put_func[mem_sharing->accessor](id, (u64)(uintptr_t)mem_sharing->ptr, mem_sharing->size,
+        &info.sharing_pa);
+    if (ret != 0) {
+        rmo_warn("Put addr warnning. (ret=%d; devid=%u; accessor=%u)\n",
+            ret, id, mem_sharing->accessor);
+    } else {
+        rmo_debug("Disable success. (devid=%u; accessor=%u; len=%llu; enable_flag=%u; tgid=%d)\n",
+            devid, mem_sharing->accessor, mem_sharing->size, mem_sharing->enable_flag, tgid);
+    }
     return 0;
 }
 
 static int rmo_mem_sharing(struct rmo_cmd_mem_sharing *mem_sharing)
 {
-    u32 devid = mem_sharing->devid;
-    u32 id = (mem_sharing->side == MEM_HOST_SIDE) ? 0 : mem_sharing->devid;
-    u64 convert_addr = 0;
-    int ret;
-
     if (mem_sharing->enable_flag == 0) {
-        ret = rmo_mem_get_func[mem_sharing->accessor](id, (u64)(uintptr_t)mem_sharing->ptr, mem_sharing->size,
-            &convert_addr);
-        if (ret != 0) {
-            rmo_err("Failed to get addr. (ret=%d; devid=%u; accessor=%u)\n",
-                ret, id, mem_sharing->accessor);
-            return ret;
-        }
-        ret = rmo_mng_addr_update(devid, &convert_addr, mem_sharing->size);
-        if (ret != 0) {
-            rmo_err("Failed to update addr. (ret=%d; devid=%u; accessor=%u)\n",
-                ret, devid, mem_sharing->accessor);
-            goto err_to_put;
-        }
+        return rmo_mem_sharing_enable(mem_sharing);
+    } else {
+        return rmo_mem_sharing_disable(mem_sharing);
     }
-
-    if (g_mem_sharing_func[mem_sharing->accessor] == NULL) {
-        rmo_err("Not register. (devid=%u; accessor=%u)\n", devid, mem_sharing->accessor);
-        ret = -ENODEV;
-        goto err_to_put;
-    }
-    ret = g_mem_sharing_func[mem_sharing->accessor](devid, convert_addr, mem_sharing->size);
-    if (ret != 0) {
-        rmo_err("Failed to dispatch. (ret=%d; devid=%u; accessor=%u; len=%llu; enable_flag=%u)\n",
-            ret, devid, mem_sharing->accessor, mem_sharing->size, mem_sharing->enable_flag);
-        goto err_to_put;
-    }
-
-    if (mem_sharing->enable_flag == 1) {
-        ret = rmo_mem_put_func[mem_sharing->accessor](id, (u64)(uintptr_t)mem_sharing->ptr, mem_sharing->size,
-            &convert_addr);
-        if (ret != 0) {
-            rmo_err("Failed to put addr. (ret=%d; devid=%u; accessor=%u)\n",
-                ret, id, mem_sharing->accessor);
-            return ret;
-        }
-    }
-
-    rmo_debug("Sharing success. (devid=%u; accessor=%u; len=%llu; enable_flag=%u)\n",
-        id, mem_sharing->accessor, mem_sharing->size, mem_sharing->enable_flag);
-    return 0;
-
-err_to_put:
-    if (mem_sharing->enable_flag == 0) {
-        (void)rmo_mem_put_func[mem_sharing->accessor](devid, (u64)(uintptr_t)mem_sharing->ptr, mem_sharing->size,
-            &convert_addr);
-    }
-    return ret;
 }
 
 static int rmo_ioctl_mem_sharing(u32 cmd, unsigned long arg)
@@ -169,16 +240,17 @@ static int rmo_ioctl_mem_sharing(u32 cmd, unsigned long arg)
     }
 
     if (!uda_is_phy_dev(mem_sharing.devid)) {
-        return -ENOTSUPP;
+        return -EOPNOTSUPP;
     }
-    if ((mem_sharing.ptr == NULL) || (mem_sharing.size == 0) || (mem_sharing.size > RMO_MEM_SHARING_MAX_SIZE)) {
+
+    if ((mem_sharing.ptr == NULL) || (mem_sharing.size == 0) || (mem_sharing.size > RMO_MEM_SHARING_MAX_SIZE) ||
+        (((u64)(uintptr_t)(mem_sharing.ptr) & (KA_MM_PAGE_SIZE - 1)) != 0)) {
         rmo_err("Invalid para. (ptr=%p; size=%llu)\n", mem_sharing.ptr, mem_sharing.size);
         return -EINVAL;
     }
 
     if ((mem_sharing.accessor < 0) || (mem_sharing.accessor >= ACCESSOR_MAX)) {
-        rmo_err("Invalid accessor. (accessor=%d)\n", mem_sharing.accessor);
-        return -EINVAL;
+        return -EOPNOTSUPP;
     }
 
     if (mem_sharing.side != MEM_HOST_SIDE) {
@@ -194,7 +266,11 @@ static int rmo_ioctl_mem_sharing(u32 cmd, unsigned long arg)
     return rmo_mem_sharing(&mem_sharing);
 }
 
-static struct task_ctx_domain *res_mem_sharing_ops_domain = NULL;
+void rmo_mem_sharing_domain_task_exit(u32 udevid, int tgid, struct task_start_time *start_time)
+{
+    rmo_mem_sharing_ctx_destroy(res_mem_sharing_ops_domain, tgid);
+}
+DECLAER_FEATURE_AUTO_UNINIT_TASK(rmo_mem_sharing_domain_task_exit, FEATURE_LOADER_STAGE_1);
 
 int rmo_mem_sharing_init(void)
 {

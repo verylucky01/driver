@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,15 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-#include <linux/sysfs.h>
-#include <linux/stat.h>
-#include <linux/device.h>
-#include <linux/slab.h>
-#include <linux/workqueue.h>
-#include <linux/version.h>
-#include <linux/fs.h>
-#include <linux/vmalloc.h>
-#include <linux/uaccess.h>
+
+#include "ka_common_pub.h"
+#include "ka_driver_pub.h"
+#include "ka_fs_pub.h"
+
 #include "pbl/pbl_davinci_api.h"
 #include "pbl_mem_alloc_interface.h"
 #include "fms_kernel_interface.h"
@@ -28,7 +24,6 @@
 #if defined(CFG_BUILD_DEBUG) && defined(CFG_FEATURE_IMU_CORE)
 #include "dms_imu_heartbeat.h"
 #endif
-#include "ka_fs_pub.h"
 #include "dms_sysfs.h"
 
 #define DMS_ATTR_RD (00400 | 00040)
@@ -37,7 +32,7 @@
 #define MAX_CAT_BUFSIZE 2010
 #define PRINTT_LINE 30
 
-STATIC ssize_t dms_sysfs_feature_list_show(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t dms_sysfs_feature_list_show(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     if (buf == NULL) {
         dms_err("buf is NULL.\n");
@@ -47,7 +42,7 @@ STATIC ssize_t dms_sysfs_feature_list_show(struct device *dev, struct device_att
     return dms_feature_print_feature_list(buf);
 }
 
-STATIC ssize_t dms_sysfs_node_list_show(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t dms_sysfs_node_list_show(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     if (buf == NULL) {
         dms_err("buf is NULL.\n");
@@ -57,85 +52,85 @@ STATIC ssize_t dms_sysfs_node_list_show(struct device *dev, struct device_attrib
     return dms_devnode_print_node_list(buf);
 }
 
-STATIC ssize_t dms_sysfs_sensor_list_show(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t dms_sysfs_sensor_list_show(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     return dms_sensor_print_sensor_list(buf);
 }
 
-STATIC ssize_t dms_sysfs_sensor_mask_show(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t dms_sysfs_sensor_mask_show(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     return 0;
 }
 
-STATIC ssize_t dms_sysfs_sensor_mask_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+STATIC ssize_t dms_sysfs_sensor_mask_store(ka_device_t *dev, ka_device_attribute_t *attr, const char *buf, size_t count)
 {
     return 0;
 }
 
-STATIC ssize_t dms_sysfs_channel_flux_show(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t dms_sysfs_channel_flux_show(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     return dms_event_dfx_channel_flux_show(buf);
 }
 
-STATIC ssize_t dms_sysfs_channel_flux_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+STATIC ssize_t dms_sysfs_channel_flux_store(ka_device_t *dev, ka_device_attribute_t *attr, const char *buf, size_t count)
 {
     return dms_event_dfx_channel_flux_store(buf, count);
 }
 
-STATIC ssize_t dms_sysfs_convergent_diagrams_show(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t dms_sysfs_convergent_diagrams_show(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     return dms_event_dfx_convergent_diagrams_show(buf);
 }
 
-STATIC ssize_t dms_sysfs_convergent_diagrams_store(struct device *dev, struct device_attribute *attr,
+STATIC ssize_t dms_sysfs_convergent_diagrams_store(ka_device_t *dev, ka_device_attribute_t *attr,
     const char *buf, size_t count)
 {
     return dms_event_dfx_convergent_diagrams_store(buf, count);
 }
 
-STATIC ssize_t dms_sysfs_event_list_show(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t dms_sysfs_event_list_show(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     return dms_event_dfx_event_list_show(buf);
 }
 
-STATIC ssize_t dms_sysfs_event_list_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+STATIC ssize_t dms_sysfs_event_list_store(ka_device_t *dev, ka_device_attribute_t *attr, const char *buf, size_t count)
 {
     return dms_event_dfx_event_list_store(buf, count);
 }
 
-STATIC ssize_t dms_sysfs_mask_list_show(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t dms_sysfs_mask_list_show(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     return dms_event_dfx_mask_list_show(buf);
 }
 
-STATIC ssize_t dms_sysfs_mask_list_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+STATIC ssize_t dms_sysfs_mask_list_store(ka_device_t *dev, ka_device_attribute_t *attr, const char *buf, size_t count)
 {
     return dms_event_dfx_mask_list_store(buf, count);
 }
 
-STATIC ssize_t dms_sysfs_subscribe_handle_show(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t dms_sysfs_subscribe_handle_show(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     return dms_event_dfx_subscribe_handle_show(buf);
 }
 
-STATIC ssize_t dms_sysfs_subscribe_process_show(struct device *dev, struct device_attribute *attr, char *buf)
+STATIC ssize_t dms_sysfs_subscribe_process_show(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     return dms_event_dfx_subscribe_process_show(buf);
 }
 
 #if defined(CFG_BUILD_DEBUG) && !defined(CFG_HOST_ENV) && defined(CFG_FEATURE_IMU_CORE)
-ssize_t dms_sysfs_imu_hb_show(struct device *dev, struct device_attribute *attr, char *buf)
+ssize_t dms_sysfs_imu_hb_show(ka_device_t *dev, ka_device_attribute_t *attr, char *buf)
 {
     return dms_imu_hb_show(buf);
 }
 
-ssize_t dms_sysfs_imu_hb_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+ssize_t dms_sysfs_imu_hb_store(ka_device_t *dev, ka_device_attribute_t *attr, const char *buf, size_t count)
 {
     return dms_imu_hb_store(buf, count);
 }
 #endif
 
-#define DRV_DMS_FS_ATTR DEVICE_ATTR
+#define DRV_DMS_FS_ATTR KA_DRIVER_DEVICE_ATTR
 #define DRV_FS_ATTR_NAME_POINTER(_name)  &dev_attr_##_name.attr
 
 #define DECLARE_DMS_FS_ATTR \
@@ -179,15 +174,15 @@ DECLARE_DMS_FS_ATTR_LIST(attribute, sysfs);
 DECLARE_DEBUG_DMS_FS_ATTR;
 #endif
 
-static const struct attribute_group g_dms_sysfs_group = {
-    .attrs = g_dms_sysfs_attr_list,
-    .name = "dms"
+static const ka_attribute_group_t g_dms_sysfs_group = {
+    ka_fs_init_ag_attrs(g_dms_sysfs_attr_list)
+    ka_fs_init_ag_name("dms")
 };
 
 void dms_sysfs_init(void)
 {
     int ret;
-    struct device *dev = davinci_intf_get_owner_device();
+    ka_device_t *dev = davinci_intf_get_owner_device();
     if (dev == NULL) {
         dms_err("dms dev is NULL, sysfs init failed.\n");
         return;
@@ -210,7 +205,7 @@ void dms_sysfs_init(void)
 
 void dms_sysfs_uninit(void)
 {
-    struct device *dev = davinci_intf_get_owner_device();
+    ka_device_t *dev = davinci_intf_get_owner_device();
     if (dev == NULL) {
         return;
     }

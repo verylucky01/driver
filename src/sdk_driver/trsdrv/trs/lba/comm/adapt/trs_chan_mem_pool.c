@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -16,6 +16,7 @@
 #include "ka_base_pub.h"
 #include "ka_fs_pub.h"
 #include "ka_kernel_def_pub.h"
+#include "ka_compiler_pub.h"
 
 #include "securec.h"
 #include "trs_timestamp.h"
@@ -217,7 +218,7 @@ int chan_mem_node_ops_open(ka_inode_t *inode, ka_file_t *file)
     return ka_fs_single_open(file, chan_mem_node_show, ka_base_pde_data(inode));
 }
 
-ssize_t chan_mem_node_ops_write(ka_file_t *filp, const char __user *ubuf, size_t count, loff_t *ppos)
+ssize_t chan_mem_node_ops_write(ka_file_t *filp, const char __ka_user *ubuf, size_t count, loff_t *ppos)
 {
     char ch[2] = {0}; /* 2 bytes long */
     long val;
@@ -231,7 +232,7 @@ ssize_t chan_mem_node_ops_write(ka_file_t *filp, const char __user *ubuf, size_t
     }
 
     ch[count - 1] = '\0';
-    if (kstrtol(ch, 10, &val)) {
+    if (ka_base_kstrtol(ch, 10, &val)) {
         return -EFAULT;
     }
     magic_check_enable= (val == 0) ? false : true;

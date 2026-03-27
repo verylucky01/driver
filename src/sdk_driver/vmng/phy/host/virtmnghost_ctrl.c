@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,9 +11,13 @@
  * GNU General Public License for more details.
  */
 
+#include "ka_kernel_def_pub.h"
+#include "ka_system_pub.h"
+#include "ka_memory_pub.h"
 #include "pbl/pbl_uda.h"
 
 #include "vmng_mem_alloc_interface.h"
+#include "vmng_cmd_msg.h"
 #include "comm_kernel_interface.h"
 #include "virtmnghost_unit.h"
 #include "hw_vdavinci.h"
@@ -22,11 +26,6 @@
 #include "virtmnghost_pci.h"
 #include "virtmng_res_drv.h"
 #include "virtmnghost_ctrl.h"
-#include "ka_task_pub.h"
-#include "ka_kernel_def_pub.h"
-#include "ka_system_pub.h"
-#include "ka_base_pub.h"
-#include "ka_memory_pub.h"
 
 struct vmngh_client *g_vmngh_clients[VMNG_CLIENT_TYPE_MAX];
 struct vmngh_vascend_client *g_vmngh_vascend_clients[VMNG_CLIENT_TYPE_MAX];

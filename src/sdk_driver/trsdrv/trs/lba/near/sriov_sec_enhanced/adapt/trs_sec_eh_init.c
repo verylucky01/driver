@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -49,7 +49,7 @@ int trs_ts_hw_init(struct trs_id_inst *inst)
 {
     int type, i;
 
-    for (type = 0; type < ARRAY_SIZE(g_trs_hw_init); type++) {
+    for (type = 0; type < KA_BASE_ARRAY_SIZE(g_trs_hw_init); type++) {
         int ret = g_trs_hw_init[type](inst);
         if (ret != 0) {
             for (i = type - 1; i >= 0; i--) {
@@ -66,7 +66,7 @@ void trs_ts_hw_uninit(struct trs_id_inst *inst)
 {
     int type;
 
-    for (type = ARRAY_SIZE(g_trs_hw_uninit) - 1; type >= 0; type--) {
+    for (type = KA_BASE_ARRAY_SIZE(g_trs_hw_uninit) - 1; type >= 0; type--) {
         g_trs_hw_uninit[type](inst);
     }
 }
@@ -75,7 +75,7 @@ static int trs_ts_func_init(struct trs_id_inst *inst)
 {
     int type, i;
 
-    for (type = 0; type < ARRAY_SIZE(g_trs_func_init); type++) {
+    for (type = 0; type < KA_BASE_ARRAY_SIZE(g_trs_func_init); type++) {
         int ret = g_trs_func_init[type](inst);
         if (ret != 0) {
             for (i = type - 1; i >= 0; i--) {
@@ -93,7 +93,7 @@ static void trs_ts_func_uninit(struct trs_id_inst *inst)
 {
     int type;
 
-    for (type = ARRAY_SIZE(g_trs_func_uninit) - 1; type >= 0; type--) {
+    for (type = KA_BASE_ARRAY_SIZE(g_trs_func_uninit) - 1; type >= 0; type--) {
         g_trs_func_uninit[type](inst);
     }
 }

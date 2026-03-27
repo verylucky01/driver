@@ -141,7 +141,7 @@ static void devmm_primary_heap_module_mem_stats_inc(struct devmm_virt_com_heap *
     }
 }
 
-void devmm_primary_heap_module_mem_stats_dec(struct devmm_virt_com_heap *heap)
+void devmm_primary_heap_module_mem_stats_dec(struct devmm_virt_com_heap *heap, uint64_t size)
 {
     uint32_t mem_val = devmm_heap_sub_type_to_mem_val(heap->heap_sub_type);
     uint32_t page_type = (heap->heap_type == DEVMM_HEAP_HUGE_PAGE) ? DEVMM_HUGE_PAGE_TYPE : DEVMM_NORMAL_PAGE_TYPE;
@@ -153,8 +153,10 @@ void devmm_primary_heap_module_mem_stats_dec(struct devmm_virt_com_heap *heap)
     svm_mem_stats_type_pack(&type, mem_val, page_type, phy_memtype);
     /* heap->module_id is for large heap (>=512M) */
     if ((heap->heap_sub_type != SUB_RESERVE_TYPE) && (module_id < SVM_MAX_MODULE_ID)) {
-        svm_module_alloced_size_dec(&type, devid, module_id, heap->mapped_size);
-        heap->module_id = SVM_MAX_MODULE_ID;
+        svm_module_alloced_size_dec(&type, devid, module_id, size);
+        if (heap->start != DEVMM_HOST_PIN_START) { /* uva alloc mem from host_base_heap, need to dec size */
+            heap->module_id = SVM_MAX_MODULE_ID;
+        }
     }
 }
 
@@ -276,6 +278,7 @@ static DVresult devmm_free_to_host_pin_heap(struct devmm_virt_heap_mgmt *mgmt, s
         return ret;
     }
 
+    devmm_primary_heap_module_mem_stats_dec(heap, free_len);
     return DRV_ERROR_NONE;
 }
 
@@ -302,10 +305,17 @@ DVresult devmm_free_to_base_heap(struct devmm_virt_heap_mgmt *mgmt, struct devmm
     if (devmm_get_heap_list_by_type(mgmt, &heap_type, &heap_list) != DRV_ERROR_NONE) {
         return DRV_ERROR_INVALID_VALUE;
     }
+
     (void)pthread_rwlock_wrlock(&heap_list->list_lock);
+    if (devmm_virt_list_empty_careful(&heap->list)) {
+        (void)pthread_rwlock_unlock(&heap_list->list_lock);
+        DEVMM_DRV_ERR("Ptr wasn't allocated by user. (ptr=0x%lx)\n", ptr);
+        return DRV_ERROR_INVALID_VALUE;
+    }
     devmm_virt_list_del_init(&heap->list);
     heap_list->heap_cnt--;
     (void)pthread_rwlock_unlock(&heap_list->list_lock);
+
     if (devmm_virt_heap_free_ops(heap, ptr) != 0) {
         DEVMM_DRV_ERR("Free ptr error. (ptr=0x%lx)\n", ptr);
         return DRV_ERROR_IOCRL_FAIL;

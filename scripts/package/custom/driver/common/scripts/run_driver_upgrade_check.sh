@@ -538,7 +538,31 @@ cache_hardware_version_info() {
     date '+%s' | _try_save_cache
 }
 
+remove_white_proc_cfg() {
+    is_910b_or_910_93 || return 0
 
+    local base_version=25.5.0
+    local config_file="/etc/custom_process.cfg"
+
+    version_lt "${PACKAGE_VERSION}" ${base_version}
+    if [[ $? != 0 ]]; then
+        logger_debug "No need remove ${config_file}"
+        return
+    fi
+
+    if [[ -f "${config_file}" ]]; then
+        rm -f "${config_file}"
+        logger_debug "Remove ${config_file}"
+    else
+        logger_debug "${config_file} does not exist!"
+        return
+    fi
+
+    if [[ -f "${config_file}" ]]; then
+        logger_warning "Remove ${config_file} fail"
+    fi
+        
+}
 execute_upgrade_checks() {
     logger_debug 'Start executing upgrade check'
 
@@ -551,6 +575,7 @@ execute_upgrade_checks() {
     check_rollback_interception_by_cdr || fail_exit $?
     check_rollback_interception_by_hbm || fail_exit $?
 
+    remove_white_proc_cfg
     logger_debug 'Upgrade check successful'
 }
 

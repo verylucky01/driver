@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,6 +11,7 @@
  * GNU General Public License for more details.
  */
 
+#include "ka_kernel_def_pub.h"
 #include "vpc_kernel_interface.h"
 #include "comm_kernel_interface.h"
 #include "devdrv_util.h"
@@ -20,7 +21,6 @@
 #include "devdrv_mem_alloc.h"
 #include "devdrv_vpc.h"
 #include "pbl/pbl_uda.h"
-#include "ka_kernel_def_pub.h"
 
 STATIC struct devdrv_dma_dev *devdrv_get_dma_dev_by_devid(u32 dev_id)
 {
@@ -517,10 +517,8 @@ int devdrv_vpc_client_init(u32 devid)
 {
 #ifdef CFG_FEATURE_SRIOV
     int ret;
-    u32 index_id;
 
-    (void)uda_udevid_to_add_id(devid, &index_id);
-    ret = vpc_register_client(index_id, 0, &devdrv_vpc_client);
+    ret = vpc_register_client(devid, 0, &devdrv_vpc_client);
     if (ret != 0) {
         devdrv_err("Calling vpc_register_client fail. (ret=%d)\n", ret);
         return ret;

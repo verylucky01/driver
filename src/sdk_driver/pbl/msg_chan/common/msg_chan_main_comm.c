@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,10 +11,9 @@
  * GNU General Public License for more details.
  */
 
+#include "ka_kernel_def_pub.h"
 #include "pbl/pbl_feature_loader.h"
 #include "msg_chan_main.h"
-#include "ka_base_pub.h"
-#include "ka_kernel_def_pub.h"
 
 struct devdrv_comm_dev_ops g_comm_ops[DEVDRV_COMMNS_TYPE_MAX];
 struct devdrv_msg_client g_client_info;
@@ -185,7 +184,7 @@ STATIC void devdrv_set_communication_set_ops_disable(u32 type, u32 dev_id)
     unsigned long flags;
 
     ka_task_write_lock_irqsave(&g_comm_ops[type].rwlock, flags);
-    cnt = atomic_sub_return(1, &g_comm_ops[type].dev_cnt);
+    cnt = ka_base_atomic_sub_return(1, &g_comm_ops[type].dev_cnt);
     if (cnt == 0) {
         g_comm_ops[type].status = DEVDRV_COMM_OPS_TYPE_DISABLE;
     }

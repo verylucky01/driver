@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,6 +13,7 @@
 #include "ka_kernel_def_pub.h" 
 #include "pbl/pbl_uda.h"
 
+#include "comm_kernel_interface.h"
 #include "trs_core.h"
 #include "trs_chip_def_comm.h"
 #include "trs_core_stars_v1_ops.h"
@@ -20,6 +21,9 @@
 #include "trs_tscpu_core_near_ops.h"
 #include "soc_adapt.h"
 #include "trs_stars_comm.h"
+#ifdef CFG_FEATURE_SUPPORT_UB_CONNECTION
+#include "trs_ub_init_common.h"
+#endif
 #include "trs_host_core.h"
 #include "trs_sia_adapt_auto_init.h"
 
@@ -65,7 +69,13 @@ int trs_core_config(struct trs_id_inst *inst)
             return ret;
         }
 
-        ops->res_id_ctrl = trs_core_ops_stars_soc_res_ctrl;
+        if (devdrv_get_connect_protocol(inst->devid) == CONNECT_PROTOCOL_UB) {
+#ifdef CFG_FEATURE_SUPPORT_UB_CONNECTION
+            ops->res_id_ctrl = trs_ub_stars_soc_res_ctrl;
+#endif
+        } else {
+            ops->res_id_ctrl = trs_core_ops_stars_soc_res_ctrl;
+        }
         ret = trs_core_ts_inst_register(inst, hw_type, UDA_NEAR, TRS_CORE_SQ_TRIGGER_WQ_UNBIND_FLAG, ops);
         if (ret != 0) {
             trs_soc_sq_send_trigger_db_uninit(inst);

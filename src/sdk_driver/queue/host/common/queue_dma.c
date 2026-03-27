@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,36 +10,17 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
 #ifndef QUEUE_UT
-#if !defined(EMU_ST)
-#ifndef DRV_HOST
-#include "linux/share_pool.h"
-#endif
-#endif
-#include <asm/atomic.h>
-#include <linux/uaccess.h>
-#include <linux/delay.h>
-#include <linux/mutex.h>
-#include <linux/printk.h>
-#include <linux/hashtable.h>
-#include <linux/cdev.h>
-#include <linux/slab.h>
-#include <linux/mod_devicetable.h>
-#include <linux/version.h>
-
 #include <securec.h>
-#include <linux/fs.h>
-#include <linux/pci.h>
-#include <linux/vmalloc.h>
-
+#include "kernel_version_adapt.h"
+#include "queue_dma.h"
+#include "ka_memory_pub.h"
+#include "ka_system_pub.h"
 #include "svm_kernel_interface.h"
 #include "queue_module.h"
 #include "queue_fops.h"
 #include "queue_channel.h"
-#include "kernel_version_adapt.h"
-#include "queue_dma.h"
-#include "ka_memory_pub.h"
+
 
 #define QUEUE_WAKEUP_TIMEINTERVAL 5000 /* 5s */
 
@@ -55,11 +36,11 @@
 #endif
 
 
-void *queue_kvalloc(u64 size, gfp_t flags)
+void *queue_kvalloc(u64 size, ka_gfp_t flags)
 {
-    void *ptr = queue_drv_kmalloc(size, GFP_ATOMIC | __GFP_NOWARN | __GFP_ACCOUNT | flags);
+    void *ptr = queue_drv_kmalloc(size, KA_GFP_ATOMIC | __KA_GFP_NOWARN | __KA_GFP_ACCOUNT | flags);
     if (ptr == NULL) {
-        ptr = ka_vmalloc(size, GFP_KERNEL | __GFP_ACCOUNT | flags, PAGE_KERNEL);
+        ptr = ka_vmalloc(size, KA_GFP_KERNEL | __KA_GFP_ACCOUNT | flags, KA_PAGE_KERNEL);
     }
 
     return ptr;
@@ -67,8 +48,8 @@ void *queue_kvalloc(u64 size, gfp_t flags)
 
 void queue_kvfree(const void *ptr)
 {
-    if (is_vmalloc_addr(ptr)) {
-        vfree(ptr);
+    if (ka_mm_is_vmalloc_addr(ptr)) {
+        ka_mm_vfree(ptr);
     } else {
         queue_drv_kfree(ptr);
     }
@@ -82,8 +63,8 @@ STATIC int queue_pa_to_pm_pa(u32 devid, u64 *paddr, u64 num, u64 *out_paddr)
     int ret;
 
     for (i = 0; i < num;) {
-        u64 real_num  = min_t(u64, num - i, DEVDRV_AGENT_SMMU_SUPPORT_MAX_NUM);
-        ret = devdrv_smmu_iova_to_phys(devid, (dma_addr_t *)(uintptr_t)&paddr[i],
+        u64 real_num  = ka_base_min_t(u64, num - i, DEVDRV_AGENT_SMMU_SUPPORT_MAX_NUM);
+        ret = devdrv_smmu_iova_to_phys(devid, (ka_dma_addr_t *)(uintptr_t)&paddr[i],
             real_num, (phys_addr_t *)(uintptr_t)&out_paddr[i]);
         if (ret != 0) {
             queue_err("Can not transfer iova to phys. (devid=%u; i=%llu; num=%llu)\n", devid, i, num);
@@ -107,7 +88,7 @@ STATIC int queue_pa_blks_to_pm_pa_blks(u32 devid, struct queue_dma_block *blks, 
     }
 
     for (i = 0; i < num;) {
-        u64 real_num = min_t(u64, num - i, DEVDRV_AGENT_SMMU_SUPPORT_MAX_NUM);
+        u64 real_num = ka_base_min_t(u64, num - i, DEVDRV_AGENT_SMMU_SUPPORT_MAX_NUM);
 
         for (j = 0; j < real_num; ++j) {
             iova_list[j] = (u64)blks[i + j].dma;
@@ -120,7 +101,7 @@ STATIC int queue_pa_blks_to_pm_pa_blks(u32 devid, struct queue_dma_block *blks, 
         }
 
         for (j = 0; j < real_num; ++j) {
-            out_blks[i + j].dma = (dma_addr_t)iova_list[j];
+            out_blks[i + j].dma = (ka_dma_addr_t)iova_list[j];
         }
         i += real_num;
     }
@@ -131,9 +112,9 @@ STATIC int queue_pa_blks_to_pm_pa_blks(u32 devid, struct queue_dma_block *blks, 
 STATIC u64 queue_get_page_num(u64 addr, u64 addr_len)
 {
     u64 align_addr_len, page_num;
-    align_addr_len = ((addr & (PAGE_SIZE - 1)) + addr_len);
-    page_num = align_addr_len / PAGE_SIZE;
-    if ((align_addr_len & (PAGE_SIZE - 1)) != 0) {
+    align_addr_len = ((addr & (KA_MM_PAGE_SIZE - 1)) + addr_len);
+    page_num = align_addr_len / KA_MM_PAGE_SIZE;
+    if ((align_addr_len & (KA_MM_PAGE_SIZE - 1)) != 0) {
         page_num++;
     }
     return page_num;
@@ -148,7 +129,7 @@ STATIC int queue_alloc_dma_blks(struct queue_dma_list *dma_list, bool dma_sva_en
     } else {
         page_num = queue_get_page_num(dma_list->va, dma_list->len);
     }
-    dma_list->page = (struct page **)queue_kvalloc(page_num * sizeof(struct page *), 0);
+    dma_list->page = (ka_page_t **)queue_kvalloc(page_num * sizeof(ka_page_t *), 0);
     if (dma_list->page == NULL) {
         queue_err("kmalloc %llu failed.\n", page_num);
         return -ENOMEM;
@@ -178,11 +159,11 @@ STATIC void queue_free_dma_blks(struct queue_dma_list *dma_list)
 
 void queue_try_cond_resched(unsigned long *pre_stamp)
 {
-    unsigned long timeinterval = jiffies_to_msecs(jiffies - *pre_stamp);
+    unsigned long timeinterval = ka_system_jiffies_to_msecs(ka_jiffies - *pre_stamp);
 
     if (timeinterval > QUEUE_WAKEUP_TIMEINTERVAL) {
-        cond_resched();
-        *pre_stamp = jiffies;
+        ka_task_cond_resched();
+        *pre_stamp = ka_jiffies;
     }
 }
 
@@ -191,15 +172,15 @@ STATIC void queue_fill_dma_blks_sva(struct queue_dma_list *dma_list)
 #if !defined(EMU_ST)
     // Only one blk when using virtual address copy.
     u64 aligned_va, aligned_size;
-    aligned_va = round_down(dma_list->va, PAGE_SIZE);
-    aligned_size = round_up(dma_list->len + (dma_list->va - aligned_va), PAGE_SIZE);
+    aligned_va = ka_base_round_down(dma_list->va, KA_MM_PAGE_SIZE);
+    aligned_size = ka_base_round_up(dma_list->len + (dma_list->va - aligned_va), KA_MM_PAGE_SIZE);
     dma_list->blks[0].dma = aligned_va; /* tmp store pa */
     dma_list->blks[0].sz = aligned_size;
 #endif
     return;
 }
 
-STATIC void queue_put_user_pages(struct page **pages, u64 page_num, u64 unpin_num)
+STATIC void queue_put_user_pages(ka_page_t **pages, u64 page_num, u64 unpin_num)
 {
     unsigned long stamp;
     u64 i;
@@ -208,24 +189,24 @@ STATIC void queue_put_user_pages(struct page **pages, u64 page_num, u64 unpin_nu
         return;
     }
 
-    stamp = jiffies;
+    stamp = ka_jiffies;
     for (i = 0; i < unpin_num; i++) {
         if (pages[i] != NULL) {
-            put_page(pages[i]);
+            ka_mm_put_page(pages[i]);
             pages[i] = NULL;
         }
         queue_try_cond_resched(&stamp);
     }
 }
 
-STATIC int queue_get_user_pages_fast(u64 va, u64 page_num, struct page **pages)
+STATIC int queue_get_user_pages_fast(u64 va, u64 page_num, ka_page_t **pages)
 {
     u64 got_num, remained_num, tmp_va;
-    unsigned long stamp = jiffies;
+    unsigned long stamp = ka_jiffies;
     int expected_num, tmp_num;
 
     for (got_num = 0; got_num < page_num;) {
-        tmp_va = va + got_num * PAGE_SIZE;
+        tmp_va = va + got_num * KA_MM_PAGE_SIZE;
         remained_num = page_num - got_num;
         expected_num = (int)((remained_num > QUEUE_GET_2M_PAGE_NUM) ? QUEUE_GET_2M_PAGE_NUM : remained_num);
         tmp_num = ka_mm_get_user_pages_fast(tmp_va, expected_num, KA_FOLL_WRITE, &pages[got_num]);
@@ -246,31 +227,31 @@ err_exit:
     return -EFBIG;
 }
 
-STATIC bool is_svm_addr(struct vm_area_struct *vma, u64 addr)
+STATIC bool is_svm_addr(ka_vm_area_struct_t *vma, u64 addr)
 {
     return ka_mm_is_svm_addr(vma, addr);
 }
  
 STATIC int queue_get_user_pages(struct queue_dma_list *dma_list)
 {
-    struct vm_area_struct *vma = NULL;
+    ka_vm_area_struct_t *vma = NULL;
     bool svm_flag;
     int ret;
 
-    down_read(get_mmap_sem(current->mm));
-    vma = find_vma(current->mm, dma_list->va);
+    ka_task_down_read(get_mmap_sem(ka_task_get_current()->mm));
+    vma = ka_mm_find_vma(ka_task_get_current()->mm, dma_list->va);
     if ((vma == NULL) || (dma_list->va < vma->vm_start)) {
-        up_read(get_mmap_sem(current->mm));
+        ka_task_up_read(get_mmap_sem(ka_task_get_current()->mm));
         queue_err("Get vma failed. (va=0x%pK; len=0x%llx; page_num=%llu)\n",
             (void *)(uintptr_t)dma_list->va, dma_list->len, dma_list->page_num);
         return -EFBIG;
     }
     svm_flag = is_svm_addr(vma, dma_list->va);
-    up_read(get_mmap_sem(current->mm));
+    ka_task_up_read(get_mmap_sem(ka_task_get_current()->mm));
 
     /* memory remap by remap_pfn_rang, get user page fast can not get page addr */
     if (svm_flag == true) {
-        ret = devmm_get_pages_list(current->mm, dma_list->va, dma_list->page_num, dma_list->page);
+        ret = devmm_get_pages_list(ka_task_get_current()->mm, dma_list->va, dma_list->page_num, dma_list->page);
     } else {
         ret = queue_get_user_pages_fast(dma_list->va, dma_list->page_num, dma_list->page);
     }
@@ -294,24 +275,24 @@ STATIC int queue_fill_dma_blks(struct queue_dma_list *dma_list, bool dma_sva_ena
     }
 
     for (i = 0; i < dma_list->page_num; i++) {
-        dma_list->blks[i].dma = (dma_addr_t)page_to_phys(dma_list->page[i]); /* tmp store pa */
-        dma_list->blks[i].sz = PAGE_SIZE;
+        dma_list->blks[i].dma = (ka_dma_addr_t)ka_mm_page_to_phys(dma_list->page[i]); /* tmp store pa */
+        dma_list->blks[i].sz = KA_MM_PAGE_SIZE;
     }
 
     return 0;
 }
 
-STATIC int queue_map_dma_blks(struct device *dev, struct queue_dma_list *dma_list)
+STATIC int queue_map_dma_blks(ka_device_t *dev, struct queue_dma_list *dma_list)
 {
-    unsigned long stamp = jiffies;
-    struct page *page = NULL;
+    unsigned long stamp = ka_jiffies;
+    ka_page_t *page = NULL;
     u64 i, j;
 
     for (i = 0; i < dma_list->blks_num; i++) {
-        page = pfn_to_page(PFN_DOWN(dma_list->blks[i].dma));
-        dma_list->blks[i].dma = hal_kernel_devdrv_dma_map_page(dev, page, 0, dma_list->blks[i].sz, DMA_BIDIRECTIONAL);
-        if (dma_mapping_error(dev, dma_list->blks[i].dma) != 0) {
-            queue_err("Dma mapping error. (dma_idx=%llu; ret=%d)\n", i, dma_mapping_error(dev, dma_list->blks[i].dma));
+        page = ka_mm_pfn_to_page(KA_MM_PFN_DOWN(dma_list->blks[i].dma));
+        dma_list->blks[i].dma = hal_kernel_devdrv_dma_map_page(dev, page, 0, dma_list->blks[i].sz, KA_DMA_BIDIRECTIONAL);
+        if (ka_mm_dma_mapping_error(dev, dma_list->blks[i].dma) != 0) {
+            queue_err("Dma mapping error. (dma_idx=%llu; ret=%d)\n", i, ka_mm_dma_mapping_error(dev, dma_list->blks[i].dma));
             goto map_dma_blks_err;
         }
         queue_try_cond_resched(&stamp);
@@ -319,9 +300,9 @@ STATIC int queue_map_dma_blks(struct device *dev, struct queue_dma_list *dma_lis
 
     return 0;
 map_dma_blks_err:
-    stamp = jiffies;
+    stamp = ka_jiffies;
     for (j = 0; j < i; j++) {
-        hal_kernel_devdrv_dma_unmap_page(dev, dma_list->blks[j].dma, dma_list->blks[j].sz, DMA_BIDIRECTIONAL);
+        hal_kernel_devdrv_dma_unmap_page(dev, dma_list->blks[j].dma, dma_list->blks[j].sz, KA_DMA_BIDIRECTIONAL);
         queue_try_cond_resched(&stamp);
     }
 
@@ -331,11 +312,11 @@ map_dma_blks_err:
 STATIC void queue_clear_dma_blks(struct queue_dma_list *dma_list)
 {
 #ifndef CFG_FEATURE_SURPORT_PCIE_DMA_SVA
-    unsigned long stamp = jiffies;
+    unsigned long stamp = ka_jiffies;
     u64 i;
 
     for (i = 0; i < dma_list->page_num; i++) {
-        put_page(dma_list->page[i]);
+        ka_mm_put_page(dma_list->page[i]);
         queue_try_cond_resched(&stamp);
     }
 #endif
@@ -358,14 +339,14 @@ STATIC void queue_merg_dma_blks(struct queue_dma_block *blks, u64 idx, u64 *merg
     *merg_idx = j;
 }
 
-STATIC void queue_unmap_dma_blks(struct device *dev, struct queue_dma_list *dma_list)
+STATIC void queue_unmap_dma_blks(ka_device_t *dev, struct queue_dma_list *dma_list)
 {
-    unsigned long stamp = jiffies;
+    unsigned long stamp = ka_jiffies;
     u64 i;
 
     for (i = 0; i < dma_list->blks_num; i++) {
 #ifndef CFG_FEATURE_SURPORT_PCIE_DMA_SVA
-        hal_kernel_devdrv_dma_unmap_page(dev, dma_list->blks[i].dma, dma_list->blks[i].sz, DMA_BIDIRECTIONAL);
+        hal_kernel_devdrv_dma_unmap_page(dev, dma_list->blks[i].dma, dma_list->blks[i].sz, KA_DMA_BIDIRECTIONAL);
 #endif
         queue_try_cond_resched(&stamp);
     }
@@ -378,7 +359,7 @@ STATIC bool queue_get_dma_sva_enable(void)
     return false;
 #endif
 }
-int queue_make_dma_list(struct device *dev, bool hccs_vm_flag, u32 dev_id, struct queue_dma_list *dma_list)
+int queue_make_dma_list(ka_device_t *dev, bool hccs_vm_flag, u32 dev_id, struct queue_dma_list *dma_list)
 {
     u64 i, merg_idx;
     int ret;
@@ -428,7 +409,7 @@ free_dma_list:
     return DRV_ERROR_MEMORY_OPT_FAIL;
 }
 
-void queue_clear_dma_list(struct device *dev, bool hccs_vm_flag, struct queue_dma_list *dma_list)
+void queue_clear_dma_list(ka_device_t *dev, bool hccs_vm_flag, struct queue_dma_list *dma_list)
 {
     if (dma_list->blks_num == 0) {
         return;
@@ -447,18 +428,18 @@ int queue_dma_sync_link_copy(u32 dev_id, struct devdrv_dma_node *dma_node, u64 d
     u32 copy_num;
     int retry_cnt = 0;
     int ret = 0;
-    unsigned long stamp = jiffies;
+    unsigned long stamp = ka_jiffies;
     unsigned long timeinterval;
 
     max_per_num = QUEUE_DMA_MAX_NODE_CNT;
     for (already_copy_num = 0; already_copy_num < dma_node_num;) {
         left_node_num = dma_node_num - already_copy_num;
-        copy_num = (u32)min(left_node_num, max_per_num);
+        copy_num = (u32)ka_base_min(left_node_num, max_per_num);
         ret = hal_kernel_devdrv_dma_sync_link_copy(dev_id, DEVDRV_DMA_DATA_TRAFFIC, DEVDRV_DMA_WAIT_INTR,
             copy_node, copy_num);
         /* dma queue is full, delay resubmit */
         if ((ret == -ENOSPC) && (retry_cnt < QUEUE_DMA_RETRY_CNT)) {
-            usleep_range(QUEUE_DMA_WAIT_MIN_TIME, QUEUE_DMA_WAIT_MAX_TIME);
+            ka_system_usleep_range(QUEUE_DMA_WAIT_MIN_TIME, QUEUE_DMA_WAIT_MAX_TIME);
             retry_cnt++;
             continue;
         }
@@ -471,7 +452,7 @@ int queue_dma_sync_link_copy(u32 dev_id, struct devdrv_dma_node *dma_node, u64 d
         already_copy_num += copy_num;
         copy_node = copy_node + copy_num;
     }
-    timeinterval= jiffies_to_msecs(jiffies - stamp);
+    timeinterval= ka_system_jiffies_to_msecs(ka_jiffies - stamp);
     if (timeinterval > QUEUE_WAKEUP_TIMEINTERVAL) {
         queue_warn("Hal_kernel_devdrv_dma_sync_link_copy too long. (dev_id=%u; timeinterval=%lu, retry_cnt=%d; dma_node_num=%llu)\n",
             dev_id, timeinterval, retry_cnt, dma_node_num);

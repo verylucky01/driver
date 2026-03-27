@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -25,7 +25,8 @@ bool pcivnic_is_register_netdev(u32 dev_id)
     }
 
     /* CLOUD_V1 and CLOUD_V2's host not support vnic in release run pkg */
-    if ((chip_type == HISI_CLOUD_V1) || (chip_type == HISI_CLOUD_V2)) {
+    if ((chip_type == HISI_CLOUD_V1) || (chip_type == HISI_CLOUD_V2) ||
+        (chip_type == HISI_CLOUD_V4) || (chip_type == HISI_CLOUD_V5)) {
         return false;
     } else {
         return true;

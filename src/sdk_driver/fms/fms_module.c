@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,8 +10,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
-#include <linux/module.h>
 
 #include "fms_module.h"
 #include "pbl_feature_loader.h"
@@ -25,17 +23,17 @@ struct submodule_ops {
 STATIC struct submodule_ops g_sub_table[] = {
     {dms_dtm_init, dms_dtm_exit},
     {dms_smf_init, dms_smf_exit},
-#ifndef CFG_HOST_ENV
+#ifndef CFG_EDGE_HOST
     {fpdc_receiver_init, fpdc_receiver_exit},
 #endif
     {module_feature_auto_init, module_feature_auto_uninit},
 };
 
-STATIC int __init init_fms_base(void)
+STATIC int KA_MODULE_INIT init_fms_base(void)
 {
     int index, ret;
     int table_size = sizeof(g_sub_table) / sizeof(struct submodule_ops);
- 
+
     for (index = 0; index < table_size; index++) {
         ret = g_sub_table[index].init();
         if  (ret != 0) {
@@ -50,7 +48,7 @@ out:
     return ret;
 }
 
-STATIC void __exit exit_fms_base(void)
+STATIC void KA_MODULE_EXIT exit_fms_base(void)
 {
     int index;
     int table_size = sizeof(g_sub_table) / sizeof(struct submodule_ops);

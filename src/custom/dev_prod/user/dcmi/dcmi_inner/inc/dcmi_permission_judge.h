@@ -91,7 +91,7 @@ int dcmi_judge_compatibility(unsigned char* version, int ver_len, unsigned char*
 
 int dcmi_check_user_config_parameter(const char *config_name, unsigned int buf_size, unsigned char *buf);
 
-int dcmi_check_a2_a3_device_reset_docker_permission();
+int dcmi_check_a2_a3_a5_device_reset_docker_permission();
 
 int dcmi_acc_ctrl_check(unsigned int acc_ctrl);
 

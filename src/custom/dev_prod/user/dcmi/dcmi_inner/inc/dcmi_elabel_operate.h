@@ -28,9 +28,59 @@
 
 #define DCMI_ELABEL_LOCK_TIMEOUT 1000
 
+#define ELABEL_MAX_LEN_910_95 512
+
+// 用户态输入，只计算数据段长度
+#define HEAD_LENGTH                    (24 - 4 -4)
+#define NPU_BOARD_TYPE_LENGTH          (8 - 4)
+#define MAIN_BOARD_ID_LENGTH           (8 - 4)
+#define BOARD_PRODUCT_NAME_LENGTH      (68 - 4)
+#define BOARD_MODEL_LENGTH             (68 - 4)
+#define BOARD_MANUFACTURER_LENGTH      (68 - 4)
+#define BOARD_SERIAL_NUMBER_LENGTH     (68 - 4)
+#define BOARD_ID_LENGTH                (8 - 4)
+#define PCB_ID_BOARD_HARD_VER_LENGTH   (8 - 4)
+#define BOM_ID_LENGTH                  (8 - 4)
+#define DESCRIPTION_LENGTH             (272 - 4)
+#define MANUFACTURED_LENGTH            (36 - 4)
+#define CLEI_CODE_LENGTH               (36 - 4)
+#define BOM_LENGTH                     (68 - 4)
+#define PRODUCT_NAME_LENGTH            (68 - 4)
+#define PRODUCT_MANUFACTURE_LENGTH     (68 - 4)
+#define PRODUCT_SERIAL_NUMBER_LENGTH   (68 - 4)
+#define PRODUCT_PART_LENGTH            (68 - 4)
+#define ITEM_LENGTH                    (34 - 4)
+#define ISSUENUMBER_LENGTH             (24 - 4)
+#define EXPAND_INFO_LENGTH             (266 - 4)
+
 #define ELABEL_LOCK_FILE_NAME "/run/elabel_lock_flag"
 #define ELABEL_MUTEX_FIRST_TRY_TIMES 100 /* 获取超时锁，首先尝试调用trylock的次数 */
 #define ELABEL_MUTEX_SLEEP_TIMES_1MS 1000
+
+enum elabel_item_type_910_95 {
+    ELABEL_ITEM_ID_910_95_HEAD = 0x65,                    /* 电子标签版本号 */
+    ELABEL_ITEM_ID_910_95_NPU_BOARD_TYPE = 0x66,          /* NPU分bin使用的ID */
+    ELABEL_ITEM_ID_910_95_MAIN_BOARD_ID = 0x67,           /* 主板ID，AO区分标卡/模组 */
+    ELABEL_ITEM_ID_910_95_BOARD_PRODUCT_NAME = 0x22,      /* 单板名称，继承老命令字 */
+    ELABEL_ITEM_ID_910_95_BOARD_MODEL = 0x69,             /* 单板型号 */
+    ELABEL_ITEM_ID_910_95_BOARD_MANUFACTURER = 0x6a,      /* 单板生产厂家 */
+    ELABEL_ITEM_ID_910_95_BOARD_SERIAL_NUMBER = 0x23,     /* 单板序列号，继承 */
+    ELABEL_ITEM_ID_910_95_BOARD_ID = 0x6c,                /* 单板ID，区分VRD固件 */
+    ELABEL_ITEM_ID_910_95_PCB_ID_BOARD_HARD_VER = 0x6d,   /* PCB版本编号 */
+    ELABEL_ITEM_ID_910_95_BOM_ID = 0x6e,                  /* BOM版本编号，区分VRD固件 */
+    ELABEL_ITEM_ID_910_95_DESCRIPTION = 0x6f,             /* 单板描述 */
+    ELABEL_ITEM_ID_910_95_MANUFACTURED = 0x21,            /* 生产日期，继承 */
+    ELABEL_ITEM_ID_910_95_CLEI_CODE = 0x71,               /* 预留，遵循北美规范 */
+    ELABEL_ITEM_ID_910_95_BOM = 0x72,                     /* 更精细粒度的item，销售编码 */
+    ELABEL_ITEM_ID_910_95_PRODUCT_NAME = 0x31,            /* 产品名称，继承 */
+    ELABEL_ITEM_ID_910_95_PRODUCT_MANUFACTURER = 0x74,    /* 产品厂家 */
+    ELABEL_ITEM_ID_910_95_PRODUCT_SERIAL_NUMBER = 0x75,   /* 产品序列号 */
+    ELABEL_ITEM_ID_910_95_PRODUCT_PART = 0x76,            /* 产品编号 */
+    ELABEL_ITEM_ID_910_95_ITEM = 0x77,                    /* 预留 */
+    ELABEL_ITEM_ID_910_95_ISSUENUMBER = 0x78,             /* 预留 */
+    ELABEL_ITEM_ID_910_95_EXPAND_INFO = 0x79,             /* 扩展域段 */
+    ELABEL_ITEM_ID_910_95_INVALID,                        /* 非法值 */
+};
 
 enum elabel_ret {
     ELABEL_RET_OK = 0,
@@ -69,6 +119,11 @@ enum elabel_item_id {
     ELABEL_ITEM_ID_EXTEND = 0x50
 };
 
+struct elabel_data_info_910_95 {
+    unsigned char op_code;
+    unsigned int elabel_length;
+};
+
 struct dcmi_elabel_item {
     unsigned char item_id;
     unsigned short item_size;
@@ -83,10 +138,35 @@ struct dcmi_elabel_field_bytes {
     unsigned char data[0];
 };
 
+struct dcmi_elabel_field_head_info {
+    unsigned short crc;
+    unsigned short len;
+    unsigned char data[16];
+    unsigned int data_len;
+};
+
 struct dcmi_elabel_field_8_bytes {
     unsigned short crc;
     unsigned short len;
     unsigned char data[4];
+};
+
+struct dcmi_elabel_field_24_bytes {
+    unsigned short crc;
+    unsigned short len;
+    unsigned char data[20];
+};
+
+struct dcmi_elabel_field_34_bytes {
+    unsigned short crc;
+    unsigned short len;
+    unsigned char data[30];
+};
+
+struct dcmi_elabel_field_36_bytes {
+    unsigned short crc;
+    unsigned short len;
+    unsigned char data[32];
 };
 
 struct dcmi_elabel_field_52_bytes {
@@ -95,10 +175,28 @@ struct dcmi_elabel_field_52_bytes {
     unsigned char data[48];
 };
 
+struct dcmi_elabel_field_68_bytes {
+    unsigned short crc;
+    unsigned short len;
+    unsigned char data[64];
+};
+
 struct dcmi_elabel_field_72_bytes {
     unsigned short crc;
     unsigned short len;
     unsigned char data[68];
+};
+
+struct dcmi_elabel_field_266_bytes {
+    unsigned short crc;
+    unsigned short len;
+    unsigned char data[262];
+};
+
+struct dcmi_elabel_field_272_bytes {
+    unsigned short crc;
+    unsigned short len;
+    unsigned char data[268];
 };
 
 struct dcmi_elabel_field_500_bytes {
@@ -147,9 +245,57 @@ struct dcmi_elabel_data {
     struct dcmi_elabel_extend_area extend_info;
 };
 
+struct dcmi_elabel_data_v2 {
+    struct dcmi_elabel_field_head_info head;
+    struct dcmi_elabel_field_8_bytes npu_board_type;
+    struct dcmi_elabel_field_8_bytes main_board_id;
+    struct dcmi_elabel_field_68_bytes board_product_name;
+    struct dcmi_elabel_field_68_bytes board_model;
+    struct dcmi_elabel_field_68_bytes board_manufacture;
+    struct dcmi_elabel_field_68_bytes board_serial_num;
+    struct dcmi_elabel_field_8_bytes board_id;
+    struct dcmi_elabel_field_8_bytes pcb_id_board_hard_ver;
+    struct dcmi_elabel_field_8_bytes bom_id;
+    struct dcmi_elabel_field_272_bytes description;
+    struct dcmi_elabel_field_36_bytes manufactured;
+    struct dcmi_elabel_field_36_bytes cleicode;
+    struct dcmi_elabel_field_68_bytes bom;
+    struct dcmi_elabel_field_68_bytes product_product_name;
+    struct dcmi_elabel_field_68_bytes product_manufacture;
+    struct dcmi_elabel_field_68_bytes product_serial_num;
+    struct dcmi_elabel_field_68_bytes product_part;
+    struct dcmi_elabel_field_34_bytes item;
+    struct dcmi_elabel_field_24_bytes issue_num;
+    struct dcmi_elabel_field_266_bytes reserved;
+};
+
 struct dcmi_elabel_env {
     unsigned char elabel_status;
     struct dcmi_elabel_data *elabel_data;
+};
+
+static const struct elabel_data_info_910_95 g_elabel_data[] = {
+    {ELABEL_ITEM_ID_910_95_HEAD,                        HEAD_LENGTH},
+    {ELABEL_ITEM_ID_910_95_NPU_BOARD_TYPE,              NPU_BOARD_TYPE_LENGTH},
+    {ELABEL_ITEM_ID_910_95_MAIN_BOARD_ID,               MAIN_BOARD_ID_LENGTH},
+    {ELABEL_ITEM_ID_910_95_BOARD_PRODUCT_NAME,          BOARD_PRODUCT_NAME_LENGTH},
+    {ELABEL_ITEM_ID_910_95_BOARD_MODEL,                 BOARD_MODEL_LENGTH},
+    {ELABEL_ITEM_ID_910_95_BOARD_MANUFACTURER,          BOARD_MANUFACTURER_LENGTH},
+    {ELABEL_ITEM_ID_910_95_BOARD_SERIAL_NUMBER,         BOARD_SERIAL_NUMBER_LENGTH},
+    {ELABEL_ITEM_ID_910_95_BOARD_ID,                    BOARD_ID_LENGTH},
+    {ELABEL_ITEM_ID_910_95_PCB_ID_BOARD_HARD_VER,       PCB_ID_BOARD_HARD_VER_LENGTH},
+    {ELABEL_ITEM_ID_910_95_BOM_ID,                      BOM_ID_LENGTH},
+    {ELABEL_ITEM_ID_910_95_DESCRIPTION,                 DESCRIPTION_LENGTH},
+    {ELABEL_ITEM_ID_910_95_MANUFACTURED,                MANUFACTURED_LENGTH},
+    {ELABEL_ITEM_ID_910_95_CLEI_CODE,                   CLEI_CODE_LENGTH},
+    {ELABEL_ITEM_ID_910_95_BOM,                         BOM_LENGTH},
+    {ELABEL_ITEM_ID_910_95_PRODUCT_NAME,                PRODUCT_NAME_LENGTH},
+    {ELABEL_ITEM_ID_910_95_PRODUCT_MANUFACTURER,        PRODUCT_MANUFACTURE_LENGTH},
+    {ELABEL_ITEM_ID_910_95_PRODUCT_SERIAL_NUMBER,       PRODUCT_SERIAL_NUMBER_LENGTH},
+    {ELABEL_ITEM_ID_910_95_PRODUCT_PART,                PRODUCT_PART_LENGTH},
+    {ELABEL_ITEM_ID_910_95_ITEM,                        ITEM_LENGTH},
+    {ELABEL_ITEM_ID_910_95_ISSUENUMBER,                 ISSUENUMBER_LENGTH},
+    {ELABEL_ITEM_ID_910_95_EXPAND_INFO,                 EXPAND_INFO_LENGTH},
 };
 
 static const struct dcmi_elabel_item elabel_items[] = {
@@ -289,6 +435,115 @@ static const struct dcmi_elabel_item elabel_items[] = {
         (unsigned char *)("")}
 };
 
+static const struct dcmi_elabel_item elabel_items_v2[] = {
+    {ELABEL_ITEM_ID_910_95_HEAD,
+        (unsigned char)sizeof(struct dcmi_elabel_field_head_info),
+        16,
+        (unsigned long)&((struct dcmi_elabel_data_v2 *)0)->head,
+        (unsigned char *)("")},
+    {ELABEL_ITEM_ID_910_95_NPU_BOARD_TYPE,
+        (unsigned char)sizeof(struct dcmi_elabel_field_8_bytes),
+        4,
+        (unsigned long)&((struct dcmi_elabel_data_v2 *)0)->npu_board_type,
+        (unsigned char *)("")},
+    {ELABEL_ITEM_ID_910_95_MAIN_BOARD_ID,
+        (unsigned char)sizeof(struct dcmi_elabel_field_8_bytes),
+        4,
+        (unsigned long)&((struct dcmi_elabel_data_v2 *)0)->main_board_id,
+        (unsigned char *)("")},
+
+    {ELABEL_ITEM_ID_910_95_BOARD_PRODUCT_NAME,
+        (unsigned char)sizeof(struct dcmi_elabel_field_68_bytes),
+        64,
+        (unsigned long)&((struct dcmi_elabel_data_v2 *)0)->board_product_name,
+        (unsigned char *)("")},
+    {ELABEL_ITEM_ID_910_95_BOARD_MODEL,
+        (unsigned char)sizeof(struct dcmi_elabel_field_68_bytes),
+        64,
+        (unsigned long)&((struct dcmi_elabel_data_v2 *)0)->board_model,
+        (unsigned char *)("")},
+    {ELABEL_ITEM_ID_910_95_BOARD_MANUFACTURER,
+        (unsigned char)sizeof(struct dcmi_elabel_field_68_bytes),
+        64,
+        (unsigned long)&((struct dcmi_elabel_data_v2 *)0)->board_manufacture,
+        (unsigned char *)("")},
+    {ELABEL_ITEM_ID_910_95_BOARD_SERIAL_NUMBER,
+        (unsigned char)sizeof(struct dcmi_elabel_field_68_bytes),
+        64,
+        (unsigned long)&((struct dcmi_elabel_data_v2 *)0)->board_serial_num,
+        (unsigned char *)("")},
+    {ELABEL_ITEM_ID_910_95_BOARD_ID,
+        (unsigned char)sizeof(struct dcmi_elabel_field_8_bytes),
+        4,
+        (unsigned long)&((struct dcmi_elabel_data_v2 *)0)->board_id,
+        (unsigned char *)("")},
+    {ELABEL_ITEM_ID_910_95_PCB_ID_BOARD_HARD_VER,
+        (unsigned char)sizeof(struct dcmi_elabel_field_8_bytes),
+        4,
+        (unsigned long)&((struct dcmi_elabel_data_v2 *)0)->pcb_id_board_hard_ver,
+        (unsigned char *)("")},
+    {ELABEL_ITEM_ID_910_95_BOM_ID,
+        (unsigned char)sizeof(struct dcmi_elabel_field_8_bytes),
+        4,
+        (unsigned long)&((struct dcmi_elabel_data_v2 *)0)->bom_id,
+        (unsigned char *)("")},
+    {ELABEL_ITEM_ID_910_95_DESCRIPTION,
+        (unsigned char)sizeof(struct dcmi_elabel_field_272_bytes),
+        268,
+        (unsigned long)&((struct dcmi_elabel_data_v2 *)0)->description,
+        (unsigned char *)("")},
+    {ELABEL_ITEM_ID_910_95_MANUFACTURED,
+        (unsigned char)sizeof(struct dcmi_elabel_field_36_bytes),
+        32,
+        (unsigned long)&((struct dcmi_elabel_data_v2 *)0)->manufactured,
+        (unsigned char *)("")},
+    {ELABEL_ITEM_ID_910_95_CLEI_CODE,
+        (unsigned char)sizeof(struct dcmi_elabel_field_36_bytes),
+        32,
+        (unsigned long)&((struct dcmi_elabel_data_v2 *)0)->cleicode,
+        (unsigned char *)("")},
+    {ELABEL_ITEM_ID_910_95_BOM,
+        (unsigned char)sizeof(struct dcmi_elabel_field_68_bytes),
+        64,
+        (unsigned long)&((struct dcmi_elabel_data_v2 *)0)->bom,
+        (unsigned char *)("")},
+    {ELABEL_ITEM_ID_910_95_PRODUCT_NAME,
+        (unsigned char)sizeof(struct dcmi_elabel_field_68_bytes),
+        64,
+        (unsigned long)&((struct dcmi_elabel_data_v2 *)0)->product_product_name,
+        (unsigned char *)("")},
+    {ELABEL_ITEM_ID_910_95_PRODUCT_MANUFACTURER,
+        (unsigned char)sizeof(struct dcmi_elabel_field_68_bytes),
+        64,
+        (unsigned long)&((struct dcmi_elabel_data_v2 *)0)->product_manufacture,
+        (unsigned char *)("")},
+    {ELABEL_ITEM_ID_910_95_PRODUCT_SERIAL_NUMBER,
+        (unsigned char)sizeof(struct dcmi_elabel_field_68_bytes),
+        64,
+        (unsigned long)&((struct dcmi_elabel_data_v2 *)0)->product_serial_num,
+        (unsigned char *)("")},
+    {ELABEL_ITEM_ID_910_95_PRODUCT_PART,
+        (unsigned char)sizeof(struct dcmi_elabel_field_68_bytes),
+        64,
+        (unsigned long)&((struct dcmi_elabel_data_v2 *)0)->product_part,
+        (unsigned char *)("")},
+    {ELABEL_ITEM_ID_910_95_ITEM,
+        (unsigned char)sizeof(struct dcmi_elabel_field_34_bytes),
+        30,
+        (unsigned long)&((struct dcmi_elabel_data_v2 *)0)->item,
+        (unsigned char *)("")},
+    {ELABEL_ITEM_ID_910_95_ISSUENUMBER,
+        (unsigned char)sizeof(struct dcmi_elabel_field_24_bytes),
+        20,
+        (unsigned long)&((struct dcmi_elabel_data_v2 *)0)->issue_num,
+        (unsigned char *)("")},
+    {ELABEL_ITEM_ID_910_95_EXPAND_INFO,
+        (unsigned char)sizeof(struct dcmi_elabel_field_266_bytes),
+        262,
+        (unsigned long)&((struct dcmi_elabel_data_v2 *)0)->reserved,
+        (unsigned char *)("")}
+};
+
 #define ELABEL_STATUS_RAM_HAS_DATA   (1 << 0)
 #define ELABEL_STATUS_FLASH_HAS_DATA (1 << 1)
 #define ELABEL_STATUS_FLASH_WR_ERR   (1 << 2)
@@ -308,5 +563,7 @@ int dcmi_elabel_set_data(unsigned char item_id, unsigned char *data, unsigned sh
 int dcmi_cpu_get_device_elabel_info(int card_id, struct dcmi_elabel_info *elabel_info);
 
 void dcmi_set_default_elabel_str(char *elabel, int elabel_size);
+
+int dcmi_ao_get_elabel_info(int card_id, int device_id, unsigned char item_id, char *data, unsigned short data_size);
 
 #endif /* __DCMI_ELABEL_OPERATE_H__ */

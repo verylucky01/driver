@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -30,6 +30,8 @@
 #include "svm_master_dev_capability.h"
 #include "devmm_mem_alloc_interface.h"
 #include "svm_srcu_work.h"
+#include "ka_base_pub.h"
+#include "ka_memory_pub.h"
 
 #ifdef CFG_FEATURE_VFIO
 #include "devmm_pm_adapt.h"
@@ -926,7 +928,7 @@ devmm_fill_dma_blklist_err:
 
 void devmm_pa_node_list_dma_unmap(u32 dev_id, struct devmm_copy_side *side)
 {
-    bool is_in_softirq = (bool)in_softirq();
+    bool is_in_softirq = (bool)ka_base_in_softirq();
     ka_device_t *dev = NULL;
     u32 stamp = (u32)ka_jiffies;
     u32 i, host_flag;
@@ -1095,23 +1097,22 @@ STATIC void devmm_get_device_cpy_blk_num(int is_svm_huge, u64 byte_count, struct
     }
 }
 
-STATIC u32 devmm_get_blk_num(u64 byte_count, struct devmm_memory_attributes *attr)
-{
-    u32 blk_num, page_size;
+STATIC u32 devmm_get_blk_num(u64 byte_count, struct devmm_memory_attributes *attr)	 
+{	 
+    u32 blk_num, page_size;	 
 
-    if (attr->copy_use_va) {
-        blk_num = 1;
-    } else {
-        if (attr->is_svm_device) {
-            page_size = (attr->is_svm_huge) ? devmm_svm->device_hpage_size : devmm_svm->device_page_size;
-        } else {
-            page_size = attr->host_page_size;
-        }
+    if (attr->copy_use_va) {	 
+        blk_num = 1;	 
+    } else {	 
+        if (attr->is_svm_device) {	 
+            page_size = (attr->is_svm_huge) ? devmm_svm->device_hpage_size : devmm_svm->device_page_size;	 
+        } else {	 
+            page_size = attr->host_page_size;	 
+        }	 
+        blk_num = (u32)DEVMM_SIZE_TO_PAGE_NUM(byte_count, page_size);	 
+    }	 
 
-        blk_num = (u32)DEVMM_SIZE_TO_PAGE_NUM(byte_count, page_size);
-    }
-
-    return blk_num;
+    return blk_num;	 
 }
 
 struct devmm_copy_res *devmm_alloc_copy_res(u64 byte_count,
@@ -1199,7 +1200,7 @@ static void _devmm_svm_addr_pa_list_get(struct devmm_copy_side *side)
 
     for (i = 0; i < side->num; i++) {
         pg = side->blks[i].page;
-        if ((comp_head == NULL) && (PageCompound(pg) != 0)) {
+        if ((comp_head == NULL) && (ka_mm_PageCompound(pg) != 0)) {
             comp_head = ka_mm_compound_head(pg);
             comp_num = 1ULL << ka_mm_compound_order(comp_head);
             ka_mm_get_page(pg);
@@ -1234,7 +1235,7 @@ int devmm_svm_addr_pa_list_get(struct devmm_svm_process *svm_proc, u64 va, u64 s
 
 static void devmm_svm_addr_pa_list_put(struct devmm_copy_side *side)
 {
-    bool is_in_softirq = (bool)in_softirq();
+    bool is_in_softirq = (bool)ka_base_in_softirq();
     u32 stamp = (u32)ka_jiffies;
     u32 i;
 
@@ -1298,17 +1299,13 @@ int devmm_get_non_svm_addr_pa_list(struct devmm_svm_process *svm_proc, u64 va, u
 
 static inline void devmm_put_non_svm_addr_pa_list(struct devmm_copy_side *side)
 {
-    bool is_in_softirq = (bool)in_softirq();
+    bool is_in_softirq = (bool)ka_base_in_softirq();
     u32 stamp = (u32)ka_jiffies;
     u32 i;
 
     for (i = 0; i < side->blks_num; i++) {
         if (side->blks[i].page != NULL) {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
             ka_mm_unpin_user_page(side->blks[i].page);
-#else
-            ka_mm_put_page(side->blks[i].page);
-#endif
         } else {
             break;
         }
@@ -1368,11 +1365,11 @@ int devmm_vm_pa_blks_to_pm_pa_blks(u32 devid, struct devmm_dma_block *blks, u64 
     return 0;
 }
 
-static int devmm_make_host_pa_node_list(struct devmm_mem_copy_convrt_para *para, struct devmm_svm_process *svm_proc,
+static int devmm_make_host_pa_node_list_no_merge(struct devmm_mem_copy_convrt_para *para, struct devmm_svm_process *svm_proc,
     struct devmm_memory_attributes *attr, struct devmm_copy_side *side)
 {
     struct devmm_copy_res *res = para->res;
-    u32 i, merg_idx, host_flag;
+    u32 host_flag;
     int ret, write;
 
     side->blk_page_size = KA_MM_PAGE_SIZE;
@@ -1420,6 +1417,17 @@ static int devmm_make_host_pa_node_list(struct devmm_mem_copy_convrt_para *para,
         }
     }
 
+    return ret;
+}
+
+static int devmm_make_host_pa_node_list(struct devmm_mem_copy_convrt_para *para, struct devmm_svm_process *svm_proc,
+    struct devmm_memory_attributes *attr, struct devmm_copy_side *side)
+{
+    u32 i, merg_idx;
+    int ret;
+
+    ret = devmm_make_host_pa_node_list_no_merge(para, svm_proc, attr, side);
+
     for (merg_idx = 0, i = 0; i < side->num; i++) {
         devmm_merg_blk(side->blks, i, &merg_idx);
     }
@@ -1427,7 +1435,7 @@ static int devmm_make_host_pa_node_list(struct devmm_mem_copy_convrt_para *para,
 
     return ret;
 }
-
+                                                         
 void devmm_clear_host_pa_node_list(int pin_flg, struct devmm_copy_side *side)
 {
     if (pin_flg == DEVMM_PIN_PAGES) {
@@ -1436,7 +1444,7 @@ void devmm_clear_host_pa_node_list(int pin_flg, struct devmm_copy_side *side)
         devmm_put_non_svm_addr_pa_list(side);
     }
 }
-
+    
 static INLINE void devmm_fill_sva_dma_blk_node(u64 va, u64 sz,
     struct devmm_memory_attributes *attr, struct devmm_copy_side *side)
 {
@@ -2094,7 +2102,7 @@ static inline void devmm_async_task_record_inc(struct devmm_svm_process *svm_pro
 static inline void devmm_async_task_record_dec(struct devmm_svm_process *svm_proc, u32 devid)
 {
     struct devmm_svm_proc_master *master_data = (struct devmm_svm_proc_master *)svm_proc->priv_data;
-    atomic_dec_if_positive(&(master_data->async_copy_record.task_cnt[devid]));
+    ka_base_atomic_dec_if_positive(&(master_data->async_copy_record.task_cnt[devid]));
 }
 
 static void devmm_dma_copy_task_set_para(struct devmm_mem_copy_convrt_para *para,
@@ -2512,7 +2520,7 @@ int devmm_ioctl_memcpy_process_res(struct devmm_svm_process *svm_proc, struct de
 
     return devmm_ioctl_memcpy_process(svm_proc, para, src_attr, dst_attr);
 }
-
+                                                                                                                                                                                   
 void devmm_async_cpy_inc_addr_ref(struct devmm_svm_process *svm_proc, u64 src, u64 dst, u64 size)
 {
     /* ioctl api already check src dst ok, here will not fail */

@@ -28,8 +28,7 @@ static drvError_t rmo_mem_sharing_para_check(struct drvMemSharingPara *para)
     }
 
     if ((para->accessor < 0) || (para->accessor >= ACCESSOR_MAX)) {
-        rmo_err("Invalid accessor. (accessor=%d)\n", para->accessor);
-        return DRV_ERROR_INVALID_VALUE;
+        return DRV_ERROR_NOT_SUPPORT;
     }
 
     if (para->side != MEM_HOST_SIDE) {
@@ -63,8 +62,10 @@ drvError_t halSetMemSharing(struct drvMemSharingPara *para)
     arg.pg_prot = para->pg_prot;
     ret = rmo_cmd_ioctl(RMO_MEM_SHARING, &arg);
     if (ret != DRV_ERROR_NONE) {
-        rmo_err("Dispatch memory failed. (ret=%d; id=%u; side=%d; accessor=%u; va=0x%llx; size=%llu)\n",
-            ret, para->id, para->side, para->accessor, (uint64_t)(uintptr_t)para->ptr, para->size);
+        if (ret != DRV_ERROR_NOT_SUPPORT) {
+            rmo_err("Dispatch memory failed. (ret=%d; id=%u; side=%d; accessor=%u; va=0x%llx; size=%llu)\n",
+                ret, para->id, para->side, para->accessor, (uint64_t)(uintptr_t)para->ptr, para->size);
+        }
         return ret;
     }
     rmo_debug("Dispatch memory success. (id=%u; side=%d; accessor=%u; va=0x%llx; size=%llu)\n",

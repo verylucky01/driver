@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,11 +11,11 @@
  * GNU General Public License for more details.
  */
 
+#include "ka_driver_pub.h"
 #include "res_drv.h"
 #include "devdrv_util.h"
 #include "devdrv_ctrl.h"
 #include "res_drv_cloud_v1.h"
-#include "ka_driver_pub.h"
 
 #define DEVDRV_CLOUD_V1_P2P_SUPPORT_MAX_DEVICE 16
 
@@ -334,7 +334,7 @@ STATIC void devdrv_cloud_v1_init_link_info(struct devdrv_pci_ctrl *pci_ctrl)
 
 /* cloud ai server, has 2 node(4p system), host side number 0-3 --- node 0, 4-7 --- node 1
    cloud evb, has 2 node(2p system), host side number 0-1 --- node 0, 2-3 --- node 1 */
-STATIC int devdrv_get_cloud_server_devid(struct devdrv_shr_para __iomem *para)
+STATIC int devdrv_get_cloud_server_devid(struct devdrv_shr_para __ka_mm_iomem *para)
 {
     int dev_id = -1;
     struct devdrv_ctrl *p_ctrls = get_devdrv_ctrl();
@@ -363,7 +363,7 @@ STATIC int devdrv_get_cloud_pcie_card_devid(struct devdrv_pci_ctrl *pci_ctrl)
     int dev_id = -1;
 #if defined(CFG_FEATURE_DMI) && defined(CONFIG_DMI)
     int ret = 0;
-    struct devdrv_shr_para __iomem *para = NULL;
+    struct devdrv_shr_para __ka_mm_iomem *para = NULL;
     struct devdrv_ctrl *p_ctrls = get_devdrv_ctrl();
 
     if ((pci_ctrl == NULL) || (pci_ctrl->pdev == NULL) || (ka_pci_get_bus(pci_ctrl->pdev) == NULL)) {
@@ -406,7 +406,7 @@ STATIC int devdrv_get_cloud_pcie_card_devid(struct devdrv_pci_ctrl *pci_ctrl)
 
 STATIC int devdrv_alloc_devid_cloud(struct devdrv_pci_ctrl *pci_ctrl)
 {
-    struct devdrv_shr_para __iomem *para = NULL;
+    struct devdrv_shr_para __ka_mm_iomem *para = NULL;
     int dev_id = -1;
     int board_type;
 

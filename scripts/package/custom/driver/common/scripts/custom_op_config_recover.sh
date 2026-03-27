@@ -240,7 +240,7 @@ function config_recover()
 }
 
 if [ ! -f "$CUSTOM_OP_CONF" ]; then
-    log "CUSTOM_OP_CONF path is not exist, do not need to recover, exit."
+    log "CUSTOM_OP_CONF path is not exist, restore to default, exit."
     exit 0
 fi
 

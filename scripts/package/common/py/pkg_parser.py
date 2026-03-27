@@ -14,6 +14,7 @@ import copy
 import glob
 import hashlib
 import itertools
+import argparse
 import re
 import xml.etree.ElementTree as ET
 import os
@@ -28,11 +29,15 @@ from typing import (
 )
 
 from .utils import pkg_utils
+from .pkg_feature import (
+    PkgFeature, combine_feature_and_feature_list, load_feature_list, config_feature_to_set,
+    make_pkg_feature
+)
 from .filelist import FileItem, FileList, fill_is_common_path
 from .utils.pkg_utils import (
     ContainAsteriskError, FAIL, BLOCK_CONFIG_PATH,
     BlockConfigError, EnvNotSupported, IllegalVersionDir, PackageError,
-    ParseOsArchError, config_feature_to_set,
+    ParseOsArchError,
     flatten, star_pipe, merge_dict, yield_if, ErrMsgs, each_file_line, strip_lines
 )
 from .utils.funcbase import constant, dispatch, invoke, pipe, star_apply
@@ -89,6 +94,7 @@ def replace_env(env_dict: EnvDict, in_str: str):
 
 
 class ParseEnv(NamedTuple):
+    need_package_func: Callable[[Dict], bool]
     env_dict: EnvDict
     parse_option: ParseOption
     delivery_dir: str
@@ -112,6 +118,7 @@ class LoadedBlockElement(NamedTuple):
     dst_path: str
     chips: Set[str]
     features: Set[str]
+    pkg_features: Set[str]
     attrs: Dict[str, str]
 
 
@@ -123,7 +130,6 @@ class FileInfoParsedResult(NamedTuple):
 
 
 class BlockConfig(NamedTuple):
-
     dir_install_list: List[Dict]
     move_files: List[FileInfo]
     expand_content_list: List[Dict]
@@ -136,6 +142,7 @@ class PackerConfig(NamedTuple):
 
 
 class XmlConfig(NamedTuple):
+    xml_relpath: str
     default_config: Dict[str, str]
     package_attr: PackageAttr
     version_info: VersionInfo
@@ -343,6 +350,15 @@ def parse_package_attr(root_ele: ET.Element, args: Namespace) -> Dict:
     )
 
 
+def parse_feature_config_by_root(root_ele: ET.Element) -> Dict:
+    package_info_ele = root_ele.find("feature_config")
+    return parse_package_info(package_info_ele)
+
+
+def get_feature_list(args: argparse.Namespace, feature_attr: Dict) -> str:
+    return args.feature_list or feature_attr.get('feature_list', '')
+
+
 def render_cann_version(a_ver: int,
                         b_ver: int,
                         c_ver: Optional[int],
@@ -540,7 +556,8 @@ def extract_generate_info_content(generate_info_ele: ET.Element, env_dict: EnvDi
 
 def parse_generate_infos_by_loaded_block(loaded_block: LoadedBlockElement,
                                          default_config: Dict[str, str],
-                                         env_dict: EnvDict) -> List[Dict]:
+                                         env_dict: EnvDict,
+                                         need_package_func: Callable[[Dict], bool]) -> List[Dict]:
     return invoke(
         pipe(
             partial(
@@ -556,6 +573,7 @@ def parse_generate_infos_by_loaded_block(loaded_block: LoadedBlockElement,
                     star_apply(merge_dict),
                 )
             ),
+            partial(filter, need_package_func),
             list,
         ),
         loaded_block.root_ele.findall('generate_info')
@@ -579,6 +597,17 @@ def check_value(value: str,
     if package_check and package_attr.get('suffix') == 'run':
         if check_contain_asterisk(value):
             raise ContainAsteriskError(value)
+
+
+def need_package(info: Dict[str, str],
+                 input_feature: PkgFeature,
+                 parse_option: ParseOption,
+                 env_dict: EnvDict) -> bool:
+    pkg_features = info['pkg_feature']
+    if not input_feature.matched(pkg_features):
+        return False
+
+    return True
 
 
 def get_dst_prefix(file_info: FileInfo, env: ParseEnv) -> str:
@@ -628,11 +657,20 @@ def join_dst_path(base: str, other: str) -> str:
 
 def evaluate_info(info: Dict[str, str],
                   loaded_block: LoadedBlockElement,
-                  env_dict: EnvDict) -> Dict[str, str]:
-    dst_keys = ('dst_path',)
+                  env_dict: EnvDict,
+                  pkg: bool = False) -> Dict[str, str]:
+    if pkg:
+        dst_keys = ('src_path', 'value')
+    else:
+        dst_keys = ('dst_path', 'pkg_softlink')
 
     replace_env_func = partial(replace_env, env_dict)
     add_dst_path_func = partial(join_dst_path, loaded_block.dst_path)
+
+    def split_pkg_softlink(key: str, value: str) -> Tuple[str, str]:
+        if key == 'pkg_softlink':
+            return key, value.split(';')
+        return key, value
 
     def upper_value(key: str, value: str) -> Tuple[str, str]:
         if key == 'configurable':
@@ -656,19 +694,25 @@ def evaluate_info(info: Dict[str, str],
             return key, 'NA'
         return key, value
 
-    def merge_feature(key: str, value: str) -> Tuple[str, str]:
-        if key in ('chip', 'feature'):
+    def merge_feature(key: str, value: str) -> Tuple[str, Set[str]]:
+        if key in ('chip', 'feature', 'pkg_feature'):
             config_features = config_feature_to_set(value, key)
             return key, config_features | getattr(loaded_block, f'{key}s')
         return key, value
 
-    def eval_value(_key: str, value: str) -> str:
-        if value is not None:
-            return apply_func(replace_env_func, value)
+    def eval_value(key: str, value: str) -> str:
+        if value is None:
+            return key, None
+        return key, apply_func(replace_env_func, value)
+
+    def bool_value(key: str, value: str) -> Tuple[str, bool]:
+        if key == 'preprocess':
+            return key, value.lower() in BOOL_VALUES
+        return key, value
 
     eval_value_func = star_pipe(
-        upper_value, add_dst_path, replace_pkg_inner_softlink,
-        merge_feature, eval_value,
+        upper_value, split_pkg_softlink, add_dst_path, replace_pkg_inner_softlink,
+        merge_feature, eval_value, bool_value, lambda x, y: y,
     )
 
     return {
@@ -701,6 +745,10 @@ def parse_dir_info_elements(loaded_block: LoadedBlockElement,
             check_value(
                 dir_info['value'], env.parse_option.package_check, package_attr
             )
+
+            if not env.need_package_func(dir_info):
+                continue
+
             dir_infos.append(dir_info)
 
     return dir_infos
@@ -859,6 +907,9 @@ def parse_file_element(file_ele: ET.Element,
     file_info = merge_dict(file_config, file_ele.attrib)
     file_info = evaluate_info(file_info, loaded_block, env.env_dict)
 
+    if not env.need_package_func(file_info):
+        return
+
     if package_attr.get('expand_asterisk', False):
         expand_asterisk_func = partial(expand_file_info_asterisk, env=env)
     else:
@@ -938,7 +989,7 @@ def parse_block_config(loaded_block: LoadedBlockElement,
     )
 
     generate_infos = parse_generate_infos_by_loaded_block(
-        loaded_block, default_config, parse_env.env_dict
+        loaded_block, default_config, parse_env.env_dict, parse_env.need_package_func
     )
 
     return BlockConfig(
@@ -956,7 +1007,7 @@ def parse_block_config(loaded_block: LoadedBlockElement,
 
 def make_loaded_block_element(root_ele: ET.Element,
                               dst_path: str = '') -> LoadedBlockElement:
-    return LoadedBlockElement(root_ele, False, dst_path, set(), set(), {})
+    return LoadedBlockElement(root_ele, False, dst_path, set(), set(), set(), {})
 
 
 def parse_block_element(block_ele: ET.Element,
@@ -1060,7 +1111,36 @@ def read_version_info(package_attr: PackageAttr) -> Tuple[str, str]:
     return version, version_dir
 
 
+def get_feature_list_filepath(top_dir: str,
+                              pkg_name: str,
+                              chip_scenes: str,
+                              feature_list: str) -> Optional[str]:
+    if not feature_list:
+        return None
+
+    return os.path.join(
+        top_dir, pkg_utils.CONFIG_SCRIPT_PATH, pkg_name, chip_scenes, feature_list
+    )
+
+
+def parse_feature(xml_root: ET.Element, args: Namespace, top_dir: str) -> PkgFeature:
+    feature_attr = parse_feature_config_by_root(xml_root)
+    feature_list = get_feature_list(args, feature_attr)
+    feature_list_path = get_feature_list_filepath(
+        top_dir, args.pkg_name, args.chip_name, feature_list
+    )
+    feature = make_pkg_feature(
+        combine_feature_and_feature_list(
+            "",
+            feature_list_path
+        ),
+        False
+    )
+    return feature
+
+
 def parse_xml_config(filepath: str,
+                     xml_relpath: str,
                      delivery_dir: str,
                      parse_option: ParseOption,
                      args: Namespace) -> XmlConfig:
@@ -1074,6 +1154,7 @@ def parse_xml_config(filepath: str,
     default_config = xml_root.attrib.copy()
 
     package_attr = parse_package_attr(xml_root, args)
+    feature = parse_feature(xml_root, args, pkg_utils.TOP_SOURCE_DIR)
     version, version_dir = read_version_info(package_attr)
     if args.disable_multi_version:
         version_dir = None
@@ -1094,8 +1175,12 @@ def parse_xml_config(filepath: str,
         timestamp
     )
 
+    need_package_func = partial(
+        need_package, input_feature=feature, parse_option=parse_option, env_dict=env_dict
+    )
+
     parse_env = ParseEnv(
-        env_dict, parse_option, delivery_dir, pkg_utils.TOP_SOURCE_DIR
+        need_package_func, env_dict, parse_option, delivery_dir, pkg_utils.TOP_SOURCE_DIR
     )
 
     blocks = parse_blocks(
@@ -1110,6 +1195,6 @@ def parse_xml_config(filepath: str,
         fill_is_common_path_func = iter
 
     return XmlConfig(
-        default_config, package_attr, version_info, blocks, version, None,
+        xml_relpath, default_config, package_attr, version_info, blocks, version, None,
         PackerConfig(fill_is_common_path_func)
     )

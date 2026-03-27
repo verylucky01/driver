@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,9 +14,10 @@
 #include "ka_task_pub.h"
 #include "udis_log.h"
 #include "udis_management.h"
+#include "ka_common_pub.h"
 
 STATIC struct udis_ctrl_block *g_udis_cb[UDIS_DEVICE_UDEVID_MAX];
-STATIC struct rw_semaphore g_udis_cb_lock[UDIS_DEVICE_UDEVID_MAX];
+STATIC ka_rw_semaphore_t g_udis_cb_lock[UDIS_DEVICE_UDEVID_MAX];
 
 struct udis_ctrl_block* udis_get_ctrl_block(unsigned int udevid)
 {

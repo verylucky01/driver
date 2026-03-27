@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,28 +11,24 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/types.h>
-#include <linux/poll.h>
-#include <linux/kfifo.h>
-
-#include "devdrv_manager_container.h"
-#include "devdrv_pcie.h"
 #include "ka_task_pub.h"
 #include "ka_base_pub.h"
 #include "ka_fs_pub.h"
 #include "ka_memory_pub.h"
+#include "devdrv_manager_container.h"
+#include "devdrv_pcie.h"
 #include "devdrv_device_online.h"
 
-DECLARE_WAIT_QUEUE_HEAD(devid_upgrade_waitq);
+KA_TASK_DECLARE_WAIT_QUEUE_HEAD(devid_upgrade_waitq);
 KA_TASK_DEFINE_SPINLOCK(devdrv_online_fifo_lock);
 
 #define FIFO_CELL_SIZE sizeof(u32)
-#define DEVDRV_MAX_DEVID_BUFFER (DEVDRV_PF_DEV_MAX_NUM * FIFO_CELL_SIZE)
+#define DEVDRV_MAX_DEVID_BUFFER (ASCEND_PDEV_MAX_NUM * FIFO_CELL_SIZE)
 
-static struct kfifo devdrv_devid_kfifo;
+static ka_kfifo_t devdrv_devid_kfifo;
 volatile u32 devid_upgrade_flag = 0;
 
-STATIC int devdrv_manager_online_save_devids(struct kfifo* pkfifo, u32 dev_id)
+STATIC int devdrv_manager_online_save_devids(ka_kfifo_t* pkfifo, u32 dev_id)
 {
     ka_task_spin_lock_bh(&devdrv_online_fifo_lock);
     if (ka_base_kfifo_avail(pkfifo) < FIFO_CELL_SIZE) {
@@ -48,7 +44,7 @@ STATIC int devdrv_manager_online_save_devids(struct kfifo* pkfifo, u32 dev_id)
 
 void devdrv_manager_online_del_devids(u32 dev_id)
 {
-    u32 dev_ids[DEVDRV_PF_DEV_MAX_NUM] = {0};
+    u32 dev_ids[ASCEND_PDEV_MAX_NUM] = {0};
     u32 id_buf;
     int i = 0;
     int j;
@@ -59,7 +55,7 @@ void devdrv_manager_online_del_devids(u32 dev_id)
 
     ka_task_spin_lock_bh(&devdrv_online_fifo_lock);
     while (ka_base_kfifo_len(&devdrv_devid_kfifo) >= FIFO_CELL_SIZE) {
-        if (ka_base_kfifo_out(&devdrv_devid_kfifo, &id_buf, FIFO_CELL_SIZE) && (i < DEVDRV_PF_DEV_MAX_NUM)) {
+        if (ka_base_kfifo_out(&devdrv_devid_kfifo, &id_buf, FIFO_CELL_SIZE) && (i < ASCEND_PDEV_MAX_NUM)) {
             dev_ids[i++] = id_buf;
         }
     }
@@ -90,9 +86,9 @@ void devdrv_manager_online_devid_update(u32 dev_id)
     ka_task_wake_up_interruptible(&devid_upgrade_waitq);
 }
 
-int devdrv_manager_online_get_devids(struct file *filep, unsigned int cmd, unsigned long arg)
+int devdrv_manager_online_get_devids(ka_file_t *filep, unsigned int cmd, unsigned long arg)
 {
-    u32 dev_ids[DEVDRV_PF_DEV_MAX_NUM];
+    u32 dev_ids[ASCEND_PDEV_MAX_NUM];
     u32 dev_id;
     int j = 0;
     int ret;
@@ -103,8 +99,8 @@ int devdrv_manager_online_get_devids(struct file *filep, unsigned int cmd, unsig
         return -EPERM;
     }
 
-    for (i = 0; i < DEVDRV_PF_DEV_MAX_NUM; i++) {
-        dev_ids[i] = DEVDRV_PF_DEV_MAX_NUM;
+    for (i = 0; i < ASCEND_PDEV_MAX_NUM; i++) {
+        dev_ids[i] = ASCEND_PDEV_MAX_NUM;
     }
 
     i = 0;
@@ -115,7 +111,7 @@ int devdrv_manager_online_get_devids(struct file *filep, unsigned int cmd, unsig
         }
     }
     ka_task_spin_unlock_bh(&devdrv_online_fifo_lock);
-    if (copy_to_user_safe((void *)(uintptr_t)arg, dev_ids, FIFO_CELL_SIZE * DEVDRV_PF_DEV_MAX_NUM)) {
+    if (copy_to_user_safe((void *)(uintptr_t)arg, dev_ids, FIFO_CELL_SIZE * ASCEND_PDEV_MAX_NUM)) {
         devdrv_drv_err("copy_to_user_safe failed\n");
         /* copy to user failed, need to add devids to fifo */
         while (j < i) {
@@ -133,7 +129,7 @@ int devdrv_manager_online_get_devids(struct file *filep, unsigned int cmd, unsig
     return 0;
 }
 
-u32 devdrv_manager_poll(struct file *filep, struct poll_table_struct *wait)
+u32 devdrv_manager_poll(ka_file_t *filep, ka_poll_table_struct_t *wait)
 {
     u32 ret = 0;
 

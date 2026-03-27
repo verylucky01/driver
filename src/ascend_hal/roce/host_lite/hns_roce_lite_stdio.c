@@ -260,7 +260,7 @@ int hns_roce_lite_mmap_hva(struct rdma_lite_device_buf *dev_buf, struct rdma_lit
 
     host_buf->dva = dev_buf->va;
     host_buf->length = dev_buf->len;
-    if (ctx->page_size != PAGE_ALIGN_2MB) {
+    if (ctx->page_size == PAGE_ALIGN_4KB) {
         host_buf->hva = hns_roce_lite_mmap_host_va(dev_buf->va, host_buf->length, ctx);
         goto page_align_4k_out;
     }
@@ -298,7 +298,7 @@ int hns_roce_lite_unmmap_hva(struct rdma_lite_host_buf *host_buf, struct hns_roc
     struct rdma_lite_mem_pool *mem_pool = NULL;
     unsigned int free_size = 0;
 
-    if (ctx->page_size != PAGE_ALIGN_2MB) {
+    if (ctx->page_size == PAGE_ALIGN_4KB) {
         return hns_roce_lite_unmmap_host_va(host_buf->dva, ctx);
     }
 
@@ -330,7 +330,7 @@ int hns_roce_lite_mmap_hdb(struct rdma_lite_device_buf *dev_buf, struct rdma_lit
 
     host_buf->dva = dev_buf->va;
     host_buf->length = dev_buf->len;
-    if (ctx->page_size != PAGE_ALIGN_2MB) {
+    if (ctx->page_size == PAGE_ALIGN_4KB) {
         host_buf->hva = hns_roce_lite_mmap_db(host_buf->dva, host_buf->length, ctx);
         goto page_align_4k_out;
     }
@@ -349,7 +349,7 @@ page_align_4k_out:
 
 int hns_roce_lite_unmmap_hdb(struct rdma_lite_host_buf *host_buf, struct hns_roce_lite_context *ctx)
 {
-    if (ctx->page_size != PAGE_ALIGN_2MB) {
+    if (ctx->page_size == PAGE_ALIGN_4KB) {
         return hns_roce_lite_unmmap_db(host_buf->dva, ctx);
     }
 

@@ -646,8 +646,7 @@ int dcmi_get_device_pcie_info(int card_id, int device_id, struct dcmi_pcie_info 
         return err;
     }
 
-    if (dcmi_board_chip_type_is_ascend_910_95() &&
-        dcmi_mainboard_is_a900_a5_ub(g_mainboard_info.mainboard_id)) {
+    if (dcmi_mainboard_is_a900_a5_ub(g_mainboard_info.mainboard_id)) {
         gplog(LOG_ERR, "This device does not support.");
         return DCMI_ERR_CODE_NOT_SUPPORT;
     }
@@ -676,8 +675,7 @@ int dcmi_get_device_pcie_info_v2(int card_id, int device_id, struct dcmi_pcie_in
         return err;
     }
 
-    if (dcmi_board_chip_type_is_ascend_910_95() &&
-        dcmi_mainboard_is_a900_a5_ub(g_mainboard_info.mainboard_id)) {
+    if (dcmi_mainboard_is_a900_a5_ub(g_mainboard_info.mainboard_id)) {
         return DCMI_ERR_CODE_NOT_SUPPORT;
     }
 
@@ -747,6 +745,8 @@ int dcmi_get_device_elabel_info(int card_id, int device_id, struct dcmi_elabel_i
         if (dcmi_board_chip_type_is_ascend_310b()) {
             dcmi_set_i2c_dev_name(I2C9_DEV_NAME); // 模组elabel的iic设备名称
             return dcmi_i2c_get_npu_device_elable_info(card_id, elabel_info);
+        } else if (dcmi_board_chip_type_is_ascend_910_95()) {
+            return dcmi_ao_get_npu_device_elabel_info(card_id, device_id, elabel_info);
         } else {
             return dcmi_get_npu_device_elable_info(card_id, device_id, elabel_info);
         }
@@ -917,7 +917,7 @@ int dcmi_set_device_info(int card_id, int device_id, enum dcmi_main_cmd main_cmd
 
     err = dcmi_set_device_info_permission_check(main_cmd, sub_cmd);
     if (err != DCMI_OK) {
-        gplog(LOG_ERR, "check permission failed. card_id=%d, device_id=%d,main_cmd=%u, sub_cmd=%u, err=%d",
+        gplog(LOG_ERR, "check permission failed. card_id=%d, device_id=%d, main_cmd=%d, sub_cmd=%u, err=%d",
             card_id, device_id, main_cmd, sub_cmd, err);
         return err;
     }
@@ -956,11 +956,11 @@ int dcmi_set_device_info(int card_id, int device_id, enum dcmi_main_cmd main_cmd
     if (device_type == NPU_TYPE) {
         err = dcmi_set_npu_device_info(card_id, device_id, main_cmd, sub_cmd, buf, buf_size);
         if (err != DCMI_OK) {
-            gplog(LOG_ERR, "set device info failed. card_id=%d, device_id=%d,main_cmd=%d, sub_cmd=%u, err=%d", card_id,
+            gplog(LOG_ERR, "set device info failed. card_id=%d, device_id=%d, main_cmd=%d, sub_cmd=%u, err=%d", card_id,
                 device_id, main_cmd, sub_cmd, err);
             return err;
         }
-        gplog(LOG_OP, "set device info success. card_id=%d, device_id=%d,main_cmd=%d, sub_cmd=%u", card_id, device_id,
+        gplog(LOG_OP, "set device info success. card_id=%d, device_id=%d, main_cmd=%d, sub_cmd=%u", card_id, device_id,
             main_cmd, sub_cmd);
     } else {
         gplog(LOG_ERR, "device_type %d is not support.", device_type);
@@ -970,8 +970,7 @@ int dcmi_set_device_info(int card_id, int device_id, enum dcmi_main_cmd main_cmd
     return DCMI_OK;
 }
 
-int dcmi_set_custom_op_secverify_mode(int card_id, int device_id, enum dcmi_main_cmd main_cmd, unsigned int sub_cmd,
-    const void *buf, unsigned int buf_size)
+int dcmi_set_custom_op_secverify_mode(int card_id, int device_id, const void *buf, unsigned int buf_size)
 {
     int err;
     enum dcmi_unit_type device_type = NPU_TYPE;
@@ -981,8 +980,8 @@ int dcmi_set_custom_op_secverify_mode(int card_id, int device_id, enum dcmi_main
         return DCMI_ERR_CODE_OPER_NOT_PERMITTED;
     }
 
-    if (buf == NULL || main_cmd >= DCMI_MAIN_CMD_MAX) {
-        gplog(LOG_ERR, "buf is NULL or main_cmd is invalid. main_cmd=%d", main_cmd);
+    if (buf == NULL) {
+        gplog(LOG_ERR, "dcmi_set_custom_op_secverify_mode buf is NULL.");
         return DCMI_ERR_CODE_INVALID_PARAMETER;
     }
 
@@ -997,7 +996,8 @@ int dcmi_set_custom_op_secverify_mode(int card_id, int device_id, enum dcmi_main
     }
 
     if (device_type == NPU_TYPE) {
-        err = dcmi_set_npu_device_info(card_id, device_id, main_cmd, sub_cmd, buf, buf_size);
+        err = dcmi_set_npu_device_info(card_id, device_id, DCMI_MAIN_CMD_SEC, DCMI_SEC_SUB_CMD_CUST_SIGN_FLAG,
+            buf, buf_size);
         if (err != DCMI_OK) {
             gplog(LOG_ERR, "set device info failed. card_id=%d, device_id=%d, err=%d", card_id, device_id, err);
             return err;
@@ -1011,8 +1011,8 @@ int dcmi_set_custom_op_secverify_mode(int card_id, int device_id, enum dcmi_main
     return DCMI_OK;
 }
 
-int dcmi_set_custom_op_secverify_enable(int card_id, int device_id, const char *config_name, unsigned int buf_size,
-    unsigned char *buf)
+int dcmi_set_custom_op_secverify_enable(int card_id, int device_id, const char *config_name,
+    unsigned char *buf, unsigned int buf_size)
 {
     int err;
     int device_logic_id = 0;
@@ -1135,8 +1135,8 @@ int dcmi_get_device_mac_count(int card_id, int device_id, int *count)
         return err;
     }
 
-    if (dcmi_board_chip_type_is_ascend_910b_300i_a2() == TRUE) {
-        gplog(LOG_ERR, "This device does not support get device mac count.");
+    if (dcmi_board_chip_type_is_ascend_910b_300i_a2() || dcmi_board_chip_type_is_ascend_910_95_card()) {
+        gplog(LOG_OP, "This device does not support get device mac count.");
         return DCMI_ERR_CODE_NOT_SUPPORT;
     }
 

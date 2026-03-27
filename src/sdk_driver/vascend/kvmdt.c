@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,47 +11,14 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/version.h>
-#include <linux/init.h>
-#include <linux/device.h>
-#include <linux/mm.h>
-#include <linux/mmu_context.h>
-#include <linux/types.h>
-#include <linux/list.h>
-#include <linux/rbtree.h>
-#include <linux/spinlock.h>
-#include <linux/uuid.h>
-
-#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(4,10,0)) || (defined(DRV_UT)))
-#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(4,18,0)) || (defined(DRV_UT)))
-#include <linux/sched/mm.h>
-#endif
-#include <linux/kvm_host.h>
-#include <linux/vfio.h>
-#endif
-
-#include <linux/kvm_host.h>
-#include <linux/debugfs.h>
-#include <linux/dma-mapping.h>
-#include <linux/dma-direction.h>
-#include <linux/module.h>
-#include <linux/uaccess.h>
-#include <linux/vmalloc.h>
-#include <linux/sched/signal.h>
-
+#include "ka_task_pub.h"
+#include "ka_fs_pub.h"
+#include "ka_kvm_pub.h"
 #include "dma_pool.h"
 #include "vfio_ops.h"
 #include "dvt_sysfs.h"
 #include "dvt.h"
 #include "kvmdt.h"
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,8,0))
-#define USE_MM          kthread_use_mm
-#define UNUSE_MM        kthread_unuse_mm
-#else
-#define USE_MM          use_mm
-#define UNUSE_MM        unuse_mm
-#endif
 
 #define HW_VDAVINCI_READ_SUPPORT_TYPES 3
 #define HW_VDAVINCI_WRITE_SUPPORT_TYPES 2
@@ -159,17 +126,6 @@ bool hw_vdavinci_priv_callback_check(struct vdavinci_priv *vdavinci_priv)
     return true;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,19,0)
-STATIC void guid_to_uuid(struct device *dev, uuid_le *dst, const guid_t *src)
-{
-    if (UUID_SIZE != sizeof(guid_t) || UUID_SIZE != sizeof(uuid_le)) {
-        vascend_err(dev, "uuid size error\n");
-        return;
-    }
-    memcpy_s(dst, UUID_SIZE, src, UUID_SIZE);
-}
-#endif
-
 struct hw_vdavinci *hw_vdavinci_create(struct kobject *kobj, struct mdev_device *mdev)
 {
     int ret = 0;
@@ -178,11 +134,7 @@ struct hw_vdavinci *hw_vdavinci_create(struct kobject *kobj, struct mdev_device 
     struct device *pdev;
     struct hw_dvt *dvt;
     struct hw_pf_info *pf_info;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,19,0)
-    uuid_le uuid;
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(5,1,0)
-    const guid_t *uuid = mdev_uuid(mdev);
-#endif
+    uuid_le uuid = vdavinci_get_uuid(mdev);
 
     pdev = get_mdev_parent(mdev);
     dvt = kdev_to_davinci(pdev)->dvt;
@@ -198,14 +150,7 @@ struct hw_vdavinci *hw_vdavinci_create(struct kobject *kobj, struct mdev_device 
     }
 
     vascend_info(pdev, "enter create vdavinci, type: %s\n", kobject_name(kobj));
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,19,0)
-    guid_to_uuid(pdev, &uuid, &mdev->uuid);
     vdavinci = g_hw_vdavinci_ops.vdavinci_create(dvt, type, uuid);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(5,1,0)
-    vdavinci = g_hw_vdavinci_ops.vdavinci_create(dvt, type, *uuid);
-#else
-    vdavinci = g_hw_vdavinci_ops.vdavinci_create(dvt, type, mdev_uuid(mdev));
-#endif
     if (IS_ERR_OR_NULL(vdavinci)) {
         ret = vdavinci == NULL ? -EFAULT : PTR_ERR(vdavinci);
         vascend_err(pdev, "failed to create vdavinci: %d\n", ret);
@@ -269,96 +214,9 @@ int hw_vdavinci_remove(struct mdev_device *mdev)
     return 0;
 }
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(6,0,0))
-STATIC int hw_vdavinci_iommu_notifier(struct notifier_block *nb,
-                                      unsigned long action, void *data)
-{
-    struct hw_vdavinci *vdavinci = container_of(nb,
-            struct hw_vdavinci, vdev.iommu_notifier);
-
-    if (action == VFIO_IOMMU_NOTIFY_DMA_UNMAP) {
-        unsigned long start_gfn;
-        struct vfio_iommu_type1_dma_unmap *unmap = data;
-
-        if (unmap == NULL) {
-            return NOTIFY_BAD;
-        }
-        start_gfn = unmap->iova >> PAGE_SHIFT;
-        mutex_lock(&vdavinci->vdev.cache_lock);
-        hw_vdavinci_unplug_ram(vdavinci, start_gfn, unmap->size);
-        mutex_unlock(&vdavinci->vdev.cache_lock);
-    }
-
-    return NOTIFY_OK;
-}
-
-STATIC int hw_vdavinci_group_notifier(struct notifier_block *nb,
-                                      unsigned long action, void *data)
-{
-    struct vm_dom_info *vm_dom = NULL;
-    struct hw_vdavinci *vdavinci = container_of(nb,
-            struct hw_vdavinci, vdev.group_notifier);
-    struct mutex *g_vm_domains_lock = get_vm_domains_lock();
-
-    if (action == VFIO_GROUP_NOTIFY_SET_KVM) {
-        vdavinci->vdev.kvm = data;
-
-        if (data == NULL) {
-            schedule_work(&vdavinci->vdev.release_work);
-        } else {
-            mutex_lock(g_vm_domains_lock);
-            vm_dom = vm_dom_info_get(vdavinci->vdev.kvm);
-            mutex_unlock(g_vm_domains_lock);
-            if (!vm_dom) {
-                vascend_err(vdavinci_to_dev(vdavinci), "vnpu init domain failed.\n");
-            }
-
-            vdavinci->vdev.domain = vm_dom;
-        }
-    }
-
-    return NOTIFY_OK;
-}
-
-STATIC int hw_get_vfio_group(struct mdev_device *mdev)
-{
-#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(5,7,0)))
-    int ret = 0;
-    struct hw_vdavinci *vdavinci = get_mdev_drvdata(mdev_dev(mdev));
-    struct vfio_group *vfio_group = NULL;
-
-    vfio_group = vfio_group_get_external_user_from_dev(mdev_dev(mdev));
-    if (IS_ERR_OR_NULL(vfio_group)) {
-        ret = !vfio_group ? -EFAULT : (int)PTR_ERR(vfio_group);
-        vascend_err(vdavinci_to_dev(vdavinci),
-                    "vfio_group_get_external_user_from_dev failed, ret: %d\n", ret);
-        return ret;
-    }
-    vdavinci->vdev.vfio_group = vfio_group;
-#endif
-    return 0;
-}
-
-STATIC void hw_put_vfio_group(struct mdev_device *mdev)
-{
-#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(5,7,0)))
-    struct hw_vdavinci *vdavinci = get_mdev_drvdata(mdev_dev(mdev));
-
-    if (!vdavinci->vdev.vfio_group) {
-        return;
-    }
-    vfio_group_put_external_user(vdavinci->vdev.vfio_group);
-    vdavinci->vdev.vfio_group = NULL;
-#endif
-}
-#endif /* KERNEL_VERSION(6,0,0) */
-
 int hw_vdavinci_open(struct mdev_device *mdev)
 {
     int ret = 0;
-#if ((LINUX_VERSION_CODE < KERNEL_VERSION(6,0,0)))
-    unsigned long events;
-#endif
     struct hw_vdavinci *vdavinci = get_mdev_drvdata(mdev_dev(mdev));
 
     vascend_info(vdavinci_to_dev(vdavinci), "enter open vdavinci, vid: %u\n", vdavinci->id);
@@ -371,33 +229,10 @@ int hw_vdavinci_open(struct mdev_device *mdev)
     vdavinci->qemu_task = current->group_leader;
     cpumask_clear(&vdavinci->vm_cpus_mask);
 
-#if ((LINUX_VERSION_CODE < KERNEL_VERSION(6,0,0)))
-    vdavinci->vdev.iommu_notifier.notifier_call = hw_vdavinci_iommu_notifier;
-    vdavinci->vdev.group_notifier.notifier_call = hw_vdavinci_group_notifier;
-
-    events = VFIO_IOMMU_NOTIFY_DMA_UNMAP;
-    ret = vfio_register_notifier(mdev_dev(mdev), VFIO_IOMMU_NOTIFY,
-                                 &events, &vdavinci->vdev.iommu_notifier);
+    ret = vdavinci_register_vfio_group(vdavinci);
     if (ret != 0) {
-        vascend_err(vdavinci_to_dev(vdavinci), "vfio register iommu notifier failed, "
-            "vid: %u, ret: %d\n", vdavinci->id, ret);
-        goto out;
+        return ret;
     }
-
-    events = VFIO_GROUP_NOTIFY_SET_KVM;
-    ret = vfio_register_notifier(mdev_dev(mdev), VFIO_GROUP_NOTIFY,
-                                 &events, &vdavinci->vdev.group_notifier);
-    if (ret != 0) {
-        vascend_err(vdavinci_to_dev(vdavinci), "vfio register group notifier failed, "
-            "vid: %u, ret: %d\n", vdavinci->id, ret);
-        goto unregister_iommu;
-    }
-
-    ret = hw_get_vfio_group(mdev);
-    if (ret)
-        goto unregister_group;
-#endif
-
     if (!try_module_get(THIS_MODULE)) {
         ret = -EBUSY;
         goto undo_group;
@@ -420,18 +255,7 @@ int hw_vdavinci_open(struct mdev_device *mdev)
 out_module:
     module_put(THIS_MODULE);
 undo_group:
-#if ((LINUX_VERSION_CODE <= KERNEL_VERSION(5,18,0)))
-    hw_put_vfio_group(mdev);
-
-unregister_group:
-    vfio_unregister_notifier(mdev_dev(mdev), VFIO_GROUP_NOTIFY,
-                             &vdavinci->vdev.group_notifier);
-
-unregister_iommu:
-    vfio_unregister_notifier(mdev_dev(mdev), VFIO_IOMMU_NOTIFY,
-                             &vdavinci->vdev.iommu_notifier);
-out:
-#endif
+    vdavinci_unregister_vfio_group(vdavinci);
     return ret;
 }
 
@@ -463,9 +287,6 @@ STATIC void __hw_vdavinci_release(struct hw_vdavinci *vdavinci)
     struct kvmdt_guest_info *info = NULL;
     struct vdavinci_ioeventfd *ioeventfd = NULL;
     struct vdavinci_ioeventfd *ioeventfd_tmp = NULL;
-#if ((LINUX_VERSION_CODE < KERNEL_VERSION(6,0,0)))
-    int ret;
-#endif
 
     vascend_info(vdavinci_to_dev(vdavinci), "enter release vdavinci, vid: %u\n",
                  vdavinci->id);
@@ -480,21 +301,7 @@ STATIC void __hw_vdavinci_release(struct hw_vdavinci *vdavinci)
 
     g_hw_vdavinci_ops.vdavinci_release(vdavinci);
 
-#if ((LINUX_VERSION_CODE < KERNEL_VERSION(6,0,0)))
-    ret = vfio_unregister_notifier(mdev_dev(vdavinci->vdev.mdev), VFIO_GROUP_NOTIFY,
-                                   &vdavinci->vdev.group_notifier);
-    if (ret != 0) {
-        vascend_err(vdavinci_to_dev(vdavinci), "Failed to unregister vfio group notifier, "
-            "vid: %u, ret: %d\n", vdavinci->id, ret);
-    }
-
-    ret = vfio_unregister_notifier(mdev_dev(vdavinci->vdev.mdev), VFIO_IOMMU_NOTIFY,
-                                   &vdavinci->vdev.iommu_notifier);
-    if (ret != 0) {
-        vascend_err(vdavinci_to_dev(vdavinci), "Failed to unregister vfio iommu notifier, "
-            "vid: %u, ret: %d\n", vdavinci->id, ret);
-    }
-#endif
+    vdavinci_unregister_vfio_group(vdavinci);
 
     module_put(THIS_MODULE);
 
@@ -502,15 +309,12 @@ STATIC void __hw_vdavinci_release(struct hw_vdavinci *vdavinci)
     kvmdt_guest_exit(info);
 
     hw_vdavinci_release_msix_eventfd_ctx(vdavinci);
-#if ((LINUX_VERSION_CODE <= KERNEL_VERSION(5,18,0)))
-    hw_put_vfio_group(vdavinci->vdev.mdev);
-#endif
 
     vdavinci->vdev.kvm = NULL;
     vdavinci->handle = 0;
 
     list_for_each_entry_safe(ioeventfd, ioeventfd_tmp, &vdavinci->ioeventfds_list, next) {
-#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(4,17,0)) || (defined(DRV_UT)))
+#if IS_VDAVINCI_KERNEL_VERSION_SUPPORT
         hw_vdavinci_ioeventfd_deactive(vdavinci, ioeventfd);
 #endif
     }
@@ -948,19 +752,11 @@ STATIC long _hw_vdavinci_device_get_info(uintptr_t arg,
     return copy_to_user((void __user *)arg, &info, minsz) != 0 ?    -EFAULT : 0;
 }
 
-#if ((LINUX_VERSION_CODE < KERNEL_VERSION(4,18,0)) && (!defined(DRV_UT)))
 STATIC int _hw_vdavinci_device_get_cap(int cap_type_id,
                                        struct vfio_region_info_cap_sparse_mmap *sparse,
                                        struct vfio_region_info *info, uintptr_t arg)
 {
-    return 0;
-}
-#else
-
-STATIC int _hw_vdavinci_device_get_cap(int cap_type_id,
-                                       struct vfio_region_info_cap_sparse_mmap *sparse,
-                                       struct vfio_region_info *info, uintptr_t arg)
-{
+#if IS_VDAVINCI_KERNEL_VERSION_SUPPORT
     int ret;
     struct vfio_info_cap caps = { .buf = NULL, .size = 0 };
 
@@ -995,9 +791,9 @@ STATIC int _hw_vdavinci_device_get_cap(int cap_type_id,
         }
         kfree(caps.buf);
     }
+#endif
     return 0;
 }
-#endif
 
 STATIC struct vfio_region_info_cap_sparse_mmap *
 hw_vdavinci_device_get_sparse_info(struct vdavinci_mapinfo *mmio_map_info, unsigned int map_num)
@@ -1179,7 +975,7 @@ STATIC long _hw_vdavinci_device_get_irq_info(uintptr_t arg,
     return copy_to_user((void __user *)arg, &info, minsz) != 0 ? -EFAULT : 0;
 }
 
-#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(4,17,0)) || (defined(DRV_UT)))
+#if (IS_VDAVINCI_KERNEL_VERSION_SUPPORT || (defined(DRV_UT)))
 STATIC long _hw_vdavinci_device_set_ioeventfd(uintptr_t arg,
                                               struct hw_vdavinci *vdavinci)
 {
@@ -1275,7 +1071,7 @@ long hw_vdavinci_ioctl(struct mdev_device *mdev, unsigned int cmd,
             return _hw_vdavinci_device_set_irqs(arg_uptr, vdavinci);
         case VFIO_DEVICE_RESET:
             return _hw_vdavinci_device_reset(vdavinci);
-        #if ((LINUX_VERSION_CODE >= KERNEL_VERSION(4,17,0)) || (defined(DRV_UT)))
+        #if ((IS_VDAVINCI_KERNEL_VERSION_SUPPORT) || (defined(DRV_UT)))
         case VFIO_DEVICE_IOEVENTFD:
             return _hw_vdavinci_device_set_ioeventfd(arg_uptr, vdavinci);
         #endif
@@ -1319,125 +1115,29 @@ STATIC int kvmdt_inject_msix(uintptr_t handle, u32 vector)
     }
 
     if (vdavinci->vdev.msix_triggers == NULL ||
-            vdavinci->vdev.msix_triggers[vector] == NULL) {
+        vdavinci->vdev.msix_triggers[vector] == NULL) {
         return 0;
     }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6,8,0))
-    eventfd_signal(vdavinci->vdev.msix_triggers[vector]);
-    vdavinci->debugfs.msix_count[vector]++;
-#else
-    if (eventfd_signal(vdavinci->vdev.msix_triggers[vector], 1)) {
+    if (vdavinci_eventfd_signal(vdavinci->vdev.msix_triggers[vector], 1) != 0) {
         vdavinci->debugfs.msix_count[vector]++;
         return 0;
     }
-#endif
 
     return 0;
 }
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5,7,0))
-#if ((LINUX_VERSION_CODE < KERNEL_VERSION(4,18,0)) && (!defined(DRV_UT)))
-STATIC int kvmdt_rw_gpa(uintptr_t handle, unsigned long gpa,
-                        void *buf, unsigned long len, bool write)
-{
-       return 0;
-}
-#else
-STATIC int kvmdt_rw_gpa(uintptr_t handle, unsigned long gpa,
-                        void *buf, unsigned long len, bool write)
-{
-    struct kvmdt_guest_info *info = (struct kvmdt_guest_info *)handle;
-    struct kvm *kvm = NULL;
-    int idx, ret;
-    bool kthread = (current->mm == NULL);
-    mm_segment_t old_fs = get_fs();
-
-    if (!handle_valid(handle)) {
-        return -ESRCH;
-    }
-
-    kvm = info->kvm;
-    if (kthread) {
-        if (!mmget_not_zero(kvm->mm)) {
-            return -EFAULT;
-        }
-        USE_MM(kvm->mm);
-    }
-
-    idx = srcu_read_lock(&kvm->srcu);
-    set_fs(USER_DS);
-    if (write) {
-        ret = kvm_write_guest(kvm, gpa, buf, len);
-    } else {
-        ret = kvm_read_guest(kvm, gpa, buf, len);
-    }
-    set_fs(old_fs);
-    srcu_read_unlock(&kvm->srcu, idx);
-
-    if (kthread) {
-        UNUSE_MM(kvm->mm);
-        mmput(kvm->mm);
-    }
-    return ret;
-}
-#endif
-#endif
-
-#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(5,19,0)))
 STATIC int kvmdt_rw_gpa_common(uintptr_t handle, unsigned long gpa,
                                void *buf, unsigned long len, bool write)
 {
-    int ret;
     struct kvmdt_guest_info *info = NULL;
-    int (*vfio_dma_rw_fn)(struct vfio_device *device, dma_addr_t iova,
-                          void *data, size_t len, bool write);
 
     if (!handle_valid(handle)) {
         return -ESRCH;
     }
-
     info = (struct kvmdt_guest_info *)handle;
-
-    vfio_dma_rw_fn = symbol_get(vfio_dma_rw);
-    if (!vfio_dma_rw_fn) {
-        return -EINVAL;
-    }
-    ret = vfio_dma_rw_fn(info->vdavinci->vdev.vfio_device, gpa, buf, len, write);
-    symbol_put(vfio_dma_rw);
-
-    return ret;
+    return vdavinci_rw_gpa(info, gpa, buf, len, write);
 }
-#elif ((LINUX_VERSION_CODE >= KERNEL_VERSION(5,7,0)))
-STATIC int kvmdt_rw_gpa_common(uintptr_t handle, unsigned long gpa,
-                               void *buf, unsigned long len, bool write)
-{
-    int ret;
-    struct kvmdt_guest_info *info = NULL;
-    int (*vfio_dma_rw_fn)(struct vfio_group *group, dma_addr_t user_iova,
-                          void *data, size_t len, bool write);
-
-    if (!handle_valid(handle)) {
-        return -ESRCH;
-    }
-
-    info = (struct kvmdt_guest_info *)handle;
-
-    vfio_dma_rw_fn = symbol_get(vfio_dma_rw);
-    if (!vfio_dma_rw_fn) {
-        return -EINVAL;
-    }
-    ret = vfio_dma_rw_fn(info->vdavinci->vdev.vfio_group, gpa, buf, len, write);
-    symbol_put(vfio_dma_rw);
-    return ret;
-}
-#else
-STATIC int kvmdt_rw_gpa_common(uintptr_t handle, unsigned long gpa,
-                               void *buf, unsigned long len, bool write)
-{
-    return kvmdt_rw_gpa(handle, gpa, buf, len, write);
-}
-#endif
 
 STATIC int kvmdt_read_gpa(uintptr_t handle, unsigned long gpa,
                           void *buf, unsigned long len)
@@ -1451,18 +1151,13 @@ STATIC int kvmdt_write_gpa(uintptr_t handle, unsigned long gpa,
     return kvmdt_rw_gpa_common(handle, gpa, buf, len, true);
 }
 
-#if ((LINUX_VERSION_CODE < KERNEL_VERSION(4,18,0)) && (!defined(DRV_UT)))
 STATIC unsigned long kvmdt_gfn_to_mfn(uintptr_t handle, unsigned long gfn)
 {
-    return 0;
-}
-#else
-STATIC unsigned long kvmdt_gfn_to_mfn(uintptr_t handle, unsigned long gfn)
-{
+    unsigned long pfn = 0;
+#if (IS_VDAVINCI_KERNEL_VERSION_SUPPORT || (defined(DRV_UT)))
     struct kvmdt_guest_info *info = (struct kvmdt_guest_info *)handle;
-    unsigned long pfn;
     struct kvm *kvm = NULL;
-    bool kthread = (current->mm == NULL);
+    bool kthread = (ka_task_get_current_mm() == NULL);
 
     if (!handle_valid(handle)) {
         return ~0;
@@ -1473,22 +1168,22 @@ STATIC unsigned long kvmdt_gfn_to_mfn(uintptr_t handle, unsigned long gfn)
         if (!mmget_not_zero(kvm->mm)) {
             return ~0;
         }
-        USE_MM(kvm->mm);
+        vdavinci_use_mm(kvm->mm);
     }
 
     pfn = gfn_to_pfn(info->kvm, gfn);
 
     if (kthread) {
-        UNUSE_MM(kvm->mm);
+        vdavinci_unuse_mm(kvm->mm);
         mmput(kvm->mm);
     }
 
     if (is_error_noslot_pfn(pfn)) {
         return ~0;
     }
+#endif
     return pfn;
 }
-#endif
 
 STATIC int kvmdt_guest_init(struct mdev_device *mdev)
 {
@@ -1502,7 +1197,7 @@ STATIC int kvmdt_guest_init(struct mdev_device *mdev)
     }
 
     kvm = vdavinci->vdev.kvm;
-    if (kvm == NULL || kvm->mm != current->mm) {
+    if (kvm == NULL || kvm->mm != ka_task_get_current_mm()) {
         vascend_err(vdavinci_to_dev(vdavinci), "KVM is required to use huawei vdavinci, "
             "vid: %u\n", vdavinci->id);
         return -ESRCH;
@@ -1512,7 +1207,7 @@ STATIC int kvmdt_guest_init(struct mdev_device *mdev)
     if (info == NULL) {
         return -ENOMEM;
     }
-
+    mutex_init(&vdavinci->vdev.cache_lock);
     vdavinci->handle = (uintptr_t)info;
     info->vdavinci = vdavinci;
     info->kvm = kvm;
@@ -1528,12 +1223,8 @@ STATIC void hw_vdavinci_release_vm_domain(struct hw_vdavinci *vdavinci)
     struct vm_dom_info *vm_dom =
                 (struct vm_dom_info *)vdavinci->vdev.domain;
 
-    if (vm_dom) {
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,11,0))
-        if (refcount_dec_and_mutex_lock(&vm_dom->ref.refcount, g_vm_domains_lock)) {
-#else
-        if (atomic_dec_and_test(&vm_dom->ref.refcount)) {
-#endif
+    if (vm_dom != NULL) {
+        if (vdavinci_refcount_mutex_lock(&vm_dom->ref, g_vm_domains_lock)) {
             mutex_unlock(g_vm_domains_lock);
 
             hw_vdavinci_unpin_pages(vdavinci);
@@ -1552,6 +1243,7 @@ STATIC void kvmdt_guest_exit(struct kvmdt_guest_info *info)
     kvm_put_kvm(info->kvm);
     hw_vdavinci_dma_pool_uninit(info->vdavinci);
     hw_vdavinci_release_vm_domain(info->vdavinci);
+    mutex_destroy(&info->vdavinci->vdev.cache_lock);
     vfree(info);
 }
 
@@ -1600,50 +1292,51 @@ STATIC int kvmdt_get_mmio_info(void **dst, int *size, void *_vdavinci, int bar)
     return 0;
 }
 
+STATIC bool is_vcpu_thread(struct task_struct *task)
+{
+    return strstarts(task->comm, "CPU ");
+}
+
 bool get_node_cpu_by_page(struct hw_vdavinci *vdavinci,
                           unsigned int current_cpu,
                           struct page *page,
                           struct cpumask *cpumask)
 {
 #ifdef CONFIG_NUMA
-#define VDAVINCI_KVM_CPU_SIGN           "CPU "
-#define VDAVINCI_KVM_CPU_SIGN_COUNT     4
     unsigned int cpu = 0;
     struct task_struct *me = NULL;
     struct task_struct *thread = NULL;
     int page_node = page_to_nid(page);
     struct task_struct *qemu_task = vdavinci->qemu_task;
+    struct cpumask *thread_mask;
 
     if (page_node == cpu_to_node(current_cpu)) {
         return false;
     }
-
     me = qemu_task;
     thread = me;
     do {
-        if (strncmp(thread->comm, VDAVINCI_KVM_CPU_SIGN, VDAVINCI_KVM_CPU_SIGN_COUNT) == 0) {
-            cpu = task_cpu(thread);
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,3,0))
-            cpumask_or(&(vdavinci->vm_cpus_mask), &(vdavinci->vm_cpus_mask),
-                       &(thread->cpus_mask));
-#endif
-            if (cpu_to_node(cpu) == page_node) {
-                cpumask_set_cpu(cpu, cpumask);
-            }
+        if (!is_vcpu_thread(thread)) {
+            continue;
         }
+        cpu = task_cpu(thread);
+        if (cpu_to_node(cpu) == page_node) {
+            cpumask_set_cpu(cpu, cpumask);
+        }
+        thread_mask = vdavinci_get_cpumask(thread);
+        cpumask_or(&(vdavinci->vm_cpus_mask), &(vdavinci->vm_cpus_mask), thread_mask);
     } while_each_thread(me, thread);
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,3,0))
     for_each_cpu(cpu, &(vdavinci->vm_cpus_mask)) {
         if (cpu_to_node(cpu) == page_node) {
             cpumask_set_cpu(cpu, cpumask);
         }
     }
-    for_each_cpu(cpu, &(qemu_task->cpus_mask)) {
+    thread_mask = vdavinci_get_cpumask(qemu_task);
+    for_each_cpu(cpu, thread_mask) {
         if (cpu_to_node(cpu) == page_node) {
             cpumask_set_cpu(cpu, cpumask);
         }
     }
-#endif /* KERNEL_VERSION(5,3,0) */
 #endif /* CONFIG_NUMA */
     return true;
 }

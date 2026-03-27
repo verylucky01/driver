@@ -26,7 +26,8 @@ struct trs_res_id_ctx {
     struct res_id_usr_info *res_id_info;
 };
 
-static struct trs_res_id_ctx res_id_ctx[TRS_DEV_NUM][TRS_TS_NUM][DRV_INVALID_ID];
+static struct trs_res_id_ctx res_id_ctx[TRS_DEV_NUM][TRS_TS_NUM][DRV_INVALID_ID] = {0};
+static int trs_dev_single_res_id_init(uint32_t dev_id, drvIdType_t id_type);
 
 static struct trs_res_id_ctx *trs_get_res_id_ctx(uint32_t dev_id, uint32_t ts_id, drvIdType_t type)
 {
@@ -69,13 +70,12 @@ static struct res_id_usr_info *_trs_get_res_id_info(uint32_t dev_id, uint32_t ts
 {
     struct trs_res_id_ctx *ctx = trs_get_res_id_ctx(dev_id, ts_id, type);
 
-    if (id >= ctx->res_id_num) {
-        trs_err("Invalid id. (dev_id=%u; ts_id=%u; type=%d; id=%u)\n", dev_id, ts_id, type, id);
+    if (ctx->res_id_info == NULL) {
         return NULL;
     }
 
-    if (ctx->res_id_info == NULL) {
-        trs_err("Not init. (dev_id=%u; ts_id=%u; type=%d; id=%u)\n", dev_id, ts_id, type, id);
+    if (id >= ctx->res_id_num) {
+        trs_err("Invalid id. (dev_id=%u; ts_id=%u; type=%d; id=%u)\n", dev_id, ts_id, type, id);
         return NULL;
     }
 
@@ -134,22 +134,6 @@ drvError_t __attribute__((weak)) halResAddrUnmap(unsigned int devId, struct res_
     return DRV_ERROR_NONE;
 }
 #endif
-
-static int trs_res_id_info_init(uint32_t dev_id, drvIdType_t type, struct trs_res_id_para *para)
-{
-    struct res_id_usr_info *id_info = NULL;
-
-    id_info = _trs_get_res_id_info(dev_id, para->tsid, type, para->id);
-    if (id_info == NULL) {
-        return DRV_ERROR_UNINIT;
-    }
-
-    id_info->valid = 1;
-    id_info->res_addr = 0;
-    id_info->res_len = 0;
-    return DRV_ERROR_NONE;
-}
-
 
 int trs_res_map_reg_init(uint32_t dev_id, uint32_t ts_id, uint32_t res_id, drvIdType_t type, struct res_id_usr_info *id_info)
 {
@@ -226,6 +210,40 @@ static void trs_res_id_info_un_init(uint32_t dev_id, uint32_t ts_id, uint32_t re
     id_info->valid = 0;
     id_info->res_addr = 0;
     id_info->res_len = 0;
+    id_info->priv = 0;
+}
+
+static int _trs_res_id_info_init(uint32_t dev_id, uint32_t ts_id, uint32_t res_id, drvIdType_t type,
+    struct res_id_info_val *id_info_val)
+{
+    struct res_id_usr_info *id_info = NULL;
+
+    id_info = _trs_get_res_id_info(dev_id, ts_id, type, res_id);
+    if (id_info == NULL) {
+        return DRV_ERROR_UNINIT;
+    }
+
+    id_info->res_len = id_info_val->res_len;
+    id_info->res_addr = id_info_val->res_addr;
+    id_info->valid = 1;
+    return DRV_ERROR_NONE;
+}
+
+int trs_res_id_info_init(uint32_t dev_id, uint32_t ts_id, uint32_t res_id, drvIdType_t type,
+    struct res_id_info_val *id_info_val)
+{
+    struct trs_res_id_ctx *ctx = NULL;
+    int ret = 0;
+
+    ctx = trs_get_res_id_ctx(dev_id, ts_id, type);
+    if (ctx->res_id_info == NULL) {
+        ret = trs_dev_single_res_id_init(dev_id, type);
+        if (ret != 0) {
+            return ret;
+        }
+    }
+
+    return _trs_res_id_info_init(dev_id, ts_id, res_id, type, id_info_val);
 }
 
 static int trs_res_type_init(uint32_t dev_id, uint32_t ts_id, int id_type, struct res_id_usr_info **id_info, uint32_t *id_num)
@@ -316,8 +334,32 @@ static void trs_ts_res_id_un_init(uint32_t dev_id, uint32_t ts_id)
 
     for (type = 0; type < DRV_INVALID_ID; type++) {
         ctx = trs_get_res_id_ctx(dev_id, ts_id, type);
-        trs_res_type_un_init(dev_id, ts_id, type, &ctx->res_id_info, &ctx->res_id_num);
+        if (ctx->res_id_info != NULL) {
+            trs_res_type_un_init(dev_id, ts_id, type, &ctx->res_id_info, &ctx->res_id_num);
+        }
     }
+}
+
+static int trs_dev_single_res_id_init(uint32_t dev_id, drvIdType_t id_type)
+{
+    uint32_t ts_num = trs_get_ts_num(dev_id);
+    uint32_t i, j;
+    int ret;
+
+    for (i = 0; i < ts_num; i++) {
+        struct trs_res_id_ctx *ctx = trs_get_res_id_ctx(dev_id, i, id_type);
+        ret = trs_res_type_init(dev_id, i, trs_get_res_id_type(id_type), &ctx->res_id_info, &ctx->res_id_num);
+        if (ret != DRV_ERROR_NONE) {
+            for (j = 0; j < i; j++) {
+                ctx = trs_get_res_id_ctx(dev_id, j, id_type);
+                trs_res_type_un_init(dev_id, j, id_type, &ctx->res_id_info, &ctx->res_id_num);
+            }
+            return ret;
+        }
+    }
+
+    trs_info("Res id init. (devid=%u; id_type=%d)\n", dev_id, id_type);
+    return 0;
 }
 
 int trs_dev_res_id_init(uint32_t dev_id)
@@ -349,10 +391,6 @@ void trs_dev_res_id_uninit(uint32_t dev_id)
 {
     uint32_t ts_num = trs_get_ts_num(dev_id);
     uint32_t ts_id;
-
-    if (trs_get_connection_type(dev_id) != TRS_CONNECT_PROTOCOL_UB) {
-        return;
-    }
 
     for (ts_id = 0; ts_id < ts_num; ts_id++) {
         trs_ts_res_id_un_init(dev_id, ts_id);
@@ -441,7 +479,8 @@ static drvError_t trs_local_res_alloc(uint32_t dev_id, struct halResourceIdInput
     if (ret == DRV_ERROR_NONE) {
         if ((trs_get_connection_type(dev_id) == TRS_CONNECT_PROTOCOL_UB) &&
             ((in->type == DRV_NOTIFY_ID) || (in->type == DRV_CNT_NOTIFY_ID))) {
-            ret = trs_res_id_info_init(dev_id, in->type, &para);
+            struct res_id_info_val id_info_val = {0};
+            ret = _trs_res_id_info_init(dev_id, para.tsid, para.id, in->type, &id_info_val);
             if (ret != 0) {
                 trs_err("Failed to init res id info. (dev_id=%u; type=%d; id=%u)\n", dev_id, in->type, para.id);
                 return ret;
@@ -529,8 +568,8 @@ static drvError_t trs_res_free_para_check(uint32_t dev_id, struct halResourceIdI
         return DRV_ERROR_INVALID_VALUE;
     }
 
-    if ((dev_id >= TRS_DEV_NUM) || (in->type >= DRV_INVALID_ID)) {
-        trs_err("Invalid para. (dev_id=%u; res_type=%d)\n", dev_id, in->type);
+    if ((dev_id >= TRS_DEV_NUM) || (in->type >= DRV_INVALID_ID) || (in->tsId >= TRS_TS_NUM)) {
+        trs_err("Invalid para. (dev_id=%u; res_type=%d; ts_id=%u)\n", dev_id, in->type, in->tsId);
         return DRV_ERROR_INVALID_VALUE;
     }
     return DRV_ERROR_NONE;
@@ -553,8 +592,8 @@ static drvError_t trs_local_res_free(uint32_t dev_id, struct halResourceIdInputI
 
     trs_res_fill_ioctrl_para(in, &para);
 
-    if ((trs_get_connection_type(dev_id) == TRS_CONNECT_PROTOCOL_UB) &&
-        ((in->type == DRV_NOTIFY_ID) || (in->type == DRV_CNT_NOTIFY_ID))) {
+    if (((trs_get_connection_type(dev_id) == TRS_CONNECT_PROTOCOL_UB) &&
+        ((in->type == DRV_NOTIFY_ID) || (in->type == DRV_CNT_NOTIFY_ID))) || (in->type == DRV_STREAM_ID)) {
         trs_res_id_info_un_init(dev_id, in->tsId, in->resourceId, in->type);
     }
 
@@ -838,23 +877,4 @@ drvError_t halResourceDetailQuery(uint32_t devId, struct halResourceIdInputInfo 
                 devId, in->tsId, in->type, info->type);
             return DRV_ERROR_INVALID_VALUE;
     }
-}
-
-drvError_t trs_stream_task_fill(uint32_t dev_id, uint32_t stream_id, void *stream_mem, void *task_info, uint32_t task_cnt)
-{
-    struct trs_stream_task_para para = {0};
-    drvError_t ret;
-
-    para.stream_id = stream_id;
-    para.stream_mem = stream_mem;
-    para.task_info = task_info;
-    para.task_cnt = task_cnt;
-    ret = trs_dev_io_ctrl(dev_id, TRS_STREAM_TASK_FILL, &para);
-    if (ret != 0) {
-        trs_err("Ioctl failed. (dev_id=%u; ret=%d)\n", dev_id, ret);
-        return ret;
-    }
-
-    trs_debug("Fill stream task success. (dev_id=%u; stream_id=%u; task_cnt=%u)\n", dev_id, stream_id, task_cnt);
-    return DRV_ERROR_NONE;
 }

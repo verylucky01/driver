@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -15,22 +15,24 @@
 #define __DAVINCI_INTF_PROCESS_H__
 
 #include "ka_task_pub.h"
+#include "ka_common_pub.h"
+#include "ka_memory_pub.h"
 
-#ifndef __GFP_ACCOUNT
+#ifndef __KA_GFP_ACCOUNT
 #  ifdef __GFP_KMEMCG
-#    define __GFP_ACCOUNT __GFP_KMEMCG /* for linux version 3.10 */
+#    define __KA_GFP_ACCOUNT __GFP_KMEMCG /* for linux version 3.10 */
 #  endif
 #  ifdef __GFP_NOACCOUNT
-#    define __GFP_ACCOUNT 0 /* for linux version 4.1 */
+#    define __KA_GFP_ACCOUNT 0 /* for linux version 4.1 */
 #  endif
 #endif
 
 struct davinci_intf_file_stru *create_file_proc_entry(
     struct davinci_intf_process_stru *proc,
-    struct file *file);
+    ka_file_t *file);
 struct davinci_intf_file_stru *get_file_proc_entry(
     struct davinci_intf_process_stru *proc,
-    struct file *file);
+    ka_file_t *file);
 unsigned int get_file_module_cnt(struct davinci_intf_process_stru *proc, const char *module_name);
 
 void destory_file_proc_list(struct davinci_intf_process_stru *proc);
@@ -47,15 +49,15 @@ struct davinci_intf_process_stru *get_process_entry_latest(
     ka_pid_t proc_pid);
 void free_process_entry(struct davinci_intf_process_stru *proc);
 void destroy_process_list(struct davinci_intf_stru *cb);
-int add_file_to_list(struct davinci_intf_stru *cb, struct file *file,
+int add_file_to_list(struct davinci_intf_stru *cb, ka_file_t *file,
     struct davinci_intf_private_stru *private_data);
 int add_module_to_list(struct davinci_intf_stru *cb,
     struct davinci_intf_private_stru *file_private,
-    struct file *file,
+    ka_file_t *file,
     const char *module_name);
 void remove_file_from_list(struct davinci_intf_stru *cb,
     ka_pid_t owner_pid,
-    struct file *file);
+    ka_file_t *file);
 int check_module_file_close(struct davinci_intf_stru *cb,
     const char *module_name);
 int check_module_file_close_in_process(

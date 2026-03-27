@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -19,6 +19,7 @@
 #ifndef EMU_ST
 #include "devdrv_common.h"
 #include "pbl/pbl_board_config.h"
+#include "pbl/pbl_chip_config.h"
 #endif
 
 #include "trs_pub_def.h"
@@ -56,8 +57,8 @@ static int shr_id_get_notify_base_addr(u32 devid, u32 remote_phy_id, u64 *base_a
     }
 
     if ((topology_type == TOPOLOGY_HCCS) || (topology_type == TOPOLOGY_SIO) || (topology_type == TOPOLOGY_HCCS_SW)) {
-        struct devdrv_info *info;
-        info = devdrv_manager_get_devdrv_info(remote_phy_id);
+        struct dbl_dev_base_info *info;
+        info = dbl_get_dev_base_info(remote_phy_id);
         if (info == NULL) {
             trs_err("Get chipid failed. (remote_phy_id=%u)\n", remote_phy_id);
             return -EINVAL;

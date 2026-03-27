@@ -8,7 +8,7 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # ------------------------------------------------------------------------------------------------------------
 EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/kernel_adapt/include
-MODULE_NAME := drv_vascend_stub
+MODULE_NAME := asdrv_vascend_adapt
 obj-m += ${MODULE_NAME}.o
 ${MODULE_NAME}-objs := interface_stub.o hw_dvt_stub.o
 

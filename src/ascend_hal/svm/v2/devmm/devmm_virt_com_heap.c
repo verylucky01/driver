@@ -450,7 +450,7 @@ STATIC void devmm_merge_unmap_free_node_to_va_node(uint64_t va, struct devmm_rbt
 
     /* try to merge va to node */
     node_tmp = devmm_rbtree_get_idle_va_node_in_range(va, rbtree_queue);
-    if ((node_tmp != NULL) && devmm_node_flag_is_first_va(node_tmp) && !devmm_node_flag_is_mapped(node_tmp)) {
+    if ((node_tmp != NULL) && ((devmm_node_flag_is_first_va(node_tmp) && !devmm_node_flag_is_mapped(node_tmp))))  {
         /* merge left node need update va */
         node->data.va = node->data.va > node_tmp->data.va ? node_tmp->data.va : node->data.va;
         node->data.size += node_tmp->data.size;
@@ -1275,8 +1275,9 @@ DVresult devmm_free_mem(uint64_t va, struct devmm_virt_com_heap *heap, uint64_t 
     }
     *free_len = node->data.size;
     memtype = devmm_node_flag_get_memtype(node->data.flag);
-    if ((node->data.size == node->data.total) && ((node->data.total > heap->need_cache_thres[memtype]) ||
-        devmm_node_flag_is_nocache(node->data.flag))) {
+
+    if (((node->data.size == node->data.total) && ((node->data.total > heap->need_cache_thres[memtype]) ||
+        devmm_node_flag_is_nocache(node->data.flag)))) {
         ret = devmm_free_nocache_mem_process(va, heap, node, memtype);
         if (ret != DRV_ERROR_NONE) {
             devmm_rollback_mem_node_to_alloced_tree(heap, node);

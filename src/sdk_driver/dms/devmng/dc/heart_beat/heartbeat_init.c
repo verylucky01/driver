@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,6 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
+#include "ka_dfx_pub.h"
+
 #include "pbl/pbl_uda.h"
 #include "pbl/pbl_feature_loader.h"
 #include "dms/dms_notifier.h"
@@ -87,7 +89,7 @@ int heart_beat_device_resume(void *data)
     return 0;
 }
 
-STATIC int heart_beat_notifier(struct notifier_block *nb, unsigned long mode, void *data)
+STATIC int heart_beat_notifier(ka_notifier_block_t *nb, unsigned long mode, void *data)
 {
     int ret = 0;
 
@@ -109,7 +111,7 @@ STATIC int heart_beat_notifier(struct notifier_block *nb, unsigned long mode, vo
     return 0;
 }
 
-STATIC struct notifier_block g_heart_beat_notifier = {
+STATIC ka_notifier_block_t g_heart_beat_notifier = {
     .notifier_call = heart_beat_notifier,
 };
 

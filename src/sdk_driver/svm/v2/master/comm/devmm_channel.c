@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,7 +11,7 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/hugetlb.h>
+#include "ka_memory_pub.h"
 
 #include "svm_ioctl.h"
 #include "devmm_chan_handlers.h"
@@ -565,7 +565,7 @@ struct devmm_chan_handlers_st devmm_channel_msg_processes[DEVMM_CHAN_MAX_ID] = {
             sizeof(struct devmm_chan_target_blk_query),
             sizeof(struct devmm_target_blk),
             DEVMM_MSG_NOT_NEED_PROC_MASK
-        }
+        },
 };
 
 int devmm_notify_device_close_process(struct devmm_svm_process *svm_pro,

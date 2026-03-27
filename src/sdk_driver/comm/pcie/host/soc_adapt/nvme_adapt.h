@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -19,8 +19,8 @@
 #define DEVDRV_MSG_CHAN_DB_OFFSET 0x4     /* doorbell offset */
 #define DEVDRV_DB_QUEUE_TYPE 2
 
-void devdrv_set_sq_doorbell(void __iomem *io_base, u32 val);
-void devdrv_set_cq_doorbell(void __iomem *io_base, u32 val);
+void devdrv_set_sq_doorbell(void __ka_mm_iomem *io_base, u32 val);
+void devdrv_set_cq_doorbell(void __ka_mm_iomem *io_base, u32 val);
 
 
 #endif

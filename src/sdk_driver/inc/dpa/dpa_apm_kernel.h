@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,9 +14,9 @@
 #ifndef DPA_APM_KERNEL_H
 #define DPA_APM_KERNEL_H
 
-#include <linux/types.h>
-#include <linux/module.h>
-#include <linux/notifier.h>
+#include "ka_dfx_pub.h"
+#include "ka_common_pub.h"
+
 #include "dpa_pids_map.h"
 #include "pbl/pbl_task_ctx.h"
 
@@ -88,7 +88,7 @@ int apm_query_slave_ssid(u32 udevid, int slave_tgid, int *ssid);
    5: slave(cp) recycle resource
    6: master recycle resource
    7: use APM_STAGE_(PRE_)* to meet "master release before slave" scene
-   n->notifier_call: int exit_notify(struct notifier_block *self, unsigned long val, void *data)
+   n->notifier_call: int exit_notify(ka_notifier_block_t *self, unsigned long val, void *data)
                      val : stage+pid, data : null
    n->priority: 0, lowest pri */
 enum apm_exit_stage {
@@ -125,12 +125,12 @@ static inline bool apm_notify_task_exit(int tgid, struct task_start_time *time)
     return (apm_master_domain_check_set_pre_exit(tgid, time) || apm_slave_domain_check_set_pre_exit(tgid, time));
 }
 
-int apm_master_exit_register(struct notifier_block *n);
-void apm_master_exit_unregister(struct notifier_block *n);
-int apm_slave_exit_register(struct notifier_block *n);
-void apm_slave_exit_unregister(struct notifier_block *n);
-int apm_remote_master_exit_register(struct notifier_block *n);
-void apm_remote_master_exit_unregister(struct notifier_block *n);
+int apm_master_exit_register(ka_notifier_block_t *n);
+void apm_master_exit_unregister(ka_notifier_block_t *n);
+int apm_slave_exit_register(ka_notifier_block_t *n);
+void apm_slave_exit_unregister(ka_notifier_block_t *n);
+int apm_remote_master_exit_register(ka_notifier_block_t *n);
+void apm_remote_master_exit_unregister(ka_notifier_block_t *n);
 
 /* notifier_block->priority: the number larger, the priority higher */
 enum apm_task_exit_notify_pri {
@@ -144,7 +144,7 @@ enum apm_task_exit_notify_pri {
     APM_EXIT_NOTIFIY_PRI_APM_RES = 18
 };
 
-static inline int apm_task_exit_register(struct notifier_block *master_nb, struct notifier_block *slave_nb)
+static inline int apm_task_exit_register(ka_notifier_block_t *master_nb, ka_notifier_block_t *slave_nb)
 {
     int ret = 0;
 
@@ -161,7 +161,7 @@ static inline int apm_task_exit_register(struct notifier_block *master_nb, struc
     return ret;
 }
 
-static inline void apm_task_exit_unregister(struct notifier_block *master_nb, struct notifier_block *slave_nb)
+static inline void apm_task_exit_unregister(ka_notifier_block_t *master_nb, ka_notifier_block_t *slave_nb)
 {
     apm_slave_exit_unregister(slave_nb);
     apm_master_exit_unregister(master_nb);
@@ -176,12 +176,13 @@ static inline void apm_task_exit_unregister(struct notifier_block *master_nb, st
         device slave res map: device current slave task check, device current get res addr
 */
 struct apm_res_map_ops {
-    struct module *owner;
+    ka_module_t *owner;
     bool (*res_is_belong_to_proc)(int master_tgid, int slave_tgid, u32 udevid, struct res_map_info_in *res_info);
     int (*get_res_addr)(u32 udevid, struct res_map_info_in *res_info, u64 *pa, u32 *len);
     /* res is mem, may have multi pages, every pa len is one page, len res total len, must page align */
     int (*get_res_addr_array)(u32 udevid, struct res_map_info_in *res_info, u64 pa[], u32 num, u32 *len);
     void (*put_res_addr_array)(u32 udevid, struct res_map_info_in *res_info, u64 pa[], u32 len);
+    int (*update_res_info)(u32 udevid, struct res_map_info_in *res_info);
 };
 
 int hal_kernel_apm_res_map_ops_register(enum res_addr_type res_type, struct apm_res_map_ops *ops);

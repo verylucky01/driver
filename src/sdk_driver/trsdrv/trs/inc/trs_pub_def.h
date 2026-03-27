@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -73,46 +73,28 @@ struct trsModeInfo {
 #define module_trs "trs_drv"
 #define trs_err(fmt, ...) do { \
     drv_err(module_trs, "<%s:%d:%d:%d> " fmt, \
-        ka_task_get_current_comm(), ka_task_get_current_tgid(), ka_task_get_current_pid(), ka_system_smp_processor_id(), ##__VA_ARGS__); \
+        ka_task_get_current_comm(), ka_task_get_current_tgid(), ka_task_get_current_pid(), ka_system_raw_smp_processor_id(), ##__VA_ARGS__); \
     share_log_err(TSDRV_SHARE_LOG_START, fmt, ##__VA_ARGS__); \
 } while (0)
 #define trs_warn(fmt, ...) do { \
     drv_warn(module_trs, "<%s:%d:%d:%d> " fmt, \
-        ka_task_get_current_comm(), ka_task_get_current_tgid(), ka_task_get_current_pid(), ka_system_smp_processor_id(), ##__VA_ARGS__); \
+        ka_task_get_current_comm(), ka_task_get_current_tgid(), ka_task_get_current_pid(), ka_system_raw_smp_processor_id(), ##__VA_ARGS__); \
 } while (0)
 #define trs_info(fmt, ...) do { \
     drv_info(module_trs, "<%s:%d:%d:%d> " fmt, \
-        ka_task_get_current_comm(), ka_task_get_current_tgid(), ka_task_get_current_pid(), ka_system_smp_processor_id(), ##__VA_ARGS__); \
+        ka_task_get_current_comm(), ka_task_get_current_tgid(), ka_task_get_current_pid(), ka_system_raw_smp_processor_id(), ##__VA_ARGS__); \
 } while (0)
 #define trs_debug(fmt, ...) do { \
     drv_pr_debug(module_trs, "<%s:%d:%d:%d> " fmt, \
-        ka_task_get_current_comm(), ka_task_get_current_tgid(), ka_task_get_current_pid(), ka_system_smp_processor_id(), ##__VA_ARGS__); \
+        ka_task_get_current_comm(), ka_task_get_current_tgid(), ka_task_get_current_pid(), ka_system_raw_smp_processor_id(), ##__VA_ARGS__); \
 } while (0)
 
 #define trs_info_ratelimited(fmt, ...) do { \
     drv_info_ratelimited(module_trs, "<%s:%d:%d:%d> " fmt, \
-        ka_task_get_current_comm(), ka_task_get_current_tgid(), ka_task_get_current_pid(), ka_system_smp_processor_id(), ##__VA_ARGS__); \
+        ka_task_get_current_comm(), ka_task_get_current_tgid(), ka_task_get_current_pid(), ka_system_raw_smp_processor_id(), ##__VA_ARGS__); \
 } while (0)
 
-#ifndef __GFP_ACCOUNT
-#ifdef __GFP_KMEMCG
-#define __GFP_ACCOUNT __GFP_KMEMCG /* for linux version 3.10 */
-#endif
-
-#ifdef __GFP_NOACCOUNT
-#define __GFP_ACCOUNT 0 /* for linux version 4.1 */
-#endif
-#endif
-
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(4, 4, 0)
-static inline unsigned int kref_read(const ka_kref_t *kref)
-{
-    return ka_base_atomic_read(&kref->refcount);
-}
-
-#define ALIGN_DOWN(addr, size)  ((addr)&(~((size)-1)))
 #define PCI_VENDOR_ID_HUAWEI 0x19e5
-#endif
 
 #define TRS_KA_MODULE_ID_TYPE_0             ka_get_module_id(HAL_MODULE_TYPE_TS_DRIVER, KA_SUB_MODULE_TYPE_0)
 #define TRS_KA_MODULE_ID_TYPE_1             ka_get_module_id(HAL_MODULE_TYPE_TS_DRIVER, KA_SUB_MODULE_TYPE_1)
@@ -278,7 +260,7 @@ static inline bool trs_bitmap_bit_is_vaild(u32 bitmap, u32 bit)
 static inline void trs_try_resched(unsigned long *cur_jiffies, unsigned long timeout_ms)
 {
     unsigned long interval = ka_system_jiffies_to_msecs(ka_jiffies - *cur_jiffies);
-    if (interval > timeout_ms) {
+    if ((interval > timeout_ms) && !ka_base_in_atomic()) {
         ka_task_cond_resched();
         *cur_jiffies = ka_jiffies;
     }
@@ -290,14 +272,14 @@ bool trs_is_reboot_active(void);
 
 #define TRS_INIT_REBOOT_NOTIFY              \
 static bool g_trs_active_reboot = false;    \
-static int trs_reboot_notify_handle(struct notifier_block *notifier, unsigned long event, void *data)   \
+static int trs_reboot_notify_handle(ka_notifier_block_t *notifier, unsigned long event, void *data)   \
 {                                                                                                       \
     if (event != SYS_RESTART && event != SYS_HALT && event != SYS_POWER_OFF) {                          \
-        return NOTIFY_DONE;                                                                             \
+        return KA_NOTIFY_DONE;                                                                             \
     }                                                                                                   \
                                                                                                         \
     g_trs_active_reboot = true;                                                                         \
-    return NOTIFY_OK;                                                                                   \
+    return KA_NOTIFY_OK;                                                                                   \
 }                                                                                                       \
                                                                                                         \
 static ka_notifier_block_t trs_reboot_notifier = {                                                    \

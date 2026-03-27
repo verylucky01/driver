@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,9 +10,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
-#include <linux/errno.h>
-#include <linux/slab.h>
 #include "dms_event_distribute.h"
 #include "dms_event_converge.h"
 #include "dms_event_distribute_proc.h"
@@ -28,6 +25,8 @@
 #include "ka_base_pub.h"
 #include "ka_hashtable_pub.h"
 #include "ka_kernel_def_pub.h"
+#include "ka_common_pub.h"
+
 #ifndef DMS_DEVICE_ST
 #include "dms_converge_config.h"
 #else
@@ -129,7 +128,7 @@ static int dms_event_obj_to_event_code(struct dms_event_obj *event_obj,
 {
     unsigned int owner_node_type;
     exception_node->event.event_code = 0;
-#ifdef CFG_HOST_ENV
+#ifdef CFG_EDGE_HOST
     exception_node->event.event_code |= DMS_EVENT_CODE_ENVIRONMENT_HOST;
 #else
     exception_node->event.event_code |= DMS_EVENT_CODE_ENVIRONMENT_DEVICE;
@@ -239,8 +238,8 @@ static int dms_sensor_reported_resume(struct dms_sensor_reported_list *reported_
     DMS_EVENT_NODE_STRU *exception_node)
 {
     struct dms_event_sensor_reported *event_node = NULL;
-    struct list_head *pos = NULL;
-    struct list_head *n = NULL;
+    ka_list_head_t *pos = NULL;
+    ka_list_head_t *n = NULL;
 
     ka_task_mutex_lock(&reported_list->lock);
     if (ka_list_empty_careful(&reported_list->head) != DRV_ERROR_NONE) {
@@ -283,8 +282,8 @@ static int dms_sensor_reported_occur(struct dms_sensor_reported_list *reported_l
     DMS_EVENT_NODE_STRU *exception_node)
 {
     struct dms_event_sensor_reported *event_node = NULL;
-    struct list_head *pos = NULL;
-    struct list_head *n = NULL;
+    ka_list_head_t *pos = NULL;
+    ka_list_head_t *n = NULL;
 
     ka_task_mutex_lock(&reported_list->lock);
     if (reported_list->reported_num > DMS_MAX_EVENT_NUM) {
@@ -488,7 +487,7 @@ ssize_t dms_event_print_convergent_diagrams(u32 devid, char opt, char *str)
     int len, ret;
     int avl_len = EVENT_DFX_BUF_SIZE_MAX;
     EVENT_CONVERGE_NODE_T *convergent_node = NULL;
-    struct hlist_node *local_node = NULL;
+    ka_hlist_node_t *local_node = NULL;
     char *refill_buf = str;
     u32 bkt;
 
@@ -542,7 +541,7 @@ ssize_t dms_event_print_event_list(u32 devid, char *str)
     int len;
     int avl_len = EVENT_DFX_BUF_SIZE_MAX;
     struct dms_dev_ctrl_block *dev_cb = NULL;
-    struct list_head *pos = NULL, *n = NULL;
+    ka_list_head_t *pos = NULL, *n = NULL;
     DMS_EVENT_NODE_STRU *event_node = NULL;
     char *refill_buf = str;
 
@@ -737,7 +736,7 @@ int dms_event_convergent_item_init(unsigned int item_converge_id[], unsigned int
 STATIC bool dms_event_convergent_diagrams_layer_check(void)
 {
     EVENT_CONVERGE_NODE_T *convergent_node = NULL;
-    struct hlist_node *local_node = NULL;
+    ka_hlist_node_t *local_node = NULL;
     u32 protect_i = 0;
     u32 bkt, layer;
 
@@ -814,7 +813,7 @@ int dms_event_convergent_diagrams_init(void)
 void dms_event_convergent_diagrams_exit(void)
 {
     EVENT_CONVERGE_NODE_T *event_node = NULL;
-    struct hlist_node *local_node = NULL;
+    ka_hlist_node_t *local_node = NULL;
     u32 bkt, i;
 
     /* to avoid double free */
@@ -844,7 +843,7 @@ int dms_event_convergent_diagrams_clear(u32 devid, bool hotreset)
 {
     struct dms_dev_ctrl_block *dev_cb = NULL;
     EVENT_CONVERGE_NODE_T *event_node = NULL;
-    struct hlist_node *local_node = NULL;
+    ka_hlist_node_t *local_node = NULL;
     u32 bkt;
 
     dev_cb = dms_get_dev_cb(devid);
@@ -878,7 +877,7 @@ int dms_event_convergent_diagrams_clear(u32 devid, bool hotreset)
 STATIC void dms_event_clear_reported_list(struct dms_sensor_reported_list *reported_list, int owner_pid)
 {
     struct dms_event_sensor_reported *event_node = NULL;
-    struct list_head *pos = NULL, *n = NULL;
+    ka_list_head_t *pos = NULL, *n = NULL;
 
     ka_task_mutex_lock(&reported_list->lock);
     ka_list_for_each_safe(pos, n, &reported_list->head) {
@@ -900,8 +899,8 @@ void dms_event_cb_release(int owner_pid)
 {
     u32 i;
     struct dms_dev_ctrl_block *dev_cb = NULL;
-    struct list_head *pos = NULL;
-    struct list_head *n = NULL;
+    ka_list_head_t *pos = NULL;
+    ka_list_head_t *n = NULL;
     DMS_EVENT_NODE_STRU *event_node = NULL;
     struct dms_converge_event_list *converge_list = NULL;
 
@@ -939,8 +938,8 @@ KA_EXPORT_SYMBOL(dms_event_cb_release);
 void dms_event_mask_del_to_event_cb(u32 phyid, struct dms_dev_ctrl_block *dev_cb, u32 event_id)
 {
     struct dms_converge_event_list *converge_list = NULL;
-    struct list_head *pos = NULL;
-    struct list_head *n = NULL;
+    ka_list_head_t *pos = NULL;
+    ka_list_head_t *n = NULL;
     DMS_EVENT_NODE_STRU *event_node = NULL;
 
     converge_list = &dev_cb->dev_event_cb.event_list;
@@ -1024,8 +1023,8 @@ void dms_event_add_to_mask_list(struct dms_dev_ctrl_block *dev_cb, u32 event_id)
 
 void dms_event_del_to_mask_list(struct dms_dev_ctrl_block *dev_cb, u32 event_id)
 {
-    struct list_head *pos = NULL;
-    struct list_head *n = NULL;
+    ka_list_head_t *pos = NULL;
+    ka_list_head_t *n = NULL;
     struct dms_mask_event *mask_event = NULL;
 
     ka_task_mutex_lock(&dev_cb->dev_event_cb.dfx_table.lock);
@@ -1047,8 +1046,8 @@ void dms_event_del_to_mask_list(struct dms_dev_ctrl_block *dev_cb, u32 event_id)
 
 void dms_event_mask_list_clear(struct dms_dev_ctrl_block *dev_cb)
 {
-    struct list_head *pos = NULL;
-    struct list_head *n = NULL;
+    ka_list_head_t *pos = NULL;
+    ka_list_head_t *n = NULL;
     struct dms_mask_event *mask_event = NULL;
 
     ka_task_mutex_lock(&dev_cb->dev_event_cb.dfx_table.lock);
@@ -1068,8 +1067,8 @@ ssize_t dms_event_print_mask_list(u32 devid, char *str)
     int len;
     int avl_len = EVENT_DFX_BUF_SIZE_MAX;
     struct dms_dev_ctrl_block *dev_cb = NULL;
-    struct list_head *pos = NULL;
-    struct list_head *n = NULL;
+    ka_list_head_t *pos = NULL;
+    ka_list_head_t *n = NULL;
     struct dms_mask_event *mask_event = NULL;
     char *refill_buf = str;
 
@@ -1284,8 +1283,8 @@ static int dms_event_converge_resume_add_to_cb(struct dms_dev_ctrl_block *dev_cb
     DMS_EVENT_NODE_STRU *exception_node)
 {
     struct dms_converge_event_list *converge_list = NULL;
-    struct list_head *pos = NULL;
-    struct list_head *n = NULL;
+    ka_list_head_t *pos = NULL;
+    ka_list_head_t *n = NULL;
     DMS_EVENT_NODE_STRU *event_node = NULL;
 
     converge_list = &dev_cb->dev_event_cb.event_list;
@@ -1329,8 +1328,8 @@ static int dms_event_converge_occur_add_to_cb(struct dms_dev_ctrl_block *dev_cb,
     DMS_EVENT_NODE_STRU *exception_node)
 {
     struct dms_converge_event_list *converge_list = NULL;
-    struct list_head *pos = NULL;
-    struct list_head *n = NULL;
+    ka_list_head_t *pos = NULL;
+    ka_list_head_t *n = NULL;
     DMS_EVENT_NODE_STRU *event_node = NULL;
     DMS_EVENT_NODE_STRU *tmp_node = NULL;
 
@@ -1443,8 +1442,8 @@ int dms_get_event_code_from_event_cb(u32 devid, u32 *health_code, u32 health_len
     struct shm_event_code *event_code, u32 event_len)
 {
     struct dms_dev_ctrl_block *dev_cb = NULL;
-    struct list_head *pos = NULL;
-    struct list_head *n = NULL;
+    ka_list_head_t *pos = NULL;
+    ka_list_head_t *n = NULL;
     DMS_EVENT_NODE_STRU *event_node = NULL;
     unsigned int i = 0;
 

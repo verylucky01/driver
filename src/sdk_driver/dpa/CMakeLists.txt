@@ -15,8 +15,12 @@ else()
 endif ()
 
 # APM_DEPEND
-if(${PRODUCT} STREQUAL ascend910_95)
+if(${PRODUCT} STREQUAL ascend950)
     set(ascend_apm_host_depends asdrv_pbl drv_seclib_host)
+endif ()
+
+if(${PRODUCT} STREQUAL ascend910B OR ${PRODUCT} STREQUAL ascend950)
+    set(ascend_rmo_host_depends drv_seclib_host drv_pcie_host asdrv_pbl ascend_kernel_open_adapt)
 endif ()
 
 # UDIS_DEPEND
@@ -25,4 +29,4 @@ set(ascend_udis_depends drv_seclib_host asdrv_pbl drv_pcie_host ascend_kernel_op
 add_host_ko(LOCAL_MODULE asdrv_dpa
     KO_SRC_FOLDER ${CMAKE_CURRENT_SOURCE_DIR}
     MAKE_ARGS ${MAKE_ARGS}
-    TARGETE_DPENDS "${ascend_apm_host_depends}" "${drv_dp_proc_mng_host_depends}" "${ascend_udis_depends}")
+    TARGETE_DPENDS "${ascend_apm_host_depends}" "${drv_dp_proc_mng_host_depends}" "${ascend_udis_depends}" "${ascend_rmo_host_depends}")

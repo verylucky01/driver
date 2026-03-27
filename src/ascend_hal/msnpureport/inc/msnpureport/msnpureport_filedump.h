@@ -18,6 +18,7 @@
 #define TYPE_3 (1U << 3U)
 #define TYPE_4 (1U << 4U)
 #define TYPE_5 (1U << 5U)
+#define TYPE_6 (1U << 6U)
 
 typedef struct {
     const char *label;             // component-specific label

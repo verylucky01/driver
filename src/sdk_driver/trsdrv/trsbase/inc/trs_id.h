@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -16,6 +16,7 @@
 #include <linux/types.h>
 
 #include "ka_base_pub.h"
+#include "ka_task_pub.h"
 
 #include "ascend_hal_define.h"
 
@@ -153,7 +154,7 @@ static inline int trs_id_free(struct trs_id_inst *inst, int type, u32 id)
 
 int trs_id_free_batch_by_type(struct trs_id_inst *inst, int type);
 int trs_id_flush_to_pool(struct trs_id_inst *inst);
-void trs_id_clear_reserved_flag(struct trs_id_inst *inst, pid_t pid);
+void trs_id_clear_reserved_flag(struct trs_id_inst *inst, ka_pid_t pid);
 int trs_id_to_string(struct trs_id_inst *inst, int type, u32 id, char *msg, u32 msg_len);
 int trs_id_get_range(struct trs_id_inst *inst, int type, u32 *start, u32 *end);
 

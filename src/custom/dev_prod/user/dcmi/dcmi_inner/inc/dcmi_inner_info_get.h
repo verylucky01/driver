@@ -366,6 +366,10 @@ int dcmi_get_custom_op_secverify_enable(int card_id, int device_id, unsigned cha
 
 int dcmi_get_custom_op_secverify_mode(int card_id, int device_id, unsigned int *model);
 
+int dcmi_get_npu_ub_port_link_status_info(int card_id, int device_id, struct dcmi_ub_port_link_status *ub_status);
+
+int dcmi_ao_get_npu_device_elabel_info(int card_id, int device_id, struct dcmi_elabel_info *elabel_info);
+
 #ifndef _WIN32
 /* 新增的内部dsmi接口（未对外暴露），临时定义使用 */
 int dsmi_get_hccs_status(unsigned int device_id1, unsigned int device_id2, int *hccs_status);

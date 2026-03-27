@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -994,6 +994,7 @@ enum devdrv_dev_resource_type {
     DEVDRV_MAX_MEM_INFO_TYPE = DEVDRV_DEV_DDR_FREE,
     DEVDRV_DEV_PROCESS_PID,
     DEVDRV_DEV_PROCESS_MEM,
+    DEVDRV_DEV_PROCESS_CONTAINER_PID,
     DEVDRV_DEV_INFO_TYPE_MAX
 };
 
@@ -1007,7 +1008,7 @@ struct devdrv_resource_info {
     char buf[DEVDRV_MAX_PAYLOAD_LEN];
 };
 
-#define DEVDRV_MAX_CHIP_NUM 16
+#define DEVDRV_MAX_CHIP_NUM 64
 #define DEVDRV_RANDOM_SIZE 24
 struct devdrv_chip_list {
     int count;

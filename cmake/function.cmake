@@ -9,46 +9,80 @@
 # ------------------------------------------------------------------------------------------------------------
 
 macro(get_host_linux_distributor)
-    # Distributor ID:	Ubuntu
+    set(HOST_LINUX_DISTRIBUTOR_ID "")
+    set(HOST_LINUX_DISTRIBUTOR_RELEASE "")
+
     find_program(LSB_RELEASE_PROGRAM lsb_release)
     if(LSB_RELEASE_PROGRAM)
         execute_process(COMMAND bash -c "lsb_release -i | sed 's@Distributor ID:\t@@g'"
             RESULT_VARIABLE result
             OUTPUT_VARIABLE HOST_LINUX_DISTRIBUTOR_ID
             OUTPUT_STRIP_TRAILING_WHITESPACE)
-        if (result)
-            set(HOST_LINUX_DISTRIBUTOR_ID unknown)
-        endif()
     elseif(EXISTS "/etc/os-release")
         execute_process(COMMAND bash -c "cat /etc/os-release | grep '^NAME' | awk -F '\"' '{print \$2}'"
             RESULT_VARIABLE result
             OUTPUT_VARIABLE HOST_LINUX_DISTRIBUTOR_ID
             OUTPUT_STRIP_TRAILING_WHITESPACE)
-        if (result)
-            set(HOST_LINUX_DISTRIBUTOR_ID unknown)
-        endif()
     endif()
+    if ((result) OR (HOST_LINUX_DISTRIBUTOR_ID STREQUAL ""))
+        set(HOST_LINUX_DISTRIBUTOR_ID unknown)
+    endif()
+
     string(TOLOWER ${HOST_LINUX_DISTRIBUTOR_ID} HOST_LINUX_DISTRIBUTOR_ID)
 
     if ((HOST_LINUX_DISTRIBUTOR_ID STREQUAL "euleros") OR (HOST_LINUX_DISTRIBUTOR_ID STREQUAL "debian"))
-        # EulerOS特殊处理，拼接Release和Codename，下例中版本号为2.8
-        # Distributor ID:	EulerOS
-        # Description:	EulerOS release 2.0 (SP8)
-        # Release:	2.0
-        # Codename:	SP8
-        execute_process(COMMAND bash -c "lsb_release -r | sed 's@[a-zA-Z:\t ]@@g' | awk -F. '{print $1}'"
-            RESULT_VARIABLE result
-            OUTPUT_VARIABLE major_version
-            OUTPUT_STRIP_TRAILING_WHITESPACE)
-        if (result)
+        set(major_version 0)
+        set(minor_version 0)
+        if(LSB_RELEASE_PROGRAM)
+            # Combine the Release and Codename. In the following example, the version number is 2.8
+            #
+            # Distributor ID:	EulerOS
+            # Description:	EulerOS release 2.0 (SP8)
+            # Release:	2.0
+            # Codename:	SP8
+            #
+            execute_process(COMMAND bash -c "lsb_release -r | sed 's@[a-zA-Z:\t ]@@g' | awk -F. '{print $1}'"
+                RESULT_VARIABLE result
+                OUTPUT_VARIABLE major_version
+                OUTPUT_STRIP_TRAILING_WHITESPACE)
+            if (result)
+                set(major_version 0)
+            endif()
+
+            execute_process(COMMAND bash -c "lsb_release -c | sed 's@[a-zA-Z:\t ]@@g' | awk -F '' '{print $0}' | cut -b 1-2"
+                RESULT_VARIABLE result
+                OUTPUT_VARIABLE minor_version
+                OUTPUT_STRIP_TRAILING_WHITESPACE)
+            if (result)
+                set(minor_version 0)
+            endif()
+        elseif(EXISTS "/etc/os-release")
+            # get the Release and Codename from /etc/os-release. In the following example, the version number is 2.8
+            #
+            # VERSION_ID="2.0"
+            # VERSION="2.0 (SP8)"
+            #
+            execute_process(COMMAND bash -c "cat /etc/os-release | grep '^VERSION_ID=' | awk -F '\"' '{print \$2}' | awk -F. '{print \$1}'"
+                RESULT_VARIABLE result
+                OUTPUT_VARIABLE major_version
+                OUTPUT_STRIP_TRAILING_WHITESPACE)
+            if (result)
+                set(major_version 0)
+            endif()
+            execute_process(COMMAND bash -c "cat /etc/os-release | grep '^VERSION=' | awk -F '\"' '{print \$2}' | awk -F[SP\\)] '{print \$3}'"
+                RESULT_VARIABLE result
+                OUTPUT_VARIABLE minor_version
+                OUTPUT_STRIP_TRAILING_WHITESPACE)
+            if (result)
+                set(minor_version 0)
+            endif()
+        endif()
+
+        if (major_version STREQUAL "")
             set(major_version 0)
         endif()
 
-        execute_process(COMMAND bash -c "lsb_release -c | sed 's@[a-zA-Z:\t ]@@g' | awk -F '' '{print $0}' | cut -b 1-2"
-            RESULT_VARIABLE result
-            OUTPUT_VARIABLE minor_version
-            OUTPUT_STRIP_TRAILING_WHITESPACE)
-        if ((result) OR (minor_version STREQUAL ""))
+        if (minor_version STREQUAL "")
             set(minor_version 0)
         endif()
 
@@ -59,20 +93,17 @@ macro(get_host_linux_distributor)
         # Release:	7.6.1810
         if(LSB_RELEASE_PROGRAM)
             execute_process(COMMAND bash -c "lsb_release -r | sed 's@[a-zA-Z:\t ]@@g' | awk -F. '{print $1 \".\" $2}' "
-            RESULT_VARIABLE result
-            OUTPUT_VARIABLE HOST_LINUX_DISTRIBUTOR_RELEASE
-            OUTPUT_STRIP_TRAILING_WHITESPACE)
-            if (result)
-                set(HOST_LINUX_DISTRIBUTOR_RELEASE 0.0)
-            endif()
+                RESULT_VARIABLE result
+                OUTPUT_VARIABLE HOST_LINUX_DISTRIBUTOR_RELEASE
+                OUTPUT_STRIP_TRAILING_WHITESPACE)
         elseif(EXISTS "/etc/os-release")
             execute_process(COMMAND bash -c "cat /etc/os-release | grep '^VERSION_ID' | awk -F '\"' '{print \$2}'"
                 RESULT_VARIABLE result
                 OUTPUT_VARIABLE HOST_LINUX_DISTRIBUTOR_RELEASE
                 OUTPUT_STRIP_TRAILING_WHITESPACE)
-            if (result)
-                set(HOST_LINUX_DISTRIBUTOR_RELEASE unknown)
-            endif()
+        endif()
+        if ((result) OR (HOST_LINUX_DISTRIBUTOR_RELEASE STREQUAL ""))
+            set(HOST_LINUX_DISTRIBUTOR_RELEASE 0.0)
         endif()
     endif()
 

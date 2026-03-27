@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -17,5 +17,6 @@
 bool run_in_normal_docker(void);
 bool run_in_admin_docker(void);
 bool run_in_docker(void);
+int dbl_host_pid_to_container_pid(pid_t host_pid, pid_t *container_pid);
 
 #endif

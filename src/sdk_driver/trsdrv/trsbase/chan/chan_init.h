@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -90,7 +90,9 @@ struct trs_chan {
     ka_proc_dir_entry_t *entry;
     ka_task_spinlock_t lock;    /* for cq dispatch */
     int work_running;
+    int tasklet_running;
     u32 retry_times;
+    u64 interrupt_time_us;
 };
 
 static inline bool trs_chan_has_sq(struct trs_chan *chan)

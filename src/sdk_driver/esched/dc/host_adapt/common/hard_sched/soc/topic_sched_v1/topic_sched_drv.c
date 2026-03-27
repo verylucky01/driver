@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,9 +10,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-#include <asm/io.h>
-#include <linux/slab.h>
-#include <linux/preempt.h>
 
 #include "securec.h"
 
@@ -354,12 +351,12 @@ int esched_drv_fill_sqe(u32 chip_id, u32 event_src, struct topic_sched_sqe *sqe,
     if ((esched_drv_is_used_host_pid(event_info->event_id, sqe->topic_type)) &&
         (!esched_drv_is_sched_mode_change_task(sqe->topic_id, sqe->subtopic_id))) {
 #ifdef CFG_ENV_HOST
-        host_pid = (u32)current->tgid;
+        host_pid = (u32)ka_task_get_current()->tgid;
         /* query host app pid by cp pid */
         ret = devdrv_query_master_pid_by_device_slave(chip_id, event_info->pid, &host_pid);
         if (ret == 0) {
             sched_debug("Query master pid success. (pid=%d; host_pid=%u; current_pid=%d)\n",
-                event_info->pid, host_pid, current->tgid);
+                event_info->pid, host_pid, ka_task_get_current()->tgid);
         }
 #else
         int cp_type;
@@ -432,7 +429,7 @@ int esched_get_real_pid(struct topic_sched_mailbox *mb, u32 devid, u32 pid)
     } else if (mb->topic_id == EVENT_TS_CALLBACK_MSG) {
         dst_pid = mb->user_data[TOPIC_SCHED_TS_CALLBACK_PID_INDEX];
     } else {
-        memcpy_fromio(&dst_pid, &mb->stream_id, sizeof(dst_pid)); /* pid store in stream_id and task_id */
+        ka_mm_memcpy_fromio(&dst_pid, &mb->stream_id, sizeof(dst_pid)); /* pid store in stream_id and task_id */
         is_pid_dst = ((dst_pid & PID_MAP_MASK) != 0);
         dst_pid &= MB_PID_MASK;
     }

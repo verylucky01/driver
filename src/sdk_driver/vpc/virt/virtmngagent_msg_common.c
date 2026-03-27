@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,13 +11,13 @@
  * GNU General Public License for more details.
  */
 
+#include "ka_kernel_def_pub.h"
 #include "virtmngagent_msg_common.h"
 #include "virtmng_msg_common.h"
 #include "vmng_kernel_interface.h"
 #include "virtmng_public_def.h"
 #include "virtmngagent_msg.h"
 #include "virtmng_msg_pub.h"
-#include "ka_kernel_def_pub.h"
 
 static int (*g_vmnga_msg_common_recv_pcie_proc[])(u32 dev_id, u32 fid, struct vmng_rx_msg_proc_info *proc_info) = {
     vmng_msg_recv_common_verfiy_info,

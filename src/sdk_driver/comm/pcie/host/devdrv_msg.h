@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,6 +14,7 @@
 #ifndef __DEVDRV_MSG_H_
 #define __DEVDRV_MSG_H_
 
+#include "ka_list_pub.h"
 #include "devdrv_dma.h"
 #include "devdrv_pci.h"
 #include "devdrv_common_msg.h"
@@ -22,7 +23,6 @@
 #ifdef CFG_FEATURE_S2S
 #include "devdrv_s2s_msg.h"
 #endif
-#include "ka_list_pub.h"
 
 #define DEVDRV_SUCCESS 0x5a
 #define DEVDRV_FAILED 0xa5
@@ -105,7 +105,7 @@ struct devdrv_msg_chan {
     u32 flag;   /* sync or async:bit0 */
     struct devdrv_msg_queue_info sq_info;
     struct devdrv_msg_queue_info cq_info;
-    void __iomem *io_base; /* the address of SQ tail db */
+    void __ka_mm_iomem *io_base; /* the address of SQ tail db */
     enum devdrv_msg_client_type msg_type;
     int irq_rx_msg_notify;
     int irq_tx_finish_notity;
@@ -142,10 +142,10 @@ struct devdrv_non_trans_msg_send_data_para {
 struct devdrv_msg_dev {
     struct devdrv_pci_ctrl *pci_ctrl;
     ka_device_t *dev;
-    void __iomem *db_io_base;   /* the base addr of doorbell */
-    void __iomem *ctrl_io_base; /* the base addr of nvme ctrl reg */
-    void __iomem *reserve_mem_base; /* device reserve mem base, access by ATU */
-    void __iomem *local_reserve_mem_base; /* host reserve mem base */
+    void __ka_mm_iomem *db_io_base;   /* the base addr of doorbell */
+    void __ka_mm_iomem *ctrl_io_base; /* the base addr of nvme ctrl reg */
+    void __ka_mm_iomem *reserve_mem_base; /* device reserve mem base, access by ATU */
+    void __ka_mm_iomem *local_reserve_mem_base; /* host reserve mem base */
     u32 chan_cnt;
     u32 func_id;
     struct devdrv_common_msg common_msg;

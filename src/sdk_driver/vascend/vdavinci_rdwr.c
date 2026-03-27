@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -93,13 +93,13 @@ ssize_t hw_vdavinci_rw(struct hw_vdavinci *vdavinci, char *buf,
     return _hw_vdavinci_rw(vdavinci, &p, buf, write);
 }
 
-#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(4,17,0)) || (defined(DRV_UT)))
+#if ((IS_VDAVINCI_KERNEL_VERSION_SUPPORT) || (defined(DRV_UT)))
 STATIC int vdavinci_ioeventfd_handler(void *opaque, void *unused)
 {
     struct vdavinci_ioeventfd *ioeventfd = opaque;
     struct position p;
 
-    p.index = ioeventfd->bar;
+    p.index = (unsigned int)ioeventfd->bar;
     p.pos = ioeventfd->pos;
     p.count = ioeventfd->count;
 

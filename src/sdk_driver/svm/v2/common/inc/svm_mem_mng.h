@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -85,8 +85,8 @@ int devmm_get_user_pages_remote(ka_task_struct_t *tsk, ka_mm_struct_t *mm,
     u64 va, int write, u32 num, ka_page_t **pages);
 int devmm_check_and_set_svm_static_reserve_vma(void *svm_proc, ka_vm_area_struct_t **svm_vma);
 int devmm_check_and_set_custom_svm_vma(void *svm_proc, ka_vm_area_struct_t **svm_vma);
-u64 devmm_kpg_size(ka_page_t *pg);
-bool devmm_is_giant_page(ka_page_t **pages);
+u64 devmm_kernel_pg_size(ka_page_t *pg);
+bool devmm_is_giant_page(ka_page_t **pages, u64 pg_num);
 bool devmm_is_svm_vma_magic(void *check_magic);
 
 #endif /* SVM_MEM_MNG_H */

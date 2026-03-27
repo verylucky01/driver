@@ -11,26 +11,20 @@
 #### CPACK to package run #####
 
 # download makeself package
-if (${BUILD_COMPONENT} STREQUAL "DRIVER")
-    include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/third_party/makeself-fetch.cmake)
-endif()
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/third_party/makeself-fetch.cmake)
 
 set(CPACK_PACKAGE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build_out)
 
 function(pack_built_in)
-    if(${PRODUCT} STREQUAL ascend910B AND ASCEND910_93_EX)
-        set(CPACK_PRODUCT ascend910_93)
-    else()
-        set(CPACK_PRODUCT ${PRODUCT})
-    endif()
-
     if (${BUILD_COMPONENT} STREQUAL "DRIVER_COMPAT")
-        include(cmake/config/package_config/package_driver_compat.cmake)
+        set(CPACK_PKG_NAME driver_compat)
+        include(cmake/config/package_config/package_driver.cmake)
     endif()
 
     if (${BUILD_COMPONENT} STREQUAL "DRIVER")
         include(cmake/third_party/driver_device_fetch.cmake)
         get_driver_device()
-        include(cmake/config/package_config/package_${PRODUCT}.cmake)
+        set(CPACK_PKG_NAME driver)
+        include(cmake/config/package_config/package_driver.cmake)
     endif()
 endfunction()

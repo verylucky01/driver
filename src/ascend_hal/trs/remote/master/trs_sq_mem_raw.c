@@ -30,7 +30,7 @@ int trs_sq_mem_raw_alloc(uint32_t devid, uint64_t *va, uint64_t size)
         return ret;
     }
 
-    flag = MEM_DEV | MEM_ADVISE_P2P | devid;
+    flag = MEM_DEV | MEM_ADVISE_P2P | devid | ((uint64_t)TSDRV_MODULE_ID << MEM_MODULE_ID_BIT);
     flag |= trs_sq_send_mode_is_high_performance(devid) ? 0 : MEM_DEV_CP_ONLY;
 
     ret = halMemAlloc((void **)&svm_va, size, flag | MEM_CONTIGUOUS_PHY); /* Max support 4M contiguous. */

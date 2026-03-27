@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,18 +14,16 @@
 #ifndef ESCHED_FAULT_REPORT_H
 #define ESCHED_FAULT_REPORT_H
 
-#include <linux/types.h>
-#include <linux/kallsyms.h>
 #include "esched_log.h"
 
 typedef int (*fault_report_handle)(u32 devid);
 static inline void esched_kernel_soft_fault_report(u32 devid)
 {
 #ifndef EMU_ST
-    fault_report_handle handle = (fault_report_handle)(uintptr_t)__symbol_get("hal_kernel_drv_soft_fault_report");
+    fault_report_handle handle = (fault_report_handle)(uintptr_t)__ka_system_symbol_get("hal_kernel_drv_soft_fault_report");
     if (handle != NULL) {
         handle(devid);
-        __symbol_put("hal_kernel_drv_soft_fault_report");
+        __ka_system_symbol_put("hal_kernel_drv_soft_fault_report");
         sched_err("report fault. (devid=%u)\n", devid);
     }
 #endif

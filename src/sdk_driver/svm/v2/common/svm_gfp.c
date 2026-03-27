@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,6 +11,7 @@
  * GNU General Public License for more details.
  */
 
+#include "ka_memory_pub.h"
 #include "devmm_adapt.h"
 #include "devmm_common.h"
 #include "svm_define.h"
@@ -60,13 +61,9 @@ static void devmm_update_alloc_nid_info(u32 devid, u32 vfid, int nids[], u32 *ni
 
 static void devmm_clear_single_page(ka_page_t *pg, u64 page_size)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
     if (ka_mm_PagePoisoned(pg) == 0) {
         (void)memset_s(ka_mm_page_address(pg), page_size, 0, page_size);
     }
-#else
-    (void)memset_s(ka_mm_page_address(pg), page_size, 0, page_size);
-#endif
 }
 
 static void devmm_clear_normal_single_page(ka_page_t *pg)
@@ -77,7 +74,7 @@ static void devmm_clear_normal_single_page(ka_page_t *pg)
 static void devmm_clear_compound_page(ka_page_t *pg)
 {
     ka_page_t *head_page = ka_mm_compound_head(pg);
-    devmm_clear_single_page(head_page, devmm_kpg_size(head_page));
+    devmm_clear_single_page(head_page, devmm_kernel_pg_size(head_page));
 }
  
 static void devmm_clear_huge_page(ka_page_t *pg)
@@ -136,7 +133,7 @@ static void devmm_free_normal_page(struct devmm_phy_addr_attr *attr, ka_page_t *
 {
     int nid = ka_mm_page_to_nid(pg);
 
-    if (PageCompound(pg) != 0) {
+    if (ka_mm_PageCompound(pg) != 0) {
         devmm_compound_page_ref_dec(pg, attr->is_already_clear);
     } else {
         devmm_normal_single_page_ref_dec(pg, attr->is_already_clear);
@@ -174,7 +171,7 @@ static void devmm_free_huge_pages(struct devmm_phy_addr_attr *attr, ka_page_t **
     bool is_giant_page = false;
     u64 i;
 
-    is_giant_page = (pages[0] != NULL) ? devmm_is_giant_page(pages) : false;
+    is_giant_page = devmm_is_giant_page(pages, pg_num);
     for (i = 0; i < pg_num; i++) {
         if ((is_giant_page == false) || ((i % DEVMM_GIANT_TO_HUGE_PAGE_NUM) == 0)) {
             if (pages[i] != NULL) {
@@ -231,7 +228,7 @@ static void devmm_get_sub_pages_from_compound_page(ka_page_t *compound_page,
 static void devmm_get_sub_pages(struct devmm_phy_addr_attr *attr,
     ka_page_t *page, u32 order, ka_page_t **out_pages, u64 pg_num)
 {
-    if (PageCompound(page) != 0) {
+    if (ka_mm_PageCompound(page) != 0) {
         devmm_get_sub_pages_from_compound_page(page, order, out_pages, pg_num);
     } else {
         devmm_get_sub_pages_from_normal_high_level_page(page, order, out_pages, pg_num);
@@ -317,7 +314,7 @@ static int devmm_alloc_continuous_pages(struct devmm_phy_addr_attr *attr,
     int ret, i;
 
     /* To simplify the code, pg_num should be power of 2. */
-    if (attr->is_compound_page && (is_power_of_2(pg_num) == false)) {
+    if (attr->is_compound_page && (ka_mm_is_power_of_2(pg_num) == false)) {
         return -EINVAL;
     }
 
@@ -390,6 +387,9 @@ static ka_page_t *devmm_alloc_hpage(struct devmm_phy_addr_attr *attr, int nid, u
     ka_page_t *hpage = NULL;
     u64 pg_num;
     int ret;
+#if !(defined(__arm__) || defined(__aarch64__))
+    u32 order;
+#endif
 
     pg_num = attr->is_giant_page ? DEVMM_GIANT_TO_HUGE_PAGE_NUM : 1;
     ret = devmm_huge_free_mem_size_sub(attr->devid, attr->vfid, nid, pg_num, flag);
@@ -399,11 +399,20 @@ static ka_page_t *devmm_alloc_hpage(struct devmm_phy_addr_attr *attr, int nid, u
         return NULL;
     }
 
+#if defined(__arm__) || defined(__aarch64__)
     hpage = _devmm_alloc_hpage(nid, flag);
     if (hpage == NULL) {
         devmm_huge_free_mem_size_add(attr->devid, attr->vfid, nid, pg_num, flag);
     }
-
+#else
+    flag = devmm_get_alloc_mask(true);
+    order = (u32)ka_mm_get_order(pg_num << KA_MM_HPAGE_SHIFT);
+    /* cannot use ka_alloc_pages_node, because ka mem stats not include normal page */
+    hpage = __ka_alloc_pages_node(nid, flag, order);
+    if (hpage == NULL) {
+        devmm_huge_free_mem_size_add(attr->devid, attr->vfid, nid, pg_num, flag);
+    }
+#endif
     return hpage;
 }
 

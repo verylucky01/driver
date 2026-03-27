@@ -9,7 +9,7 @@
 # ------------------------------------------------------------------------------------------------------------
 if (${PRODUCT} STREQUAL ascend910B)
     set(asdrv_esched_depends asdrv_dms drv_seclib_host drv_pcie_host asdrv_pbl asdrv_trsbase asdrv_dpa ascend_kernel_open_adapt)
-elseif (${PRODUCT} STREQUAL ascend910_95)
+elseif (${PRODUCT} STREQUAL ascend950)
     set(asdrv_esched_depends asdrv_dms drv_seclib_host asdrv_pbl asdrv_vmng asdrv_trsbase ascend_kernel_open_adapt drv_pcie_host asdrv_dpa)
 endif()
 add_host_ko(LOCAL_MODULE asdrv_esched

@@ -17,10 +17,10 @@ EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/inc/pbl
 EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/vnic/inc
 EXTRA_CFLAGS += -I${C_SEC_INCLUDE}
 EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/vnic/host
-EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/vnic/command
+EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/vnic/command/msg
 EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/kernel_adapt/include
 EXTRA_CFLAGS += -isystem $(shell $(CC) -print-file-name=include)
-ifneq ($(filter $(PRODUCT), ascend910_95),)
+ifneq ($(filter $(PRODUCT), ascend950),)
 	EXTRA_CFLAGS += -Iinclude/linux
 endif
 

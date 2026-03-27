@@ -116,6 +116,12 @@ int dcmi_board_chip_type_is_ascend_910_95(void)
     return (dcmi_get_board_chip_type() == DCMI_CHIP_TYPE_D910_95) ? TRUE : FALSE;
 }
 
+int dcmi_board_chip_type_is_ascend_910_95_card(void)
+{
+    return ((dcmi_get_board_chip_type() == DCMI_CHIP_TYPE_D910_95) &&
+    (dcmi_get_board_type() == DCMI_BOARD_TYPE_CARD)) ? TRUE : FALSE;
+}
+
 int dcmi_board_chip_type_is_ascend_910b_300i_a2(void)
 {
     return ((dcmi_get_board_chip_type() == DCMI_CHIP_TYPE_D910B) &&
@@ -355,11 +361,6 @@ void dcmi_init_product_type_inner(int card_id, int device_id)
     struct tag_pcie_idinfo_all tag_pcie_info = { 0 };
     struct dcmi_board_info board_info = { 0 };
 
-    ret = dcmi_get_device_pcie_info_v2(card_id, device_id, &pcie_info);
-    if (ret != DCMI_OK) {
-        gplog(LOG_ERR, "dcmi_get_device_pcie_info_v2 failed. ret is %d", ret);
-    }
-
     ret = dcmi_get_device_board_info(card_id, device_id, &board_info);
     if (ret != DCMI_OK) {
         gplog(LOG_ERR, "Failed to query board info of card %d.", card_id);
@@ -402,22 +403,27 @@ int dcmi_mainboard_is_arm_910_93(unsigned int main_board_id)
 
 int dcmi_mainboard_is_a900_a5_pcie(unsigned int main_board_id)
 {
-    return (main_board_id == DCMI_A5_POD_2D_MAIN_BOARD_ID_TMP) ||
+    return ((g_board_details.chip_type == DCMI_CHIP_TYPE_D910_95) && 
+        ((main_board_id == DCMI_A5_POD_2D_MAIN_BOARD_ID_TMP) ||
         (main_board_id == DCMI_A5_POD_EVB_MAIN_BOARD_ID_TMP) ||
         (main_board_id == DCMI_A_X_910_95_MAIN_BOARD_ID) ||
-        (main_board_id == DCMI_A_X_910_95_UBOE_MAIN_BOARD_ID);
+        (main_board_id == DCMI_A_X_910_95_UBOE_MAIN_BOARD_ID) ||
+        (main_board_id == DCMI_910_95_1P_MAINBOARD_ID) ||
+        (main_board_id == DCMI_910_95_2P_MAINBOARD_ID) ||
+        (main_board_id == DCMI_910_95_4P_MAINBOARD_ID)));
 }
 
 int dcmi_mainboard_is_a900_a5_ub(unsigned int main_board_id)
 {
-    return (main_board_id == DCMI_A_K_910_95_MAIN_BOARD_ID) ||
+    return ((g_board_details.chip_type == DCMI_CHIP_TYPE_D910_95) &&
+        ((main_board_id == DCMI_A_K_910_95_MAIN_BOARD_ID) ||
         (main_board_id == DCMI_A_K_910_95_UBOE_MAIN_BOARD_ID) ||
         (main_board_id == DCMI_A_K_910_95_2_6_MAIN_BOARD_ID) ||
         (main_board_id == DCMI_A_K_910_95_2_6_UBOE_MAIN_BOARD_ID) ||
         (main_board_id == DCMI_A5_POD_2D_BACKUP_MAIN_BOARD_ID) ||
         (main_board_id == DCMI_A5_POD_2D_MAIN_BOARD_ID) ||
         (main_board_id == DCMI_A5_POD_1D_MAIN_BOARD_ID) ||
-        (main_board_id == DCMI_A5_POD_EVB_MAIN_BOARD_ID_UB_TMP);
+        (main_board_id == DCMI_A5_POD_EVB_MAIN_BOARD_ID_UB_TMP)));
 }
 
 int dcmi_a900_a3_superpod_fp_card_id_convert(int card_id, int device_id)
@@ -500,8 +506,7 @@ int dcmi_is_has_pcieinfo(void)
     switch (board_type) {
         case DCMI_BOARD_TYPE_CARD:
         case DCMI_BOARD_TYPE_SERVER:
-            if (dcmi_get_board_chip_type() == DCMI_CHIP_TYPE_D910_95 &&
-                dcmi_mainboard_is_a900_a5_ub(g_mainboard_info.mainboard_id)) {
+            if (dcmi_mainboard_is_a900_a5_ub(g_mainboard_info.mainboard_id)) {
                 return FALSE;
             }
             return TRUE;

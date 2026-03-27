@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -12,6 +12,7 @@
  */
 
 #include "ka_kernel_def_pub.h"
+#include "ka_compiler_pub.h"
 
 #include "trs_core.h"
 #include "trs_stars_comm.h"
@@ -66,7 +67,7 @@ static struct submodule_ops g_sub_table[] = {
 #endif
 };
 
-static int __init init_trs(void)
+static int __ka_init init_trs(void)
 {
     int index, ret;
     int table_size = sizeof(g_sub_table) / sizeof(struct submodule_ops);
@@ -85,7 +86,7 @@ static int __init init_trs(void)
     return ret;
 }
 
-static void __exit exit_trs(void)
+static void __ka_exit exit_trs(void)
 {
     int index;
     int table_size = sizeof(g_sub_table) / sizeof(struct submodule_ops);

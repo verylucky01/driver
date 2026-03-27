@@ -32,11 +32,16 @@ extern "C"{
 #define DCMI_PCI_INVALID_VALUE    (-1)
 
 #define MAX_MACRO_ID 12
+#define MIN_MACRO_ID 0
 #define MAX_H60_ID   7
 #define MAX_A_X_MACRO_ID   10
 #define RES_MACRO_ID 8
 #define MAX_310P_MACRO_ID 4
-#define MIN_310P_MACRO_ID 0
+#define MAX_910_95_POD_MACRO_ID 17
+#define MAX_910_95_1P_MACRO_ID 3
+#define MAX_910_95_2P_MACRO_ID 8
+#define MAX_910_95_4P_MACRO_ID 6
+#define RES_910_95_2P_MACRO_ID 7
 
 #define FULL_EYE_MAX_LANE_NUM 4
 #define FULL_EYE_MAX_MODE_NUM 4

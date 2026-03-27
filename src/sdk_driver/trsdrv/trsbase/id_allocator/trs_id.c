@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -33,7 +33,7 @@ static ka_kmem_cache_t *trs_id_cache;
 
 struct trs_id_rsv_node {
     u32 id;
-    pid_t pid;
+    ka_pid_t pid;
     ka_list_head_t list; // rsv list node
 };
 
@@ -43,7 +43,7 @@ struct trs_id_node {
     u32 id_start;
     u32 id_avail_num;
     u32 id_total_num;
-    pid_t pid;
+    ka_pid_t pid;
     u32 is_in_idle; /* 0:default; 1: in idle list and idle hash table */
     ka_hlist_node_t link;
     ka_list_head_t list;
@@ -454,7 +454,7 @@ static int trs_id_pool_try_free_batch(struct trs_id_pool *id_pool)
 
     while (id_pool->allocatable_num > 0) {
         /* allocatable_num - rsv_num = not rsv num*/
-        u32 batch_num = min_t(u32, (id_pool->allocatable_num - id_pool->rsv_num), id_pool->attr.batch_num);
+        u32 batch_num = ka_base_min_t(u32, (id_pool->allocatable_num - id_pool->rsv_num), id_pool->attr.batch_num);
         u32 id[MAX_TRS_ID_BATCH_NUM];
         u32 idx = 0;
         int ret;
@@ -588,7 +588,7 @@ static struct trs_id_pool *trs_id_pool_get(struct trs_id_inst *inst, int type)
     id_pool = g_trs_id_pool[ts_inst][type];
     if (id_pool != NULL) {
         /* When id pool is obtained, the module reference counting of ops must be added. */
-        if (try_module_get(id_pool->ops.owner)) {
+        if (ka_system_try_module_get(id_pool->ops.owner)) {
             kref_safe_get(&id_pool->ref);
         } else {
             id_pool = NULL;
@@ -785,13 +785,19 @@ static bool trs_id_pool_has_res_for_alloc(struct trs_id_pool *id_pool)
 
 static void trs_id_print_isolated_res_detail(struct trs_id_pool *id_pool)
 {
+    if (id_pool->type == TRS_NOTIFY_ID) {
+        return;
+    }
+
     if (id_pool->attr.isolate_num > 1) {
         struct trs_id_node *node = NULL;
         ka_hlist_node_t *tmp = NULL;
         u32 bkt = 0;
+
         trs_err("No res. (devid=%u; tsid=%u; type=%s; allocatable_num=%u; alloc_num=%u)\n",
             id_pool->inst.devid, id_pool->inst.tsid, trs_id_type_to_name(id_pool->type),
             id_pool->allocatable_num, id_pool->alloc_num);
+
         ka_hash_for_each_safe(id_pool->allocated_htable, bkt, tmp, node, link) {
             if (node->id_avail_num > 0) {
                 trs_err("Other process node. (pid=%d; id_avail_num=%u)\n", node->pid, node->id_avail_num);
@@ -1209,7 +1215,7 @@ static struct trs_id_node *trs_id_pool_get_current_node_by_id(struct trs_id_pool
     return NULL;
 }
 
-static void _trs_id_clear_reserved_flag(struct trs_id_pool *id_pool, pid_t pid)
+static void _trs_id_clear_reserved_flag(struct trs_id_pool *id_pool, ka_pid_t pid)
 {
     struct trs_id_rsv_node *node = NULL;
     struct trs_id_rsv_node *n = NULL;
@@ -1234,7 +1240,7 @@ static void _trs_id_clear_reserved_flag(struct trs_id_pool *id_pool, pid_t pid)
     }
 }
 
-static void trs_id_clear_reserved_flag_by_type(struct trs_id_inst *inst, int type, pid_t pid)
+static void trs_id_clear_reserved_flag_by_type(struct trs_id_inst *inst, int type, ka_pid_t pid)
 {
     struct trs_id_pool *id_pool = trs_id_pool_get(inst, type);
 
@@ -1248,7 +1254,7 @@ static void trs_id_clear_reserved_flag_by_type(struct trs_id_inst *inst, int typ
     trs_id_pool_put(id_pool);
 }
 
-void trs_id_clear_reserved_flag(struct trs_id_inst *inst, pid_t pid)
+void trs_id_clear_reserved_flag(struct trs_id_inst *inst, ka_pid_t pid)
 {
     int type;
 

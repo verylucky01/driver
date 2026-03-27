@@ -31,8 +31,8 @@ target_link_libraries(uda_obj PRIVATE
 target_compile_definitions(uda_obj PRIVATE
     DRV_HOST
     CFG_FEATURE_UDA_CONSTRUCT_INIT
-    $<$<STREQUAL:${PRODUCT},ascend910_95>:CFG_FEATURE_ASCEND910_95_STUB>
-    $<$<STREQUAL:${PRODUCT},ascend910_95>:ASCEND_BACKUP_DEV_NUM=1>
+    $<$<STREQUAL:${PRODUCT},ascend950>:CFG_FEATURE_ASCEND950_STUB>
+    $<$<STREQUAL:${PRODUCT},ascend950>:ASCEND_BACKUP_DEV_NUM=1>
 )
 
 target_compile_options(uda_obj PRIVATE
@@ -85,7 +85,7 @@ target_link_libraries(uda_base_obj PRIVATE
 target_compile_definitions(uda_base_obj PRIVATE
     DRV_HOST
     CFG_FEATURE_UDA_CONSTRUCT_INIT
-    $<$<STREQUAL:${PRODUCT},ascend910_95>:CFG_FEATURE_ASCEND910_95_STUB>
+    $<$<STREQUAL:${PRODUCT},ascend950>:CFG_FEATURE_ASCEND950_STUB>
 )
 
 target_compile_options(uda_base_obj PRIVATE

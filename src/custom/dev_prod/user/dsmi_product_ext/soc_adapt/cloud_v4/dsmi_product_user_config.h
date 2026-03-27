@@ -17,7 +17,7 @@
 
 #define GUID_INFO                       "guid_info"
 #define GUID_INFO_BLOCK_OFFSET          0x2130000       // 具体范围查看 g_flash_ctrl
-#define GUID_INFO_CONFIG_SIZE           16
+#define GUID_INFO_CONFIG_SIZE           32
 
 const struct user_config_item_product g_user_config_info_product[UC_PROD_ITEM_MAX_NUM] = {
     {GUID_INFO, NULL, FLASH_BLOCK_COMMON,

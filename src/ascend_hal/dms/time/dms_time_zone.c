@@ -28,7 +28,9 @@
 #include "dms_user_common.h"
 #include "dms_time_zone.h"
 
-#ifndef STATIC
+#ifdef STATIC_SKIP
+#define STATIC
+#else
 #define STATIC static
 #endif
 

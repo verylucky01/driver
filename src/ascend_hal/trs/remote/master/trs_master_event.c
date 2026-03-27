@@ -327,7 +327,7 @@ drvError_t trs_svm_mem_event_sync(uint32_t dev_id, void *in, UINT64 size,
     void *msg = NULL;
     drvError_t ret;
 
-    ret = halMemAlloc(&msg, size, MEM_DEV | MEM_TYPE_DDR | dev_id);
+    ret = halMemAlloc(&msg, size, MEM_DEV | MEM_TYPE_DDR | dev_id | ((uint64_t)TSDRV_MODULE_ID << MEM_MODULE_ID_BIT));
     if (ret != DRV_ERROR_NONE) {
         trs_err("Alloc device mem fail. (devid=%u; size=%llu; ret=%d)\n", dev_id, size, ret);
         return DRV_ERROR_INNER_ERR;
@@ -370,16 +370,18 @@ drvError_t trs_svm_mem_event_sync(uint32_t dev_id, void *in, UINT64 size,
     }
 
     if (reply->reply_len != reply->buf_len) {
-        (void)halMemFree(msg);
-        trs_clear_event(&event_info);
-        trs_err("The reply_len not equal to buf_len. (reply_len=%u; buf_len=%u)\n", reply->reply_len, reply->buf_len);
-        return DRV_ERROR_PARA_ERROR;
+        if ((reply->reply_len < sizeof(int)) || (DRV_EVENT_REPLY_BUFFER_RET(reply->buf) == 0)) {
+            trs_err("Sync event failed. (reply_len=%u; buf_len=%u)\n", reply->reply_len, reply->buf_len);
+            ret = DRV_ERROR_INNER_ERR;
+        } else {
+            trs_warn("Sync event proc warn. (result=%d)\n", DRV_EVENT_REPLY_BUFFER_RET(reply->buf));
+        }
     }
 
     (void)halMemFree(msg);
     trs_clear_event(&event_info);
 
-    return DRV_ERROR_NONE;
+    return ret;
 }
 
 static drvError_t trs_res_id_alloc_sync(uint32_t dev_id,
@@ -467,7 +469,7 @@ drvError_t trs_sq_cq_query_sync(uint32_t dev_id, struct halSqCqQueryInfo *info)
     if ((ret != 0) || (result != 0)) {
         trs_err("Failed to sync sqcq query event. (ret=%d; result=%d)\n", ret, result);
         free(reply.buf);
-        return result;
+        return (ret != 0) ? ret : (drvError_t)result;
     }
 
     info->value[0] = *(uint32_t *)DRV_EVENT_REPLY_BUFFER_DATA_PTR(reply.buf);
@@ -489,7 +491,7 @@ drvError_t trs_sq_cq_config_sync(uint32_t dev_id, struct halSqCqConfigInfo *info
         DRV_SUBEVENT_TRS_SQCQ_CONFIG_MSG, &reply);
     if ((ret != 0) || (result != 0)) {
         trs_err("Failed to sync sqcq config event. (ret=%d; result=%d)\n", ret, result);
-        return result;
+        return (ret != 0) ? ret : (drvError_t)result;
     }
 
     trs_debug("Config success. (dev_id=%u; sq_id=%u; prop=%d)\n", dev_id, info->sqId, info->prop);
@@ -607,15 +609,17 @@ drvError_t trs_local_mem_event_sync(uint32_t dev_id, void *in, UINT64 size,
         return DRV_ERROR_INNER_ERR;
     }
 
-    if (reply->reply_len != reply->buf_len) {
-        trs_clear_event(&event_info);
-        trs_err("reply_len(%u) not equal to buf_len(%u).\n", reply->reply_len, reply->buf_len);
-        return DRV_ERROR_PARA_ERROR;
+    if (reply->reply_len != reply->buf_len) { /* check if sync event fail */
+        if ((reply->reply_len < sizeof(int)) || (DRV_EVENT_REPLY_BUFFER_RET(reply->buf) == 0)) {
+            trs_err("Sync event failed. (reply_len=%u; buf_len=%u)\n", reply->reply_len, reply->buf_len);
+            ret = DRV_ERROR_INNER_ERR;
+        } else {
+            trs_warn("Sync event proc warn. (result=%d)\n", DRV_EVENT_REPLY_BUFFER_RET(reply->buf));
+        }
     }
 
     trs_clear_event(&event_info);
-
-    return DRV_ERROR_NONE;
+    return ret;
 }
 
 static int trs_shr_id_config(uint32_t dev_id, struct drvShrIdInfo *info)

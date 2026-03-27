@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -118,6 +118,12 @@ typedef char* (*ka_class_devnode)(ka_device_t *dev, umode_t *mode);
 #define KA_DRIVER_ALIGN(x, a)                  ALIGN(x, a)
 #define KA_DRIVER_IS_ALIGNED(x, a)		       IS_ALIGNED(x, a)
 
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(4, 4, 0)
+#define KA_DRIVER_ALIGN_DOWN(addr, size)       ((addr)&(~((size)-1)))
+#else
+#define KA_DRIVER_ALIGN_DOWN(addr, size)       ALIGN_DOWN(addr, size)
+#endif
+
 #define KA_DRIVER_DEVICE_ATTR(_name, _mode, _show, _store) DEVICE_ATTR(_name, _mode, _show, _store)
 
 #define ka_driver_clk_disable(clk) clk_disable(clk)
@@ -155,11 +161,13 @@ int ka_driver_get_acpi_disabled(void);
 #define ka_driver_of_find_property(np, name, lenp) of_find_property(np, name, lenp)
 #define ka_driver_of_get_next_available_child(node, prev) of_get_next_available_child(node, prev)
 #define ka_driver_of_get_next_child(node, prev) of_get_next_child(node, prev)
+#define ka_driver_for_each_child_of_node(parent, child) for_each_child_of_node(parent, child)
 #define ka_driver_of_parse_phandle(np, phandle_name, index) of_parse_phandle(np, phandle_name, index)
 #define ka_driver_of_parse_phandle_with_args(np, list_name, cells_name, index, out_args) of_parse_phandle_with_args(np, list_name, cells_name, index, out_args)
 #define ka_driver_of_parse_phandle_with_args_map(np, list_name, stem_name, index, out_args) of_parse_phandle_with_args_map(np, list_name, stem_name, index, out_args)
 #define ka_driver_of_parse_phandle_with_fixed_args(np, list_name, cell_count, index, out_args) of_parse_phandle_with_fixed_args(np, list_name, cell_count, index, out_args)
 #define ka_driver_of_match_device(matches, dev) of_match_device(matches, dev)
+#define ka_driver_of_property_read_u32(np, propname, out_value) of_property_read_u32(np, propname, out_value)
 
 #ifndef __cplusplus
 ka_class_t *ka_driver_class_create(ka_module_t *owner, const char *name);
@@ -174,6 +182,7 @@ int ka_driver_class_set_devnode(ka_class_t *cls, ka_class_devnode devnode);
 #endif
 
 #define ka_driver_of_node_put(node) of_node_put(node)
+#define ka_driver_dev_get_drvdata(dev) dev_get_drvdata(dev)
 #define ka_driver_mdev_dev(mdev) mdev_dev(mdev)
 #define ka_driver_mdev_from_dev(dev) mdev_from_dev(dev)
 #define ka_driver_mdev_get_drvdata(mdev) mdev_get_drvdata(mdev)
@@ -191,5 +200,10 @@ int ka_driver_class_set_devnode(ka_class_t *cls, ka_class_devnode devnode);
 #define ka_driver_vfio_unregister_notifier(dev, type, nb) vfio_unregister_notifier(dev, type, nb)
 #define ka_driver_dev_to_node(dev) dev_to_node(dev)
 int ka_driver_dmi_find_devid(ka_pci_dev_t *pdev, int DMI_DEV_TYPE_DEV_SLOT, int *dev_id);
+
+#define ka_driver_gpio_is_valid(num) gpio_is_valid(num)
+#define ka_driver_gpio_request(num, name) gpio_request(num, name)
+#define ka_driver_gpio_get_value(num) gpio_get_value(num)
+#define ka_driver_gpio_free(num) gpio_free(num)
 
 #endif

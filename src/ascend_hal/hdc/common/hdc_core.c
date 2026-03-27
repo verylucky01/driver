@@ -132,7 +132,7 @@ mmProcess hdc_pcie_create_bind_fd(void)
     mmProcess fd;
     int flag;
 
-    if (g_hdcConfig.h2d_type != HDC_TRANS_USE_UB) {
+    if (g_hdcConfig.h2d_type == HDC_TRANS_USE_PCIE) {
         fd = mmOpen2(PCIE_DEV_NAME, M_RDONLY, M_IRUSR);
         if (fd < 0) {
             HDC_LOG_ERR("open hdc dev file failed, errno %d\n", errno);
@@ -142,18 +142,23 @@ mmProcess hdc_pcie_create_bind_fd(void)
             (void)fcntl(fd, F_SETFD, flag);
         }
         return fd;
-    } else {
+    } else if (g_hdcConfig.h2d_type == HDC_TRANS_USE_UB){
         return hdc_ub_open();
+    } else {
+        HDC_LOG_ERR("Variable h2d_type is invalid. (h2d_type=%#x)\n", g_hdcConfig.h2d_type);
+        return EN_ERROR;
     }
 }
 
 void hdc_pcie_close_bind_fd(mmProcess fd)
 {
     if (fd != HDC_SESSION_FD_INVALID) {
-        if (g_hdcConfig.h2d_type != HDC_TRANS_USE_UB) {
+        if (g_hdcConfig.h2d_type == HDC_TRANS_USE_PCIE) {
             (void)mm_close_file(fd);
-        } else {
+        } else if (g_hdcConfig.h2d_type == HDC_TRANS_USE_UB) {
             hdc_ub_close(fd);
+        } else {
+            HDC_LOG_ERR("Variable h2d_type is invalid. (h2d_type=%#x)\n", g_hdcConfig.h2d_type);
         }
     }
 }
@@ -422,14 +427,18 @@ STATIC hdcError_t hdc_phandle_get(struct hdcConfig *hdcConfig)
     signed int i = hdc_get_handle_count();
 
     /* Waiting for permission to open /dev/hisi_dev */
-    HDC_LOG_INFO("HDC trans_type=%d, h2d_type=%d.\n", hdcConfig->trans_type, hdcConfig->h2d_type);
+    HDC_LOG_INFO("HDC trans_type=%d, h2d_type=%#x.\n", hdcConfig->trans_type, hdcConfig->h2d_type);
     while (i--) {
         if (hdcConfig->h2d_type == HDC_TRANS_USE_UB) {
             hdcConfig->pcie_handle = hdc_ub_open();
             HDC_LOG_INFO("Open ub.\n");
-        } else {
+        } else if (hdcConfig->h2d_type == HDC_TRANS_USE_PCIE) {
             hdcConfig->pcie_handle = hdc_pcie_open();
             HDC_LOG_INFO("Open pcie.\n");
+        } else {
+            HDC_LOG_ERR("Variable h2d_type is invalid. (h2d_type=%#x)\n", g_hdcConfig.h2d_type);
+            hdcConfig->pcie_handle = EN_ERROR;
+            break;
         }
         if (hdcConfig->pcie_handle != (mmProcess)EN_ERROR) {
             break;
@@ -1390,9 +1399,13 @@ STATIC hdcError_t drv_hdc_recv_msg_len(struct hdc_session *pSession, unsigned in
     if (g_hdcConfig.trans_type == HDC_TRANS_USE_PCIE) {
         if (g_hdcConfig.h2d_type == HDC_TRANS_USE_UB) {
             ret = hdc_ub_recv_peek(pSession, (signed int *)&msg_len, recvConfig);
-        } else {
+        } else if (g_hdcConfig.h2d_type == HDC_TRANS_USE_PCIE) {
             ret = hdc_pcie_recv_peek(g_hdcConfig.pcie_handle, pSession, (signed int *)&msg_len, recvConfig);
+        } else {
+            HDC_LOG_ERR("Variable h2d_type is invalid. (h2d_type=%#x)\n", g_hdcConfig.h2d_type);
+            return DRV_ERROR_INVALID_HANDLE;
         }
+
         if (ret != DRV_ERROR_NONE) {
             if (ret == (-HDCDRV_NO_BLOCK)) {
                 return DRV_ERROR_NON_BLOCK;
@@ -1470,7 +1483,7 @@ STATIC hdcError_t drv_hdc_add_msg_body(struct hdc_session *pSession, struct drvH
 
     if (*pBuf == NULL) {
         HDC_LOG_ERR("Call malloc failed. (sock=%d)\n", session_fd);
-        return DRV_ERROR_MALLOC_FAIL;
+        return DRV_ERROR_OUT_OF_MEMORY;
     }
 
     ret = drvHdcAddMsgBuffer(pMsg, *pBuf, (signed int)msg_len);
@@ -1510,9 +1523,12 @@ STATIC hdcError_t drv_hdc_recv_msg_body(struct hdc_session *pSession, char *pBuf
     if (g_hdcConfig.trans_type == HDC_TRANS_USE_PCIE) {
         if (g_hdcConfig.h2d_type == HDC_TRANS_USE_UB) {
             ret = hdc_ub_recv(pSession, pBuf, (signed int)bufLen, (signed int *)msgLen, recvConfig);
-        } else {
+        } else if (g_hdcConfig.h2d_type == HDC_TRANS_USE_PCIE) {
             ret = hdc_pcie_recv(g_hdcConfig.pcie_handle, pSession, pBuf, (signed int)bufLen, (signed int *)msgLen,
                 recvConfig);
+        } else {
+            HDC_LOG_ERR("Variable h2d_type is invalid. (h2d_type=%#x)\n", g_hdcConfig.h2d_type);
+            return DRV_ERROR_INVALID_HANDLE;
         }
         if (ret != DRV_ERROR_NONE) {
             /* No error log is generated when the module is destructed (DRV_ERROR_INVALID_HANDLE) */
@@ -1877,8 +1893,11 @@ STATIC drvError_t drv_hdc_get_session_attr(HDC_SESSION session, signed int attr,
 
     if (g_hdcConfig.h2d_type == HDC_TRANS_USE_UB) {
         ret = hdc_ub_get_session_attr(g_hdcConfig.pcie_handle, pSession, attr, value);
-    } else {
+    } else if (g_hdcConfig.h2d_type == HDC_TRANS_USE_PCIE) {
         ret = hdc_pcie_get_session_attr(g_hdcConfig.pcie_handle, pSession, attr, value);
+    } else {
+        HDC_LOG_ERR("Variable h2d_type is invalid. (h2d_type=%#x)\n", g_hdcConfig.h2d_type);
+        return DRV_ERROR_INVALID_HANDLE;
     }
     if (ret != DRV_ERROR_NONE) {
         if (ret == (-HDCDRV_SESSION_HAS_CLOSED)) {
@@ -1906,8 +1925,11 @@ drvError_t drv_hdc_get_peer_dev_id(signed int devId, signed int *peerDevId)
 
     if (g_hdcConfig.h2d_type == HDC_TRANS_USE_UB) {
         return (drvError_t)hdc_ub_get_peer_devId(g_hdcConfig.pcie_handle, devId, peerDevId);
-    } else {
+    } else if (g_hdcConfig.h2d_type == HDC_TRANS_USE_PCIE) {
         return (drvError_t)hdc_pcie_get_peer_devid(g_hdcConfig.pcie_handle, devId, peerDevId);
+    } else {
+        HDC_LOG_ERR("Variable h2d_type is invalid. (h2d_type=%#x)\n", g_hdcConfig.h2d_type);
+        return DRV_ERROR_INVALID_HANDLE;
     }
 }
 
@@ -2014,8 +2036,11 @@ hdcError_t halHdcSend(HDC_SESSION session, struct drvHdcMsg *pMsg, UINT64 flag, 
     if (g_hdcConfig.trans_type == HDC_TRANS_USE_PCIE) {
         if (g_hdcConfig.h2d_type == HDC_TRANS_USE_UB) {
             ret = hdc_ub_send(pSession, pMsg, wait, timeout);
-        } else {
+        } else if (g_hdcConfig.h2d_type == HDC_TRANS_USE_PCIE) {
             ret = hdc_pcie_send(g_hdcConfig.pcie_handle, pSession, pMsg, wait, timeout);
+        } else {
+            HDC_LOG_ERR("Variable h2d_type is invalid. (h2d_type=%#x)\n", g_hdcConfig.h2d_type);
+            return DRV_ERROR_INVALID_HANDLE;
         }
         if (ret != DRV_ERROR_NONE) {
             if (ret == (-HDCDRV_NO_BLOCK)) {

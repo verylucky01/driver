@@ -18,9 +18,9 @@ int drvGetDeviceDevIDByHostDevID(uint32_t host_dev_id, uint32_t *local_dev_id);
 extern drvError_t drvPcieIMUDDRRead(uint32_t devId, uint32_t offset, uint8_t *value, uint32_t len);
 #endif
 
-drvError_t drv_pcie_sram_readead(uint32_t devId, uint32_t offset, uint8_t *value, uint32_t len);
-drvError_t drv_pcie_ddr_readead(uint32_t devId, uint32_t offset, uint8_t *value, uint32_t len);
-drvError_t drv_pcie_bbox_hdr_readread(uint32_t devId, uint32_t offset, uint8_t *value, uint32_t len);
-drvError_t drv_reg_sram_readead(uint32_t devId, uint32_t offset, uint8_t *value, uint32_t len);
+drvError_t drv_pcie_sram_read(uint32_t devId, uint32_t offset, uint8_t *value, uint32_t len);
+drvError_t drv_pcie_ddr_read(uint32_t devId, uint32_t offset, uint8_t *value, uint32_t len);
+drvError_t drv_pcie_bbox_hdr_read(uint32_t devId, uint32_t offset, uint8_t *value, uint32_t len);
+drvError_t drv_reg_sram_read(uint32_t devId, uint32_t offset, uint8_t *value, uint32_t len);
 #endif
 #endif

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,8 +14,7 @@
 #ifndef URD_DEFINE_H
 #define URD_DEFINE_H
 
-#include <linux/types.h>
-#include <linux/version.h>
+#include "ka_memory_pub.h"
 #include "dmc_kernel_interface.h"
 #include "urd_define_adapt.h"
 
@@ -25,12 +24,12 @@
 #  define STATIC    static
 #endif
 
-#ifndef __GFP_ACCOUNT
+#ifndef __KA_GFP_ACCOUNT
 #  ifdef __GFP_KMEMCG
-#    define __GFP_ACCOUNT __GFP_KMEMCG /* for linux version 3.10 */
+#    define __KA_GFP_ACCOUNT __GFP_KMEMCG /* for linux version 3.10 */
 #  endif
 #  ifdef __GFP_NOACCOUNT
-#    define __GFP_ACCOUNT 0 /* for linux version 4.1 */
+#    define __KA_GFP_ACCOUNT 0 /* for linux version 4.1 */
 #  endif
 #endif
 

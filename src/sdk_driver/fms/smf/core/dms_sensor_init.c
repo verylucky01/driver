@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,18 +10,14 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-#include <linux/slab.h>
-#include <linux/version.h>
-#include <linux/kthread.h>
-#include <linux/timer.h>
-#include <linux/delay.h>
+
 #include "dms_kernel_version_adapt.h"
 #include "dms/dms_interface.h"
 #include "dms_sensor_notify.h"
 #include "dms_sensor.h"
 #include "kernel_version_adapt.h"
 #include "pbl_mem_alloc_interface.h"
-#ifndef CFG_HOST_ENV
+#ifndef CFG_EDGE_HOST
 #include "timer_affinity.h"
 #endif
 #ifdef CFG_FEATURE_BIND_CORE
@@ -72,7 +68,7 @@ static int dms_sensor_scan_task(void *arg)
 
     while (!ka_task_kthread_should_stop()) {
         /* Waiting for synchronization semaphore lock */
-        ret = wait_event_interruptible_timeout(sys_cb->sensor_scan_wait,
+        ret = ka_task_wait_event_interruptible_timeout(sys_cb->sensor_scan_wait,
                                                ka_base_atomic_read(&sys_cb->sensor_scan_task_state) > 0, timeout);
         if (ret == 0) {
             /* wait event timeout */
@@ -145,10 +141,11 @@ static unsigned int dms_sensor_task_init(void)
     return DRV_ERROR_NONE;
 }
 
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
 STATIC void dms_release_sensor_scan_task_sem(unsigned long time)
 #else
-STATIC void dms_release_sensor_scan_task_sem(struct timer_list *t)
+STATIC void dms_release_sensor_scan_task_sem(ka_timer_list_t *t)
 #endif
 {
     struct dms_system_ctrl_block *sys_cb = NULL;
@@ -165,10 +162,10 @@ static unsigned int dms_init_sensor_timer(void)
     init_timer(&sys_cb->dms_sensor_check_timer);
     sys_cb->dms_sensor_check_timer.function = dms_release_sensor_scan_task_sem;
 #else
-    timer_setup(&sys_cb->dms_sensor_check_timer, dms_release_sensor_scan_task_sem, 0);
+    ka_system_timer_setup(&sys_cb->dms_sensor_check_timer, dms_release_sensor_scan_task_sem, 0);
 #endif
     sys_cb->dms_sensor_check_timer.expires = ka_jiffies + ka_system_msecs_to_jiffies(DMS_SENSOR_CHECK_TIMER_LEN);
-#ifndef CFG_HOST_ENV
+#ifndef CFG_EDGE_HOST
     add_timer_affinity(&sys_cb->dms_sensor_check_timer);
 #else
     ka_system_add_timer(&sys_cb->dms_sensor_check_timer);

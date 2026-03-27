@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,8 +11,8 @@
  * GNU General Public License for more details.
  */
 
-#include "msg_chan_main.h"
 #include "ka_kernel_def_pub.h"
+#include "msg_chan_main.h"
 
 void *devdrv_pcimsg_alloc_non_trans_queue_inner_msg(u32 index_id, struct devdrv_non_trans_msg_chan_info *chan_info)
 {
@@ -45,7 +45,7 @@ int devdrv_pcimsg_free_non_trans_queue(void *msg_chan)
     struct devdrv_comm_dev_ops *dev_ops = devdrv_add_ops_ref();
     if (dev_ops == NULL) {
         devdrv_err("Host free non trans chan fail.\n");
-        return -EINVAL;
+        return -ENODEV;
     }
     ret = dev_ops->ops.free_non_trans(msg_chan);
     devdrv_sub_ops_ref(dev_ops);

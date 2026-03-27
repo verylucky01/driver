@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -19,35 +19,36 @@
 
 #include "pbl/pbl_davinci_api.h"
 #include "rmo_fops.h"
+#include "rmo_slab.h"
 
 static int rmo_open(ka_inode_t *inode, ka_file_t *file)
 {
     struct task_id_entity *task = NULL;
 
-    task = (struct task_id_entity *)ka_mm_kzalloc(sizeof(struct task_id_entity), KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
+    task = (struct task_id_entity *)rmo_kzalloc(sizeof(struct task_id_entity), KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
     if (task == NULL) {
 #ifndef EMU_ST
-        rmo_err("Failed to ka_mm_kzalloc task_id_entity.\n");
+        rmo_err("Failed to kzalloc task_id_entity.\n");
         return -ENOMEM;
 #endif
     }
 
-    task->tgid = current->tgid;
-    task_get_start_time_by_tgid(current->tgid, &task->start_time);
-    file->private_data = (void *)task;
+    task->tgid = ka_task_get_current_tgid();
+    task_get_start_time_by_tgid(ka_task_get_current_tgid(), &task->start_time);
+    ka_fs_set_file_private_data(file, (void *)task);
 
-    rmo_info("Open. (tgid=%d)\n", current->tgid);
+    rmo_info("Open. (tgid=%d)\n", ka_task_get_current_tgid());
     return 0;
 }
 
 static int rmo_release(ka_inode_t *inode, ka_file_t *file)
 {
-    struct task_id_entity *task = (struct task_id_entity *)(file->private_data);
+    struct task_id_entity *task = (struct task_id_entity *)ka_fs_get_file_private_data(file);
     if (task != NULL) {
         module_feature_auto_uninit_task(0, task->tgid, (void*)&(task->start_time));
         rmo_info("Release. (tgid=%d)\n", task->tgid);
-        ka_mm_kfree(task);
-        file->private_data = NULL;
+        rmo_kfree(task);
+        ka_fs_set_file_private_data(file, NULL);
     }
 
     return 0;
@@ -78,39 +79,24 @@ static long rmo_ioctl(ka_file_t *file, u32 cmd, unsigned long arg)
     return rmo_ioctl_handler[_KA_IOC_NR(cmd)](cmd, arg);
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 3, 0)
 static int rmo_mremap(ka_vm_area_struct_t * area)
 {
     return -ENOTSUPP;
 }
-#endif
 
 static ka_vm_operations_struct_t rmo_vm_ops = {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 3, 0)
-    .mremap = rmo_mremap,
-#endif
+    ka_vm_ops_init_mremap(rmo_mremap)
 };
 
 static int rmo_mmap(ka_file_t *file, ka_vm_area_struct_t *vma)
 {
-    vma->vm_ops = &rmo_vm_ops;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
-    vm_flags_set(vma, vma->vm_flags | KA_VM_LOCKED | KA_VM_DONTEXPAND | KA_VM_DONTDUMP | KA_VM_DONTCOPY | KA_VM_IO);
-    if (!(vma->vm_flags & KA_VM_WRITE)) {
-        vm_flags_clear(vma, VM_MAYWRITE);
+    ka_mm_set_vm_ops(vma, &rmo_vm_ops);
+    ka_mm_set_vm_flags(vma, ka_mm_get_vm_flags(vma) | KA_VM_LOCKED |
+                                KA_VM_DONTEXPAND | KA_VM_DONTDUMP | KA_VM_DONTCOPY | KA_VM_IO | KA_VM_PFNMAP);
+    if (!(ka_mm_get_vm_flags(vma) & KA_VM_WRITE)) {
+        ka_mm_vm_flags_clear(vma, KA_VM_MAYWRITE);
     }
-#else
-    vma->vm_flags |= KA_VM_DONTEXPAND;
-    vma->vm_flags |= KA_VM_LOCKED;
-    vma->vm_flags |= KA_VM_PFNMAP;
-    vma->vm_flags |= KA_VM_DONTDUMP;
-    vma->vm_flags |= KA_VM_DONTCOPY;
-    vma->vm_flags |= KA_VM_IO;
-    if (!(vma->vm_flags & KA_VM_WRITE)) {
-        vma->vm_flags &= ~VM_MAYWRITE;
-    }
-#endif
-    vma->vm_private_data = (void *)(uintptr_t)RMO_VMA_MAP_MAGIC_VERIFY;
+    ka_mm_set_vm_private_data(vma, (void *)(uintptr_t)RMO_VMA_MAP_MAGIC_VERIFY);
 
     return 0;
 }

@@ -10,6 +10,8 @@
 #ifndef QUE_CON_TYPE_H
 #define QUE_CON_TYPE_H
 
+#include "dms/dms_misc_interface.h"
+
 enum que_con_type {
     QUE_CON_PCIE = 0,
     QUE_CON_UB,

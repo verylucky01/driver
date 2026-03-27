@@ -65,16 +65,24 @@ extern "C" {
 #define PROC_MAX_PATH_LEN           256
 #define LINE_MAX_LEN                64
 #define CMP_NAME_MAX_SIZE           5
-#define WHITE_PROC_MAX_NUM          20
+#define WHITE_PROC_MAX_NUM          10
 #define NPU_MAX_CHIP_NUM_IN_CARD    16
 #define WHITE_PROC_CFG_FILE_NAME_LEN    64
 #define KILL_MAX_TRY_CNT            2
 #define BASE_TEN_NUMERAL_SYSTEM     10
+#define PROC_STATE_ALIVE            1
+#define PROC_STATE_DEAD            0
 
 typedef struct proc_info {
     int proc_num;
     int pid[WHITE_PROC_MAX_NUM];
-}WHITE_PROC_INFO;
+} WHITE_PROC_INFO;
+
+typedef struct proc_occupy_state {
+    int pid[WHITE_PROC_MAX_NUM];
+    int state[WHITE_PROC_MAX_NUM];
+    int pid_cnt;
+} OCCUPIED_PROC_INFO;
 
 #define DCMI_SMP_INVALID_ID (0xFFFFFFFF)
 #define DCMI_SMP_DEVICE_NUMBER (4)
@@ -101,7 +109,7 @@ int dcmi_set_all_npu_hot_reset();
 
 void dcmi_npu_msn_env_clean(int cardId);
 
-int dcmi_reset_brother_card(int card_id, int device_id, int device_logic_id);
+int dcmi_reset_brother_card(int card_id, int brother_card_id);
 
 int dcmi_set_npu_device_reset_inband(int card_id, int device_id);
 

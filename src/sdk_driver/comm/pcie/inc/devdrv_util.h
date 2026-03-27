@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,8 +14,8 @@
 #ifndef _DEVDRV_UTIL_H_
 #define _DEVDRV_UTIL_H_
 
-#include "dmc_kernel_interface.h"
 #include "ka_dfx_pub.h"
+#include "dmc_kernel_interface.h"
 
 #define module_devdrv "drv_pcie"
 
@@ -115,11 +115,5 @@
 
 #define BOARD_CLOUD_V2_EVB 0x201
 #define BOARD_MINI_V3_EVB 0x301
-
-#ifdef CFG_ENV_HOST
-#define DEVDRV_MAX_DEVICE 64
-#else
-#define DEVDRV_MAX_DEVICE 4
-#endif
 
 #endif

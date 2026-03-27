@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -64,10 +64,22 @@ typedef struct tag_stars_cqe_dvpp_info {
     uint32_t int_err;
 } rt_stars_cqe_dvpp_info_t;
 
+typedef struct tag_stars_ubdma_status {
+    uint16_t jettyid0;
+    uint16_t jettyid1;
+    uint16_t ci_idx0;
+    uint16_t ci_idx1;
+    uint8_t status0;
+    uint8_t sub_status0;
+    uint8_t status1;
+    uint8_t sub_status1;
+} rt_stars_ubdma_status_t;
+
 typedef union tag_stars_cqe_status {
     rt_stars_cqe_sys_cnt_t sys_cnt;
     rt_stars_cqe_error_info_t error_info;
     rt_stars_cqe_dvpp_info_t dvpp_info;
+    rt_stars_ubdma_status_t ubdma_info;
 } rt_stars_cqe_status_t;
 
 typedef struct tag_stars_cqe {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,18 +11,16 @@
  * GNU General Public License for more details.
  */
 
+#include "ka_system_pub.h"
+#include "ka_barrier_pub.h"
+#include "ka_memory_pub.h"
+#include "ka_list_pub.h"
 #include "virtmng_msg_pub.h"
 #include "virtmng_stack.h"
 #include "virtmng_public_def.h"
 #include "virtmng_msg_admin.h"
 #include "virtmng_msg_pub.h"
 #include "vmng_mem_alloc_interface.h"
-
-#include "ka_system_pub.h"
-#include "ka_barrier_pub.h"
-#include "ka_memory_pub.h"
-#include "ka_common_pub.h"
-#include "ka_list_pub.h"
 
 STATIC void vmng_uninit_msg_cluster_rx_chan(struct vmng_msg_cluster *msg_cluster, const struct vmng_msg_ops *ops);
 

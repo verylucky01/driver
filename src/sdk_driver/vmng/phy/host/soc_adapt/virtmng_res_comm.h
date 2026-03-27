@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,9 +14,8 @@
 #ifndef VIRTMNG_RES_COMM_H
 #define VIRTMNG_RES_COMM_H
 
-#include "virtmnghost_ctrl.h"
-#include "ka_task_pub.h"
 #include "ka_system_pub.h"
+#include "virtmnghost_ctrl.h"
 
 int vmngh_alloc_vfid_comm(u32 dev_id, u32 dtype, u32 *fid);
 void vmngh_free_vfid_comm(u32 dev_id, u32 vfid);

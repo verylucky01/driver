@@ -165,7 +165,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001251107203_zh-cn_topic_0000001177894684_zh-cn_topic_0000001115026454_toc533412083"></a>**
 
-```c
+```
 … 
 int ret; 
 int card_id = 0;
@@ -174,3 +174,4 @@ int state = 0;
 ret = dcmi_get_device_outband_channel_state(card_id, device_id, &state);
 …
 ```
+

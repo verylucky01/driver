@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -21,6 +21,6 @@ int devmm_ioctl_prefetch(struct devmm_svm_process *svm_pro, struct devmm_ioctl_a
 void devmm_get_dev_mem_dfx(struct devmm_svm_process *svm_pro, u32 mem_type, struct devmm_ioctl_arg *arg);
 int devmm_ipc_page_table_create_process(struct devmm_svm_process *svm_proc, struct devmm_svm_heap *heap,
     u32 *page_bitmap, struct devmm_ioctl_arg *arg, void *n_attr);
-
+    
 #endif /* SVM_MASTER_ADVISE_H */
 

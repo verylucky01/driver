@@ -15,5 +15,5 @@ target_sources(dms_obj PRIVATE
 )
 
 target_include_directories(dms_obj PRIVATE
-    $<$<STREQUAL:${PRODUCT},ascend910_95>:${DRIVER_USER_DIR}/inc/trs>
+    $<$<STREQUAL:${PRODUCT},ascend950>:${DRIVER_USER_DIR}/inc/trs>
 )

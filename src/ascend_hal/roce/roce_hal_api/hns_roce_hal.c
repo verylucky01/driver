@@ -22,7 +22,8 @@ static inline unsigned long long align(unsigned long long val, unsigned int alig
     return (val + align - 1) & ~(align - 1);
 }
 
-int hns_roce_hal_alloc_buf(void **buf, unsigned int *length, unsigned int size, unsigned int page_size, unsigned int dev_id)
+int hns_roce_hal_alloc_buf(void **buf, unsigned int *length, unsigned int size, unsigned int page_size,
+    unsigned int dev_id)
 {
 #define NODE_MASK_LIST_NUM 2
 #define MAX_NODE_BIT_NUM 128
@@ -161,7 +162,7 @@ int hns_roce_hal_get_dev_id(unsigned int chip_id, unsigned int die_id, unsigned 
     }
 
     *dev_id = 0;
-    ret = EINVAL;
+    ret = -EINVAL;
     roce_err("hns_roce_hal_get_dev_id failed, dev_id set to 0!");
 
 out:

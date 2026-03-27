@@ -185,7 +185,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001178213190_zh-cn_topic_0000001148519203_toc533412083"></a>**
 
-```c
+```
 #define ERROR_CODE_MAX_NUM  (128)
 #define BUF_SIZE          (256)
 … 
@@ -208,3 +208,4 @@ if (ret != 0){
 }
 …
 ```
+

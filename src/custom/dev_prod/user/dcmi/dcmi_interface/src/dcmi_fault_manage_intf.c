@@ -282,8 +282,7 @@ int dcmi_get_device_pcie_error_cnt(int card_id, int device_id, struct dcmi_chip_
     }
 
     if (dcmi_board_chip_type_is_ascend_910() == TRUE || dcmi_board_chip_type_is_ascend_910b() == TRUE ||
-        (dcmi_board_chip_type_is_ascend_910_95() &&
-        dcmi_mainboard_is_a900_a5_ub(g_mainboard_info.mainboard_id))) {
+        dcmi_mainboard_is_a900_a5_ub(g_mainboard_info.mainboard_id)) {
         gplog(LOG_ERR, "This device does not support.");
         return DCMI_ERR_CODE_NOT_SUPPORT;
     }
@@ -325,7 +324,8 @@ int dcmi_get_device_errorcode(
         return DCMI_ERR_CODE_INVALID_PARAMETER;
     }
 
-    if (dcmi_board_chip_type_is_ascend_910b() || dcmi_board_chip_type_is_ascend_910_93()) {
+    if (dcmi_board_chip_type_is_ascend_910b() || dcmi_board_chip_type_is_ascend_910_93() ||
+        dcmi_board_chip_type_is_ascend_910_95()) {
         gplog(LOG_ERR, "This device does not support.");
         return DCMI_ERR_CODE_NOT_SUPPORT;
     }
@@ -435,7 +435,7 @@ int dcmi_hilens_cpu_get_device_errorcode(int *error_count, unsigned int *error_c
 
         // 只包含3个字段，表示是告警头
         if (section_count == CPU_NO_ALARM_SECTION_NUM) {
-            *error_count = strtol(alarm_section_info[CPU_ALARM_COUNT_INDEX], NULL, DCMI_NUMBER_BASE);
+            *error_count = (int)strtol(alarm_section_info[CPU_ALARM_COUNT_INDEX], NULL, DCMI_NUMBER_BASE);
         } else if (section_count == CPU_ALARM_EXIST_SECTION_NUM) {
             // 包含6个字段为告警本身信息
             pcode[alarm_count++] = (unsigned int)strtol(alarm_section_info[CPU_ALARM_ID_INDEX], NULL, DCMI_NUMBER_BASE);

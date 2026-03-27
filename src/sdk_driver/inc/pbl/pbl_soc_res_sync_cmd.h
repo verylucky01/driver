@@ -1,0 +1,1 @@
+../../pbl/soc_resmng/command/msg/pbl_soc_res_sync_cmd.h

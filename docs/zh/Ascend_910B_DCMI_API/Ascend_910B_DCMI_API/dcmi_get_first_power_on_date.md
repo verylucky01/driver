@@ -150,7 +150,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001251107201_zh-cn_topic_0000001184188806_zh-cn_topic_0000001167913765_toc533412083"></a>**
 
-```c
+```
 …  
 int ret = 0; 
 int card_id = 0; 
@@ -158,3 +158,4 @@ unsigned int first_power_on_date = 0;
 ret = dcmi_get_first_power_on_date(card_id, &first_power_on_date); 
 …
 ```
+

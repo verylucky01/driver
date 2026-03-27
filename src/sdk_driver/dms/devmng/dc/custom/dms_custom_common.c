@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,14 +10,15 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
+#include "ka_errno_pub.h"
+#include "ka_base_pub.h"
+#include "ka_common_pub.h"
+#include "ka_fs_pub.h"
 #include "securec.h"
 #include "dms_custom_common.h"
 #include "dms_template.h"
 #include "dms/dms_cmd_def.h"
-#include "ka_fs_pub.h"
 #include "dms_custom_common.h"
-
 
 int dms_save_sign_flag_to_file(unsigned int device_id, char *buffer, unsigned int buff_size)
 {
@@ -80,11 +81,11 @@ int dms_custom_get_file_name(unsigned int dev_id, unsigned int sub_cmd, char *fi
 int dms_custom_is_file_exist(const char *file_name, int *is_exist)
 {
     int ret;
-    struct file *filp = NULL;
+    ka_file_t *filp = NULL;
 
-    filp = filp_open(file_name, O_RDONLY, 0);
-    if (IS_ERR_OR_NULL(filp)) {
-        ret = (int)PTR_ERR(filp);
+    filp = ka_fs_filp_open(file_name, KA_O_RDONLY, 0);
+    if (KA_IS_ERR_OR_NULL(filp)) {
+        ret = (int)KA_PTR_ERR(filp);
         if (ret == -ENOENT) {
             *is_exist = 0;
             return 0;
@@ -93,7 +94,7 @@ int dms_custom_is_file_exist(const char *file_name, int *is_exist)
         return -EINVAL;
     }
 
-    (void)filp_close(filp, NULL);
+    (void)ka_fs_filp_close(filp, NULL);
     filp = NULL;
     *is_exist = 1;
     return 0;
@@ -101,72 +102,72 @@ int dms_custom_is_file_exist(const char *file_name, int *is_exist)
 
 int dms_custom_get_file_size(const char *file_name,  unsigned long long *file_size)
 {
-    struct file *filp = NULL;
+    ka_file_t *filp = NULL;
  
     /* the file may not exist, so print warning */
-    filp = filp_open(file_name, O_RDONLY, 0);
-    if (IS_ERR_OR_NULL(filp)) {
-        dms_err("Unable to open file. (file_name=%s; errno=%ld)\n", file_name, PTR_ERR(filp));
-        return (int)PTR_ERR(filp);
+    filp = ka_fs_filp_open(file_name, KA_O_RDONLY, 0);
+    if (KA_IS_ERR_OR_NULL(filp)) {
+        dms_err("Unable to open file. (file_name=%s; errno=%ld)\n", file_name, KA_PTR_ERR(filp));
+        return (int)KA_PTR_ERR(filp);
     }
  
     /* get file total length */
     if (filp->f_inode == NULL) {
-        (void)filp_close(filp, NULL);
+        (void)ka_fs_filp_close(filp, NULL);
         filp = NULL;
         dms_err("File inode is NULL.\n");
         return -ENOENT;
     }
  
     *file_size = (unsigned long long)filp->f_inode->i_size;
-    (void)filp_close(filp, NULL);
+    (void)ka_fs_filp_close(filp, NULL);
     filp = NULL;
     return 0;
 }
 
 int dms_custom_read_file(const char *file_name, char *buf,  unsigned int size)
 {
-    struct file *filp = NULL;
+    ka_file_t *filp = NULL;
     loff_t offset_tmp = 0;
     ssize_t result;
  
-    filp = filp_open(file_name, O_RDONLY, 0);
-    if (IS_ERR_OR_NULL(filp)) {
-        dms_err("Unable to open file. (file_name=%s; errno=%ld)\n", file_name, PTR_ERR(filp));
-        return (int)PTR_ERR(filp);
+    filp = ka_fs_filp_open(file_name, KA_O_RDONLY, 0);
+    if (KA_IS_ERR_OR_NULL(filp)) {
+        dms_err("Unable to open file. (file_name=%s; errno=%ld)\n", file_name, KA_PTR_ERR(filp));
+        return (int)KA_PTR_ERR(filp);
     }
 
     result = ka_fs_kernel_read(filp, buf, size, &offset_tmp);
     if (result != (ssize_t)size) {
         dms_err("Kernel read file error. (result=%ld; size=%u)\n", result, size);
-        (void)filp_close(filp, NULL);
+        (void)ka_fs_filp_close(filp, NULL);
         filp = NULL;
         return -EINVAL;
     }
  
-    (void)filp_close(filp, NULL);
+    (void)ka_fs_filp_close(filp, NULL);
     filp = NULL;
     return 0;
 }
 
 int dms_sign_write_file(char *file_path, char *buffer, int size)
 {
-    struct file *filp = NULL;
+    ka_file_t *filp = NULL;
     loff_t offset_tmp = 0;
     int ret;
     int rw_len;
 
-    filp = filp_open(file_path, O_WRONLY | O_TRUNC, 0);
-    if (IS_ERR_OR_NULL(filp)) {
-        ret = (int)PTR_ERR(filp);
+    filp = ka_fs_filp_open(file_path, KA_O_WRONLY | KA_O_TRUNC, 0);
+    if (KA_IS_ERR_OR_NULL(filp)) {
+        ret = (int)KA_PTR_ERR(filp);
         if (ret != -ENOENT) {
-            dms_err("Unable to open file. (file_name=%s; err=%ld)\n", file_path, PTR_ERR(filp));
+            dms_err("Unable to open file. (file_name=%s; err=%ld)\n", file_path, KA_PTR_ERR(filp));
         }   
         return ret;
     }
 
     rw_len = ka_fs_kernel_write(filp, buffer, size, &offset_tmp);
-    (void)filp_close(filp, NULL);
+    (void)ka_fs_filp_close(filp, NULL);
     filp = NULL;
  
     if (rw_len != size) {
@@ -188,15 +189,15 @@ int search_key_and_get_value(char *buff, const char *split, const char *key, cha
         return -EINVAL;
     }
 
-    if (strlen(buff) == 0) {
+    if (ka_base_strlen(buff) == 0) {
         return -EINVAL;
     }
     /* Check if the words is end of '\n' or not. */
-    if (buff[strlen(buff) - 1] == '\n') {
-        buff[strlen(buff) - 1] = '\0';
+    if (buff[ka_base_strlen(buff) - 1] == '\n') {
+        buff[ka_base_strlen(buff) - 1] = '\0';
     }
     /* Check if it owns the key words or not. */
-    if (strstr(buff, key) == NULL) {
+    if (ka_base_strstr(buff, key) == NULL) {
         return -EINVAL;
     }
     /* Take the first part of the separator. */
@@ -205,7 +206,7 @@ int search_key_and_get_value(char *buff, const char *split, const char *key, cha
         return -EINVAL;
     }
     /* Compare key-words. */
-    if (strcmp(key, left) != 0) {
+    if (ka_base_strcmp(key, left) != 0) {
         return -EINVAL;
     }
     /* To get wanted-string. */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,7 +11,6 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/slab.h>
 #include "ascend_dev_num.h"
 #include "devdrv_manager_common.h"
 #include "devdrv_manager.h"
@@ -147,10 +146,10 @@ STATIC int dms_dev_list_init(dms_chip_dev_map_t *map_info)
 STATIC int dms_creat_chip_and_dev_linklist(dms_chip_dev_map_t *map_info)
 {
     unsigned int i, j;
-    struct list_head *n = NULL;
-    struct list_head *pos = NULL;
-    struct list_head *n_dev = NULL;
-    struct list_head *pos_dev = NULL;
+    ka_list_head_t *n = NULL;
+    ka_list_head_t *pos = NULL;
+    ka_list_head_t *n_dev = NULL;
+    ka_list_head_t *pos_dev = NULL;
     dms_chip_node_t *chip_node = NULL;
     dms_chip_dev_node_t *dev_node = NULL;
 
@@ -199,8 +198,8 @@ STATIC int dms_creat_chip_and_dev_linklist(dms_chip_dev_map_t *map_info)
 
 void dms_chip_dev_map_resource_free(dms_chip_dev_map_t **map_info)
 {
-    struct list_head *n = NULL;
-    struct list_head *pos = NULL;
+    ka_list_head_t *n = NULL;
+    ka_list_head_t *pos = NULL;
     dms_chip_node_t *chip_node = NULL;
     dms_chip_dev_map_t *chip_dev_map = NULL;
     if ((map_info == NULL) || ((*map_info) == NULL)) {
@@ -323,8 +322,8 @@ int dms_get_chip_count(int *count)
 
 int dms_get_chip_list(struct devdrv_chip_list *chip_info)
 {
-    struct list_head *n = NULL;
-    struct list_head *pos = NULL;
+    ka_list_head_t *n = NULL;
+    ka_list_head_t *pos = NULL;
     dms_chip_node_t *chip_node = NULL;
     dms_chip_dev_map_t *chip_dev_map = NULL;
 
@@ -364,10 +363,10 @@ int dms_get_chip_list(struct devdrv_chip_list *chip_info)
 int dms_get_device_from_chip(struct devdrv_chip_dev_list *chip_dev_list)
 {
     int num = 0;
-    struct list_head *n_dev = NULL;
-    struct list_head *pos_dev = NULL;
-    struct list_head *n_chip = NULL;
-    struct list_head *pos_chip = NULL;
+    ka_list_head_t *n_dev = NULL;
+    ka_list_head_t *pos_dev = NULL;
+    ka_list_head_t *n_chip = NULL;
+    ka_list_head_t *pos_chip = NULL;
     dms_chip_node_t *chip_node = NULL;
     dms_chip_dev_node_t *dev_node = NULL;
     dms_chip_dev_map_t *chip_dev_map = NULL;
@@ -420,10 +419,10 @@ ERROR_OUT:
 
 int dms_get_chip_from_device(struct devdrv_get_dev_chip_id *chip_from_dev)
 {
-    struct list_head *n_dev = NULL;
-    struct list_head *pos_dev = NULL;
-    struct list_head *n_chip = NULL;
-    struct list_head *pos_chip = NULL;
+    ka_list_head_t *n_dev = NULL;
+    ka_list_head_t *pos_dev = NULL;
+    ka_list_head_t *n_chip = NULL;
+    ka_list_head_t *pos_chip = NULL;
     dms_chip_node_t *chip_node = NULL;
     dms_chip_dev_node_t *dev_node = NULL;
     dms_chip_dev_map_t *chip_dev_map = NULL;

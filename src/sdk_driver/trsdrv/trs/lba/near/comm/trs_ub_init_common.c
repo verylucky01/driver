@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,6 +13,7 @@
 #ifndef EMU_ST
 #include "ka_task_pub.h"
 #include "ka_common_pub.h"
+#include "ka_memory_pub.h"
 #include "trs_pub_def.h"
 #include "trs_ub_init_common.h"
 
@@ -102,7 +103,7 @@ static struct trs_ub_dev *trs_ub_create_dev(u32 devid, u32 vfid)
         return NULL;
     }
 
-    ub_dev = (struct trs_ub_dev *)vzalloc(sizeof(struct trs_ub_dev));
+    ub_dev = (struct trs_ub_dev *)ka_mm_vzalloc(sizeof(struct trs_ub_dev));
     if (ub_dev == NULL) {
         trs_err("Failed to vzalloc ub_dev. (devid=%u)\n", devid);
         return NULL;
@@ -110,7 +111,7 @@ static struct trs_ub_dev *trs_ub_create_dev(u32 devid, u32 vfid)
 
     ub_dev->ubc_dev = trs_ub_get_ubcore_dev(devid);
     if (ub_dev->ubc_dev == NULL) {
-        vfree(ub_dev);
+        ka_mm_vfree(ub_dev);
         trs_err("Failed to ubc_dev. (devid=%u)\n", devid);
         return NULL;
     }
@@ -118,7 +119,7 @@ static struct trs_ub_dev *trs_ub_create_dev(u32 devid, u32 vfid)
     ub_dev->devid = devid;
     ret = trs_ub_get_eid_info(ub_dev, &eid_info);
     if (ret != 0) {
-        vfree(ub_dev);
+        ka_mm_vfree(ub_dev);
         trs_err("Failed to get eid_info. (ret=%d)\n", ret);
         return NULL;
     }
@@ -136,7 +137,7 @@ static struct trs_ub_dev *trs_ub_create_dev(u32 devid, u32 vfid)
 
 static void trs_ub_destroy_dev(struct trs_ub_dev *ub_dev)
 {
-    vfree(ub_dev);
+    ka_mm_vfree(ub_dev);
 }
 
 static void trs_ub_dev_release(struct kref_safe *ref)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,7 +11,6 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/iommu.h>
 #include "dvt.h"
 #include "domain_manage.h"
 #include "dma_pool.h"
@@ -40,7 +39,7 @@ void hw_vdavinci_iommu_detach_group(struct hw_vdavinci *vdavinci)
 STATIC bool vfio_iommu_has_sw_msi(struct iommu_group *group, phys_addr_t *base)
 {
     bool ret = false;
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,11,0))
+#if IS_VDAVINCI_KERNEL_VERSION_SUPPORT
     struct list_head group_resv_regions;
     struct iommu_resv_region *region, *next;
 
@@ -70,47 +69,13 @@ STATIC bool vfio_iommu_has_sw_msi(struct iommu_group *group, phys_addr_t *base)
     return ret;
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,12,0))
-
-#define IOVA_ANCHOR     ~0UL
-
-/*
- * copy_reserved_iova - copies the reserved between domains
- * @from: - source doamin from where to copy
- * @to: - destination domin where to copy
- * This function copies reserved iova's from one doamin to
- * other.
- */
-STATIC void copy_reserved_iova(struct iova_domain *from, struct iova_domain *to)
-{
-    unsigned long flags;
-    struct rb_node *node;
-
-    spin_lock_irqsave(&from->iova_rbtree_lock, flags);
-    for (node = rb_first(&from->rbroot); node; node = rb_next(node)) {
-        struct iova *iova = rb_entry(node, struct iova, node);
-        struct iova *new_iova;
-
-        if (iova->pfn_lo == IOVA_ANCHOR)
-                continue;
-
-        new_iova = reserve_iova(to, iova->pfn_lo, iova->pfn_hi);
-        if (!new_iova)
-            printk(KERN_ERR "Reserve iova range %lx@%lx failed\n",
-                   iova->pfn_lo, iova->pfn_hi);
-    }
-    spin_unlock_irqrestore(&from->iova_rbtree_lock, flags);
-}
-
-#endif
-
 STATIC void init_vf_iovad(struct hw_vdavinci *vdavinci)
 {
     struct vm_dom_info *vm_dom = vdavinci->vdev.domain;
     struct hw_vf_info *vf = &vdavinci->vf;
 
     vdavinci_init_iova_domain(&vf->iovad);
-    copy_reserved_iova(&vm_dom->iovad, &vf->iovad);
+    vdavinci_copy_reserved_iova(&vm_dom->iovad, &vf->iovad);
 }
 
 int hw_vdavinci_iommu_attach_group(struct hw_vdavinci *vdavinci)
@@ -148,7 +113,7 @@ int hw_vdavinci_iommu_attach_group(struct hw_vdavinci *vdavinci)
 
     resv_msi = vfio_iommu_has_sw_msi(group, &resv_msi_base);
     if (resv_msi) {
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,11,0))
+#if IS_VDAVINCI_KERNEL_VERSION_SUPPORT
         ret = iommu_get_msi_cookie(vf->domain, resv_msi_base);
 #endif
         if (ret) {
@@ -167,12 +132,6 @@ out_domain:
     vf->domain = NULL;
     return ret;
 }
-
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5,0,0))
-
-#define DMA_MAPPING_ERROR       (~(dma_addr_t)0)
-
-#endif
 
 STATIC unsigned long aligned_nrpages(unsigned long addr, size_t size)
 {

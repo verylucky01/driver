@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,6 +11,9 @@
  * GNU General Public License for more details.
  */
 
+#include "ka_kernel_def_pub.h"
+#include "ka_driver_pub.h"
+#include "ka_fs_pub.h"
 #include "devdrv_pci.h"
 #include "devdrv_ctrl.h"
 #include "devdrv_sysfs.h"
@@ -20,9 +23,6 @@
 #ifdef CFG_FEATURE_SYSFS_DUMP_DFX
 #include "devdrv_pcie_dump_dfx.h"
 #endif
-#include "ka_kernel_def_pub.h"
-#include "ka_driver_pub.h"
-#include "ka_fs_pub.h"
 
 #ifdef DRV_UT
 #define STATIC
@@ -265,7 +265,7 @@ STATIC ssize_t devdrv_sysfs_aer_cnt_store(ka_device_t *dev, ka_device_attribute_
 
     struct devdrv_sysfs_msg *msg = devdrv_kzalloc(sizeof(struct devdrv_sysfs_msg), KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
     if (msg == NULL) {
-        devdrv_err("Clear aer count failed, sysfs_msg malloc failed. (uid=%u)\n", __kuid_val(current_uid()));
+        devdrv_err("Clear aer count failed, sysfs_msg malloc failed. (uid=%u)\n", ka_task_get_current_cred_uid());
         return -EINVAL;
     }
 
@@ -274,7 +274,7 @@ STATIC ssize_t devdrv_sysfs_aer_cnt_store(ka_device_t *dev, ka_device_attribute_
     devid = devdrv_sysfs_get_devid_by_dev(dev);
     if (devid >= MAX_DEV_CNT) {
         devdrv_err("Clear aer count failed, get dev_id failed. (dev_id=%u; uid=%u)\n",
-            devid, __kuid_val(current_uid()));
+            devid, ka_task_get_current_cred_uid());
         devdrv_kfree(msg);
         return -EINVAL;
     }
@@ -283,13 +283,13 @@ STATIC ssize_t devdrv_sysfs_aer_cnt_store(ka_device_t *dev, ka_device_attribute_
         ret = devdrv_sysfs_common_msg_send(devid, (void *)msg, &real_out_len);
         if (ret != 0) {
             devdrv_err("Clear aer count failed, Common msg send failed. (dev_id=%u; uid=%u)\n",
-                devid, __kuid_val(current_uid()));
+                devid, ka_task_get_current_cred_uid());
             devdrv_kfree(msg);
             return -EINVAL;
         }
     }
 
-    devdrv_info("Clear aer count success. (dev_id=%u; uid=%u)\n", devid, __kuid_val(current_uid()));
+    devdrv_info("Clear aer count success. (dev_id=%u; uid=%u)\n", devid, ka_task_get_current_cred_uid());
 
     devdrv_kfree(msg);
     return (ssize_t)count;
@@ -493,7 +493,7 @@ STATIC ssize_t devdrv_sysfs_set_hotreset_flag(ka_device_t *dev,
     (void)attr;
 
     if (pci_ctrl == NULL) {
-        devdrv_err("Set hotreset flag failed, get pci_ctrl failed. (uid=%u)\n", __kuid_val(current_uid()));
+        devdrv_err("Set hotreset flag failed, get pci_ctrl failed. (uid=%u)\n", ka_task_get_current_cred_uid());
         return -EINVAL;
     }
     devid = pci_ctrl->dev_id;
@@ -501,7 +501,7 @@ STATIC ssize_t devdrv_sysfs_set_hotreset_flag(ka_device_t *dev,
     result = ka_base_kstrtoul(buf, 0, &val);
     if (result < 0) {
         devdrv_err("Set hotreset flag failed, ka_base_kstrtoul failed. (dev_id=%u; uid=%u; result=%ld)\n",
-            devid, __kuid_val(current_uid()), result);
+            devid, ka_task_get_current_cred_uid(), result);
         return result;
     }
 
@@ -510,13 +510,13 @@ STATIC ssize_t devdrv_sysfs_set_hotreset_flag(ka_device_t *dev,
             if (pci_ctrl->shr_para != NULL) {
                 pci_ctrl->shr_para->hot_reset_pcie_flag = DEVDRV_PCIE_HOT_RESET_FLAG;
                 devdrv_info("Set hotreset flag success. (dev_id=%u; uid=%u; val=%lu)\n",
-                    devid, __kuid_val(current_uid()), val);
+                    devid, ka_task_get_current_cred_uid(), val);
                 return (ssize_t)count;
             }
         }
     }
 
-    devdrv_info("No need to set hotreset flag. (dev_id=%u; uid=%u; val=%lu)\n", devid, __kuid_val(current_uid()), val);
+    devdrv_info("No need to set hotreset flag. (dev_id=%u; uid=%u; val=%lu)\n", devid, ka_task_get_current_cred_uid(), val);
 
     return (ssize_t)count;
 }

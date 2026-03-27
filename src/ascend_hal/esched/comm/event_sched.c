@@ -115,29 +115,32 @@ void esched_query_sync_msg_trace(uint32_t dev_id, struct event_summary *event, u
     drvError_t ret;
     struct sched_ioctl_para_trace para;
 
-    if ((dev_id >= ESCHED_DEV_NUM) || (grp_id < SCHED_MAX_DEFAULT_GRP_NUM) || (thread_id >= SCHED_MAX_SYNC_THREAD_NUM_PER_GRP)) {
+    if ((dev_id >= ESCHED_DEV_NUM) || (grp_id < SCHED_MAX_DEFAULT_GRP_NUM)) {
         sched_err("input param is invalid. (dev_id=%u; grp_id=%u; thread_id=%u)\n", dev_id, grp_id, thread_id);
         return;
     }
 
     para.input.dev_id = (unsigned int)dev_id;
-    para.input.dev_pid = (unsigned int)event->pid;
-    para.input.gid = grp_id;
-    para.input.tid = thread_id;
+    para.input.dst_pid = (unsigned int)event->pid;
+    para.input.dst_gid = event->grp_id;
+    para.input.dst_engine = event->dst_engine;
+    para.input.event_id = event->event_id;
+    para.input.subevent_id = event->subevent_id;
+    para.input.msg = *((struct sync_msg_info *)event->msg);
     ret = esched_dev_ioctl(dev_id, SCHED_QUERY_SYNC_MSG_TRACE, &para);
     if (ret != DRV_ERROR_NONE) {
         sched_err("query trace fail. (ret=%d; dev_id=%u; grp_id=%u; thread_id=%u)\n", ret, dev_id, grp_id, thread_id);
         return;
     }
 
-    sched_run_info("trace result show. (dev_id=%u; grp_id=%u; thread_id=%u; event_id=%u; subevent_id=%u; msg_type=%d; dev_pid=%d).\n",
-        dev_id, grp_id, thread_id, para.trace.event_id, para.trace.subevent_id, event->subevent_id, event->pid);
+    sched_run_info("trace event cfg. (dev_id=%u; grp_id=%u; thread_id=%u; event_id=%u; subevent_id=%u; pid=%d; dst_engine=%d).\n",
+        dev_id, grp_id, thread_id, event->event_id, event->subevent_id, event->pid, event->dst_engine);
     sched_run_info("show trace info. (src_submit_user=%llu; src_submit_kernel=%llu; dst_publish=%llu; dst_wait_start=%llu; dst_wait_end=%llu;"
-        " dst_submit_usr=%llu; dst_rsp_submit_kernel=%llu; src_publish=%llu; src_wait_start=%llu; src_wait_end=%llu; freq=%llu).\n",
+        " dst_submit_usr=%llu; dst_rsp_submit_kernel=%llu; src_publish=%llu; src_wait_start=%llu; src_wait_end=%llu).\n",
         para.trace.src_submit_user_timestamp, para.trace.src_submit_kernel_timestamp, para.trace.dst_publish_timestamp,
         para.trace.dst_wait_start_timestamp, para.trace.dst_wait_end_timestamp, para.trace.dst_submit_user_timestamp,
         para.trace.dst_submit_kernel_timestamp, para.trace.src_publish_timestamp, para.trace.src_wait_start_timestamp,
-        para.trace.src_wait_end_timestamp, esched_get_sys_freq());
+        para.trace.src_wait_end_timestamp);
 
     return;
 }

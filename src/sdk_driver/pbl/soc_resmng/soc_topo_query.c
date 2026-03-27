@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -60,7 +60,7 @@ STATIC int topo_check_in_the_same_os(unsigned int dev_id1, unsigned int dev_id2,
     dev_num = uda_get_detected_phy_dev_num();
     if (dev_num > ASCEND_PDEV_MAX_NUM) {
         soc_err("Failed to obtain the number of devices. (dev_id=%u; dev_num=%d)\n", dev_id1, dev_num);
-        return ret;
+        return -EINVAL;
     }
 
     ret = uda_get_cur_ns_udevids(devids, dev_num);
@@ -293,6 +293,8 @@ STATIC int topo_check_hccs(unsigned int dev_id1, unsigned int dev_id2, bool *res
 STATIC int topo_check_ub_for_pcie_card(u32 dev_id1, u32 host_dev_id1, u32 host_dev_id2, bool *result)
 {
     struct udevid_reorder_para info = {0};
+    u32 group_devid_mini = 0;
+    u32 group_devid_max = 0;
 #ifdef CFG_HOST_ENV
     int ret;
 #else
@@ -317,9 +319,15 @@ STATIC int topo_check_ub_for_pcie_card(u32 dev_id1, u32 host_dev_id1, u32 host_d
     info_vaddr = NULL;
 #endif
 
-    if ((info.ub_link_status == 1) &&
-        ((host_dev_id1 < host_dev_id2 && host_dev_id2 < host_dev_id1 + info.group_dev_num) ||
-        (host_dev_id1 > host_dev_id2 && host_dev_id1 < host_dev_id2 + info.group_dev_num))) {
+    if (info.group_dev_num == 0) {
+        soc_err("The number of devices in group is invalid. (dev_id=%u; group_dev_num=%u)\n",
+            dev_id1, info.group_dev_num);
+        return -EINVAL;
+    }
+
+    group_devid_mini = host_dev_id1 / info.group_dev_num * info.group_dev_num;
+    group_devid_max = host_dev_id1 / info.group_dev_num * info.group_dev_num + info.group_dev_num;
+    if ((info.ub_link_status == 1) && (host_dev_id2 >= group_devid_mini) && (host_dev_id2 < group_devid_max)) {
         *result = true;
         return 0;
     } else {
@@ -389,8 +397,6 @@ static soc_topology_check_t g_topology_check_info[] = {
     {SOC_TOPOLOGY_HCCS, topo_check_hccs},
 };
 
-/* In device side, dev_id2 is phy id on host, so, the max dev_id in device is also 64 */
-#define DMS_MAX_DEV_NUM_IN_HOST 64
 /*
   In host side invoke, dev_id1 and dev_id2 is physic id on the host.
   In device side invoke, dev_id1 is physic id on the device, dev_id2 is physic id on the host.
@@ -401,7 +407,7 @@ int soc_get_dev_topology(unsigned int dev_id1, unsigned int dev_id2, int *topolo
     bool result = false;
     int ret, i;
 
-    if ((dev_id1 >= ASCEND_PDEV_MAX_NUM) || (dev_id2 >= DMS_MAX_DEV_NUM_IN_HOST) || (topology_type == NULL)) {
+    if ((dev_id1 >= ASCEND_PDEV_MAX_NUM) || (dev_id2 >= ASCEND_HOST_PDEV_MAX_NUM) || (topology_type == NULL)) {
         soc_err("Invalid parameter. (dev_id1=%u; dev_id2=%u; topology_type=%d)\n",
             dev_id1, dev_id2, (topology_type != NULL));
         return -EINVAL;

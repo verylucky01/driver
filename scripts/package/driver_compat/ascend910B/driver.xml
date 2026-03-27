@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config name="driver_compat" copy_type="delivery" src_path="lib" dst_path="" install_own="$username:$usergroup" install_type="all">
+    <package_info>
+        <product_name>Ascend-hdk</product_name>
+        <chip_name>910b</chip_name>
+        <func_name>driver-compat</func_name>
+        <suffix>run</suffix>
+        <install_script>driver_compat/common/scripts/install.sh</install_script>
+        <help>driver_compat/common/scripts/help.info</help>
+        <version>scripts/package/driver/ascend910B/scripts/sys_version/sys_version.conf</version>
+        <parallel>true</parallel>
+        <check_features>true</check_features>
+    </package_info>
+    <generate_info value="scene.info" dst_path="" install_path="driver-compat" install_mod="440">
+        <os>$(OS_NAME)</os>
+        <os_version>$(OS_VER)</os_version>
+        <arch>$(ARCH)</arch>
+    </generate_info>
+    <version_info>
+        <interface itf_version="scripts/package/driver/common/conf/itf_ver.conf"/>
+    </version_info>
+
+    <dir_info value="driver-compat" install_path="driver-compat" install_type="all">
+        <path value="driver-compat" install_mod="750"/>
+        <path value="driver-compat/lib64" install_mod="550"/>
+        <path value="driver-compat/script" install_mod="550"/>
+    </dir_info>
+
+    <file_info value="info" copy_type="delivery" src_path="" dst_path="" install_path="driver-compat">
+        <file value="version.info" pkg_mod="440" install_mod="440"/>
+    </file_info>
+
+    <file_info value="script" copy_type="source" src_path="scripts/package/driver_compat/common/scripts" dst_path="script" install_path="driver-compat/script" pkg_mod="550" install_mod="550">
+        <file value="install.sh"/>
+        <file value="uninstall.sh"/>
+        <file value="help.info" pkg_mod="440" install_mod="440"/>
+        <file value="filelist.csv" copy_type="delivery" src_path="" pkg_mod="440" install_mod="440"/>
+        <file value="install_common_parser.sh" src_path="scripts/package/common/sh"/>
+        <file value="common_func.inc" src_path="scripts/package/common/sh"/>
+        <file value="common_func_v2.inc" src_path="scripts/package/common/sh"/>
+        <file value="common_func_v3.inc" src_path="scripts/package/common/sh"/>
+        <file value="common_installer.inc" src_path="scripts/package/common/sh"/>
+        <file value="script_operator.inc" src_path="scripts/package/common/sh"/>
+    </file_info>
+
+    <file_info value="lib64" copy_type="delivery" src_path="lib" dst_path="lib64" install_path="driver-compat/lib64" pkg_mod="440" install_mod="440">
+        <file value="libc_sec.so"/>
+        <file value="libascend_hal.so"/>
+        <file value="libascend_rdma_lite.so"/>
+        <file value="libhns-rdma-hal.so"/>
+        <file value="libhns-rdmav25.so"/>
+        <file value="libhns-rdmav34.so"/>
+        <file value="librdmacm.so.1"/>
+        <file value="libibumad.so.3"/>
+        <file value="libibverbs.so.1"/>
+    </file_info>
+</config>

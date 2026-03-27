@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -46,6 +46,7 @@
 #define KA_S_IROTH      S_IROTH
 #define KA_S_ISDIR      S_ISDIR
 
+#define KA_O_WRONLY     O_WRONLY
 #define KA_O_RDONLY     O_RDONLY
 #define KA_O_CREAT      O_CREAT
 #define KA_O_RDWR       O_RDWR
@@ -218,6 +219,7 @@ ssize_t ka_fs_kernel_write(ka_file_t *file, const void *buf, size_t count, loff_
 #define ka_fs_cdev_add(p, dev, count) cdev_add(p, dev, count)
 #define ka_fs_device_add(dev) device_add(dev)
 #define ka_fs_device_del(dev) device_del(dev)
+#define ka_fs_i_size_read(inode) i_size_read(inode)
 static inline void ka_fs_set_cdev_owner(ka_cdev_t *cdev, ka_module_t *owner)
 {
     cdev->owner = owner;

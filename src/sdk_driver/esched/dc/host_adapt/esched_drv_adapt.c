@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,12 +11,6 @@
  * GNU General Public License for more details.
  */
 #ifndef EVENT_SCHED_UT
-
-#include <asm/io.h>
-#include <linux/kthread.h>
-#include <linux/slab.h>
-#include <linux/delay.h>
-#include <linux/vmalloc.h>
 
 #include "tsdrv_interface.h"
 #include "comm_kernel_interface.h"
@@ -41,7 +35,7 @@
 #define STARS_TOPIC_HOST_AICPU_INT_MASK_NUM                         2
 
 #define SCHED_HOST_CONF_INTR_FREQ         3
-#define SCHED_HOST_MB_COUNT              (sizeof(u32) * BITS_PER_BYTE)
+#define SCHED_HOST_MB_COUNT              (sizeof(u32) * KA_BITS_PER_BYTE)
 #define SOFT_FAULT_REPORT_THR         60
 
 struct esched_drv_dev_attr {
@@ -124,7 +118,7 @@ STATIC void esched_drv_host_uninit_priv(struct sched_hard_res *res)
     res->priv = NULL;
 }
 
-STATIC void topic_sched_host_aicpu_intr_mask_set(u32 dev_id, void __iomem *io_base,
+STATIC void topic_sched_host_aicpu_intr_mask_set(u32 dev_id, void __ka_mm_iomem *io_base,
     u32 mask_index, u32 vf_id, u32 val)
 {
     if (esched_drv_get_topic_sched_version(dev_id) == (u32)TOPIC_SCHED_VERSION_V2) {
@@ -136,14 +130,14 @@ STATIC void topic_sched_host_aicpu_intr_mask_set(u32 dev_id, void __iomem *io_ba
     }
 }
 
-STATIC void topic_sched_host_ctrlcpu_intr_mask_set(u32 dev_id, void __iomem *io_base, u32 vf_id, u32 val)
+STATIC void topic_sched_host_ctrlcpu_intr_mask_set(u32 dev_id, void __ka_mm_iomem *io_base, u32 vf_id, u32 val)
 {
     if (esched_drv_get_topic_sched_version(dev_id) == (u32)TOPIC_SCHED_VERSION_V1) {
         topic_sched_host_ctrlcpu_intr_mask_set_v1(io_base, vf_id, val);
     }
 }
 
-STATIC bool topic_sched_host_ccpu_is_mb_valid(u32 dev_id, const void __iomem *io_base, u32 mb_id, u32 vf_id)
+STATIC bool topic_sched_host_ccpu_is_mb_valid(u32 dev_id, const void __ka_mm_iomem *io_base, u32 mb_id, u32 vf_id)
 {
     if (esched_drv_get_topic_sched_version(dev_id) == (u32)TOPIC_SCHED_VERSION_V1) {
         return topic_sched_host_ccpu_is_mb_valid_v1(io_base, mb_id, vf_id);
@@ -152,7 +146,7 @@ STATIC bool topic_sched_host_ccpu_is_mb_valid(u32 dev_id, const void __iomem *io
     return false;
 }
 
-STATIC bool topic_sched_host_aicpu_is_mb_valid(u32 dev_id, const void __iomem *io_base, u32 mb_id, u32 vf_id)
+STATIC bool topic_sched_host_aicpu_is_mb_valid(u32 dev_id, const void __ka_mm_iomem *io_base, u32 mb_id, u32 vf_id)
 {
     if (esched_drv_get_topic_sched_version(dev_id) == (u32)TOPIC_SCHED_VERSION_V2) {
 #ifndef EMU_ST
@@ -163,7 +157,7 @@ STATIC bool topic_sched_host_aicpu_is_mb_valid(u32 dev_id, const void __iomem *i
     }
 }
 
-STATIC void topic_sched_host_aicpu_intr_clr(u32 dev_id, void __iomem *io_base, u32 intr_index, u32 vf_id, u32 val)
+STATIC void topic_sched_host_aicpu_intr_clr(u32 dev_id, void __ka_mm_iomem *io_base, u32 intr_index, u32 vf_id, u32 val)
 {
     if (esched_drv_get_topic_sched_version(dev_id) == (u32)TOPIC_SCHED_VERSION_V2) {
 #ifndef EMU_ST
@@ -174,14 +168,14 @@ STATIC void topic_sched_host_aicpu_intr_clr(u32 dev_id, void __iomem *io_base, u
     }
 }
 
-STATIC void topic_sched_host_ccpu_intr_clr(u32 dev_id, void __iomem *io_base, u32 vf_id, u32 val)
+STATIC void topic_sched_host_ccpu_intr_clr(u32 dev_id, void __ka_mm_iomem *io_base, u32 vf_id, u32 val)
 {
     if (esched_drv_get_topic_sched_version(dev_id) == (u32)TOPIC_SCHED_VERSION_V1) {
         topic_sched_host_ccpu_intr_clr_v1(io_base, vf_id, val);
     }
 }
 
-STATIC void topic_sched_host_aicpu_intr_enable(u32 dev_id, void __iomem *io_base, u32 cpu_index, u32 vf_id)
+STATIC void topic_sched_host_aicpu_intr_enable(u32 dev_id, void __ka_mm_iomem *io_base, u32 cpu_index, u32 vf_id)
 {
     if (esched_drv_get_topic_sched_version(dev_id) == (u32)TOPIC_SCHED_VERSION_V2) {
 #ifndef EMU_ST
@@ -192,14 +186,14 @@ STATIC void topic_sched_host_aicpu_intr_enable(u32 dev_id, void __iomem *io_base
     }
 }
 
-STATIC void topic_sched_host_ctrlcpu_intr_enable(u32 dev_id, void __iomem *io_base, u32 cpu_index, u32 vf_id)
+STATIC void topic_sched_host_ctrlcpu_intr_enable(u32 dev_id, void __ka_mm_iomem *io_base, u32 cpu_index, u32 vf_id)
 {
     if (esched_drv_get_topic_sched_version(dev_id) == (u32)TOPIC_SCHED_VERSION_V1) {
         topic_sched_host_ctrlcpu_intr_enable_v1(io_base, cpu_index, vf_id);
     }
 }
 
-STATIC void topic_sched_host_aicpu_int_all_status(u32 dev_id, const void __iomem *io_base, u32 *val, u32 vf_id)
+STATIC void topic_sched_host_aicpu_int_all_status(u32 dev_id, const void __ka_mm_iomem *io_base, u32 *val, u32 vf_id)
 {
     if (esched_drv_get_topic_sched_version(dev_id) == (u32)TOPIC_SCHED_VERSION_V2) {
 #ifndef EMU_ST
@@ -210,7 +204,7 @@ STATIC void topic_sched_host_aicpu_int_all_status(u32 dev_id, const void __iomem
     }
 }
 
-STATIC void topic_sched_host_aicpu_intr_all_clr(u32 dev_id, void __iomem *io_base, u32 val, u32 vf_id)
+STATIC void topic_sched_host_aicpu_intr_all_clr(u32 dev_id, void __ka_mm_iomem *io_base, u32 val, u32 vf_id)
 {
     if (esched_drv_get_topic_sched_version(dev_id) == (u32)TOPIC_SCHED_VERSION_V2) {
 #ifndef EMU_ST
@@ -221,7 +215,7 @@ STATIC void topic_sched_host_aicpu_intr_all_clr(u32 dev_id, void __iomem *io_bas
     }
 }
 
-STATIC void topic_sched_host_aicpu_int_status(u32 dev_id, const void __iomem *io_base,
+STATIC void topic_sched_host_aicpu_int_status(u32 dev_id, const void __ka_mm_iomem *io_base,
     u32 intr_index, u32 *val, u32 vf_id)
 {
     if (esched_drv_get_topic_sched_version(dev_id) == (u32)TOPIC_SCHED_VERSION_V2) {
@@ -233,7 +227,7 @@ STATIC void topic_sched_host_aicpu_int_status(u32 dev_id, const void __iomem *io
     }
 }
 
-STATIC void topic_sched_host_ccpu_int_status(u32 dev_id, const void __iomem *io_base, u32 *val, u32 vf_id)
+STATIC void topic_sched_host_ccpu_int_status(u32 dev_id, const void __ka_mm_iomem *io_base, u32 *val, u32 vf_id)
 {
     if (esched_drv_get_topic_sched_version(dev_id) != (u32)TOPIC_SCHED_VERSION_V2) {
         topic_sched_host_ccpu_int_status_v1(io_base, val, vf_id);
@@ -397,7 +391,7 @@ STATIC struct topic_data_chan *esched_drv_interrupt_get_topic_chan(u32 dev_id, u
 }
 
 
-STATIC irqreturn_t esched_drv_host_task_interrupt(int irq, void *data)
+STATIC ka_irqreturn_t esched_drv_host_task_interrupt(int irq, void *data)
 {
     struct sched_hard_res *res = (struct sched_hard_res *)data;
     struct topic_data_chan *topic_chan = NULL;
@@ -406,7 +400,7 @@ STATIC irqreturn_t esched_drv_host_task_interrupt(int irq, void *data)
     struct esched_drv_dev_attr *dev_attr = esched_drv_interrupt_get_host_dev_attr(res->dev_id);
 
     if (dev_attr == NULL) {
-        return IRQ_HANDLED;
+        return KA_IRQ_HANDLED;
     }
 
     for (i = 0; i < STARS_TOPIC_HCPU_INT_REG_NUM; i++) {
@@ -424,7 +418,7 @@ STATIC irqreturn_t esched_drv_host_task_interrupt(int irq, void *data)
                     continue;
                 }
                 esched_drv_host_mb_intr_clr(topic_chan, i, val, dev_attr->vf_id);
-                tasklet_schedule(&topic_chan->sched_task);
+                ka_system_tasklet_schedule(&topic_chan->sched_task);
             }
         }
     }
@@ -435,14 +429,14 @@ STATIC irqreturn_t esched_drv_host_task_interrupt(int irq, void *data)
 
     topic_sched_host_ccpu_int_status(res->dev_id, res->io_base, &val, dev_attr->vf_id);
     if (val == 0) {
-        return IRQ_HANDLED;
+        return KA_IRQ_HANDLED;
     }
 
     cpu_ctx = sched_get_cpu_ctx(sched_get_numa_node(res->dev_id), NON_SCHED_DEFAULT_CPUID);
     esched_drv_host_mb_intr_clr(cpu_ctx->topic_chan, 0, val, dev_attr->vf_id);
-    tasklet_schedule(&cpu_ctx->topic_chan->sched_task);
+    ka_system_tasklet_schedule(&cpu_ctx->topic_chan->sched_task);
 
-    return IRQ_HANDLED;
+    return KA_IRQ_HANDLED;
 }
 
 void esched_drv_mb_intr_enable(struct topic_data_chan *topic_chan)
@@ -475,6 +469,7 @@ STATIC void esched_drv_host_init_cpu_mb(u32 chip_id, u32 mb_index, u32 wait_mb_i
     u32 offset = TOPIC_SCHED_MB_SIZE * wait_mb_id;
 
     topic_chan->mb_id = mb_index;
+    topic_chan->chan_id = mb_index;
 
     /* host rsv_mem_va only use for mailbox */
     topic_chan->wait_mb = (struct topic_sched_mailbox *)(topic_chan->hard_res->rsv_mem_va + offset);
@@ -527,7 +522,7 @@ STATIC int esched_drv_init_aicpu_chan(struct sched_numa_node *node)
         topic_chan->hard_res = res;
         topic_chan->cpu_ctx = NULL;
         esched_drv_host_init_cpu_mb(chip_id, chan_id, chan_id);
-        tasklet_init(&topic_chan->sched_task, esched_aicpu_sched_task, (uintptr_t)topic_chan);
+        ka_system_tasklet_init(&topic_chan->sched_task, esched_aicpu_sched_task, (uintptr_t)topic_chan);
         topic_chan->valid = SCHED_VALID;
     }
 
@@ -548,7 +543,7 @@ STATIC void esched_drv_uninit_aicpu_chan(struct sched_numa_node *node)
             continue;
         }
         if (topic_chan->valid == SCHED_VALID) {
-            tasklet_kill(&topic_chan->sched_task);
+            ka_system_tasklet_kill(&topic_chan->sched_task);
             topic_chan->valid = SCHED_INVALID;
         }
 #endif
@@ -605,7 +600,7 @@ STATIC int esched_drv_init_ccpu_chan(struct sched_numa_node *node, u32 mb_id)
     topic_chan->cpu_ctx->topic_chan = topic_chan;
 
     esched_drv_host_init_cpu_mb(dev_id, mb_id, chan_id);
-    tasklet_init(&topic_chan->sched_task, esched_ccpu_sched_task, (uintptr_t)topic_chan);
+    ka_system_tasklet_init(&topic_chan->sched_task, esched_ccpu_sched_task, (uintptr_t)topic_chan);
     topic_chan->valid = SCHED_VALID;
 
     esched_drv_remote_add_mb(dev_id, dev_attr->vf_id);
@@ -622,7 +617,7 @@ STATIC void esched_drv_uninit_ccpu_chan(struct sched_numa_node *node)
     }
 
     if (topic_chan->valid == SCHED_VALID) {
-        tasklet_kill(&topic_chan->sched_task);
+        ka_system_tasklet_kill(&topic_chan->sched_task);
         topic_chan->valid = SCHED_INVALID;
     }
 }
@@ -679,7 +674,7 @@ STATIC int esched_drv_host_init_irq(struct sched_hard_res *res)
     }
 
     /* all cpu in host can handle the same irq */
-    (void)irq_set_affinity_hint(attr->irq, NULL);
+    (void)ka_base_irq_set_affinity_hint(attr->irq, NULL);
     res->irq_reg_flag = 1;
 
     sched_info("Request irq success. (dev_id=%u; irq=%u)\n", dev_id, attr->irq);
@@ -697,7 +692,7 @@ STATIC void esched_drv_host_uninit_irq(struct sched_hard_res *res)
     }
 
     if (res->irq_reg_flag == 1) {
-        (void)irq_set_affinity_hint((u32)attr->irq, NULL);
+        (void)ka_base_irq_set_affinity_hint((u32)attr->irq, NULL);
         (void)devdrv_unregister_irq_by_vector_index(res->dev_id, res->irq[0], (void *)res);
         res->irq_reg_flag = 0;
     }
@@ -969,9 +964,9 @@ STATIC int esched_drv_init_msg_chan_main_proc(struct sched_hard_res *res)
     return 0;
 }
 
-STATIC void esched_drv_init_msg_chan_work(struct work_struct *p_work)
+STATIC void esched_drv_init_msg_chan_work(ka_work_struct_t *p_work)
 {
-    struct sched_hard_res *res = container_of(p_work, struct sched_hard_res, init.work);
+    struct sched_hard_res *res = ka_container_of(p_work, struct sched_hard_res, init.work);
     int ret;
 
     if (res->intr_config_flag == SCHED_INVALID) {
@@ -979,7 +974,7 @@ STATIC void esched_drv_init_msg_chan_work(struct work_struct *p_work)
         if (ret != 0) {
             res->retry_times++;
             sched_debug("Retry. (dev_id=%u; retry_times=%u; ret=%d)\n", res->dev_id, res->retry_times, ret);
-            (void)schedule_delayed_work(&res->init, SCHED_HOST_CONF_INTR_FREQ * HZ);
+            (void)ka_task_schedule_delayed_work(&res->init, SCHED_HOST_CONF_INTR_FREQ * KA_HZ);
             return;
         }
         res->intr_config_flag = SCHED_VALID;
@@ -993,7 +988,7 @@ STATIC void esched_drv_init_msg_chan_work(struct work_struct *p_work)
             esched_kernel_soft_fault_report(res->dev_id);
         }
         sched_debug("Retry. (dev_id=%u; retry_times=%u; ret=%d)\n", res->dev_id, res->retry_times, ret);
-        (void)schedule_delayed_work(&res->init, 1 * HZ);
+        (void)ka_task_schedule_delayed_work(&res->init, 1 * KA_HZ);
         return;
     }
 
@@ -1138,8 +1133,8 @@ int esched_hw_dev_init(struct sched_numa_node *node)
     ret = esched_drv_init_msg_chan(res);
     if (ret != 0) {
         sched_warn("device not ready, need start delay work to retry. (chip_id=%u)\n", chip_id);
-        INIT_DELAYED_WORK(&res->init,  esched_drv_init_msg_chan_work);
-        (void)schedule_delayed_work(&res->init, 0);
+        KA_TASK_INIT_DELAYED_WORK(&res->init,  esched_drv_init_msg_chan_work);
+        (void)ka_task_schedule_delayed_work(&res->init, 0);
         res->delay_work_enable = 1;
     }
 
@@ -1160,7 +1155,7 @@ void esched_hw_dev_uninit(struct sched_numa_node *node)
 
     res->init_flag = SCHED_INVALID;
     if (res->delay_work_enable != 0) {
-        (void)cancel_delayed_work_sync(&res->init);
+        (void)ka_task_cancel_delayed_work_sync(&res->init);
     }
     res->delay_work_enable = 0;
 

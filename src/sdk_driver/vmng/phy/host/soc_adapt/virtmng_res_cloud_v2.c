@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -36,7 +36,7 @@ STATIC int vmngh_check_pci_reset_finish(u32 dev_id)
     return VMNG_OK;
 }
 
-static int vmngh_sriov_reset_vdev_cloud_v2(u32 dev_id)
+STATIC int vmngh_sriov_reset_vdev_cloud_v2(u32 dev_id)
 {
     struct uda_mia_dev_para mia_para;
     u32 pf_id, vf_id;

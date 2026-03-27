@@ -32,8 +32,8 @@ drvError_t DmsGetDevProbeNum(unsigned int *num);
 drvError_t DmsGetDevProbeList(unsigned int *devices, unsigned int len);
 drvError_t DmsGetP2PStatus(unsigned int dev_id, unsigned int peer_dev_id, unsigned int *status);
 drvError_t DmsGetP2PCapbility(unsigned int dev_id, unsigned long long *capbility);
-drvError_t DmsEnableP2P(unsigned int dev_id, unsigned int peer_dev_id);
-drvError_t DmsDisableP2P(unsigned int dev_id, unsigned int peer_dev_id);
+drvError_t DmsEnableP2P(unsigned int dev_id, unsigned int peer_dev_id, unsigned int type);
+drvError_t DmsDisableP2P(unsigned int dev_id, unsigned int peer_dev_id, unsigned int type);
 drvError_t DmsCanAccessPeer(unsigned int dev_id, unsigned int peer_dev_id, int *can_access_peer);
 drvError_t DmsHalGetDeviceInfoEx(unsigned int dev_id, int module_type, int info_type,
     void *buf, unsigned int *size);
@@ -56,5 +56,6 @@ drvError_t dms_get_process_resource(unsigned int dev_id, struct dsmi_resource_pa
 drvError_t dms_set_sign_flag_ioctl(unsigned int dev_id, DSMI_MAIN_CMD main_cmd, unsigned int sub_cmd,
     const void *buf, unsigned int size);
 drvError_t dms_get_sign_flag_ioctl(
-    unsigned int dev_id, DSMI_MAIN_CMD main_cmd, unsigned int sub_cmd, void *buf, unsigned int *size);    
+    unsigned int dev_id, DSMI_MAIN_CMD main_cmd, unsigned int sub_cmd, void *buf, unsigned int *size);
+drvError_t dms_get_phy_dev_info(unsigned int phy_id, int info_type, unsigned int *val);
 #endif

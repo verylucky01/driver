@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -184,6 +184,7 @@ bool trs_is_proc_has_res(u32 devid, u32 tsid, int pid, int res_type, int res_id)
 }
 KA_EXPORT_SYMBOL_GPL(trs_is_proc_has_res);
 
+/* in stream extend scene, sq que info get from stream  */
 int trs_get_res_info(struct trs_id_inst *inst, int res_type, u32 res_id, void *info)
 {
     if ((res_type < (int)TRS_STREAM) || (res_type >= (int)TRS_MAX_ID_TYPE) || (inst->devid >= TRS_DEV_MAX_NUM)) {

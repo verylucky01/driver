@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -29,9 +29,8 @@ static ka_proc_dir_entry_t *g_devmm_dev_feature_entry[SVM_MAX_AGENT_NUM] = {NULL
 #ifndef EMU_ST
 static int devmm_dev_feature_capability_show(ka_seq_file_t *seq, void *offset)
 {
-    u32 devid = (u32)((u64)(uintptr_t)seq->private >> DEVMM_SEQ_PRIVATE_DATA_OFFSET);
-    u32 feature_id = (u32)(uintptr_t)seq->private;
-
+    u32 devid = (u32)((u64)(uintptr_t)ka_fs_get_seq_file_private(seq) >> DEVMM_SEQ_PRIVATE_DATA_OFFSET);
+    u32 feature_id = (u32)(uintptr_t)ka_fs_get_seq_file_private(seq);
     if (g_devmm_dev_feature[feature_id].feature_capability_get_handlers != NULL) {
         ka_fs_seq_printf(seq, "%d\n", g_devmm_dev_feature[feature_id].feature_capability_get_handlers(devid));
     } else {
@@ -75,24 +74,14 @@ static ssize_t devmm_dev_feature_ops_write(ka_file_t *filp, const char __ka_user
     return (ssize_t)count;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0)
 static const ka_procfs_ops_t devmm_dev_feature_ops = {
-    .proc_open    = devmm_dev_feature_ops_open,
-    .proc_read    = ka_fs_seq_read,
-    .proc_write   = devmm_dev_feature_ops_write,
-    .proc_lseek   = ka_fs_seq_lseek,
-    .proc_release = ka_fs_single_release,
+    ka_fs_init_pf_owner(KA_THIS_MODULE) \
+    ka_fs_init_pf_open(devmm_dev_feature_ops_open) \
+    ka_fs_init_pf_read(ka_fs_seq_read) \
+    ka_fs_init_pf_write(devmm_dev_feature_ops_write) \
+    ka_fs_init_pf_lseek(ka_fs_seq_lseek) \
+    ka_fs_init_pf_release(ka_fs_single_release) \
 };
-#else
-static const ka_file_operations_t devmm_dev_feature_ops = {
-    .owner = KA_THIS_MODULE,
-    .open    = devmm_dev_feature_ops_open,
-    .read    = ka_fs_seq_read,
-    .write   = devmm_dev_feature_ops_write,
-    .llseek  = ka_fs_seq_lseek,
-    .release = ka_fs_single_release,
-};
-#endif
 #endif
 
 void devmm_dev_feature_proc_fs_create(ka_proc_dir_entry_t  *dev_entry, u32 logic_id)

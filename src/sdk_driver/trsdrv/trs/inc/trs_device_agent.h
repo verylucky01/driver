@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -29,6 +29,7 @@ struct trs_device_agent_ops {
     int (*trs_agent_instance)(u32 devid, u32 tsid);
     void (*trs_agent_uninstance)(u32 devid, u32 tsid);
     int (*trs_agent_notice_ts)(u32 devid, u32 tsid, u8 *msg, u32 msg_len);
+    int (*trs_agent_res_num_query)(u32 devid, u32 tsid, struct trs_res_query_para *data);
 };
 
 void trs_agent_register_ops(u32 devid, struct trs_device_agent_ops *ops);

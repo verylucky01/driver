@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,9 +14,8 @@
 #ifndef PBL_URD_H
 #define PBL_URD_H
 
-#include <linux/device.h>
-#include <linux/notifier.h>
-#include <linux/types.h>
+#include "ka_type.h"
+#include "ka_dfx_pub.h"
 #include "pbl_urd_common.h"
 
 struct urd_cmd_kernel_para {
@@ -52,8 +51,8 @@ ssize_t dms_feature_print_feature_list(char *buf);
 
 #define URD_NOTIFIER_INIT    (0x1)
 #define URD_NOTIFIER_RELEASE (0x2)
-int urd_register_notifier(struct notifier_block* nb);
-int urd_unregister_notifier(struct notifier_block* nb);
+int urd_register_notifier(ka_notifier_block_t* nb);
+int urd_unregister_notifier(ka_notifier_block_t* nb);
 
 int dms_cmd_process_from_kernel(u32 devid, struct urd_cmd *cmd, struct urd_cmd_para *cmd_para);
 

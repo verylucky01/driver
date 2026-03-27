@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -23,16 +23,22 @@
 
 ka_pgprot_t devmm_make_pgprot(unsigned int flg, bool is_nocache)
 {
-    u64 prot_val = ka_pgprot_val(KA_PAGE_SHARED);
+    u64 prot_val;
+     
+    if (flg & DEVMM_PAGE_READONLY_FLG) {
+        prot_val = ka_pgprot_val(KA_PAGE_READONLY);
+    } else {
+        prot_val = ka_pgprot_val(KA_PAGE_SHARED);
+    }
 
-    return __pgprot(prot_val);
+    return __ka_pgprot(prot_val);
 }
 
 ka_pgprot_t devmm_make_pgprot_ex(u32 flg, struct devmm_pgprot_cfg_info cfg_info)
 {
     u64 prot_val = ka_pgprot_val(KA_PAGE_SHARED);
 
-    return __pgprot(prot_val);
+    return __ka_pgprot(prot_val);
 }
 
 bool devmm_pa_is_remote_addr(u64 pa)

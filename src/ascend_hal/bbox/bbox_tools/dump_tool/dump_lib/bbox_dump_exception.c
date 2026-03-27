@@ -35,7 +35,7 @@ STATIC void bbox_online_device_state(struct bbox_devices_info *info)
 
     drvError_t err = drvGetDevNum(&info->dev_num);
     if (err != DRV_ERROR_NONE) {
-        BBOX_ERR_CTRL(BBOX_WAR, return, "get dev number failed(%d).", (int)err);
+        BBOX_ERR_CTRL(BBOX_WAR, return, "get dev number unsuccessfully(%d).", (int)err);
     }
 
     for (i = 0; i < info->dev_num && i < MAX_PHY_DEV_NUM; i++) {

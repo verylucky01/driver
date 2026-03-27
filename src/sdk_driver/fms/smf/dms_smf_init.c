@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,17 +10,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
-#include <linux/kernel.h>
-#include <linux/slab.h>
-#include <linux/types.h>
-#include <linux/printk.h>
-#include <linux/delay.h>
-#include <linux/version.h>
-#include <linux/ioctl.h>
-#include <linux/module.h>
-#include <linux/vmalloc.h>
-#include <linux/mutex.h>
 
 #include "dms/dms_interface.h"
 #include "dms_sensor_init.h"

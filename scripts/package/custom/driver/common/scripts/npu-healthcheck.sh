@@ -164,7 +164,7 @@ function check_os_version()
             echo "OS type do not exist in the compatibility list."
             echo "OS infomation is : `uname -a`"
             return $OS_VERSION_ERROR
-        fi     
+        fi
     elif [ -f "/etc/neokylin-release" ] && [ ! -h "/etc/neokylin-release" ];then
         if_neokylin=$(cat "/etc/neokylin-release" | grep "NeoKylin")
         if [ "$if_neokylin" != "" ];then
@@ -175,7 +175,7 @@ function check_os_version()
             echo "OS type do not exist in the compatibility list."
             echo "OS infomation is : $(uname -a)"
             return $OS_VERSION_ERROR
-        fi           
+        fi
     elif [ -f "/etc/kylin-release" ] && [ ! -h "/etc/kylin-release" ];then
         if_kylinos=$(cat "/etc/kylin-release" | grep -i "Kylin")
         if [ "$if_kylinos" != "" ];then
@@ -267,7 +267,7 @@ function npu_tool_check_version()
             firm_version=$(grep -iw "Firmware Version" board_card${card_id}_chip${chip_num}.txt | awk -F ": " '{print $2}')
             for (( j = 0 ; j < ${#dangerous_driver_list[*]}  ; j++ ))
             do
-                if [[ "$soft_version" =~ "${dangerous_driver_list[$j]}" ]] || [["$firm_version" =~ "${dangerous_driver_list[$j]}"]]; then
+                if [[ "$soft_version" =~ "${dangerous_driver_list[$j]}" ]] || [[ "$firm_version" =~ "${dangerous_driver_list[$j]}" ]]; then
                     echo "card in slot $slot_id chip $chip_num version is in the dangerous driver list. Software is $soft_version, firmware version is $firm_version."
                     has_find=1
                 fi
@@ -496,16 +496,16 @@ function check_iic_health()
             iic_status=$(echo $iic_status_line | awk -F ": " '{print $2}' )
             if [ "${iic_status}" == "OK" ];then
                 continue
-            else 
+            else
                 has_find=1
                 cat "iic_card${card_id}.txt"
                 echo "slot${slot_id}_card${card_id} health state is $iic_status"
                 break
             fi
         done < iic_card${card_id}.txt
-            
+
     done < $_out_save_file
-	
+
 	if [ $has_find -eq 1 ];then
 		return $DCHIP_HEALTH_ERROR
 	else
@@ -549,7 +549,7 @@ function check_pcie_state()
         bus_real_speed=${bus_real_speed_str%GT*}
         bus_cap_width=${bus_cap_width_str#*x}
         bus_real_width=${bus_real_width_str#*x}
-        
+
         $npu_tool info -t product -i "${card_id}" -c 0 | grep "Atlas 300I Model 3000"
         if [ $? -eq 0 ];then
             bus_min_width=2
@@ -569,7 +569,7 @@ function check_pcie_state()
                 lspci -vvv -s $pci_bus 2>/dev/null | grep "AER"
             fi
         fi
-        
+
         if [[ $(lspci | grep "d100") == "" ]]; then
             continue
         fi
@@ -579,13 +579,13 @@ function check_pcie_state()
         do
             $npu_tool info -t board -i "${card_id}" -c "$i" > chipinfo_${card_id}_${i}.txt
             if [ $? -ne 0 ];then
-                log "get slot${slot_id}-chip${i} board info fail" 
+                log "get slot${slot_id}-chip${i} board info fail"
                 continue
             fi
 
             ### check start status
             pci_chip=$(grep -iw "PCIe Bus Info" chipinfo_${card_id}_${i}.txt | awk -F ": " '{print $2}' )
-            
+
             # 通过芯片的pcie编号找到PCIe switch的编号
             pci_switch=`find /sys -name remove | grep -i $pci_chip | awk -F '/' '{print $(NF-2)}'`
             if [[ "${pci_switch}" = "" ]];then
@@ -597,7 +597,7 @@ function check_pcie_state()
                 switch_real_speed_str=`lspci -vvv -s $pci_switch | grep "LnkSta" | awk -F ',' '{print $1}' | awk 'NR==1' | awk -F "Speed " '{print $2}'`
                 switch_cap_width_str=`lspci -vvv -s $pci_switch | grep "LnkCap" | awk -F ',' '{print $3}' | awk -F "Width " '{print $2}'`
                 switch_real_width_str=`lspci -vvv -s $pci_switch | grep "LnkSta" | awk -F ',' '{print $2}' | awk 'NR==1' | awk -F "Width " '{print $2}' | awk -F " " '{print $1}'`
-                
+
                 switch_cap_speed=${switch_cap_speed_str%GT*}
                 switch_real_speed=${switch_real_speed_str%GT*}
                 switch_cap_width=${switch_cap_width_str#*x}
@@ -742,7 +742,7 @@ function check_init()
         # OS兼容性列表
         ubuntu_os_list=("Ubuntu" "18.04" "4.15")
         centos_os_list=("CentOS" "7.6" "3.10")
-        euleros_os_list=("EulerOS" "2.0 (SP8)" "4.19")  
+        euleros_os_list=("EulerOS" "2.0 (SP8)" "4.19")
         #server兼容性列表
         huawei_server_list=("2288H V5" "TaiShan 200 (Model 2280)")
     elif [[ $(lspci | grep "d100") != "" ]]
@@ -780,12 +780,12 @@ function check_support_i2c_check()
         $npu_tool info -t product -i "${cardid_tmp}" -c 0  | grep "Atlas 300I Model 3000" > /dev/null
         if [ $? -eq 0 ];then
             return 0
-        fi        
+        fi
 
         $npu_tool info -t product -i "${cardid_tmp}" -c 0 | grep "Atlas 300I Model 3010" > /dev/null
         if [ $? -eq 0 ];then
             return 0
-        fi  
+        fi
 
         return 1
     done <card_id.txt
@@ -858,7 +858,7 @@ case $1 in
             cd - >/dev/null
             [ -d "${work_dir}" ] && rm -rf "${work_dir}"
             echo "$DCHIP_HEALTH_ERROR"
-            exit $DCHIP_HEALTH_ERROR          
+            exit $DCHIP_HEALTH_ERROR
         else
             check_support_i2c_check
             if [ $? -eq 0 ];then
@@ -931,7 +931,7 @@ case $1 in
             check_ascend_health "all_card_info.txt"
             ret4=$?
         fi
-        
+
         check_pcie_state "all_card_info.txt"
         ret5=$?
 

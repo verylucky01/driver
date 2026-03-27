@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -68,6 +68,14 @@ struct trs_logic_cqe {
     union {
         u64 timestamp;
         u16 sqe_index;
+        struct {
+            u16 jettyid0;
+            u16 jettyid1;
+            uint8_t status0;
+            uint8_t sub_status0;
+            uint8_t status1;
+            uint8_t sub_status1;
+        };
     };
     /* Union description:
      *  Internal: enque_timestamp temporarily used as dfx
@@ -83,7 +91,7 @@ struct trs_sqcq_reg_map_para {
     u32 stream_id;
     u32 sqid;
     u32 cqid;
-    pid_t host_pid;
+    ka_pid_t host_pid;
 };
 
 struct trs_notify_reg_map_para {
@@ -93,6 +101,25 @@ struct trs_notify_reg_map_para {
     unsigned long va;       /* output */
     unsigned int len;       /* output */
     enum res_addr_type res_type;
+};
+
+struct trs_res_query_para {
+    int type;
+    u32 alloc_num;
+    u32 res[4];
+};
+
+struct trs_res_info_query {
+    union {
+        struct { /* for stream */
+            u32 stream_depth;
+            u32 task_size;
+            void *stream_base_uva;
+            void *stream_base_kva;
+            u64 stream_base_pa;
+            u32 mem_type;
+        } stream_info;
+    };
 };
 
 struct trs_core_adapt_ops {
@@ -123,9 +150,10 @@ struct trs_core_adapt_ops {
     int (*request_irq)(struct trs_id_inst *inst, u32 irq_type, u32 irq, void *para,
         ka_irqreturn_t (*handler)(int irq, void *para));
     void (*free_irq)(struct trs_id_inst *inst, u32 irq_type, u32 irq, void *para);
-    void (*set_thread_affinity)(struct trs_id_inst *inst, struct task_struct *thread);
+    void (*set_thread_affinity)(struct trs_id_inst *inst, ka_task_struct_t *thread);
     int (*ts_rpc_call)(struct trs_id_inst *inst, u8 *msg, u32 len);
     int (*get_connect_protocol)(struct trs_id_inst *inst);
+    int (*get_host_mach_flag)(struct trs_id_inst *inst, u32 *host_flag);
     /* not must (tscpu phy device set) */
     int (*get_thread_bind_irq)(struct trs_id_inst *inst, u32 irq[], u32 irq_num, u32 *valid_irq_num, u32 *irq_type);
     int (*get_ts_inst_status)(struct trs_id_inst *inst, u32 *status);
@@ -146,6 +174,7 @@ struct trs_core_adapt_ops {
     int (*ras_report)(struct trs_id_inst *inst);
     int (*mem_update)(struct trs_id_inst *inst, u64 in_addr, u64 *out_addr, int flag); /* not must, flag 0:d2h 1:h2d */
     int (*notice_proc_release)(struct trs_id_inst *inst, int pid);
+    int (*res_num_query)(struct trs_id_inst *inst, struct trs_res_query_para *para); /* not must */
 };
 
 enum {
@@ -161,6 +190,7 @@ void trs_core_ts_inst_unregister(struct trs_id_inst *inst);
 int trs_stream_bind_remote_sqcq(struct trs_id_inst *inst, u32 stream_id, u32 sqid, u32 cqid, int host_pid);
 int trs_set_sq_reg_vaddr(struct trs_id_inst *inst, u32 sqid, u64 va, size_t size);
 int trs_get_sq_reg_vaddr(struct trs_id_inst *inst, u32 sqid, u64 *va, size_t *size);
+int trs_get_sq_bind_stream_info(struct trs_id_inst *inst, u32 sq_id, struct trs_res_info_query *res_info);
 
 int trs_res_id_get(struct trs_id_inst *inst, int res_type, u32 res_id);
 int trs_res_id_put(struct trs_id_inst *inst, int res_type, u32 res_id);
@@ -180,6 +210,7 @@ int trs_rpc_msg_ctrl(struct trs_id_inst *inst, int pid, void *msg, u32 msg_len, 
 int trs_notify_config_with_ts(struct trs_id_inst *inst, u32 notify_id, u32 notify_type, u32 config_type);
 int trs_get_stream_with_sq(struct trs_id_inst *inst, u32 sqid, u32 *stream_id);
 int trs_notice_exit_proc_list_recycle(struct trs_id_inst *inst, int pid);
+int trs_notice_check_proc_recycle(struct trs_id_inst *inst, int pid);
 
 int trs_core_init_module(void);
 void trs_core_exit_module(void);

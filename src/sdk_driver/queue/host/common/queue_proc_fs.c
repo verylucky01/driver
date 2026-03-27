@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,20 +10,12 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
-#include <linux/proc_fs.h>
-#include <linux/seq_file.h>
-#include <linux/version.h>
-#include <linux/string.h>
-#include <linux/kernel.h>
-#include <linux/uaccess.h>
-#include <linux/nsproxy.h>
-#include <linux/version.h>
 #include "kernel_version_adapt.h"
 #include "ka_task_pub.h"
 #include "ka_system_pub.h"
-
 #include "securec.h"
+#include "ka_fs_pub.h"
+#include "ka_compiler_pub.h"
 
 #include "queue_module.h"
 #include "queue_proc_fs.h"
@@ -32,10 +24,10 @@
 #define PROC_FS_R_MODE 0444
 #define PROC_FS_RW_MODE 0644
 
-static struct proc_dir_entry *queue_top_entry = NULL;
-static struct proc_dir_entry *queue_process_entry = NULL;
+static ka_proc_dir_entry_t *queue_top_entry = NULL;
+static ka_proc_dir_entry_t *queue_process_entry = NULL;
 
-static int queue_normal_status_show(struct seq_file *seq, void *offset)
+static int queue_normal_status_show(ka_seq_file_t *seq, void *offset)
 {
 #ifndef EMU_ST
     struct queue_qid_status *status = (struct queue_qid_status *)seq->private;
@@ -45,22 +37,22 @@ static int queue_normal_status_show(struct seq_file *seq, void *offset)
 #endif
 }
 
-static int queue_normal_status_open(struct inode *inode, struct file *file)
+static int queue_normal_status_open(ka_inode_t *inode, ka_file_t *file)
 {
     return ka_single_open(inode, file, queue_normal_status_show);
 }
 
 STATIC_PROCFS_FILE_FUNC_OPS_OPEN(normal_status_ops, queue_normal_status_open);
 
-static int queue_abnormal_status_show(struct seq_file *seq, void *offset)
+static int queue_abnormal_status_show(ka_seq_file_t *seq, void *offset)
 {
-    seq_printf(seq, "abnormal_queue_status_show\n");
+    ka_fs_seq_printf(seq, "abnormal_queue_status_show\n");
     queue_show_all_qid_status(seq, RECORD_EXCEPT);
 
     return 0;
 }
 
-static int queue_abnormal_status_open(struct inode *inode, struct file *file)
+static int queue_abnormal_status_open(ka_inode_t *inode, ka_file_t *file)
 {
     return ka_single_open(inode, file, queue_abnormal_status_show);
 }
@@ -68,21 +60,21 @@ static int queue_abnormal_status_open(struct inode *inode, struct file *file)
 STATIC_PROCFS_FILE_FUNC_OPS_OPEN(abnormal_status_ops, queue_abnormal_status_open);
 
 #ifndef EMU_ST
-static int queue_perf_switch_show(struct seq_file *seq, void *offset)
+static int queue_perf_switch_show(ka_seq_file_t *seq, void *offset)
 {
-    seq_printf(seq, "perf_queue_switch_show\n");
+    ka_fs_seq_printf(seq, "perf_queue_switch_show\n");
     queue_show_perf_switch(seq);
 
     return 0;
 }
 
-static int queue_perf_switch_open(struct inode *inode, struct file *file)
+static int queue_perf_switch_open(ka_inode_t *inode, ka_file_t *file)
 {
     return ka_single_open(inode, file, queue_perf_switch_show);
 }
 
 #define PERF_SWITCH_MAX_LEN 10
-static ssize_t queue_perf_switch_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
+static ssize_t queue_perf_switch_write(ka_file_t *file, const char __ka_user *buffer, size_t count, loff_t *ppos)
 {
     char kstr[PERF_SWITCH_MAX_LEN] = {0};
     char *time_threshold_ptr = NULL;
@@ -91,7 +83,7 @@ static ssize_t queue_perf_switch_write(struct file *file, const char __user *buf
     bool set_perf_switch = false;
     int ret;
 
-    if (current->nsproxy->mnt_ns != init_task.nsproxy->mnt_ns) {
+    if (ka_task_get_current()->nsproxy->mnt_ns != init_task.nsproxy->mnt_ns) {
         queue_err("No permission to set perf switch.\n");
         return -EINVAL;
     }
@@ -101,7 +93,7 @@ static ssize_t queue_perf_switch_write(struct file *file, const char __user *buf
         return -EINVAL;
     }
 
-    if (copy_from_user(kstr, (void *)buffer, count)) {
+    if (ka_base_copy_from_user(kstr, (void *)buffer, count)) {
         queue_err("Copy from user fail.\n");
         return -EINVAL;
     }
@@ -109,12 +101,12 @@ static ssize_t queue_perf_switch_write(struct file *file, const char __user *buf
 
     perf_switch_ptr = strtok_s(kstr, " ", &time_threshold_ptr);
     if (perf_switch_ptr != NULL) {
-        ret = kstrtobool(perf_switch_ptr, &set_perf_switch);
+        ret = ka_base_kstrtobool(perf_switch_ptr, &set_perf_switch);
         if (ret) {
             queue_err("Kstr to bool failed. (ret=%d)\n", ret);
             return -EINVAL;
         }
-        ret = kstrtouint(time_threshold_ptr, 10, &time_threshold);
+        ret = ka_base_kstrtouint(time_threshold_ptr, 10, &time_threshold);
         if (ret != 0) {
             time_threshold = 0;
         }
@@ -131,15 +123,15 @@ static ssize_t queue_perf_switch_write(struct file *file, const char __user *buf
 
 STATIC_PROCFS_FILE_FUNC_OPS_WRITE(perf_switch_ops, queue_perf_switch_open, queue_perf_switch_write);
 
-static int queue_perf_status_show(struct seq_file *seq, void *offset)
+static int queue_perf_status_show(ka_seq_file_t *seq, void *offset)
 {
-    seq_printf(seq, "perf_queue_status_show\n");
+    ka_fs_seq_printf(seq, "perf_queue_status_show\n");
     queue_show_all_qid_status(seq, RECORD_PERF);
 
     return 0;
 }
 
-static int queue_perf_status_open(struct inode *inode, struct file *file)
+static int queue_perf_status_open(ka_inode_t *inode, ka_file_t *file)
 {
     return ka_single_open(inode, file, queue_perf_status_show);
 }
@@ -154,7 +146,7 @@ static void proc_fs_format_qid_dir_name(u32 qid, char *name, u32 len)
     }
 }
 
-static struct proc_dir_entry *proc_fs_mk_qid_dir(u32 qid, struct proc_dir_entry *parent)
+static ka_proc_dir_entry_t *proc_fs_mk_qid_dir(u32 qid, ka_proc_dir_entry_t *parent)
 {
     char name[PROC_FS_NAME_LEN];
 
@@ -162,33 +154,33 @@ static struct proc_dir_entry *proc_fs_mk_qid_dir(u32 qid, struct proc_dir_entry 
         return NULL;
     }
     proc_fs_format_qid_dir_name(qid, name, PROC_FS_NAME_LEN);
-    return proc_mkdir((const char *)name, parent);
+    return ka_fs_proc_mkdir((const char *)name, parent);
 }
 
-void queue_proc_fs_add_qid(struct queue_qid_status *status, struct proc_dir_entry *parent)
+void queue_proc_fs_add_qid(struct queue_qid_status *status, ka_proc_dir_entry_t *parent)
 {
-    struct proc_dir_entry *entry = NULL;
+    ka_proc_dir_entry_t *entry = NULL;
 
     if (status == NULL) {
         return;
     }
 
-    if (atomic_cmpxchg(&status->qid_dir_exit, QID_DIR_NO_EXIT, QID_DIR_IS_EXIT) != QID_DIR_NO_EXIT) {
+    if (ka_base_atomic_cmpxchg(&status->qid_dir_exit, QID_DIR_NO_EXIT, QID_DIR_IS_EXIT) != QID_DIR_NO_EXIT) {
         return;
     }
 
     entry = proc_fs_mk_qid_dir(status->qid, parent);
     if (entry == NULL) {
-        atomic_set(&status->qid_dir_exit, QID_DIR_NO_EXIT);
+        ka_base_atomic_set(&status->qid_dir_exit, QID_DIR_NO_EXIT);
         queue_info("Create qid entry dir unsuccessful. (qid=%u)\n", status->qid);
         return;
     }
 
-    (void)proc_create_data("queue_status", PROC_FS_R_MODE, entry, &normal_status_ops, status);
+    (void)ka_fs_proc_create_data("queue_status", PROC_FS_R_MODE, entry, &normal_status_ops, status);
 }
 
 #ifndef EMU_ST
-static void proc_fs_rm_qid_dir(u32 qid, struct proc_dir_entry *parent)
+static void proc_fs_rm_qid_dir(u32 qid, ka_proc_dir_entry_t *parent)
 {
     char name[PROC_FS_NAME_LEN];
 
@@ -197,23 +189,23 @@ static void proc_fs_rm_qid_dir(u32 qid, struct proc_dir_entry *parent)
     }
 
     proc_fs_format_qid_dir_name(qid, name, PROC_FS_NAME_LEN);
-    (void)remove_proc_subtree((const char *)name, parent);
+    (void)ka_fs_remove_proc_subtree((const char *)name, parent);
 }
 
-void queue_proc_fs_del_qid(struct queue_qid_status *status, struct proc_dir_entry *parent)
+void queue_proc_fs_del_qid(struct queue_qid_status *status, ka_proc_dir_entry_t *parent)
 {
     proc_fs_rm_qid_dir(status->qid, parent);
-    atomic_set(&status->qid_dir_exit, QID_DIR_NO_EXIT);
+    ka_base_atomic_set(&status->qid_dir_exit, QID_DIR_NO_EXIT);
 }
 #endif
-static void proc_fs_format_process_dir_name(pid_t pid, char *name, u32 len)
+static void proc_fs_format_process_dir_name(ka_pid_t pid, char *name, u32 len)
 {
     if (sprintf_s(name, len, "%d", pid) <= 0) {
         queue_info("Pid sprintf_s unsuccessful. (pid=%d)\n", pid);
     }
 }
 
-static struct proc_dir_entry *proc_fs_mk_process_dir(pid_t pid, struct proc_dir_entry *parent)
+static ka_proc_dir_entry_t *proc_fs_mk_process_dir(ka_pid_t pid, ka_proc_dir_entry_t *parent)
 {
     char name[PROC_FS_NAME_LEN];
 
@@ -221,10 +213,10 @@ static struct proc_dir_entry *proc_fs_mk_process_dir(pid_t pid, struct proc_dir_
         return NULL;
     }
     proc_fs_format_process_dir_name(pid, name, PROC_FS_NAME_LEN);
-    return proc_mkdir((const char *)name, parent);
+    return ka_fs_proc_mkdir((const char *)name, parent);
 }
 
-static void proc_fs_rm_process_dir(pid_t pid, struct proc_dir_entry *parent)
+static void proc_fs_rm_process_dir(ka_pid_t pid, ka_proc_dir_entry_t *parent)
 {
     char name[PROC_FS_NAME_LEN];
 
@@ -233,7 +225,7 @@ static void proc_fs_rm_process_dir(pid_t pid, struct proc_dir_entry *parent)
     }
 
     proc_fs_format_process_dir_name(pid, name, PROC_FS_NAME_LEN);
-    (void)remove_proc_subtree((const char *)name, parent);
+    (void)ka_fs_remove_proc_subtree((const char *)name, parent);
 }
 
 void queue_proc_fs_add_process(struct queue_context *ctx)
@@ -252,22 +244,22 @@ void queue_proc_fs_del_process(struct queue_context *ctx)
 
 void queue_proc_fs_init(void)
 {
-    struct proc_dir_entry *abnormal_entry = NULL;
-    struct proc_dir_entry *perf_entry = NULL;
+    ka_proc_dir_entry_t *abnormal_entry = NULL;
+    ka_proc_dir_entry_t *perf_entry = NULL;
 
     queue_status_record_mng_init();
-    queue_top_entry = proc_mkdir("queue", NULL);
+    queue_top_entry = ka_fs_proc_mkdir("queue", NULL);
     if (queue_top_entry != NULL) {
-        queue_process_entry = proc_mkdir("process", queue_top_entry);
-        abnormal_entry = proc_mkdir("except_collect", queue_top_entry);
+        queue_process_entry = ka_fs_proc_mkdir("process", queue_top_entry);
+        abnormal_entry = ka_fs_proc_mkdir("except_collect", queue_top_entry);
         if (abnormal_entry != NULL) {
-            (void)proc_create_data("except_queue_status", PROC_FS_R_MODE, abnormal_entry, &abnormal_status_ops, NULL);
+            (void)ka_fs_proc_create_data("except_queue_status", PROC_FS_R_MODE, abnormal_entry, &abnormal_status_ops, NULL);
         }
-        perf_entry = proc_mkdir("perf_collect", queue_top_entry);
+        perf_entry = ka_fs_proc_mkdir("perf_collect", queue_top_entry);
         if (perf_entry != NULL) {
 #ifndef EMU_ST
-            (void)proc_create_data("perf_switch", PROC_FS_RW_MODE, perf_entry, &perf_switch_ops, NULL);
-            (void)proc_create_data("perf_queue_status", PROC_FS_R_MODE, perf_entry, &perf_status_ops, NULL);
+            (void)ka_fs_proc_create_data("perf_switch", PROC_FS_RW_MODE, perf_entry, &perf_switch_ops, NULL);
+            (void)ka_fs_proc_create_data("perf_queue_status", PROC_FS_R_MODE, perf_entry, &perf_status_ops, NULL);
 #endif
         }
     }
@@ -276,7 +268,7 @@ void queue_proc_fs_init(void)
 void queue_proc_fs_uninit(void)
 {
     if (queue_top_entry != NULL) {
-        (void)remove_proc_subtree("queue", NULL);
+        (void)ka_fs_remove_proc_subtree("queue", NULL);
     }
     queue_free_all_type_qid_status();
 }

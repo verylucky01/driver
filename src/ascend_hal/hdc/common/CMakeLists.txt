@@ -12,13 +12,8 @@ target_sources(hdc_obj PRIVATE
     hdc_core.c
     hdc_client.c
     hdc_cfg_parse.c
-    hdc_pcie_drv.c
-    hdc_ppc.c
     hdc_epoll.c
-    hdc_file_trans.c
-    ${DRIVER_USER_DIR}/hdc/host/hdc_adapter.c
+    hdc_file_common.c
 )
 
-add_subdirectory(pcie)
-add_subdirectory(sock)
 add_subdirectory(hdc_config)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -61,7 +61,7 @@ static inline u64 trs_stars_cq_get_timestamp(rt_stars_cqe_t *cqe)
     u64 timestamp;
 
     timestamp = (u64)(((u64)cqe->cqe_status.sys_cnt.syscnt_high) <<
-        (sizeof(cqe->cqe_status.sys_cnt.syscnt_low) * BITS_PER_BYTE));
+        (sizeof(cqe->cqe_status.sys_cnt.syscnt_low) * KA_BITS_PER_BYTE));
     timestamp |= (u64)cqe->cqe_status.sys_cnt.syscnt_low;
 
     return timestamp;

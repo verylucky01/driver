@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,6 +11,13 @@
  * GNU General Public License for more details.
  */
 
+#include "ka_pci_pub.h"
+#include "ka_fs_pub.h"
+#include "ka_system_pub.h"
+#include "ka_barrier_pub.h"
+#include "ka_driver_pub.h"
+#include "ka_memory_pub.h"
+#include "ka_kernel_def_pub.h"
 #include "comm_kernel_interface.h"
 #include "pbl/pbl_davinci_api.h"
 #include "davinci_interface.h"
@@ -23,17 +30,6 @@
 #include "hdcdrv_pfstat.h"
 #endif
 #include "hdc_init.h"
-
-#include "ka_task_pub.h"
-#include "ka_pci_pub.h"
-#include "ka_fs_pub.h"
-#include "ka_system_pub.h"
-#include "ka_barrier_pub.h"
-#include "ka_base_pub.h"
-#include "ka_common_pub.h"
-#include "ka_driver_pub.h"
-#include "ka_memory_pub.h"
-#include "ka_kernel_def_pub.h"
 
 STATIC struct hdc_hotreset_task_info g_hdc_hotreset_task_info[HDCDRV_SUPPORT_MAX_DEV] = {{0}};
 
@@ -55,6 +51,8 @@ static const ka_pci_device_id_t hdcdrv_tbl[] = {
     { 0x203F, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
     { 0x20C6, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
     { 0x203F, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+    { 0x20E9, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+    { 0x20E9, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
     {}};
 KA_MODULE_DEVICE_TABLE(pci, hdcdrv_tbl);
 

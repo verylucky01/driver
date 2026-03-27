@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,13 +14,10 @@
 #ifndef PBL_ARRAY_CTX_H
 #define PBL_ARRAY_CTX_H
 
-#include <linux/kref.h>
-#include <linux/list.h>
-#include <linux/spinlock.h>
-#include <linux/slab.h>
-#include <linux/vmalloc.h>
-#include <linux/mutex.h>
-#include <linux/seq_file.h>
+#include "ka_task_pub.h"
+#include "ka_memory_pub.h"
+#include "ka_common_pub.h"
+#include "ka_fs_pub.h"
 
 #include "pbl_kref_safe.h"
 
@@ -38,18 +35,18 @@
 #define MAX_ARRAY_SIZE 4096
 
 struct array_ctx_domain {
-    rwlock_t ctx_lock;
-    struct mutex mutex;
+    ka_rwlock_t ctx_lock;
+    ka_mutex_t mutex;
     const char *name;
     u32 array_size;
     u32 array_num;
-    void *ctx_table[0];
+    void *ctx_table[];
 };
 
 struct array_ctx {
     struct kref_safe ref;
     u32 id;
-    struct mutex mutex;
+    ka_mutex_t mutex;
     struct array_ctx_domain *domain;
     void *priv;
     void (*release)(struct array_ctx *ctx);
@@ -60,8 +57,8 @@ static inline void array_ctx_domain_init(struct array_ctx_domain *domain, const 
 {
     domain->name = name;
     domain->array_size = array_size;
-    mutex_init(&domain->mutex);
-    rwlock_init(&domain->ctx_lock);
+    ka_task_mutex_init(&domain->mutex);
+    ka_task_rwlock_init(&domain->ctx_lock);
 }
 
 /* interface */
@@ -73,7 +70,7 @@ static inline struct array_ctx_domain *array_ctx_domain_create(const char *name,
         return NULL;
     }
 
-    domain = vzalloc(sizeof(*domain) + (sizeof(void *) * array_size));
+    domain = ka_mm_vzalloc(sizeof(*domain) + (sizeof(void *) * array_size));
     if (domain == NULL) {
         return NULL;
     }
@@ -86,8 +83,8 @@ static inline struct array_ctx_domain *array_ctx_domain_create(const char *name,
 /* interface */
 static inline void array_ctx_domain_destroy(struct array_ctx_domain *domain)
 {
-    mutex_destroy(&domain->mutex);
-    vfree(domain);
+    ka_task_mutex_destroy(&domain->mutex);
+    ka_mm_vfree(domain);
 }
 
 static inline int array_ctx_get_idle_id_locked(struct array_ctx_domain *domain, u32 *id)
@@ -108,22 +105,22 @@ static inline int array_ctx_get_idle_id_locked(struct array_ctx_domain *domain, 
 static inline int array_ctx_get_idle_id(struct array_ctx_domain *domain, u32 *id)
 {
     int ret;
-    write_lock_bh(&domain->ctx_lock);
+    ka_task_write_lock_bh(&domain->ctx_lock);
     ret = array_ctx_get_idle_id_locked(domain, id);
-    write_unlock_bh(&domain->ctx_lock);
+    ka_task_write_unlock_bh(&domain->ctx_lock);
     return ret;
 }
 
 static inline int array_ctx_add_to_domain(struct array_ctx_domain *domain, struct array_ctx *ctx)
 {
-    write_lock_bh(&domain->ctx_lock);
+    ka_task_write_lock_bh(&domain->ctx_lock);
     if (domain->ctx_table[ctx->id] != NULL) {
-        write_unlock_bh(&domain->ctx_lock);
+        ka_task_write_unlock_bh(&domain->ctx_lock);
         return -EEXIST;
     }
     domain->ctx_table[ctx->id] = ctx;
     domain->array_num++;
-    write_unlock_bh(&domain->ctx_lock);
+    ka_task_write_unlock_bh(&domain->ctx_lock);
 
     return 0;
 }
@@ -133,12 +130,12 @@ static inline void _array_ctx_release(struct array_ctx *ctx)
     if (ctx->release != NULL) {
         ctx->release(ctx);
     }
-    vfree(ctx);
+    ka_mm_vfree(ctx);
 }
 
 static inline void array_ctx_release(struct kref_safe *ref)
 {
-    struct array_ctx *ctx = container_of(ref, struct array_ctx, ref);
+    struct array_ctx *ctx = ka_container_of(ref, struct array_ctx, ref);
     _array_ctx_release(ctx);
 }
 
@@ -163,9 +160,9 @@ static inline struct array_ctx *array_ctx_get(struct array_ctx_domain *domain, u
         return NULL;
     }
 
-    read_lock_bh(&domain->ctx_lock);
+    ka_task_read_lock_bh(&domain->ctx_lock);
     ctx = _array_ctx_get(domain, id);
-    read_unlock_bh(&domain->ctx_lock);
+    ka_task_read_unlock_bh(&domain->ctx_lock);
 
     return ctx;
 }
@@ -193,7 +190,7 @@ static inline int array_ctx_init(struct array_ctx_domain *domain, struct array_c
 {
     ctx->id = id;
     ctx->priv = priv;
-    mutex_init(&ctx->mutex);
+    ka_task_mutex_init(&ctx->mutex);
     ctx->domain = domain;
     ctx->release = release;
     kref_safe_init(&ctx->ref);
@@ -204,14 +201,14 @@ static inline int _array_ctx_create(struct array_ctx_domain *domain,
     u32 id, void *priv, void (*release)(struct array_ctx *ctx))
 {
     int ret;
-    struct array_ctx *ctx = vzalloc(sizeof(*ctx));
+    struct array_ctx *ctx = ka_mm_vzalloc(sizeof(*ctx));
     if (ctx == NULL) {
         return -ENOMEM;
     }
 
     ret = array_ctx_init(domain, ctx, id, priv, release);
     if (ret != 0) {
-        vfree(ctx);
+        ka_mm_vfree(ctx);
     }
 
     return ret;
@@ -232,10 +229,10 @@ static inline int array_ctx_create(struct array_ctx_domain *domain,
 static inline void array_ctx_destroy(struct array_ctx *ctx)
 {
     struct array_ctx_domain *domain = ctx->domain;
-    write_lock_bh(&domain->ctx_lock);
+    ka_task_write_lock_bh(&domain->ctx_lock);
     domain->ctx_table[ctx->id] = NULL;
     domain->array_num--;
-    write_unlock_bh(&domain->ctx_lock);
+    ka_task_write_unlock_bh(&domain->ctx_lock);
     array_ctx_put(ctx);
 }
 
@@ -256,17 +253,17 @@ static inline void array_ctx_for_each_safe(struct array_ctx_domain *domain,
 
 static inline void array_ctx_item_show(struct array_ctx *ctx, void *priv)
 {
-    struct seq_file *seq = (struct seq_file *)priv;
-    seq_printf(seq, "    id %u ref %u\n", ctx->id, kref_safe_read(&ctx->ref));
+    ka_seq_file_t *seq = (ka_seq_file_t *)priv;
+    ka_fs_seq_printf(seq, "    id %u ref %u\n", ctx->id, kref_safe_read(&ctx->ref));
 }
 
 /* interface */
-static inline void array_ctx_domain_show(struct array_ctx_domain *domain, struct seq_file *seq)
+static inline void array_ctx_domain_show(struct array_ctx_domain *domain, ka_seq_file_t *seq)
 {
-    seq_printf(seq, "domain: %s array_size %u\n", domain->name, domain->array_size);
+    ka_fs_seq_printf(seq, "domain: %s array_size %u\n", domain->name, domain->array_size);
 
     array_ctx_for_each_safe(domain, seq, array_ctx_item_show);
-    seq_printf(seq, "\n");
+    ka_fs_seq_printf(seq, "\n");
 }
 
 /* interface */
@@ -276,9 +273,9 @@ static inline int array_ctx_lock_call_func(struct array_ctx_domain *domain, u32 
     int ret = -ESRCH;
     struct array_ctx *ctx = array_ctx_get(domain, id);
     if (ctx != NULL) {
-        mutex_lock(&ctx->mutex);
+        ka_task_mutex_lock(&ctx->mutex);
         ret = func(ctx, para);
-        mutex_unlock(&ctx->mutex);
+        ka_task_mutex_unlock(&ctx->mutex);
         array_ctx_put(ctx);
     }
 

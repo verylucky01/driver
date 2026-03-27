@@ -142,7 +142,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001206147246_zh-cn_topic_0000001223494373_zh-cn_topic_0000001102279196_toc533412083"></a>**
 
-```c
+```
 #define ERROR_CODE_MAX_NUM              (128) 
 …  
 int ret = 0; 
@@ -151,3 +151,4 @@ unsigned int error_code_list[DCMI_ERROR_CODE_MAX_COUNT] = {0};
 ret = dcmi_get_driver_errorcode(&error_count, error_code_list, ERROR_CODE_MAX_NUM); 
 …
 ```
+

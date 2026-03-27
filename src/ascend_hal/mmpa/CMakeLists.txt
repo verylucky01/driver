@@ -129,6 +129,7 @@ target_compile_definitions(static_mmpa PRIVATE
     $<$<STREQUAL:${PRODUCT},ascend031>:STRERROR_R_RETURN_INT>
 )
 target_compile_options(static_mmpa PRIVATE
+    -fPIC -pipe -Wall
     $<$<STREQUAL:${TARGET_SYSTEM_NAME},Linux>:-fvisibility=hidden>
     $<$<AND:$<STREQUAL:${TARGET_SYSTEM_NAME},Windows>,$<CONFIG:Debug>>:/MTd>
     $<$<AND:$<STREQUAL:${TARGET_SYSTEM_NAME},Windows>,$<CONFIG:Release>>:/MT>

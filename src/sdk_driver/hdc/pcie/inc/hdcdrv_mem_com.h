@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,6 +14,9 @@
 #ifndef _HDCDRV_MEM_COM_H_
 #define _HDCDRV_MEM_COM_H_
 
+#include "ka_memory_pub.h"
+#include "ka_list_pub.h"
+#include "ka_task_pub.h"
 #ifdef CFG_FEATURE_VFIO
 #include "vmng_kernel_interface.h"
 #endif
@@ -21,11 +24,6 @@
 #include "hdcdrv_cmd.h"
 #include "hdcdrv_cmd_ioctl.h"
 #include "hdcdrv_cmd_msg.h"
-#include "ka_memory_pub.h"
-#include "ka_common_pub.h"
-#include "ka_list_pub.h"
-#include "ka_task_pub.h"
-#include "ka_base_pub.h"
 
 #define VHDC_VCTX_HASH_KEY_INVALID ((unsigned long long)-1)
 #define VHDC_MEM_POOL_SG_FLAG 0xE8
@@ -92,7 +90,7 @@ struct hdcdrv_mem_pool {
     struct hdcdrv_mem *ring;
     ka_task_spinlock_t mem_lock;
     ka_list_head_t wait_list;
-    void __iomem *reserve_mem_va;
+    void __ka_mm_iomem *reserve_mem_va;
     ka_dma_addr_t reserve_mem_dma_addr;
     size_t reserve_mem_size;
 #ifdef CFG_FEATURE_MIRROR
@@ -156,7 +154,7 @@ struct hdccom_mem_init {
     /* reserve mem info */
     phys_addr_t reserve_mem_pa;
     size_t reserve_mem_size;
-    void __iomem *reserve_mem_va;
+    void __ka_mm_iomem *reserve_mem_va;
     ka_dma_addr_t reserve_mem_dma_addr;
     u32 reserve_mem_offset;
 };
@@ -233,6 +231,9 @@ struct hdcdrv_wait_mem_fin_msg {
 
 struct hdcdrv_mem_f {
     void *buf;
+#ifdef CFG_FEATURE_OVER_XCOM
+    phys_addr_t phy_addr;
+#endif
     ka_dma_addr_t addr;
     ka_page_t *page;
 #ifdef CFG_FEATURE_VFIO
@@ -258,6 +259,10 @@ struct hdcdrv_fast_mem {
 #ifdef CFG_FEATURE_HDC_REG_MEM
     u32 align_size; /* register memory align size, HUGE_PAGE->2M, NORMAL_PAGE->4k */
     u32 register_inner_page_offset; /* register memory va start offset within the corresponding PAGE(HUGE or Normal) */
+#endif
+#ifdef CFG_FEATURE_OVER_XCOM
+    dma_addr_t sdma_addr;
+    struct scatterlist *sg;
 #endif
 };
 
@@ -319,6 +324,9 @@ struct hdcdrv_fast_addr_info {
     /* first page addr offset, eg: start cpy addr = va_addr + pagesize(4k) * page_start_Idx + page_start_offset */
     u32 page_start_idx; /* first use page id, default:0 */
     u32 send_inner_page_offset; /* actually send va start offset within the corresponding PAGE(HUGE or Normal) */
+#endif
+#ifdef CFG_FEATURE_OVER_XCOM
+    u32 send_offset;
 #endif
     struct hdcdrv_fast_mem *f_mem;
 };
@@ -489,4 +497,21 @@ void hdcdrv_alloc_pool_stamp_init(void);
 void hdcdrv_set_time_stamp(u64 *stamp);
 struct hdcdrv_init_stamp *hdcdrv_get_init_stamp_info(void);
 void hdcdrv_init_stamp_record(void);
+int hdcdrv_save_fast_mem_info(struct hdcdrv_fast_mem *fast_mem,
+    u64 send_addr_va, struct hdcdrv_fast_addr_info *addr_info);
+void hdcdrv_fast_free_mem_node(struct hdcdrv_fast_mem *f_mem);
+void hdcdrv_fast_unpin_mem_normal(struct hdcdrv_fast_mem *f_mem);
+void hdcdrv_register_mem_scatter_list_uninit(struct hdcdrv_fast_mem *f_mem);
+struct hdcdrv_fast_node *hdcdrv_fast_node_search(ka_task_spinlock_t *lock, ka_rb_root_t *root,
+    u64 new_node_hash, struct hdcdrv_node_status *node_status, struct hdcdrv_node_search_info *node_search_info);
+void hdcdrv_fast_free_huge_page_mem(struct hdcdrv_fast_mem *f_mem);
+void hdcdrv_fill_fast_mem_info(struct hdcdrv_fast_mem *f_mem, u64 va, u32 len, u32 type);
+int hdcdrv_dma_map(struct hdcdrv_fast_mem *f_mem, int devid, int flag);
+void hdcdrv_huge_put_page(struct hdcdrv_fast_mem *f_mem);
+int hdcdrv_pin_user_page(unsigned long start, int nr_pages, unsigned int gup_flags, ka_page_t **pages);
+void hdcdrv_unpin_user_page(ka_page_t *page);
+int hdcdrv_remote_mem_map(struct hdcdrv_fast_node *f_node, struct hdcdrv_ctrl_msg_sync_mem_info *msg);
+void hdcdrv_remote_mem_unmap(struct hdcdrv_fast_node *f_node);
+void hdcdrv_map_remote_pa(struct hdcdrv_fast_node *f_node, struct hdcdrv_ctrl_msg_sync_mem_info *msg);
+int hdcdrv_register_mem_scatter_list_init(struct hdcdrv_fast_mem *f_mem);
 #endif /* _HDCDRV_MEM_COM_H_ */

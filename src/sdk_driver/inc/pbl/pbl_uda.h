@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,10 +14,13 @@
 #ifndef PBL_UDA_H
 #define PBL_UDA_H
 
-#include <linux/device.h>
-
+#include "ka_type.h"
+#include "ka_base_pub.h"
+#include "ka_common_pub.h"
 #include "pbl_dev_identity.h"
 #include "ascend_kernel_hal.h"
+#include "ka_base_pub.h"
+#include "ka_task_pub.h"
 
 /*
     UDA: unified device access
@@ -38,7 +41,7 @@ static inline u32 uda_get_dev_hw_type_by_name(const char *name)
     u32 dev_hw_type;
 
     for (dev_hw_type = UDA_DAVINCI; dev_hw_type < UDA_HW_MAX; dev_hw_type++) {
-        if (strcmp(uda_dev_hw_name[dev_hw_type], name) == 0) {
+        if (ka_base_strcmp(uda_dev_hw_name[dev_hw_type], name) == 0) {
             break;
         }
     }
@@ -53,10 +56,12 @@ struct uda_dev_para {
                   UDA_AGENT set existing devid; */
     u32 remote_udevid;
     u32 chip_type;
-    struct device *dev;
+    ka_device_t *dev;
     int pf_flag;  /* 1: pf; 0: vf */
     u32 master_id;
     u32 add_id; /* ID added to the input during udevid reordering */
+    u32 char_flag; /* 1: use logic id numbering */
+    u32 logic_id;
 };
 
 struct uda_mia_dev_para {
@@ -129,13 +134,14 @@ static inline void uda_davinci_remote_real_entity_type_pack(struct uda_dev_type 
 }
 
 static inline void uda_dev_para_pack(struct uda_dev_para *para,
-    u32 udevid, u32 remote_udevid, u32 chip_type, struct device *dev)
+    u32 udevid, u32 remote_udevid, u32 chip_type, ka_device_t *dev)
 {
     para->udevid = udevid;
     para->remote_udevid = remote_udevid;
     para->chip_type = chip_type;
     para->dev = dev;
     para->pf_flag = 1;   /* default pf dev */
+    para->add_id = udevid;
 }
 
 static inline void uda_mia_dev_para_pack(struct uda_mia_dev_para *mia_para, u32 phy_devid, u32 sub_devid)
@@ -180,8 +186,8 @@ int uda_notifier_register(const char *notifier, struct uda_dev_type *type, enum 
 int uda_notifier_unregister(const char *notifier, struct uda_dev_type *type);
 int uda_get_action_para(u32 udevid, enum uda_notified_action action, u32 *val);
 
-struct device *uda_get_device(u32 udevid);
-struct device *uda_get_agent_device(u32 udevid);
+ka_device_t *uda_get_device(u32 udevid);
+ka_device_t *uda_get_agent_device(u32 udevid);
 
 /* Some modules do not separate the drivers of real devices and virtual devices.
    Therefore, simples methods are provided here. */
@@ -226,6 +232,7 @@ int uda_remote_udevid_to_udevid(u32 remote_udevid, u32 *udevid);
 /* mia dev trans */
 int uda_udevid_to_mia_devid(u32 udevid, struct uda_mia_dev_para *mia_para);
 int uda_mia_devid_to_udevid(struct uda_mia_dev_para *mia_para, u32 *udevid);
+u32 uda_make_udevid(struct uda_mia_dev_para *mia_para);
 
 int uda_devid_to_udevid(u32 devid, u32 *udevid);
 int uda_devid_to_phy_devid(u32 devid, u32 *phy_devid, u32 *vfid);
@@ -238,7 +245,7 @@ int uda_ns_node_devid_to_udevid(u32 devid, u32 *udevid);
 
 bool uda_can_access_udevid(u32 udevid);
 bool uda_proc_can_access_udevid(int tgid, u32 udevid);
-bool uda_task_can_access_udevid_inherit(struct task_struct *task, u32 udevid);
+bool uda_task_can_access_udevid_inherit(ka_task_struct_t *task, u32 udevid);
 
 /* detected dev num, it is not related to whether the device is online */
 int uda_set_detected_phy_dev_num(u32 dev_num);
@@ -258,6 +265,7 @@ int uda_get_cur_ns_udevids(u32 udevids[], u32 num);
 int uda_set_dev_ns_identify(u32 udevid, u64 identify); /* should call in notifier call ctx */
 int uda_get_dev_ns_identify(u32 udevid, u64 *identify);
 int uda_get_cur_ns_id(u32 *ns_id);
+int uda_get_container_docker_id(u32 *docker_id);
 
 int uda_set_dev_share(u32 udevid, u8 share_flag);
 int uda_get_dev_share(u32 udevid, u8 *share_flag);
@@ -278,4 +286,5 @@ int uda_set_udevid_reorder_para(u32 add_id, struct udevid_reorder_para *para);
 int uda_get_udevid_reorder_para(u32 udevid, struct udevid_reorder_para *para);
 int uda_udevid_to_add_id(u32 udevid, u32 *add_id);
 int uda_add_id_to_udevid(u32 add_id, u32 *udevid);
+int uda_udevid_to_logic_id(u32 udevid, u32 *logic_id);
 #endif

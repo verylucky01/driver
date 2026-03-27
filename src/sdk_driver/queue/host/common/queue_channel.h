@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,11 +13,10 @@
 
 #ifndef QUEUE_CHANNEL_H
 #define QUEUE_CHANNEL_H
-
-#include <linux/types.h>
-#include <linux/list.h>
-#include <linux/semaphore.h>
-
+#include "ka_list_pub.h"
+#include "ka_memory_pub.h"
+#include "ka_common_pub.h"
+#include "ka_system_pub.h"
 #include "ascend_hal_define.h"
 #include "pbl/pbl_chip_config.h"
 #include "esched_kernel_interface.h"
@@ -46,7 +45,7 @@ struct queue_chan_mem_node_va {
 };
 
 struct queue_chan_mem_node_dma {
-    dma_addr_t dma;
+    ka_dma_addr_t dma;
     u64 size;
 };
 
@@ -92,8 +91,8 @@ struct queue_chan_attr {
     QUEUE_CHAN_MSG_TYPE msg_type;
     enum queue_memory_type memory_type;
     u32 devid;
-    pid_t host_pid;
-    struct device *dev;
+    ka_pid_t host_pid;
+    ka_device_t *dev;
 
     int chan_id;
     u64 serial_num;
@@ -136,9 +135,9 @@ struct queue_chan {
     u64 local_dma_blk_num;          /* Local dma blk num that already added to que_chan */
     struct queue_chan_dma *local_chan_dma;
 
-    struct semaphore tx_complete;
+    ka_semaphore_t tx_complete;
 
-    struct list_head list;
+    ka_list_head_t list;
 };
 
 struct queue_chan_copy_addr_attr {

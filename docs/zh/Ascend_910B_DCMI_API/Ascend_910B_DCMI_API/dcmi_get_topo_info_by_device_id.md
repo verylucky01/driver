@@ -173,7 +173,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001251107199_zh-cn_topic_0000001223414423_zh-cn_topic_0000001146259777_toc533412083"></a>**
 
-```c
+```
 …
 int ret = 0;
 int card_id1 = 0;
@@ -184,3 +184,4 @@ int result;
 ret = dcmi_get_topo_info_by_device_id(card_id1, device_id1, card_id2, device_id2, &result);
 …
 ```
+

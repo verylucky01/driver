@@ -583,23 +583,23 @@ drvError_t halMbufGetDqsHandle(Mbuf *mbuf,  uint64_t *handle)
     return DRV_ERROR_NOT_SUPPORT;
 }
  
-drvError_t halBuffGetDQSPooInfo(struct mempool_t *mp, DqsPoolInfo *poolInfo)
+drvError_t halBuffGetDQSPoolInfo(struct mempool_t *mp, DqsPoolInfo *poolInfo)
 {
     (void)mp;
     (void)poolInfo;
     return DRV_ERROR_NOT_SUPPORT;
 }
  
-drvError_t halBuffGetDQSPooInfoById(unsigned int poolId, DqsPoolInfo *poolInfo)
+drvError_t halBuffGetDQSPoolInfoById(unsigned int poolId, DqsPoolInfo *poolInfo)
 {
     (void)poolId;
     (void)poolInfo;
     return DRV_ERROR_NOT_SUPPORT;
 }
 
-int halMbufGetDqsPoolId(Mbuf *mbuf, uint32_t *pool_id)
+drvError_t halMbufGetDQSPoolInfo(Mbuf *mbuf, DqsPoolInfo *poolInfo)
 {
     (void)mbuf;
-    (void)pool_id;
+    (void)poolInfo;
     return (int)DRV_ERROR_NOT_SUPPORT;
 }

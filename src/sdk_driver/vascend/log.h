@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,8 +13,6 @@
 
 #ifndef LOG_H_
 #define LOG_H_
-
-#include <linux/types.h>
 
 #define module_devdrv "vascend"
 #ifdef DAVINCI_DEBUG

@@ -409,7 +409,7 @@ hot_reset()
 
     check_stop_devlog_daemon
 
-    checkUserProcess >& /dev/null
+    checkUserProcess > /dev/null 2>&1
     if [ $? = "1" ]; then
         log "[INFO]user process exist, no hot reset"
         echo "abort" > "$hotreset_status_file"

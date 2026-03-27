@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,26 +14,15 @@
 #ifndef EVENT_ESCHED_CORE_H
 #define EVENT_ESCHED_CORE_H
 
-#include <linux/mutex.h>
-#include <linux/spinlock.h>
-#include <linux/wait.h>
-#include <linux/workqueue.h>
-#include <linux/sched.h>
-#include <linux/interrupt.h>
-#include <linux/hashtable.h>
-#include <linux/version.h>
-#include <linux/rwlock_types.h>
-#include <linux/nsproxy.h>
-#include <linux/rwlock.h>
-#include <linux/time.h>
-#include <linux/timekeeping.h>
-
 #include "esched_kernel_interface.h"
 #include "ascend_hal_define.h"
 #include "esched_ioctl.h"
 #include "esched_log.h"
 #include "pbl_ka_memory.h"
 #include "esched_h2d_msg.h"
+#include "ka_hashtable_pub.h"
+#include "ka_list_pub.h"
+#include "ka_base_pub.h"
 
 #ifdef CFG_FEATURE_IDENTIFY_CP
 #include "dms/dms_devdrv_manager_comm.h"
@@ -46,12 +35,7 @@
 #include "ut_log.h"
 #endif
 
-#ifdef EVENT_SCHED_UT
-#include <linux/pid.h>
-#else
-#include <linux/version.h>
 #include "ka_task_pub.h"
-#endif
 
 #ifdef CFG_FEATURE_VFIO
 #include "esched_vf.h"
@@ -60,17 +44,6 @@
 #ifdef CFG_FEATURE_HARDWARE_SCHED
 #include "esched_drv.h"
 #endif
-
-#ifndef __GFP_ACCOUNT
-#ifdef __GFP_KMEMCG
-#define __GFP_ACCOUNT __GFP_KMEMCG /* for linux version 3.10 */
-#endif
-
-#ifdef __GFP_NOACCOUNT
-#define __GFP_ACCOUNT 0 /* for linux version 4.1 */
-#endif
-#endif
-
 
 #define SCHED_VALID 1
 #define SCHED_INVALID 0
@@ -233,8 +206,8 @@ extern unsigned long long sched_cur_cpu_tick;
 #define SCHED_GET_SYSTEM_FREQ(cnt) asm volatile("mrs %0, CNTFRQ_EL0"  : "=r" (cnt) :)
 #endif
 
-#ifndef PIDTYPE_TGID
-#define PIDTYPE_TGID (PIDTYPE_PID + 1)
+#ifndef KA_PIDTYPE_TGID
+#define KA_PIDTYPE_TGID (KA_PIDTYPE_PID + 1)
 #endif
 
 
@@ -291,7 +264,7 @@ struct sched_event_timestamp {
 };
 
 struct sched_event {
-    struct list_head list;
+    ka_list_head_t list;
     struct sched_event_que *que; /* for quikly free event to poll */
     int32_t publish_pid;
     u32 publish_cpuid;
@@ -333,7 +306,7 @@ struct sched_event_que {
     u32 head;
     u32 tail;
     struct sched_event **ring;
-    spinlock_t lock;
+    ka_task_spinlock_t lock;
     struct sched_event_que_stat stat;
 };
 
@@ -343,8 +316,8 @@ struct sched_event_list {
     u64 last_sched_num;
     u64 sched_num;
     u64 total_num;
-    spinlock_t lock;        /* used for sched event (aicpu) */
-    struct list_head head;
+    ka_task_spinlock_t lock;        /* used for sched event (aicpu) */
+    ka_list_head_t head;
 #ifdef CFG_FEATURE_VFIO
     u32 slice_cur_event_num[VMNG_VDEV_MAX_PER_PDEV];
 #endif
@@ -388,7 +361,7 @@ In order to accurately publish events to the specified thread, the in-process da
        |     |       |--subscribe tread4
 */
 struct sched_event_thread_map {
-    struct kref ref;
+    ka_kref_t ref;
     u32 thread_num;
     u32 *thread; /* The threads who subscribe the event */
 };
@@ -401,13 +374,13 @@ struct sched_event_timeout_info {
 
 struct sched_thread_stat {
     u32 sched_event;
-    atomic_t discard_event;
+    ka_atomic_t discard_event;
     u32 timeout_cnt;
 };
 
 struct sched_thread_ctx {
     u32 valid;
-    atomic_t status;
+    ka_atomic_t status;
     u32 wait_flag; /* set valid in wait event, invalid in wait event return */
 #ifdef CFG_FEATURE_THREAD_SWAPOUT
     u32 swapout_flag;
@@ -421,7 +394,7 @@ struct sched_thread_ctx {
     int32_t pre_normal_wakeup_reason;
     int32_t normal_wakeup_reason;
     int32_t event_finish_scene;
-    char name[TASK_COMM_LEN];
+    char name[KA_TASK_COMM_LEN];
     u64 start_time;
     u64 end_time;
     u64 callback_end_time;
@@ -431,12 +404,12 @@ struct sched_thread_ctx {
     u64 total_sched_time;
     u64 non_sched_publish_wakeup;
     u64 subscribe_event_bitmap;
-    struct mutex thread_mutex;
-    spinlock_t thread_finish_lock;
+    ka_mutex_t thread_mutex;
+    ka_task_spinlock_t thread_finish_lock;
     struct sched_thread_stat stat;
     struct sched_grp_ctx *grp_ctx;
     struct sched_event *event;
-    wait_queue_head_t wq;
+    ka_wait_queue_head_t wq;
 };
 
 struct sched_grp_ctx {
@@ -447,38 +420,38 @@ struct sched_grp_ctx {
     u32 cfg_thread_num;
     u32 thread_num;
     u32 *thread; /* The threads in group */
-    spinlock_t lock;
+    ka_task_spinlock_t lock;
     struct sched_proc_ctx *proc_ctx;
     struct sched_thread_ctx *thread_ctx; /* store each thread context */
     u32 *cpuid_to_tid;
     struct sched_event_thread_map event_thread_map[SCHED_MAX_EVENT_TYPE_NUM];
     struct sched_event_timeout_info event_timeout_info[SCHED_MAX_EVENT_TYPE_NUM];
     u32 max_event_num[SCHED_MAX_EVENT_TYPE_NUM];
-    atomic_t event_num[SCHED_MAX_EVENT_TYPE_NUM];
-    atomic_t drop_event_num[SCHED_MAX_EVENT_TYPE_NUM];
+    ka_atomic_t event_num[SCHED_MAX_EVENT_TYPE_NUM];
+    ka_atomic_t drop_event_num[SCHED_MAX_EVENT_TYPE_NUM];
     u32 is_exclusive;
-    atomic_t run_status;
-    atomic_t wait_cpu_mask;
+    ka_atomic_t run_status;
+    ka_atomic_t wait_cpu_mask;
     u32 cur_tid;
 
     struct sched_event_list published_event_list[SCHED_MAX_EVENT_PRI_NUM];
-    atomic_t cur_event_num;
+    ka_atomic_t cur_event_num;
     char name[EVENT_MAX_GRP_NAME_LEN];
 };
 
 struct sched_event_stat {
-    atomic_t publish_event_num;
-    atomic_t sched_event_num;
+    ka_atomic_t publish_event_num;
+    ka_atomic_t sched_event_num;
 };
 
 struct sched_proc_ctx {
-    struct hlist_node link; /* hash find link */
-    struct list_head list; /* recycle list */
-    atomic_t refcnt;
+    ka_hlist_node_t link; /* hash find link */
+    ka_list_head_t list; /* recycle list */
+    ka_atomic_t refcnt;
     int32_t pid;
     u32 task_id;
     int32_t host_pid;
-    struct mnt_namespace *mnt_ns;
+    ka_mnt_namespace_t *mnt_ns;
 #ifdef CFG_FEATURE_IDENTIFY_CP
     enum devdrv_process_type cp_type;
 #endif
@@ -487,14 +460,14 @@ struct sched_proc_ctx {
     u64 start_timestamp;
     u64 exit_timestamp;
     u32 pri;
-    atomic_t publish_event_num;
-    atomic_t sched_event_num;
+    ka_atomic_t publish_event_num;
+    ka_atomic_t sched_event_num;
     struct sched_event_stat proc_event_stat[SCHED_MAX_EVENT_TYPE_NUM];
-    char name[TASK_COMM_LEN];
+    char name[KA_TASK_COMM_LEN];
     struct sched_numa_node *node;
     u32 event_pri[SCHED_MAX_EVENT_TYPE_NUM];
     struct sched_grp_ctx grp_ctx[SCHED_MAX_GRP_NUM];
-    struct work_struct release_work;
+    ka_work_struct_t release_work;
     struct sched_sync_event_trace sched_dfx[SCHED_MAX_EX_GRP_NUM][SCHED_MAX_SYNC_THREAD_NUM_PER_GRP];
 };
 
@@ -592,8 +565,8 @@ enum sched_cpu_status {
 
 struct sched_cpu_ctx {
     u32 cpuid; /* cpu index in the numa node */
-    atomic_t cur_event_num;
-    atomic_t cpu_status;
+    ka_atomic_t cur_event_num;
+    ka_atomic_t cpu_status;
     u32 cannot_handle_event_reason;
     u64 last_sched_timestamp;
     u64 last_sched_event;
@@ -603,7 +576,7 @@ struct sched_cpu_ctx {
     /* The thread currently being scheduled by the cpu. If it is empty, it indicates that cpu is idle. */
     struct esched_thread thread;
     struct esched_abnormal_thread_record cpu_abnormal_thread;
-    spinlock_t sched_lock;
+    ka_task_spinlock_t sched_lock;
     struct sched_numa_node *node;
     struct sched_event *event_base; /* for free mem of event ring in event_res */
     struct sched_event_que event_res; /* The events posted by this cpu, get event resources from here */
@@ -621,9 +594,6 @@ struct sched_cpu_ctx {
 #define SCHED_DEFAULT_WAKEUP_TIME_THRES 1000 /* us */
 #define NON_SCHED_DEFAULT_WAKEUP_TIME_THRES 100000 /* us */
 #define SCHED_DEFAULT_PUBLISH_SUBSCRIBE_TIME_THRES 10000 /* us */
-#ifndef NSEC_PER_USEC
-#define NSEC_PER_USEC 1000L
-#endif
 
 struct sched_abnormal_event_item {
     struct sched_event_timestamp timestamp;
@@ -637,12 +607,12 @@ struct sched_abnormal_event_item {
     u32 tid;
     u32 bind_cpuid;
     u32 kernel_tid; /* system task numver, current->pid */
-    char name[TASK_COMM_LEN];
+    char name[KA_TASK_COMM_LEN];
 };
 
 struct sched_abnormal_event {
     u64 timestamp_thres;
-    atomic_t cur_index;
+    ka_atomic_t cur_index;
     struct sched_abnormal_event_item event_info[SCHED_ABNORMAL_EVENT_MAX_NUM];
 };
 
@@ -675,7 +645,7 @@ struct sched_wakeup_err_event {
 
 #define SCHED_EVENT_TRACE_MAX_NUM 2048
 struct sched_node_event_trace {
-    atomic_t cur_index;
+    ka_atomic_t cur_index;
     volatile int32_t enable_flag;
     struct sched_abnormal_event_item event_info[SCHED_EVENT_TRACE_MAX_NUM];
 };
@@ -698,7 +668,7 @@ struct sched_event_sample {
 #define SCHED_RECORD_TRACE_CNT 80
 
 struct sched_trace_record_info {
-    spinlock_t lock;
+    ka_task_spinlock_t lock;
     u32 valid;
     u32 num;
     u64 timestamp;
@@ -707,7 +677,7 @@ struct sched_trace_record_info {
 };
 
 struct pid_entry {
-    struct list_head list;
+    ka_list_head_t list;
     int pid;
 };
 
@@ -737,9 +707,16 @@ struct sched_dev_ops {
 
 #define NON_SCHED_DEFAULT_CPUID 0
 
+struct sched_recv_msg_record {
+    int msg_type;
+    u32 dst_pid;
+    u32 dst_event_id;
+    u32 dst_subevent_id;
+};
+
 struct sched_numa_node {
     u32 node_id;
-    atomic_t refcnt;
+    ka_atomic_t refcnt;
     u32 cpu_num; /* os total cpu num, size of cpu_ctx */
     u32 sched_cpu_num;
     u32 *sched_cpuid; /* Stores the absolute ID (starts from 0 in OS) of the CPU used for scheduling. */
@@ -749,14 +726,14 @@ struct sched_numa_node {
     u32 sched_set_cpu_flag;
     int sample_proc_id;
     u32 cur_task_id;
-    struct mutex node_mutex;
-    struct delayed_work guard_work;
-    struct mutex proc_mng_mutex;
-    struct list_head del_proc_head; /* After the process exits, a linked list of resources needs to be released */
-    struct mutex pid_list_mutex;
-    struct list_head pid_list;
-    rwlock_t proc_hash_table_rwlock[SCHED_PROC_HASH_TABLE_SIZE];
-    DECLARE_HASHTABLE(proc_hash_table, SCHED_PROC_HASH_TABLE_BIT);
+    ka_mutex_t node_mutex;
+    ka_delayed_work_t guard_work;
+    ka_mutex_t proc_mng_mutex;
+    ka_list_head_t del_proc_head; /* After the process exits, a linked list of resources needs to be released */
+    ka_mutex_t pid_list_mutex;
+    ka_list_head_t pid_list;
+    ka_rwlock_t proc_hash_table_rwlock[SCHED_PROC_HASH_TABLE_SIZE];
+    KA_DECLARE_HASHTABLE(proc_hash_table, SCHED_PROC_HASH_TABLE_BIT);
     struct sched_cpu_ctx **cpu_ctx;
     struct sched_event *event_base; /* for free mem of event ring in event_res */
     struct sched_event_que event_res; /* public events resources */
@@ -765,14 +742,15 @@ struct sched_numa_node {
     struct sched_event_sample *node_event_sample;
     struct sched_event_sample *proc_event_sample;
     struct sched_wakeup_err_event wakeup_err_info;
-    struct mutex node_guard_work_mutex;
+    ka_mutex_t node_guard_work_mutex;
     struct sched_trace_record_info trace_record;
+    struct sched_recv_msg_record curr_msg;
 #ifdef CFG_FEATURE_HARDWARE_SCHED
     struct sched_hard_res hard_res;
 #endif
     /* Priority grouped event list published to this node */
     struct sched_event_list published_event_list[SCHED_MAX_PROC_PRI_NUM][SCHED_MAX_EVENT_PRI_NUM];
-    atomic_t cur_event_num;
+    ka_atomic_t cur_event_num;
 #ifdef CFG_FEATURE_VFIO
     struct sched_slice_ctx slice_ctx;
 #endif
@@ -788,9 +766,9 @@ static inline u64 sched_get_cur_cpu_tick(void)
     SCHED_GET_CUR_SYSTEM_COUNTER(cnt);
     return cnt;
 #else
-    struct timespec64 timestamp;
-    ktime_get_ts64(&timestamp);
-    return ((u64)timestamp.tv_sec * USEC_PER_SEC) + ((u64)timestamp.tv_nsec / NSEC_PER_USEC);
+    ka_timespec64_t timestamp;
+    ka_system_ktime_get_ts64(&timestamp);
+    return ((u64)timestamp.tv_sec * KA_USEC_PER_SEC) + ((u64)timestamp.tv_nsec / KA_NSEC_PER_USEC);
 #endif
 }
 
@@ -806,7 +784,7 @@ static inline u64 sched_get_sys_freq(void)
     SCHED_GET_SYSTEM_FREQ(cnt);
     return cnt;
 #else
-    return USEC_PER_SEC; /* sched_get_cur_cpu_tick return microsecond */
+    return KA_USEC_PER_SEC; /* sched_get_cur_cpu_tick return microsecond */
 #endif
 }
 
@@ -820,15 +798,15 @@ static inline u64 microsecond_to_tick(u64 duration)
     }
 
     // tickFreq is record by second, to microsecond need multiply 1000000
-    return duration * (freq / USEC_PER_SEC);
+    return duration * (freq / KA_USEC_PER_SEC);
 }
 
 static inline u64 tick_to_microsecond(u64 tick)
 {
     u64 freq = sched_get_sys_freq();
     // tickFreq is record by second, to microsecond need multiply 1000000
-    if ((freq / USEC_PER_SEC) != 0) {
-        return tick / (freq / USEC_PER_SEC);
+    if ((freq / KA_USEC_PER_SEC) != 0) {
+        return tick / (freq / KA_USEC_PER_SEC);
     }
 
     return 0;
@@ -871,7 +849,7 @@ static inline struct sched_proc_ctx *sched_get_proc_ctx(struct sched_numa_node *
     struct sched_proc_ctx *proc_ctx = NULL;
 
     /*lint -e666 */
-    hash_for_each_possible(node->proc_hash_table, proc_ctx, link, pid) {
+    ka_hash_for_each_possible(node->proc_hash_table, proc_ctx, link, pid) {
         if (proc_ctx->pid == pid) {
             return proc_ctx;
         }
@@ -894,32 +872,32 @@ int32_t sched_get_firt_ctrlcpu(void);
 static inline struct sched_proc_ctx *esched_proc_get(struct sched_numa_node *node, int32_t pid)
 {
     struct sched_proc_ctx *proc_ctx = NULL;
-    u32 bucket_index = hash_min(pid, SCHED_PROC_HASH_TABLE_BIT);
+    u32 bucket_index = ka_hash_min(pid, SCHED_PROC_HASH_TABLE_BIT);
 
-    read_lock_bh(&node->proc_hash_table_rwlock[bucket_index]);
+    ka_task_read_lock_bh(&node->proc_hash_table_rwlock[bucket_index]);
     proc_ctx = sched_get_proc_ctx(node, pid);
     /* The SCHED_INVALID status means another thread has been waiting for the lock to delete the proc from
        hash table, so the current thread does not need to continue and should release the lock immediately. */
     if ((proc_ctx == NULL) || (proc_ctx->status == SCHED_INVALID)) {
-        read_unlock_bh(&node->proc_hash_table_rwlock[bucket_index]);
+        ka_task_read_unlock_bh(&node->proc_hash_table_rwlock[bucket_index]);
         return NULL;
     }
 
-    atomic_inc(&proc_ctx->refcnt);
-    read_unlock_bh(&node->proc_hash_table_rwlock[bucket_index]);
+    ka_base_atomic_inc(&proc_ctx->refcnt);
+    ka_task_read_unlock_bh(&node->proc_hash_table_rwlock[bucket_index]);
     return proc_ctx;
 }
 
 static inline void esched_proc_put(struct sched_proc_ctx *proc_ctx)
 {
     /* When the refcnt is 0, the proc_ctx to be freed should have been deleted from the hash table. */
-    if (atomic_dec_return(&proc_ctx->refcnt) > 0) {
+    if (ka_base_atomic_dec_return(&proc_ctx->refcnt) > 0) {
         return;
     }
 
-    if (in_atomic()) {
+    if (ka_base_in_atomic()) {
         (void)esched_dev_get(proc_ctx->node->node_id);
-        schedule_work_on(sched_get_firt_ctrlcpu(), &proc_ctx->release_work);
+        ka_task_schedule_work_on(sched_get_firt_ctrlcpu(), &proc_ctx->release_work);
         return;
     }
     sched_free_process(proc_ctx);
@@ -1032,7 +1010,7 @@ static inline void esched_cpu_cur_thread_clr(struct sched_cpu_ctx *cpu_ctx)
 
 static inline void esched_cpu_idle(struct sched_cpu_ctx *cpu_ctx)
 {
-    atomic_set(&cpu_ctx->cpu_status, CPU_STATUS_IDLE);
+    ka_base_atomic_set(&cpu_ctx->cpu_status, CPU_STATUS_IDLE);
     esched_cpu_cur_thread_clr(cpu_ctx);
 }
 
@@ -1063,9 +1041,9 @@ static inline struct sched_thread_ctx *esched_cpu_cur_thread_get(struct sched_cp
         return NULL;
     }
 
-    spin_lock_bh(&cpu_ctx->sched_lock);
+    ka_task_spin_lock_bh(&cpu_ctx->sched_lock);
     thread_ctx = esched_cpu_cur_thread_get_inner(cpu_ctx);
-    spin_unlock_bh(&cpu_ctx->sched_lock);
+    ka_task_spin_unlock_bh(&cpu_ctx->sched_lock);
 
     return thread_ctx;
 }
@@ -1083,9 +1061,9 @@ static inline struct sched_thread_ctx *esched_get_proc_thread_on_cpu(struct sche
     if ((cpu_ctx->thread.pid != proc_ctx->pid) || (cpu_ctx->thread.task_id != proc_ctx->task_id)) {
         return NULL;
     }
-    spin_lock_bh(&cpu_ctx->sched_lock);
+    ka_task_spin_lock_bh(&cpu_ctx->sched_lock);
     thread_ctx = sched_get_thread_ctx(sched_get_grp_ctx(proc_ctx, cpu_ctx->thread.gid), cpu_ctx->thread.tid);
-    spin_unlock_bh(&cpu_ctx->sched_lock);
+    ka_task_spin_unlock_bh(&cpu_ctx->sched_lock);
 
     return thread_ctx;
 }
@@ -1106,7 +1084,7 @@ int sched_event_add_thread(struct sched_event *event, u32 tid);
 void sched_publish_state_update(struct sched_numa_node *node, struct sched_event *event, u32 publish_type, int32_t ret);
 void sched_submit_event_state_update(struct sched_numa_node *node, u32 event_id, int32_t ret);
 
-struct mnt_namespace *sched_get_proc_mnt_ns(u32 chip_id, int pid);
+ka_mnt_namespace_t *sched_get_proc_mnt_ns(u32 chip_id, int pid);
 void esched_try_cond_resched_by_time(u32 *pre_stamp, u32 time_threshold);
 
 int32_t sched_grp_event_num_update(struct sched_grp_ctx *grp_ctx, u32 event_id);
@@ -1169,8 +1147,7 @@ int32_t sched_publish_event_to_remote(u32 chip_id, u32 event_src,
 int sched_query_remote_task_gid_msg_send(u32 chip_id, u32 dst_chip_id, int pid, const char *grp_name, u32 *gid);
 int sched_query_remote_task_gid(u32 chip_id, u32 dst_chip_id, int pid, const char *grp_name, u32 *gid);
 void sched_wakeup_process_all_thread(struct sched_proc_ctx *proc_ctx);
-int sched_query_remote_trace_msg_send(u32 chip_id,
-    u32 pid, u32 gid, u32 tid, struct sched_sync_event_trace *sched_trace);
+int sched_query_remote_trace_msg_send(u32 chip_id, struct sched_trace_input *para, struct sched_sync_event_trace *sched_trace);
 void sched_query_thread_run_time(u32 chip_id);
 
 int sched_query_tid_in_grp(u32 chip_id, int pid, u32 gid, u32 os_tid, u32 *tid);
@@ -1190,7 +1167,7 @@ void esched_client_uninit(void);
 
 void esched_wait_trace_update(struct sched_proc_ctx *proc_ctx, struct sched_event *event);
 void esched_publish_trace_update(struct sched_proc_ctx *proc_ctx, struct sched_event *event);
-void esched_submit_trace_update(u32 event_src, struct sched_numa_node *node, struct sched_published_event_info *event_info);
+void esched_submit_trace_update(u32 chip_id, u32 event_src, struct sched_published_event_info *event_info);
 void sched_get_cpuid_in_node(struct sched_numa_node *node, u32 *cpuid);
 int32_t _sched_set_sched_cpu(struct sched_numa_node *node, struct sched_sched_cpu_mask *cpu_mask);
 void sched_vf_init(void);

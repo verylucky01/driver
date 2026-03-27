@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -27,7 +27,7 @@ STATIC void hw_dvt_clean_vdavinci_vfs(struct hw_dvt *dvt)
     dvt->is_sriov_enabled = false;
 }
 
-STATIC int sriov_virtfn_bus(struct pci_dev *dev, int vf_id)
+STATIC unsigned int sriov_virtfn_bus(struct pci_dev *dev, unsigned int vf_id)
 {
     if (!dev->is_physfn) {
         return -EINVAL;
@@ -36,7 +36,7 @@ STATIC int sriov_virtfn_bus(struct pci_dev *dev, int vf_id)
         dev->sriov->stride * vf_id) >> SHIFT);
 }
 
-STATIC int sriov_virtfn_devfn(struct pci_dev *dev, int vf_id)
+STATIC unsigned int sriov_virtfn_devfn(struct pci_dev *dev, unsigned int vf_id)
 {
     if (!dev->is_physfn) {
         return -EINVAL;
@@ -120,7 +120,7 @@ int hw_dvt_sriov_enable(struct pci_dev *dev, int num_vfs)
         vascend_err(kdev, "Failed to allocate vf arrary\n");
         goto out_free_vf;
     }
-    for (i = 0; i < num_vfs; i++) {
+    for (i = 0; i < (unsigned int)num_vfs; i++) {
         dvt->sriov.vf_array[i].vf = pci_get_domain_bus_and_slot(pci_domain_nr(dev->bus),
             sriov_virtfn_bus(dev, i),
             sriov_virtfn_devfn(dev, i));

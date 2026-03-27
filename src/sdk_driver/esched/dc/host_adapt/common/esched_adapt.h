@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,9 +14,6 @@
 #ifndef ESCHED_ADAPT_H
 #define ESCHED_ADAPT_H
 
-#include <linux/types.h>
-#include <stdbool.h>
-#include <linux/kallsyms.h>
 #include "esched_log.h"
 #include "esched.h"
 #include "esched_kernel_interface.h"
@@ -25,9 +22,6 @@
 int32_t sched_fop_query_sync_msg_trace(u32 devid, unsigned long arg);
 int sched_check_cp2_dest_pid(struct sched_published_event_info *event_info);
 int32_t sched_node_sched_cpu_init(u32 dev_id);
-
-int sched_query_sync_event_trace(unsigned int chip_id,
-    unsigned int dev_pid, unsigned int gid, unsigned int tid, struct sched_sync_event_trace *trace_result);
 
 int32_t sched_node_sched_cpu_uda_init(u32 dev_id);
 int32_t sched_node_sched_cpu_module_init(u32 dev_id);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -22,7 +22,7 @@ extern "C" {
 #endif
 
 struct trs_stars_cqint {
-    void __iomem *base;
+    void __ka_mm_iomem *base;
     size_t size;
 
     u32 group;

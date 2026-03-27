@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,9 +10,9 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
+#include "ka_memory_pub.h"
 #include "devdrv_dma.h"
 #include "devdrv_util.h"
-#include "ka_memory_pub.h"
 
 #define DMA_QUEUE_SQ_TAIL 0xc
 #define DMA_QUEUE_CQ_HEAD 0x1c
@@ -29,7 +29,7 @@
 void devdrv_dma_chan_ptr_show(struct devdrv_dma_channel *dma_chan, int wait_status)
 {
     u32 sq_tail, cq_tail, cq_head, sq_head;
-    void __iomem *io_base = dma_chan->io_base;
+    void __ka_mm_iomem *io_base = dma_chan->io_base;
 
     sq_tail = ka_mm_readl(io_base + DMA_QUEUE_SQ_TAIL);
     cq_head = ka_mm_readl(io_base + DMA_QUEUE_CQ_HEAD);
@@ -47,27 +47,27 @@ void devdrv_dma_chan_ptr_show(struct devdrv_dma_channel *dma_chan, int wait_stat
     }
 }
 
-void devdrv_set_dma_sq_tail(void __iomem *io_base, u32 val)
+void devdrv_set_dma_sq_tail(void __ka_mm_iomem *io_base, u32 val)
 {
     ka_mm_writel(val, io_base + DMA_QUEUE_SQ_TAIL);
 }
 
-void devdrv_set_dma_cq_head(void __iomem *io_base, u32 val)
+void devdrv_set_dma_cq_head(void __ka_mm_iomem *io_base, u32 val)
 {
     ka_mm_writel(val, io_base + DMA_QUEUE_CQ_HEAD);
 }
 
-u32 devdrv_get_dma_cq_head(void __iomem *io_base)
+u32 devdrv_get_dma_cq_head(void __ka_mm_iomem *io_base)
 {
     return (ka_mm_readl(io_base + DMA_QUEUE_CQ_HEAD) & DMA_QUEUE_CQ_HEAD_VALID_BIT);
 }
 
-u32 devdrv_get_dma_cq_tail(void __iomem *io_base)
+u32 devdrv_get_dma_cq_tail(void __ka_mm_iomem *io_base)
 {
     return (ka_mm_readl(io_base + DMA_QUEUE_CQ_TAIL) & DMA_QUEUE_CQ_TAIL_VALID_BIT);
 }
 
-u32 devdrv_get_sq_err_ptr(const void __iomem *io_base)
+u32 devdrv_get_sq_err_ptr(const void __ka_mm_iomem *io_base)
 {
     return ka_mm_readl(io_base + DMA_QUEUE_SQ_READ_ERR_PTR);
 }
@@ -186,7 +186,7 @@ void devdrv_dma_ops_init(struct devdrv_dma_dev *dma_dev, u32 chip_type)
 STATIC void devdrv_set_pf_dma_queue_chan_pause(struct devdrv_dma_dev *dma_dev,
     bool pause_flag, u32 chan_id)
 {
-    void __iomem *reg_addr = NULL;
+    void __ka_mm_iomem *reg_addr = NULL;
     u32 regval;
 
     reg_addr = dma_dev->dma_chan_base + DEVDRV_DMA_CHAN_OFFSET * chan_id + DEVDRV_DMA_QUEUE_CTRL0;

@@ -191,7 +191,7 @@
 
 **调用示例<a name="section6374858785"></a>**
 
-```c
+```
 …  
 int ret = 0; 
 int card_id = 0; 
@@ -201,3 +201,4 @@ struct dcmi_serdes_quality_info serdes_quality_info = {0};
 ret = dcmi_get_serdes_quality_info (card_id, device_id, macro_id, &serdes_quality_info); 
 …
 ```
+

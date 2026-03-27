@@ -11,6 +11,7 @@
 #include "dms_user_common.h"
 #include "ascend_dev_num.h"
 #include "dms_device_info.h"
+#include "dms_p2p_com.h"
 
 static drvError_t dms_p2p_attr_operate(struct urd_p2p_attr *p2p_attr)
 {
@@ -43,11 +44,17 @@ static drvError_t dms_p2p_attr_operate(struct urd_p2p_attr *p2p_attr)
     }
 
     if (p2p_attr->op == DEVDRV_P2P_ADD) {
-        DMS_EVENT("Enable P2P. (logic_devid=%u; peer_phy_devid=%u)\n",
-            p2p_attr->dev_id, p2p_attr->peer_dev_id);
+        ret = dms_set_p2p_restore_info(p2p_attr->dev_id, p2p_attr->peer_dev_id, p2p_attr->type, DEVDRV_P2P_ADD);
+        if (ret != 0) {
+            return ret;
+        }
+        DMS_EVENT("Enable P2P. (logic_devid=%u; peer_phy_devid=%u)\n", p2p_attr->dev_id, p2p_attr->peer_dev_id);
     } else if (p2p_attr->op == DEVDRV_P2P_DEL) {
-        DMS_EVENT("Disable P2P. (logic_devid=%u; peer_phy_devid=%u)\n",
-            p2p_attr->dev_id, p2p_attr->peer_dev_id);
+        ret = dms_set_p2p_restore_info(p2p_attr->dev_id, p2p_attr->peer_dev_id, p2p_attr->type, DEVDRV_P2P_DEL);
+        if (ret != 0) {
+            return ret;
+        }
+        DMS_EVENT("Disable P2P. (logic_devid=%u; peer_phy_devid=%u)\n", p2p_attr->dev_id, p2p_attr->peer_dev_id);
     }
 
     return DRV_ERROR_NONE;
@@ -98,23 +105,25 @@ drvError_t DmsGetP2PCapbility(unsigned int dev_id, unsigned long long *capbility
     return DRV_ERROR_NONE;
 }
 
-drvError_t DmsEnableP2P(unsigned int dev_id, unsigned int peer_dev_id)
+drvError_t DmsEnableP2P(unsigned int dev_id, unsigned int peer_dev_id, unsigned int type)
 {
     struct urd_p2p_attr p2p_attr = {0};
 
     p2p_attr.op = DEVDRV_P2P_ADD;
     p2p_attr.dev_id = dev_id;
     p2p_attr.peer_dev_id = peer_dev_id;
+    p2p_attr.type = type;
     return dms_p2p_attr_operate(&p2p_attr);
 }
 
-drvError_t DmsDisableP2P(unsigned int dev_id, unsigned int peer_dev_id)
+drvError_t DmsDisableP2P(unsigned int dev_id, unsigned int peer_dev_id, unsigned int type)
 {
     struct urd_p2p_attr p2p_attr = {0};
 
     p2p_attr.op = DEVDRV_P2P_DEL;
     p2p_attr.dev_id = dev_id;
     p2p_attr.peer_dev_id = peer_dev_id;
+    p2p_attr.type = type;
     return dms_p2p_attr_operate(&p2p_attr);
 }
 

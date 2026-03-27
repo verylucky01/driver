@@ -58,7 +58,6 @@ STATIC int dcmi_init_bdf_info(int *device_logic_phy_id_map, int card_count)
 {
     struct dcmi_card_info *card_info = NULL;
     int ret, i, j;
-    int chip_type = dcmi_get_board_chip_type();
     int *device_logic_id_list = NULL;
     device_logic_id_list = (int *)malloc(sizeof(int) * g_board_details.device_count_in_one_card);
     if (device_logic_id_list == NULL) {
@@ -66,8 +65,7 @@ STATIC int dcmi_init_bdf_info(int *device_logic_phy_id_map, int card_count)
         return DCMI_ERR_CODE_INNER_ERR;
     }
 
-    if ((chip_type == DCMI_CHIP_TYPE_D910_95) &&
-        dcmi_mainboard_is_a900_a5_ub(g_mainboard_info.mainboard_id)) {
+    if (dcmi_mainboard_is_a900_a5_ub(g_mainboard_info.mainboard_id)) {
         free(device_logic_id_list);
         device_logic_id_list = NULL;
         return DCMI_OK;
@@ -111,6 +109,12 @@ void dcmi_init_board_info_exit_abnormally(int index)
     g_board_details.card_info[index].board_id_pos = DCMI_BOARD_ID_ACCESS_BY_NPU;
 }
 
+static void handle_init_abnormal(int card_id, int *init_abnomal_flag)
+{
+    *init_abnomal_flag = 1;
+    (void)dcmi_init_board_info_exit_abnormally(card_id);
+}
+
 STATIC void dcmi_init_server_per_device(int *device_logic_phy_id_map, int card_id,
     struct dsmi_board_info_stru *board_info, int* init_abnomal_flag)
 {
@@ -121,8 +125,7 @@ STATIC void dcmi_init_server_per_device(int *device_logic_phy_id_map, int card_i
     device_logic_id_list = (int *)malloc(sizeof(int) * g_board_details.device_count_in_one_card);
     if (device_logic_id_list == NULL) {
         gplog(LOG_ERR, "malloc device_logic_id_list failed.");
-        *init_abnomal_flag = 1;
-        (void)dcmi_init_board_info_exit_abnormally(card_id);
+        handle_init_abnormal(card_id, init_abnomal_flag);
         return;
     }
     for (i = 0; i < g_board_details.device_count_in_one_card; i++) {
@@ -133,10 +136,9 @@ STATIC void dcmi_init_server_per_device(int *device_logic_phy_id_map, int card_i
     for (i = 0; i < g_board_details.device_count_in_one_card; i++) {
         ret = dsmi_get_device_health(device_logic_id_list[i], &health);
         if (ret != DSMI_OK || health == DCMI_DEVICE_NOT_EXIST) {
-            (void)dcmi_init_board_info_exit_abnormally(card_id);
+            handle_init_abnormal(card_id, init_abnomal_flag);
             gplog(LOG_ERR, "call dsmi_get_device_health error.(logic_id=%d, health=%u, ret=%d).",
                 device_logic_id_list[i], health, ret);
-            *init_abnomal_flag = 1;
             continue;
         }
 
@@ -158,6 +160,10 @@ STATIC void dcmi_init_server_per_device(int *device_logic_phy_id_map, int card_i
             continue;
         }
         g_board_details.card_info[card_id].device_info[i].phy_id = device_phy_id;
+        // A5上card_id为phy_id
+        if (dcmi_board_chip_type_is_ascend_910_95()) {
+            g_board_details.card_info[card_id].card_id = device_phy_id;
+        }
         g_board_details.card_info[card_id].device_info[i].chip_slot = i; // ascend910卡或ascend910板的NPU单元都只有一个npu芯片
     }
     free(device_logic_id_list);
@@ -179,13 +185,19 @@ STATIC int dcmi_init_board_info(int *device_logic_phy_id_map, int card_count)
             // 如果有某个die初始化失败，跳过下面赋值流程，910_93双die状态保持一直，不需单独拆分
             continue;
         }
-        g_board_details.card_info[i].card_id = (int)board_info.slot_id;
+        // slot_id表示的是os域的id，A5上一个os域内有8个npu
+        if (!dcmi_board_chip_type_is_ascend_910_95()) {
+            g_board_details.card_info[i].card_id = (int)board_info.slot_id;
+        }
         g_board_details.card_info[i].slot_id = (int)board_info.slot_id;
         g_board_details.card_info[i].mcu_id = -1;
         g_board_details.card_info[i].cpu_id = -1;
         g_board_details.card_info[i].board_id_pos = (support_chip_type ?
             DCMI_BOARD_ID_ACCESS_BY_MCU : DCMI_BOARD_ID_ACCESS_BY_NPU);
         g_board_details.card_info[i].device_count = g_board_details.device_count_in_one_card;
+        if (dcmi_board_chip_type_is_ascend_910_95()) {
+            g_board_details.card_info[i].elabel_pos = DCMI_ELABEL_ACCESS_BY_NPU;
+        }
     }
     return DCMI_OK;
 }

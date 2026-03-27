@@ -189,13 +189,6 @@ struct sched_ioctl_para_query_table_entry_stat {
     struct esched_table_key_entry_stat stat;
 };
 
-struct sched_trace_input {
-    unsigned int dev_id;
-    unsigned int dev_pid;
-    unsigned int gid;
-    unsigned int tid;
-};
-
 struct sched_ioctl_para_trace {
     struct sched_trace_input input;
     struct sched_sync_event_trace trace;

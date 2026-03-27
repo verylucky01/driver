@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -36,27 +36,16 @@ static int soc_udev_show(ka_seq_file_t *seq, void *offset)
 
 int soc_udev_open(ka_inode_t *inode, ka_file_t *file)
 {
-    return ka_fs_single_open(file, soc_udev_show, inode->i_private);
+    return ka_fs_single_open(file, soc_udev_show, ka_fs_get_inode_i_private(inode));
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 5, 0)
-static const ka_file_operations_t udevice_ops = {
-    .owner = KA_THIS_MODULE,
-    .open    = soc_udev_open,
-    .read    = ka_fs_seq_read,
-    .llseek  = ka_fs_seq_lseek,
-    .release = ka_fs_single_release,
-};
-#else
-
 static const ka_procfs_ops_t udevice_ops = {
-    .proc_open    = soc_udev_open,
-    .proc_read    = ka_fs_seq_read,
-    .proc_lseek   = ka_fs_seq_lseek,
-    .proc_release = ka_fs_single_release,
+    ka_fs_init_pf_owner(KA_THIS_MODULE) \
+    ka_fs_init_pf_open(soc_udev_open) \
+    ka_fs_init_pf_read(ka_fs_seq_read) \
+    ka_fs_init_pf_lseek(ka_fs_seq_lseek) \
+    ka_fs_init_pf_release(ka_fs_single_release) \
 };
-
-#endif
 
 void soc_proc_fs_init(void)
 {

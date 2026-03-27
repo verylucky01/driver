@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,13 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
-
-#include <linux/list.h>
-#include <linux/sched.h>
-#include <linux/slab.h>
-#include <linux/vmalloc.h>
-#include <linux/errno.h>
+#include "ka_system_pub.h"
 
 #include "devdrv_common.h"
 #include "devdrv_manager_common.h"
@@ -31,7 +25,7 @@
 #include "devdrv_black_box.h"
 #define DEVDRV_BLACK_BOX_MAX_EXCEPTION_NUM 1024
 
-STATIC int devdrv_host_pcie_add_exception(u32 pci_devid, u32 code, struct timespec stamp)
+STATIC int devdrv_host_pcie_add_exception(u32 pci_devid, u32 code, ka_timespec_t stamp)
 {
     struct devdrv_manager_info *manager_info = devdrv_get_manager_info();
 
@@ -75,7 +69,7 @@ void devdrv_host_black_box_init(void)
     ka_task_spin_unlock_irqrestore(&manager_info->black_box.spinlock, flags);
 
     black_callback.callback = devdrv_host_pcie_add_exception;
-#ifndef CFG_FEATURE_ASCEND910_95_STUB
+#ifndef CFG_FEATURE_ASCEND950_STUB
     ret = adap_register_black_callback(&black_callback);
     if (ret) {
         devdrv_drv_err("devdrv_register_black_callback failed.\n");
@@ -90,7 +84,7 @@ void devdrv_host_black_box_exit(void)
     struct devdrv_manager_info *manager_info = devdrv_get_manager_info();
     struct devdrv_black_callback black_callback;
     struct devdrv_exception *exception = NULL;
-    struct list_head *pos = NULL, *n = NULL;
+    ka_list_head_t *pos = NULL, *n = NULL;
     unsigned long flags;
 
     if (manager_info == NULL) {
@@ -126,7 +120,7 @@ void devdrv_host_black_box_close_check(ka_pid_t pid)
 {
     struct devdrv_manager_info *manager_info = devdrv_get_manager_info();
     struct devdrv_exception *exception = NULL;
-    struct list_head *pos = NULL, *n = NULL;
+    ka_list_head_t *pos = NULL, *n = NULL;
     unsigned long flags;
     int i;
 
@@ -158,7 +152,7 @@ void devdrv_host_black_box_close_check(ka_pid_t pid)
 }
 
 STATIC struct devdrv_exception *devdrv_host_black_box_alloc_exception_data(u32 devid, u32 code,
-    struct timespec stamp, const void *data)
+    ka_timespec_t stamp, const void *data)
 {
     int ret = 0;
     struct devdrv_exception *exception = NULL;
@@ -213,7 +207,7 @@ STATIC struct devdrv_exception *devdrv_host_black_box_alloc_exception_data(u32 d
  *
  */
 int devdrv_host_black_box_add_exception(u32 devid, u32 code,
-    struct timespec stamp, const void *data)
+    ka_timespec_t stamp, const void *data)
 {
     unsigned long flags;
     uint32_t i;

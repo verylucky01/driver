@@ -627,9 +627,12 @@ struct hdcdrv_cmd_server_wakeup_wait {
 #define HDCDRV_CHIP_OS_NAME_LEN_MAX (HDCDRV_CHIP_OS_NAME_STRING_MAX_LEN + 1)
 struct hdcdrv_cmd_get_spec_devid {
     int ret;
+    int dev_id;       /* input */
+    unsigned long long pid;
+    unsigned long long reserve_comm;
     char chip_name[HDCDRV_CHIP_OS_NAME_LEN_MAX];
     char os_name[HDCDRV_CHIP_OS_NAME_LEN_MAX];
-    unsigned int dev_id;    /* output */
+    unsigned int spec_devid;    /* output */
 };
 
 union hdcdrv_cmd {
@@ -728,22 +731,6 @@ typedef struct hdc_ub_send_recv_info {
     unsigned long long timecost_exceed_cnt_send;
     unsigned long long timecost_exceed_cnt_recv;
 } hdc_ub_send_recv_info_t;
-
-
-typedef struct hdc_ub_accept_info {
-    unsigned long long timecost_query_gid;
-    unsigned long long timecost_conn_wait;
-    unsigned long long timecost_res_init;
-    unsigned long long timecost_alloc_session;
-    unsigned long long timecost_pre_init;
-    unsigned long long timecost_urma_init;
-    unsigned long long timecost_calloc_ctx;
-    unsigned long long timecost_init_urma_res;
-    unsigned long long timecost_import_jetty;
-    unsigned long long timecost_submit_event;
-    unsigned long long timecost_notify;
-    unsigned long long timecost_accept;
-} hdc_ub_accept_info_t;
 
 struct hdcdrv_session_para_info {
     unsigned int unique_val;

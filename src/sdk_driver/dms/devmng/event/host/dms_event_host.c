@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,11 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
-#include <linux/errno.h>
-#include <linux/time.h>
-#include <linux/slab.h>
-#include <linux/kthread.h>
+#include "ka_common_pub.h"
+#include "ka_system_pub.h"
 
 #include "devdrv_manager.h"
 #include "devdrv_manager_container.h"
@@ -33,14 +30,14 @@
 #include "ka_errno_pub.h"
 #include "dms_event_host.h"
 
-static struct mutex g_hvdms_subscribe_status_mutex;
+static ka_mutex_t g_hvdms_subscribe_status_mutex;
 static u32 g_hvdms_subscribe_status_bitmap[ASCEND_DEV_MAX_NUM] = {0};
-struct task_struct *g_event_save_task;
+ka_task_struct_t *g_event_save_task;
 
 void devdrv_device_black_box_add_exception(u32 devid, u32 code)
 {
 }
-int dms_event_box_add_exception(u32 devid, u32 code, struct timespec stamp)
+int dms_event_box_add_exception(u32 devid, u32 code, ka_timespec_t stamp)
 {
     return devdrv_host_black_box_add_exception(devid, code, stamp, NULL);
 }
@@ -370,7 +367,7 @@ int dms_add_event_in_local(struct dms_event_para* fault_event)
     DMS_EVENT_NODE_STRU* event_node = NULL;
 
     dev_id = fault_event->deviceid;
-    if (dev_id >= DEVDRV_PF_DEV_MAX_NUM) {
+    if (dev_id >= ASCEND_PDEV_MAX_NUM) {
         dms_err("Invalid device id. (dev_id=%u; event_id=0x%x)\n", dev_id, fault_event->event_id);
         return DRV_ERROR_PARA_ERROR;
     }
@@ -425,7 +422,7 @@ int dms_del_event_in_local(struct dms_event_para* fault_event)
     DMS_EVENT_NODE_STRU* event_node = NULL;
 
     dev_id = fault_event->deviceid;
-    if (dev_id >= DEVDRV_PF_DEV_MAX_NUM) {
+    if (dev_id >= ASCEND_PDEV_MAX_NUM) {
         dms_err("Invalid device id. (dev_id=%u; event_id=%u)\n", dev_id, fault_event->event_id);
         return DRV_ERROR_INVALID_VALUE;
     }
@@ -493,7 +490,7 @@ int dms_save_exception_in_local(void *arg)
         }
     }
 
-    dms_event_release_proc(current->tgid, current->pid);
+    dms_event_release_proc(ka_task_get_current_tgid(), ka_task_get_current_pid());
 
     dms_info("dms save remote exception in local task exit\n");
     return 0;

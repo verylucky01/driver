@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,11 +11,12 @@
  * GNU General Public License for more details.
  */
 
+#include "ka_kernel_def_pub.h"
+#include "ka_compiler_pub.h"
 #include "pbl/pbl_uda.h"
 #include "pbl/pbl_feature_loader.h"
 #include "virtmng_public_def.h"
 #include "virtmng_stub_init.h"
-#include "ka_kernel_def_pub.h"
 
 STATIC int vmng_stub_notifier_func(u32 udevid, enum uda_notified_action action)
 {
@@ -35,7 +36,7 @@ STATIC int vmng_stub_notifier_func(u32 udevid, enum uda_notified_action action)
 }
 
 #define MIA_MNG_HOST_NOTIFIER "mia_mng"
-STATIC int __init vmng_stub_init_module(void)
+STATIC int __ka_init vmng_stub_init_module(void)
 {
     struct uda_dev_type type;
     int ret;
@@ -58,7 +59,7 @@ STATIC int __init vmng_stub_init_module(void)
 }
 ka_module_init(vmng_stub_init_module);
 
-STATIC void __exit vmng_stub_exit_module(void)
+STATIC void __ka_exit vmng_stub_exit_module(void)
 {
     struct uda_dev_type type;
     int ret;

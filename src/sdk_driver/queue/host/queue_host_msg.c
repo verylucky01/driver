@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,34 +11,23 @@
  * GNU General Public License for more details.
  */
 #ifndef QUEUE_UT
-#include <linux/uaccess.h>
-#include <linux/delay.h>
-#include <linux/mutex.h>
-#include <linux/printk.h>
-#include <asm/atomic.h>
-#include <linux/hashtable.h>
-#include <linux/cdev.h>
-#include <linux/slab.h>
 #include <securec.h>
-#include <linux/mod_devicetable.h>
-
-#include "pbl/pbl_uda.h"
-
 #include "queue_module.h"
 #include "queue_channel.h"
 #include "queue_fops.h"
 #include "queue_msg.h"
 #include "hdc_kernel_interface.h"
 #include "queue_context.h"
+#include "pbl/pbl_uda.h"
 
-STATIC struct device *queue_devices[MAX_DEVICE] = {NULL};
-STATIC struct rw_semaphore queue_dev_sem[MAX_DEVICE];
+STATIC ka_device_t *queue_devices[MAX_DEVICE] = {NULL};
+STATIC ka_rw_semaphore_t queue_dev_sem[MAX_DEVICE];
 
-struct device *queue_get_device(u32 dev_id)
+ka_device_t *queue_get_device(u32 dev_id)
 {
-    down_read(&queue_dev_sem[dev_id]);
+    ka_task_down_read(&queue_dev_sem[dev_id]);
     if (queue_devices[dev_id] == NULL) {
-        up_read(&queue_dev_sem[dev_id]);
+        ka_task_up_read(&queue_dev_sem[dev_id]);
         return NULL;
     }
     return queue_devices[dev_id];
@@ -47,15 +36,15 @@ struct device *queue_get_device(u32 dev_id)
 void queue_put_device(u32 dev_id)
 {
     if (queue_devices[dev_id] != NULL) {
-        up_read(&queue_dev_sem[dev_id]);
+        ka_task_up_read(&queue_dev_sem[dev_id]);
     }
 }
 
-STATIC void queue_init_instance(u32 devid, struct device *dev)
+STATIC void queue_init_instance(u32 devid, ka_device_t *dev)
 {
-    down_write(&queue_dev_sem[devid]);
+    ka_task_down_write(&queue_dev_sem[devid]);
     queue_devices[devid] = dev;
-    up_write(&queue_dev_sem[devid]);
+    ka_task_up_write(&queue_dev_sem[devid]);
 
     queue_info("notifier init action success. (devid=%u).\n", devid);
     return;
@@ -63,9 +52,9 @@ STATIC void queue_init_instance(u32 devid, struct device *dev)
 
 STATIC void queue_uninit_instance(u32 devid)
 {
-    down_write(&queue_dev_sem[devid]);
+    ka_task_down_write(&queue_dev_sem[devid]);
     queue_devices[devid] = NULL;
-    up_write(&queue_dev_sem[devid]);
+    ka_task_up_write(&queue_dev_sem[devid]);
 
     queue_info("notifier uninit action success. (devid=%u).\n", devid);
     return;
@@ -94,7 +83,7 @@ int queue_drv_msg_chan_init(void)
     u32 devid;
 
     for (devid = 0; devid < MAX_DEVICE; devid++) {
-        init_rwsem(&queue_dev_sem[devid]);
+        ka_task_init_rwsem(&queue_dev_sem[devid]);
     }
     uda_davinci_near_real_entity_type_pack(&type);
     return uda_notifier_register(QUEUE_HOST_NOTIFIER, &type, UDA_PRI2, queue_host_notifier_func);

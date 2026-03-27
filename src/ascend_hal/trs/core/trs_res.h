@@ -17,10 +17,16 @@
 #include "trs_ioctl.h"
 #include "trs_user_msg.h"
 
+struct res_id_info_val {
+    uint32_t res_len;
+    uint64_t res_addr;
+};
+
 struct res_id_usr_info {
     uint32_t valid;
     uint32_t res_len;
     uint64_t res_addr;
+    uint32_t priv;
 };
 
 int trs_dev_res_id_init(uint32_t dev_id);
@@ -28,6 +34,8 @@ void trs_dev_res_id_uninit(uint32_t dev_id);
 struct res_id_usr_info *trs_get_res_id_info(uint32_t dev_id, uint32_t ts_id, drvIdType_t type, uint32_t id);
 uint32_t trs_get_res_id_num(uint32_t dev_id, uint32_t ts_id, drvIdType_t type);
 int trs_id_query(uint32_t dev_id, uint32_t cmd, struct trs_res_id_para *para, uint32_t *value);
+int trs_res_id_info_init(uint32_t dev_id, uint32_t ts_id, uint32_t res_id, drvIdType_t type,
+    struct res_id_info_val *id_info_val);
 
 drvError_t _halResourceIdAlloc(uint32_t dev_id, struct halResourceIdInputInfo *in, struct halResourceIdOutputInfo *out);
 drvError_t _halResourceIdFree(uint32_t dev_id, struct halResourceIdInputInfo *in);
@@ -36,7 +44,6 @@ drvError_t trs_res_config_para_check(uint32_t dev_id, struct halResourceIdInputI
     struct halResourceConfigInfo *para);
 drvError_t trs_local_res_config(uint32_t dev_id, struct halResourceIdInputInfo *in,
     struct halResourceConfigInfo *para);
-drvError_t trs_stream_task_fill(uint32_t dev_id, uint32_t stream_id, void *task_addr, void *task_info, uint32_t size);
 
 struct trs_res_remote_ops {
     drvError_t (*resid_alloc)(uint32_t dev_id, struct halResourceIdInputInfo *in, struct halResourceIdOutputInfo *out);

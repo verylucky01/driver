@@ -89,6 +89,8 @@ static drvError_t(*drv_proc_res_restore_handlers[MAX_DEV_OPERATION])(halProcResR
         [TSDRV_DEV_OPERATION] = NULL,
         [BUFF_DEV_OPERATION] = NULL,
         [QUEUE_DEV_OPERATION] = NULL,
+        [URD_DEV_OPERATION] = NULL,
+        [DMS_DEV_OPERATION] = dmsProcResRestoreHandler,
 };
 
 u32 soc_res_get_ver(u32 udevid, enum soc_ver_type type, u32 *ver);

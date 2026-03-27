@@ -12,14 +12,14 @@ set(DRIVER_TARGETS
     # kernel
     drv_seclib_host
     asdrv_pbl
-    drv_vascend_stub
+    asdrv_vascend_adapt
     asdrv_vpc
     drv_pcie_host
     asdrv_vnic
     asdrv_vmng
     drv_pcie_hdc_host
     asdrv_vvpc
-    drv_virtmng_host_stub
+    asdrv_vvmng
     asdrv_fms
     asdrv_dms
     asdrv_trsbase

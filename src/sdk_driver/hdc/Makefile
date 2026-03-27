@@ -14,7 +14,7 @@ $(MODULE_NAME)-objs += pcie/host/hdcdrv_adapt.o pcie/host/hdcdrv_host.o pcie/hos
 $(MODULE_NAME)-objs += pcie/common/hdcdrv_core.o pcie/common/hdcdrv_core_com.o pcie/common/hdcdrv_mem.o
 $(MODULE_NAME)-objs += pcie/common/hdcdrv_epoll.o pcie/common/hdcdrv_sysfs.o pcie/common/hdcdrv_mem_com.o
 
-ifneq ($(filter $(PRODUCT), ascend910_95),)
+ifneq ($(filter $(PRODUCT), ascend950),)
 	$(MODULE_NAME)-objs += ub/common/hdcdrv_core_ub.o ub/common/hdcdrv_proc_fs_ub.o ub/common/hdcdrv_mem_pool_ub.o
 	$(MODULE_NAME)-objs += ub/common/hdcdrv_mem_com_ub.o ub/host/hdcdrv_adapt_ub.o
 endif
@@ -45,7 +45,7 @@ ifneq ($(filter $(PRODUCT), ascend910B),)
 	EXTRA_CFLAGS += -DCFG_FEATURE_KA_ALLOC_INTERFACE
 endif
 
-ifneq ($(filter $(PRODUCT), ascend910_95),)
+ifneq ($(filter $(PRODUCT), ascend950),)
 	EXTRA_CFLAGS += -Iinclude/linux
 	EXTRA_CFLAGS += -DCFG_FEATURE_UB_COMM
 endif

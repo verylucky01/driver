@@ -141,7 +141,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001206307248_zh-cn_topic_0000001178373136_zh-cn_topic_0000001146139863_toc533412083"></a>**
 
-```c
+```
 … 
 int ret = 0;
 int card_id = 0;
@@ -149,3 +149,4 @@ char info[256] = {0};
 ret = dcmi_get_card_customized_info(card_id, info, sizeof(info));
 …
 ```
+

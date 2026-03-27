@@ -22,7 +22,7 @@ list(APPEND MAKE_ARGS
 
 set(drv_dvpp_cmdlist_depends
     ts_agent asdrv_svm asdrv_pbl
-    drv_pcie_host asdrv_vpc drv_seclib_host drv_vascend_stub asdrv_vmng ascend_kernel_open_adapt)
+    drv_pcie_host asdrv_vpc drv_seclib_host asdrv_vascend_adapt asdrv_vmng ascend_kernel_open_adapt)
 add_host_ko(LOCAL_MODULE drv_dvpp_cmdlist
     KO_SRC_FOLDER ${CMAKE_CURRENT_SOURCE_DIR}
     USE_LOCAL_MODULE_BIN_FOLDER

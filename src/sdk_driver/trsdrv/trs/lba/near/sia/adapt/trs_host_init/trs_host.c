@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -25,6 +25,7 @@
 #include "trs_cdqm.h"
 #include "trs_stars_comm.h"
 #include "trs_core.h"
+#include "trs_host_accelerator_util.h"
 #include "trs_host_group.h"
 #ifdef CFG_FEATURE_SUPPORT_UB_CONNECTION
 #include "trs_ub_init_common.h"
@@ -48,11 +49,22 @@ static const ka_pci_device_id_t trs_pm_adapt_tbl[] = {
     { DEVDRV_DIVERSITY_PCIE_VENDOR_ID, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
     { 0x20C6, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
     { 0x203F, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+    { 0x20E9, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
     { 0x20C6, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
     { 0x203F, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+    { 0x20E9, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
     {}
 };
 KA_MODULE_DEVICE_TABLE(pci, trs_pm_adapt_tbl);
+
+static int trs_host_notice_process_recycle(u32 devid, struct trs_msg_data *data)
+{
+    struct trs_msg_proc_recycle *msg = (struct trs_msg_proc_recycle *)data->payload;
+    struct trs_id_inst inst;
+
+    trs_id_inst_pack(&inst, devid, data->header.tsid);
+    return trs_notice_check_proc_recycle(&inst, msg->pid);
+}
 
 static const trs_msg_rdv_func_t rcv_ops[TRS_MSG_MAX] = {
     [TRS_MSG_CHAN_ABNORMAL] = trs_host_ts_adapt_abnormal_proc,
@@ -60,6 +72,7 @@ static const trs_msg_rdv_func_t rcv_ops[TRS_MSG_MAX] = {
     [TRS_MSG_FLUSH_RES_ID] = trs_host_flush_id,
     [TRS_MSG_RES_ID_CHECK] = trs_host_res_is_check_msg_proc,
     [TRS_MSG_TS_CQ_PROCESS] = trs_host_ts_cq_process,
+    [TRS_MSG_NOTICE_PROC_RECYCLE] = trs_host_notice_process_recycle,
 };
 
 int trs_host_msg_chan_recv(void *msg_chan, void *data, u32 in_data_len,
@@ -100,15 +113,15 @@ struct devdrv_non_trans_msg_chan_info *trs_get_msg_chan_info(void)
 
 /*
  module_feature_auto_init_dev adds features as follows:
- 0. trs_host_msg_init
- 1. trs_ts_doorbell_init (ascend910_95 not need)
+ 0. trs_host_msg_init, trs_host_mode_config_init_dev
+ 1. trs_ts_doorbell_init (ascend950 not need)
  2. trs_mbox_init, trs_soft_mbox_init
- 3. trs_id_init, trs_host_group_init(only ascend910_95), trs_ub_dev_init
+ 3. trs_id_init, trs_host_group_init(only ascend950), trs_ub_dev_init
  4. trs_chan_init
  5. trs_core_init
  6. trs_res_ops_init, trs_sqcq_event_dev_init
- 7. trs_ts_status_init (ascend910_95 not need)
- 8. trs_host_cdqm_init (ascend910_95 not need)
+ 7. trs_ts_status_init (ascend950 not need)
+ 8. trs_host_cdqm_init (ascend950 not need)
  */
 static int trs_near_ts_inst_notifier(struct trs_id_inst *pm_inst, enum uda_notified_action action)
 {
@@ -241,10 +254,12 @@ int init_trs_adapt(void)
     }
 
     trs_chan_mem_node_proc_fs_init();
+    trs_accelerator_util_init();
     uda_davinci_near_real_entity_type_pack(&type);
 
     ret = uda_notifier_register(TRS_NEAR_NOTIFIER, &type, UDA_PRI2, trs_near_notifier_func);
     if (ret != 0) {
+        trs_accelerator_util_uninit();
         trs_chan_mem_node_proc_fs_uninit();
         module_feature_auto_uninit();
         trs_err("Register uda notifier failed. (ret=%d)\n", ret);
@@ -261,6 +276,7 @@ void exit_trs_adapt(void)
     uda_davinci_near_real_entity_type_pack(&type);
     (void)uda_notifier_unregister(TRS_NEAR_NOTIFIER, &type);
     trs_chan_mem_node_recycle();
+    trs_accelerator_util_uninit();
     trs_chan_mem_node_proc_fs_uninit();
     module_feature_auto_uninit();
 }

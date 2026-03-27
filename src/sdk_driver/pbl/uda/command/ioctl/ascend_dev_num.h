@@ -18,11 +18,11 @@
 #ifdef CONFIG_PLATFORM_910B
 #include "ascend_platform/ascend_dev_num_910B.h"
 #endif
-#ifdef CONFIG_PLATFORM_910_95
-#include "ascend_platform/ascend_dev_num_910_95.h"
+#ifdef CONFIG_PLATFORM_950
+#include "ascend_platform/ascend_dev_num_950.h"
 #endif
 #ifdef CONFIG_PLATFORM_910_96
-#include "ascend_platform/ascend_dev_num_910_95.h"
+#include "ascend_platform/ascend_dev_num_950.h"
 #endif
 
 #endif /* __ASCEND_DEV_NUM_H__ */

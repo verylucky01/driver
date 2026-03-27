@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -47,6 +47,7 @@
 #include <linux/ktime.h>
 #include <linux/gfp.h>
 #include <linux/topology.h>
+#include <linux/sched/clock.h>
 
 #include "ka_common_pub.h"
 #include "ka_task_pub.h"
@@ -89,12 +90,23 @@
 #endif
 
 #define KA_NSEC_PER_SEC         NSEC_PER_SEC
-#define KA_NSEC_PER_MSEC	    NSEC_PER_MSEC
+#define KA_NSEC_PER_MSEC        NSEC_PER_MSEC
+
+#ifndef NSEC_PER_USEC
+#define KA_NSEC_PER_USEC        1000L
+#else
+#define KA_NSEC_PER_USEC        NSEC_PER_USEC
+#endif
+
+#define KA_MSEC_PER_SEC         MSEC_PER_SEC
+#define KA_USEC_PER_MSEC        USEC_PER_MSEC
 
 #define	KA_NUMA_NO_NODE	        NUMA_NO_NODE
 
 #define KA_CLOCK_MONOTONIC      CLOCK_MONOTONIC
-
+#define KA_USEC_PER_SEC         USEC_PER_SEC
+#define KA_DEFAULT_RATELIMIT_BURST  DEFAULT_RATELIMIT_BURST
+#define KA_DEFAULT_RATELIMIT_INTERVAL DEFAULT_RATELIMIT_INTERVAL
 /*
  * Values used for system_state. Ordering of the states must not be changed
  * as code checks for <, <=, >, >= STATE.
@@ -189,6 +201,7 @@ typedef struct kernel_param_ops ka_kernel_param_ops_t;
             request_irq(irq, handler, irqflags, devname, dev_id)
 #define ka_system_request_threaded_irq(irq, handler, thread_fn, irqflags, devname, dev_id)    \
             request_threaded_irq(irq, handler, thread_fn, irqflags, devname, dev_id)
+#define  ka_system_synchronize_rcu()     synchronize_rcu()
 #define  ka_system_synchronize_irq(irq)     synchronize_irq(irq)
 #define __ka_system_symbol_get(symbol)    __symbol_get(symbol)
 #define __ka_system_request_module    __request_module
@@ -228,6 +241,13 @@ typedef struct kernel_param_ops ka_kernel_param_ops_t;
 #define ka_system_schedule_timeout_killable(timeout)    schedule_timeout_killable(timeout)
 #define ka_system_schedule_timeout_uninterruptible(timeout)   schedule_timeout_uninterruptible(timeout)
 #define ka_system_usleep_range(min, max)     usleep_range(min, max)
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
+#define ka_system_usleep_range_state(min, max, state) usleep_range_state(min, max, state)
+#else
+#define ka_system_usleep_range_state(min, max, state) usleep_range(min, max)
+#endif
+
 #define ka_system_call_usermodehelper_exec(sub_info, wait)    call_usermodehelper_exec(sub_info, wait)
 #define ka_system_get_cpu_mask(cpu)    get_cpu_mask(cpu)
 #define ka_system_raw_smp_processor_id()    raw_smp_processor_id()
@@ -239,6 +259,8 @@ typedef struct kernel_param_ops ka_kernel_param_ops_t;
 #define ka_system_cpu_to_le32(x)    cpu_to_le32(x)
 #define ka_system_cpu_to_be64(x)    cpu_to_be64(x)
 #define ka_system_cpu_to_le64(x)    cpu_to_le64(x)
+#define ka_system_cpu_relax()       cpu_relax()
+#define ka_system_local_clock()     local_clock()
 static inline void ka_system_set_hrtimer_func(ka_hrtimer_t *timer, ka_hrtimer_restart_t (*func)(ka_hrtimer_t *))
 {
     timer->function = func;
@@ -253,6 +275,7 @@ static inline void ka_system_set_hrtimer_func(ka_hrtimer_t *timer, ka_hrtimer_re
 #define ka_system_ktime_get_coarse_ts64(ts)    ktime_get_coarse_ts64(ts)
 #define ka_system_ktime_get_raw_ts64(ts)    ktime_get_raw_ts64(ts)
 #define ka_system_ktime_get_real_ts64(ts)    ktime_get_real_ts64(ts)
+#define ka_system_ktime_get_virtual_ts64(ts)    ktime_get_virtual_ts64(ts)
 #define ka_system_ktime_get_raw_ns()    ktime_get_raw_ns()
 #define ka_system_ms_to_ktime(ms)    ms_to_ktime(ms)
 #define ka_system_timespec64_to_ktime(ts)    timespec64_to_ktime(ts)

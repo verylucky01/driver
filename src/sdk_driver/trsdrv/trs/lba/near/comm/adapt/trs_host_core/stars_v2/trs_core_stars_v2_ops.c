@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -61,11 +61,7 @@ static int trs_core_stars_v2_ops_notice_ts(struct trs_id_inst *inst, u8 *msg, u3
     struct trs_mb_header *header = (struct trs_mb_header *)msg;
 
     if ((header->cmd_type == TRS_MBOX_RES_MAP) || (header->cmd_type == TRS_MBOX_QUERY_SQ_STATUS) ||
-        (header->cmd_type == TRS_MBOX_FREE_STREAM)) {
-        return 0;
-    }
-    if ((header->cmd_type == TRS_MBOX_RESET_NOTIFY) &&
-        (devdrv_get_connect_protocol(inst->devid) == CONNECT_PROTOCOL_PCIE)) {
+        (header->cmd_type == TRS_MBOX_FREE_STREAM) || (header->cmd_type == TRS_MBOX_RESET_NOTIFY)) {
         return 0;
     }
 
@@ -129,13 +125,17 @@ static struct trs_core_adapt_ops trs_core_stars_v2_ops = {
     .get_trigger_sqid = NULL,
     .get_ts_inst_status = NULL,
     .get_connect_protocol = trs_host_get_connect_protocol,
+    .get_host_mach_flag = trs_get_host_mach_flag,
     .id_alloc = trs_core_stars_v2_id_alloc,
     .trace_cqe_fill = trs_stars_v2_trace_cqe_fill,
     .trace_sqe_fill = trs_stars_v2_trace_sqe_fill,
     .ts_rpc_call = trs_core_ops_send_ctrl_msg,
+    .ras_report = trs_host_ras_report,
     .ub_info_query = trs_ub_info_query,
     .get_sq_send_mode = trs_get_sq_send_mode,
     .notice_proc_release = trs_core_stars_v2_ops_notice_proc_release,
+    .mem_update = trs_core_ops_mem_update,
+    .res_num_query = trs_host_res_num_query,
 };
 
 struct trs_core_adapt_ops *trs_core_get_stars_v2_adapt_ops(void)

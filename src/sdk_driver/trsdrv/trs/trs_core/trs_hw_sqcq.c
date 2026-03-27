@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,16 +10,17 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-#include <uapi/linux/sched/types.h>
 #include "ka_task_pub.h"
 #include "ka_barrier_pub.h"
 #include "ka_kernel_def_pub.h"
 #include "ka_common_pub.h"
 #include "ka_system_pub.h"
 #include "ka_errno_pub.h"
+#include "ka_compiler_pub.h"
 
 #include "securec.h"
 
+#include "comm_kernel_interface.h"
 #include "pbl_uda.h"
 #include "trs_mailbox_def.h"
 #include "trs_chan.h"
@@ -161,16 +162,9 @@ static int trs_sq_send_proc(struct trs_core_ts_inst *ts_inst, enum trs_sq_send_s
 
 static void trs_set_thread_priority(struct trs_id_inst *inst)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 9, 0)
-    ka_sched_param_t sp;
-
-    sp.sched_priority = 1;
-    if (ka_task_sched_setscheduler(ka_task_get_current(), SCHED_FIFO, &sp) != 0) {
+    if (ka_task_sched_set_fifo_low(ka_task_get_current()) != 0) {
         trs_err("Set priority fail. (devid=%u; tsid=%u)\n", inst->devid, inst->tsid);
     }
-#else
-    ka_task_sched_set_fifo_low(ka_task_get_current());
-#endif
 }
 
 static int trs_sq_send_thread(void *arg)
@@ -182,11 +176,7 @@ static int trs_sq_send_thread(void *arg)
     trs_set_thread_priority(&ts_inst->inst);
 
     while (!ka_task_kthread_should_stop()) {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 0, 0)
-        ka_system_usleep_range(sq_task_sched_time - 100, sq_task_sched_time); /* 100 us */
-#else
-        usleep_range_state(sq_task_sched_time - 100, sq_task_sched_time, TASK_INTERRUPTIBLE); /* 100 us */
-#endif
+        ka_system_usleep_range_state(sq_task_sched_time - 100, sq_task_sched_time, KA_TASK_INTERRUPTIBLE); /* 100 us */
 
         if (ts_inst->sq_task_flag == 0) {
             continue;
@@ -204,7 +194,7 @@ static int trs_sq_send_thread(void *arg)
 
 static bool trs_sq_work_is_need_retry(struct trs_core_ts_inst *ts_inst, u32 num)
 {
-    if (work_pending(&ts_inst->sq_trigger_work)) {
+    if (ka_task_work_pending(&ts_inst->sq_trigger_work)) {
         return false;
     }
 
@@ -223,7 +213,7 @@ static bool trs_sq_work_is_need_retry(struct trs_core_ts_inst *ts_inst, u32 num)
 #endif
 }
 
-static void trs_sq_trigger_work(struct work_struct *p_work)
+static void trs_sq_trigger_work(ka_work_struct_t *p_work)
 {
     struct trs_core_ts_inst *ts_inst = ka_container_of(p_work, struct trs_core_ts_inst, sq_trigger_work);
     u32 num;
@@ -236,7 +226,7 @@ static void trs_sq_trigger_work(struct work_struct *p_work)
     }
 }
 
-static void trs_sq_send_fair_work(struct work_struct *p_work)
+static void trs_sq_send_fair_work(ka_work_struct_t *p_work)
 {
     struct trs_core_ts_inst *ts_inst = ka_container_of(p_work, struct trs_core_ts_inst, sq_fair_work);
 
@@ -257,7 +247,7 @@ static ka_irqreturn_t trs_sq_trigger_irq_proc(int irq, void *para)
         (void)ka_task_queue_work(ts_inst->fair_work_queue, &ts_inst->sq_fair_work);
     }
 
-    return IRQ_HANDLED;
+    return KA_IRQ_HANDLED;
 }
 
 static void trs_sq_set_cqe_status(struct trs_core_ts_inst *ts_inst, u32 sqid)
@@ -612,7 +602,7 @@ static int trs_hw_sqcq_alloc_pair(struct trs_proc_ctx *proc_ctx, struct trs_core
     para->cqId = cq_info.cqid;
 
     trs_sq_ctx_init(inst, &ts_inst->sq_ctx[sq_info.sqid], para, stream_id, chan_id);
-    trs_cq_ctx_init(&ts_inst->cq_ctx[cq_info.cqid], U32_MAX, chan_id);
+    trs_cq_ctx_init(&ts_inst->cq_ctx[cq_info.cqid], KA_U32_MAX, chan_id);
 
     reg_map_para.stream_id = stream_id;
     reg_map_para.sqid = sq_info.sqid;
@@ -970,7 +960,7 @@ static int trs_hw_sqcq_alloc_non_pair(struct trs_proc_ctx *proc_ctx, struct trs_
         trs_sq_ctx_init(inst, &ts_inst->sq_ctx[sq_info.sqid], para, stream_id, sq_chan_id);
     }
     if (cq_info.cq_phy_addr != 0) {
-        trs_cq_ctx_init(&ts_inst->cq_ctx[cq_info.cqid], U32_MAX, cq_chan_id);
+        trs_cq_ctx_init(&ts_inst->cq_ctx[cq_info.cqid], KA_U32_MAX, cq_chan_id);
     }
     reg_map_para.sqid = sq_info.sqid;
     reg_map_para.cqid = cq_info.cqid;
@@ -1079,7 +1069,7 @@ int trs_hw_sqcq_alloc(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst *ts
             trs_err("Invalid value. (ext_info_len=%u)\n", para->ext_info_len);
             return -EINVAL;
         }
-        ret = ka_base_copy_from_user(ext_info, (u8 __user *)para->ext_info, para->ext_info_len);
+        ret = ka_base_copy_from_user(ext_info, (u8 __ka_user *)para->ext_info, para->ext_info_len);
         if (ret != 0) {
             trs_err("Failed to copy ext_info from user. (len=%u)\n", para->ext_info_len);
             return ret;
@@ -1088,7 +1078,7 @@ int trs_hw_sqcq_alloc(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst *ts
     }
 
     header = para->ext_info;
-    if (((header == NULL) || ((header != NULL) && (header->type == CHAN_SUB_TYPE_HW_RTS))) && (stream_id != U32_MAX)) {
+    if (((header == NULL) || ((header != NULL) && (header->type == CHAN_SUB_TYPE_HW_RTS))) && (stream_id != KA_U32_MAX)) {
         if (!trs_proc_has_res(proc_ctx, ts_inst, TRS_STREAM, stream_id)) {
             int ret = -EINVAL;
             if ((para->flag & TSDRV_FLAG_AGENT_ID) != 0) {
@@ -1123,16 +1113,46 @@ int trs_hw_sqcq_free(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst *ts_
 }
 
 #ifdef CFG_FEATURE_SUPPORT_STREAM_TASK
+static bool trs_stream_mem_is_need_update(struct trs_core_ts_inst *ts_inst, u64 stream_pa_addr)
+{
+    int connect_protocol;
+
+    if (stream_pa_addr == 0) {
+        return false;
+    }
+
+    connect_protocol = ts_inst->ops.get_connect_protocol(&ts_inst->inst);
+    if (connect_protocol == TRS_CONNECT_PROTOCOL_PCIE) {
+        return true;
+    }
+
+    if (connect_protocol == TRS_CONNECT_PROTOCOL_HCCS) {
+        if (ts_inst->ops.get_host_mach_flag != 0) {
+            u32 host_flag;
+            int ret = ts_inst->ops.get_host_mach_flag(&ts_inst->inst, &host_flag);
+            if (ret != 0) {
+                trs_warn("Get host flag not support. (ret=%d; devid=%u)\n", ret, ts_inst->inst.devid);
+                return false;
+            }
+            if (host_flag != DEVDRV_HOST_PHY_MACH_FLAG) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 static int trs_sq_switch_stream_notice_ts(struct trs_core_ts_inst *ts_inst, u32 sqid, u32 stream_id,
-    u64 bar_addr, u32 sq_depth)
+    u64 stream_pa_addr, u32 sq_depth)
 {
     struct trs_sq_switch_stream_info msg;
-    u64 paddr = bar_addr;
+    u64 stream_device_pa = stream_pa_addr;
     int ret;
 
-    if ((bar_addr != 0) && (ts_inst->ops.get_connect_protocol(&ts_inst->inst) == TRS_CONNECT_PROTOCOL_PCIE)) {
+    /* stream_pa_addr is raw device pa in ub scene */
+    if (trs_stream_mem_is_need_update(ts_inst, stream_pa_addr)) {
         if (ts_inst->ops.mem_update != NULL) {
-            ret = ts_inst->ops.mem_update(&ts_inst->inst, bar_addr, &paddr, 1);
+            ret = ts_inst->ops.mem_update(&ts_inst->inst, stream_pa_addr, &stream_device_pa, 1);
             if (ret != 0) {
                 trs_err("Failed to get pa. (ret=%d; devid=%u)\n", ret, ts_inst->inst.devid);
                 return ret;
@@ -1144,7 +1164,7 @@ static int trs_sq_switch_stream_notice_ts(struct trs_core_ts_inst *ts_inst, u32 
     msg.cnt = 1;
     msg.nodes[0].sq_id = sqid;
     msg.nodes[0].stream_id = stream_id;
-    msg.nodes[0].sq_addr = paddr;
+    msg.nodes[0].sq_addr = stream_device_pa;
     msg.nodes[0].sq_depth = sq_depth;
     trs_debug("(devid=%u; sqid=%u; stream_id=%u; sq_depth=%u)\n", ts_inst->inst.devid, sqid, stream_id, sq_depth);
 
@@ -1161,8 +1181,10 @@ int trs_sq_switch_stream(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst 
     struct sq_switch_stream_info *info)
 {
     struct trs_id_inst *inst = &ts_inst->inst;
+    struct trs_stream_ctx *new_stream_ctx = NULL;
     u64 stream_pa_addr = 0;
     u32 old_stream_id;
+    bool get_mem_flag = false;
     int ret;
 
     if (!trs_proc_has_res(proc_ctx, ts_inst, TRS_HW_SQ, info->sq_id)) {
@@ -1180,17 +1202,27 @@ int trs_sq_switch_stream(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst 
         return ret;
     }
 
-    if (info->stream_id != U32_MAX) {
+    if (info->stream_id != KA_U32_MAX) {
         if (!trs_proc_has_res(proc_ctx, ts_inst, TRS_STREAM, info->stream_id)) {
             trs_err("Not proc sq. (devid=%u; tsid=%u; stream_id=%u)\n", inst->devid, inst->tsid, info->stream_id);
             return -EINVAL;
         }
 
-        if (ts_inst->stream_ctx[info->stream_id].stream_base_addr == 0) {
-            trs_err("Not fill stream memory. (devid=%u; tsid=%u; stream_id=%u)\n",
-                inst->devid, inst->tsid, info->stream_id);
-            return -EINVAL;
+        new_stream_ctx = &ts_inst->stream_ctx[info->stream_id];
+        if (new_stream_ctx->pa_list == NULL) {
+            ret = trs_stream_get_mem_pa_list(proc_ctx, ts_inst, new_stream_ctx, info->stream_mem, info->sq_depth);
+            if (ret != 0) {
+                trs_err("Fail to get pa list. (ret=%d; devid=%u; stream=%u)\n", ret, proc_ctx->devid, info->stream_id);
+                return ret;
+            }
+            get_mem_flag = true;
+        } else {
+            if ((info->stream_mem != NULL) && (new_stream_ctx->stream_base_addr != (u64)(uintptr_t)info->stream_mem)) {
+                trs_err("Stream and memory not match. (devid=%u; stream_id=%u)\n", proc_ctx->devid, info->stream_id);
+                return -EINVAL;
+            }
         }
+
         stream_pa_addr = ts_inst->stream_ctx[info->stream_id].pa_list[0] +
             ts_inst->stream_ctx[info->stream_id].stream_base_addr - ts_inst->stream_ctx[info->stream_id].stream_uva;
     }
@@ -1199,7 +1231,7 @@ int trs_sq_switch_stream(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst 
     if (ret != 0) {
         trs_err("Notice ts failed. (ret=%d; devid=%u; tsid=%u; stream_id=%u; sqid=%u)\n",
             ret, inst->devid, inst->tsid, info->stream_id, info->sq_id);
-        return ret;
+        goto put_mem;
     }
 
     old_stream_id = ts_inst->sq_ctx[info->sq_id].stream_id;
@@ -1208,7 +1240,7 @@ int trs_sq_switch_stream(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst 
     }
     ts_inst->sq_ctx[info->sq_id].stream_id = info->stream_id;
 
-    if (info->stream_id != U32_MAX) {
+    if (info->stream_id != KA_U32_MAX) {
         ts_inst->stream_ctx[info->stream_id].sq = info->sq_id;
         trs_stream_set_bind_sqcq(ts_inst, info->stream_id, info->sq_id, ts_inst->sq_ctx[info->sq_id].cqid,
             proc_ctx->pid);
@@ -1218,8 +1250,52 @@ int trs_sq_switch_stream(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst 
         inst->devid, inst->tsid, info->stream_id, info->sq_id);
 
     return 0;
+
+put_mem:
+    if (get_mem_flag == true) {
+        trs_stream_put_mem_pa_list(ts_inst, proc_ctx, new_stream_ctx);
+    }
+    return ret;
 }
 #endif
+
+int trs_get_sq_bind_stream_info(struct trs_id_inst *inst, u32 sq_id, struct trs_res_info_query *res_info)
+{
+    struct trs_core_ts_inst *ts_inst = NULL;
+    struct trs_stream_ctx *stream_ctx = NULL;
+    u64 addr_offset = 0;
+    u32 stream_id;
+
+    ts_inst = trs_core_inst_get(inst->devid, inst->tsid);
+    if (ts_inst == NULL) {
+        trs_err("Invalid para. (devid=%u; tsid=%u)\n", inst->devid, inst->tsid);
+        return -EINVAL;
+    }
+
+    stream_id = ts_inst->sq_ctx[sq_id].stream_id;
+    if ((stream_id == KA_U32_MAX) || (stream_id >= trs_res_get_max_id(ts_inst, TRS_STREAM))) { /* check >=  maxid */
+        trs_core_inst_put(ts_inst);
+        return -EINVAL;
+    }
+
+    stream_ctx = &ts_inst->stream_ctx[stream_id];
+    if ((stream_ctx->stream_base_addr == 0) || (stream_ctx->stream_kva == 0)) {
+        trs_core_inst_put(ts_inst);
+        return -EINVAL;
+    }
+
+    addr_offset = stream_ctx->stream_base_addr - stream_ctx->stream_uva;
+    res_info->stream_info.stream_base_uva = (void *)(uintptr_t)stream_ctx->stream_base_addr;
+    res_info->stream_info.stream_base_kva = (void *)(uintptr_t)(stream_ctx->stream_kva + addr_offset);
+    res_info->stream_info.stream_base_pa = (stream_ctx->pa_list != NULL) ? (stream_ctx->pa_list[0] + addr_offset) : 0;
+    res_info->stream_info.stream_depth = stream_ctx->depth;
+    res_info->stream_info.task_size = TRS_HW_SQE_SIZE;
+    res_info->stream_info.mem_type = TRS_CHAN_DEV_SVM_MEM;
+
+    trs_core_inst_put(ts_inst);
+    return 0;
+}
+KA_EXPORT_SYMBOL_GPL(trs_get_sq_bind_stream_info);
 
 int trs_hw_sqcq_get(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst *ts_inst, struct halSqCqInputInfo *para)
 {
@@ -1245,7 +1321,7 @@ int trs_hw_sqcq_get(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst *ts_i
 
     cqid = stm_ctx.cq;
     if ((cqid < 0) || ((u32)(cqid) >= trs_res_get_max_id(ts_inst, TRS_HW_CQ))) {
-        trs_err("Stream no cq. (devid=%u; tsid=%u; stream_id=%u; cqId=%d)\n", inst->devid, inst->tsid, stream_id, sqid);
+        trs_err("Stream no cq. (devid=%u; tsid=%u; stream_id=%u; cqId=%d)\n", inst->devid, inst->tsid, stream_id, cqid);
         return -EINVAL;
     }
 
@@ -1405,11 +1481,15 @@ static int trs_config_sq_tail_check(struct trs_core_ts_inst *ts_inst, struct hal
             ts_inst->inst.devid, para->sqId, stream_id);
         return -EINVAL;
     }
-    if ((ts_inst->stream_ctx[stream_id].pa_list != NULL) &&
-        (para->value[0] > ts_inst->stream_ctx[stream_id].tail)) {
-        trs_err("Invalid tail. (tail=%u; value=%u)\n", ts_inst->stream_ctx[stream_id].tail, para->value[0]);
-        return -EINVAL;
+
+    if ((ts_inst->stream_ctx[stream_id].pa_list != NULL) && ((ts_inst->ops.get_sq_send_mode == NULL) ||
+        (ts_inst->ops.get_sq_send_mode(ts_inst->inst.devid) == TRS_MODE_TYPE_SQ_SEND_HIGH_SECURITY))) {
+        if (para->value[0] > ts_inst->stream_ctx[stream_id].tail) {
+            trs_err("Invalid tail. (tail=%u; value=%u)\n", ts_inst->stream_ctx[stream_id].tail, para->value[0]);
+            return -EINVAL;
+        }
     }
+
     trs_debug("Config tail success. (devid=%u; sqid=%u; tail=%u; value=%u)\n",
         ts_inst->inst.devid, para->sqId, ts_inst->stream_ctx[stream_id].tail, para->value[0]);
     return 0;
@@ -1422,7 +1502,7 @@ int trs_hw_sqcq_config(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst *t
     u32 cqid = para->cqId;
     int chan_id, ret;
 
-    if ((sqid == U32_MAX) && (cqid == U32_MAX) &&
+    if ((sqid == KA_U32_MAX) && (cqid == KA_U32_MAX) &&
         ((para->prop == DRV_SQCQ_PROP_SQ_PAUSE) || (para->prop == DRV_SQCQ_PROP_SQ_RESUME))) {
         ret = trs_hw_sqcq_config_of_proc(proc_ctx, ts_inst, TRS_HW_SQ, para->prop);
         ret |= trs_hw_sqcq_config_of_proc(proc_ctx, ts_inst, TRS_HW_CQ, para->prop); /* cq need to pause in UB scene */
@@ -1463,8 +1543,8 @@ int trs_hw_sqcq_config(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst *t
             ret |= trs_chan_ctrl(inst, chan_id, CHAN_CTRL_CMD_CQ_PAUSE, 0); /* cq also need to pause in UB scene */
             break;
         case DRV_SQCQ_PROP_SQ_RESUME:
-            ret |= trs_sq_task_resume(proc_ctx, ts_inst, sqid);
-            ret = trs_chan_ctrl(inst, chan_id, CHAN_CTRL_CMD_CQ_RESUME, 0); /* cq also need to pause in UB scene */
+            ret = trs_sq_task_resume(proc_ctx, ts_inst, sqid);
+            ret |= trs_chan_ctrl(inst, chan_id, CHAN_CTRL_CMD_CQ_RESUME, 0); /* cq also need to pause in UB scene */
             break;
         case DRV_SQCQ_PROP_SQCQ_RESET:
             ret = trs_chan_ctrl(inst, chan_id, CHAN_CTRL_CMD_SQCQ_RESET, 0);
@@ -1551,7 +1631,7 @@ static int trs_query_sq_reg_vaddr(struct trs_id_inst *inst, u32 sqid, struct hal
 
     ret = trs_get_sq_reg_vaddr(inst, sqid, &va, &size);
     if (ret == 0) {
-        u32 mask = sizeof(uint32_t) * BITS_PER_BYTE;
+        u32 mask = sizeof(uint32_t) * KA_BITS_PER_BYTE;
         para->value[0] = (uint32_t)(va >> mask);
         para->value[1] = (uint32_t)(va & ((1ULL << mask) - 1));
         para->value[2] = (uint32_t)size; /* 2 return Sq reg size */
@@ -1706,7 +1786,7 @@ int trs_hw_sq_send_thread_create(struct trs_core_ts_inst *ts_inst)
 {
     struct trs_id_inst *inst = &ts_inst->inst;
 
-    ts_inst->sq_task = kthread_create(trs_sq_send_thread, (void *)ts_inst, "dev%u_sq_task", inst->devid);
+    ts_inst->sq_task = ka_task_kthread_create(trs_sq_send_thread, (void *)ts_inst, "dev%u_sq_task", inst->devid);
     if (KA_IS_ERR_OR_NULL(ts_inst->sq_task)) {
         trs_err("Failed to start hw sq send thread. (devid=%u; tsid=%u)\n", inst->devid, inst->tsid);
         return -1;

@@ -23,7 +23,7 @@ int32_t MsnFileMgrInit(const FileAgeingParam *param, const char *rootPath);
 int32_t MsnFileMgrWriteDeviceSlog(const void *msg, uint32_t len, uint32_t masterId);
 int32_t MsnFileMgrSaveFile(char *filename, uint32_t len, uint32_t masterId);
 void MsnFileMgrExit(void);
-
+int32_t MsnFileMgrScanAndAge(const char *rootPath);
 #ifdef __cplusplus
 }
 #endif

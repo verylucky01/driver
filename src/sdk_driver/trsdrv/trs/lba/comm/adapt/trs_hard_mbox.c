@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -36,7 +36,7 @@ struct trs_mbox_chan_fault {
 struct trs_mbox_chan {
     struct trs_id_inst inst;
 
-    void __iomem *base;
+    void __ka_mm_iomem *base;
     size_t size;
     u64 tx_time_us;
     u64 txdone_time_us;
@@ -215,7 +215,7 @@ static void trs_mbox_chan_get_result(struct trs_mbox_chan *chan, void *data)
         rpc_msg->rpc_call_header.len = 44;  /* 44 is max mbox data msg len, tmp! */
     }
 
-    rmb();
+    ka_rmb();
     if ((header->result != 0) && (header->cmd_type != TRS_MBOX_RECYCLE_CHECK)) {
         trs_warn("Pay attention to result. (result=%u; tx_time_us=%llu; txdone_time_us=%llu; wakeup_time_us=%llu)\n",
             header->result, chan->tx_time_us, chan->txdone_time_us, chan->wakeup_time_us);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,19 +13,14 @@
 
 #ifndef __DAVINCI_INTF_INIT_H__
 #define __DAVINCI_INTF_INIT_H__
-#include <linux/cpumask.h>
-#include <linux/rwsem.h>
-#include <linux/version.h>
+#include "ka_system_pub.h"
+#include "ka_list_pub.h"
+#include "ka_fs_pub.h"
+#include "ka_common_pub.h"
 
-#include "ascend_dev_num.h"
 #include "ka_task_pub.h"
 #include "ka_base_pub.h"
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0)
-typedef u64 TASK_TIME_TYPE;
-#else
-typedef struct timespec TASK_TIME_TYPE;
-#endif
+#include "ascend_dev_num.h"
 
 #define DAVINIC_NONE_ROOT_ACCESS    (0640)
 
@@ -68,9 +63,9 @@ typedef struct timespec TASK_TIME_TYPE;
 struct davinci_intf_file_stru {
     ka_pid_t owner_pid;
     char module_name[DAVINIC_MODULE_NAME_MAX];
-    struct inode *inode;
-    struct file *file_op;
-    struct list_head list;
+    ka_inode_t *inode;
+    ka_file_t *file_op;
+    ka_list_head_t list;
     int valid;
     unsigned int seq;
     unsigned int open_time;
@@ -81,8 +76,8 @@ struct davinci_intf_process_stru;
 struct davinci_intf_free_list_stru {
     ka_pid_t owner_pid;
     struct davinci_intf_process_stru *owner_proc;
-    struct list_head list;
-    struct work_struct release_work;
+    ka_list_head_t list;
+    ka_work_struct_t release_work;
     ka_atomic_t current_count;
     unsigned int current_free_index;
     int all_flag;
@@ -91,9 +86,9 @@ struct davinci_intf_free_list_stru {
 struct davinci_intf_process_stru {
     void *owner_cb;
     ka_pid_t owner_pid;
-    struct list_head list;
-    struct list_head file_list;
-    struct mutex res_lock;
+    ka_list_head_t list;
+    ka_list_head_t file_list;
+    ka_mutex_t res_lock;
     ka_atomic_t work_count;
     unsigned int  status;
     TASK_TIME_TYPE start_time;
@@ -102,27 +97,27 @@ struct davinci_intf_process_stru {
 
 struct davinci_intf_process_module_stru {
     char module_name[DAVINIC_MODULE_NAME_MAX];
-    struct list_head list;
+    ka_list_head_t list;
 };
 
 struct davinci_intf_sub_module_stru {
     int valid;
     int module_type;
     char module_name[DAVINIC_MODULE_NAME_MAX];
-    struct file_operations ops;
+    ka_file_operations_t ops;
     struct notifier_operations notifier;
-    struct list_head list;
+    ka_list_head_t list;
     int free_type;
     unsigned int open_module_max; /* one process can open max count module, 0 means no limit */
 };
 
 struct davinci_intf_stru {
     ka_atomic_t count;
-    struct rw_semaphore cb_sem;
-    struct cdev cdev;
-    struct device *device;
-    struct list_head process_list;
-    struct list_head module_list;
+    ka_rw_semaphore_t cb_sem;
+    ka_cdev_t cdev;
+    ka_device_t *device;
+    ka_list_head_t process_list;
+    ka_list_head_t module_list;
     unsigned int device_status[ASCEND_DEV_MAX_NUM];
     cpumask_var_t cpumask;
 };
@@ -132,7 +127,7 @@ struct davinci_intf_free_file_stru {
     struct davinci_intf_free_list_stru *owner_list;
     char module_name[DAVINIC_MODULE_NAME_MAX];
     struct davinci_intf_private_stru *file_private;
-    struct list_head list;
+    ka_list_head_t list;
     unsigned int free_type;
     unsigned int free_index;
 };
@@ -144,11 +139,11 @@ struct davinci_intf_private_stru {
     int close_flag;
     ka_atomic_t work_count;
     int release_status;
-    struct mutex fmutex;
-    struct file_operations fops;
+    ka_mutex_t fmutex;
+    ka_file_operations_t fops;
     struct notifier_operations notifier;
     struct davinci_intf_stru *device_cb;
-    struct file priv_filep;
+    ka_file_t priv_filep;
     unsigned int free_type;
     struct davinci_intf_file_stru *file_stru_node;
     struct davinci_intf_free_list_stru *free_list;
@@ -158,9 +153,9 @@ struct davinci_intf_private_stru {
 void release_file_free_list(struct davinci_intf_free_list_stru *file_free_list);
 void drv_ascend_release_work(struct davinci_intf_free_list_stru *free_list);
 void drv_intf_trans_free_list_nodes(struct davinci_intf_process_stru *proc,
-    struct file *file, unsigned int free_index);
-void free_uninit_file_pos(struct davinci_intf_process_stru *proc, struct file *file);
-void drv_ascend_free_file_node(struct file *file);
-int drv_ascend_add_release_list_all(struct davinci_intf_process_stru *proc, struct file *file);
+    ka_file_t *file, unsigned int free_index);
+void free_uninit_file_pos(struct davinci_intf_process_stru *proc, ka_file_t *file);
+void drv_ascend_free_file_node(ka_file_t *file);
+int drv_ascend_add_release_list_all(struct davinci_intf_process_stru *proc, ka_file_t *file);
 
 #endif

@@ -70,11 +70,11 @@
 
 #define DEVMM_MAX_LOGIC_DEVICE_NUM 66ULL    /* 64 + 1 + 1, host id is 65 */
 #define SVM_HOST_AGENT_ID 64
-/* 64 dvpp + 1 read + 1 dev_readonly + 1 normal + 1 pcie through*/
-#define DEVMM_NORMAL_MAX_VMA_NUM (DEVMM_MAX_PHY_DEVICE_NUM + 4)
+/* 64 dvpp + 1 read + 1 dev_readonly + 1 normal + 1 pcie through + 1 uvm*/
+#define DEVMM_NORMAL_MAX_VMA_NUM (DEVMM_MAX_PHY_DEVICE_NUM + 5)
 #define DEVMM_MAX_VMA_NUM (DEVMM_NORMAL_MAX_VMA_NUM * 2)
 
-#define DEVMM_NORMAL_UNSPLIT_MAX_VMA_NUM 4 /* vma0: dvpp mem, vma1 read  vma2: dev readonly, vma3 normal mem */
+#define DEVMM_NORMAL_UNSPLIT_MAX_VMA_NUM 5 /* vma0: dvpp mem, vma1 read  vma2: dev readonly, vma3 normal mem, vma4 uvm mem*/
 #define DEVMM_UNSPLIT_MAX_VMA_NUM (DEVMM_NORMAL_UNSPLIT_MAX_VMA_NUM * 2)
 #define DEVMM_SVM_DEV_NAME "devmm_svm"
 #define DEVMM_SVM_AGENT_DEV_NAME "devmm_svm_agent"
@@ -91,7 +91,6 @@ uint64_t devmm_get_host_uva_start(void);
 #define DEVMM_SVM_MEM_START 0x210000000000ULL /* device asan 0x100000000000ULL mmap fail */
 #define DEVMM_HOST_PIN_START 0x140000000000UL   /* 20TB */
 #endif
-
 #define DEVMM_HOST_PIN_SIZE 0x10000000000UL    /* 1TB */
 #define DEVMM_HOST_PIN_END  (DEVMM_HOST_PIN_START + DEVMM_HOST_PIN_SIZE)
 #define DEVMM_DEV_MAPPED_RANGE 37   /* 128G */
@@ -276,11 +275,11 @@ static inline bool devmm_is_in_host_pin_range(unsigned long long va)
     return ((va >= DEVMM_HOST_PIN_START) && (va < DEVMM_HOST_PIN_END));
 }
 
+
 static inline bool devmm_va_is_in_svm_range(unsigned long long va)
 {
     return devmm_is_in_mapped_range(va) || devmm_is_in_host_pin_range(va);
 }
-
 /*=============================== mem stats start =============================*/
 #define SVM_MAX_MODULE_ID                   MAX_MODULE_ID
 

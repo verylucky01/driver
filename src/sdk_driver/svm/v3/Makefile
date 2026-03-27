@@ -1,13 +1,12 @@
 EXTRA_CFLAGS += -isystem $(shell $(CC) -print-file-name=include)
 EXTRA_CFLAGS += -Iinclude/linux
 
-EXTRA_CFLAGS += -DCFG_FEATURE_MWL_BYPASS
-
 SVM_KERNEL_DIR := ${DRIVER_KERNEL_DIR}/svm/v3
 SVM_USER_DIR := ${DRIVER_USER_DIR}/svm/v3
 
 EXTRA_CFLAGS += -I${DRIVER_KERNEL_DIR}/inc
 EXTRA_CFLAGS += -I${DRIVER_KERNEL_DIR}/inc/pbl
+EXTRA_CFLAGS += -I${DRIVER_KERNEL_DIR}/inc/comm
 EXTRA_CFLAGS += -I${DRIVER_KERNEL_DIR}/kernel_adapt/include
 EXTRA_CFLAGS += -I${DRIVER_USER_DIR}/msnpureport/inc/libc_sec
 EXTRA_CFLAGS += -I${DRIVER_HAL_INC_DIR}
@@ -65,6 +64,7 @@ SVM_KERNEL_MASTER_SRCS += $(subst $(SVM_KERNEL_DIR)/,,$(wildcard $(SVM_KERNEL_DI
 SVM_KERNEL_MASTER_SRCS += $(subst $(SVM_KERNEL_DIR)/,,$(wildcard $(SVM_KERNEL_DIR)/share_log/*.c))
 SVM_KERNEL_MASTER_SRCS += $(subst $(SVM_KERNEL_DIR)/,,$(wildcard $(SVM_KERNEL_DIR)/ksvmm/*.c))
 SVM_KERNEL_MASTER_SRCS += $(subst $(SVM_KERNEL_DIR)/,,$(wildcard $(SVM_KERNEL_DIR)/pma/*.c))
+SVM_KERNEL_MASTER_SRCS += $(subst $(SVM_KERNEL_DIR)/,,$(wildcard $(SVM_KERNEL_DIR)/mms/*.c))
 
 EXTRA_CFLAGS += -I$(SVM_KERNEL_DIR)/framework/
 EXTRA_CFLAGS += -I$(SVM_KERNEL_DIR)/host_dev/
@@ -108,9 +108,13 @@ EXTRA_CFLAGS += -I$(SVM_KERNEL_DIR)/share_log
 EXTRA_CFLAGS += -I$(SVM_KERNEL_DIR)/ksvmm
 EXTRA_CFLAGS += -I$(SVM_KERNEL_DIR)/pma
 EXTRA_CFLAGS += -I$(SVM_KERNEL_DIR)/pma_ub
+EXTRA_CFLAGS += -I$(SVM_KERNEL_DIR)/mms
 
 EXTRA_CFLAGS += -DCFG_FEATURE_SHARE_LOG
 EXTRA_CFLAGS += -DCFG_FEATURE_HOST_LOG
+ifneq ($(filter $(PRODUCT), ascend950),)
+    EXTRA_CFLAGS += -DCFG_FEATURE_KA_ALLOC_INTERFACE
+endif
 
 asdrv_svm-objs := $(patsubst %.c,%.o,$(SVM_KERNEL_MASTER_SRCS))
 

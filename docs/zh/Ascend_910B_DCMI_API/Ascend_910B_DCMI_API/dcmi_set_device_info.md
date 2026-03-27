@@ -227,7 +227,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001206307236_zh-cn_topic_0000001178054672_zh-cn_topic_0000001147964365_toc533412083"></a>**
 
-```c
+```
 … 
 int ret = 0;
 int card_id = 0;
@@ -488,7 +488,7 @@ if (ret != 0){
 
 **调用示例<a name="section168848176545"></a>**
 
-```c
+```
 …
 int ret;
 int card_id = 0;
@@ -506,6 +506,7 @@ if (ret) {
 // todo
 …
 ```
+
 
 ## DCMI\_MAIN\_CMD\_QOS命令说明<a name="ZH-CN_TOPIC_0000002485455426"></a>
 
@@ -796,7 +797,7 @@ DCMI_QOS_SUB_GLOBAL_CONFIG,
 
 **调用示例<a name="section854716251547"></a>**
 
-```c
+```
 …
 int32_t ret;
 int card_id = 0;
@@ -877,6 +878,7 @@ return ret;
 }
 …
 ```
+
 
 ## DCMI\_MAIN\_CMD\_EX\_CERT命令说明<a name="ZH-CN_TOPIC_0000002485455416"></a>
 
@@ -1105,7 +1107,7 @@ return ret;
 
 **调用示例<a name="section14483105193112"></a>**
 
-```c
+```
 …
 int ret;
 int card_id = 0;
@@ -1121,6 +1123,7 @@ if (ret) {
 // todo
 …
 ```
+
 
 ## DCMI\_MAIN\_CMD\_TS命令说明<a name="ZH-CN_TOPIC_0000002517535317"></a>
 
@@ -1363,7 +1366,7 @@ DCMI_TS_SUB_CMD_MAX,
 
 **调用示例<a name="section49611431655"></a>**
 
-```c
+```
 …
 int ret;
 int card_id = 0;
@@ -1383,6 +1386,7 @@ return -1;
 return 0;
 …
 ```
+
 
 ## DCMI\_MAIN\_CMD\_DEVICE\_SHARE命令说明<a name="ZH-CN_TOPIC_0000002517615381"></a>
 
@@ -1501,10 +1505,10 @@ return 0;
 
 **约束说明<a name="section13645113118442"></a>**
 
-- 设置容器共享模式后，重启系统后容器使能状态默认为禁用。
-- 若物理机的NPU设备映射进普通容器且在该容器内对NPU执行过任意操作，则不支持修改容器共享模式。
-- device_id设置为0或1时，会同时设置设备的两个芯片的容器共享使能标记。
-- 该接口支持在物理机+特权容器场景下使用。
+-   设置容器共享模式后，重启系统后容器使能状态默认为禁用。
+-   若物理机的NPU设备映射进普通容器且在该容器内对NPU执行过任意操作，则不支持修改容器共享模式。
+-   device_id设置为0或1时，会同时设置设备的两个芯片的容器共享使能标记。
+-   该接口支持在物理机+特权容器场景下使用。
 
 **表 1**  sub\_cmd对应的buf格式
 
@@ -1611,7 +1615,7 @@ return 0;
 
 **调用示例<a name="section593717142277"></a>**
 
-```c
+```
     …
     int ret;
     int card_id = 0;
@@ -1628,3 +1632,5 @@ return 0;
     }
     …
 ```
+
+

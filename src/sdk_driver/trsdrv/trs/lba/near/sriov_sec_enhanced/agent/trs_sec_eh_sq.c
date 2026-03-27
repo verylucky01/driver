@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -252,14 +252,14 @@ int trs_sec_eh_check_and_update_cq_ctx_info(struct trs_sec_eh_ts_inst *sec_eh_cf
         return -EINVAL;
     }
 
-    cq_addr_gfn = (ctx->cq_paddr >> PAGE_SHIFT);
+    cq_addr_gfn = (ctx->cq_paddr >> KA_MM_PAGE_SHIFT);
     cq_addr_mfn = hw_dvt_hypervisor_gfn_to_mfn(vdavinci, cq_addr_gfn);
     if ((cq_addr_mfn == 0) || (cq_addr_mfn == 0xffffffffffffffff)) {
         trs_err("Get mfn failed. (devid=%u; pf_id=%u; vf_id=%u)\n", inst.devid, pf_id, vf_id);
         return -EINVAL;
     }
 
-    ctx->cq_paddr = ((u64)cq_addr_mfn << PAGE_SHIFT);
+    ctx->cq_paddr = ((u64)cq_addr_mfn << KA_MM_PAGE_SHIFT);
 #endif
 
     return 0;

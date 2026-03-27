@@ -183,6 +183,11 @@ int dsmi_get_work_mode(unsigned int *work_mode);
 * @return  0 for success, others for fail
 * @note Support:Ascend310,Ascend910,Ascend910B,Ascend310P
 */
+
+int dsmi_get_multi_die_policy(unsigned int *out);
+
+int dsmi_set_multi_die_policy(unsigned int policy);
+
 int dsmi_get_mainboard_id(unsigned int device_id, unsigned int *mainboard_id);
  
 /**
@@ -238,6 +243,6 @@ int dsmi_get_custom_op_secverify_cert_show_info(unsigned int device_id, const ch
  * @return  0 for success, others for fail
  */
 int dsmi_cmd_get_custom_cert_show_info(unsigned int device_id, const char *buf,
- 	unsigned int buf_size, void *show_info, unsigned int show_info_size);
+    unsigned int buf_size, void *show_info, unsigned int show_info_size);
 
 #endif

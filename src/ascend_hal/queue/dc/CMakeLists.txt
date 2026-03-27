@@ -9,10 +9,10 @@
 # ------------------------------------------------------------------------------------------------------------
 add_library(queue_obj OBJECT)
 
-if (${PRODUCT} STREQUAL ascend910_95)
+if (${PRODUCT} STREQUAL ascend950)
     if (${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL aarch64)
         if(${ENABLE_UBE})
-            set(support_ub "ascend910_95")
+            set(support_ub "ascend950")
         endif ()
     endif ()
 endif ()
@@ -41,16 +41,16 @@ target_include_directories(queue_obj PRIVATE
     ${DRIVER_KERNEL_DIR}/dms/command/ioctl
 )
 
+target_link_libraries(queue_obj PRIVATE
+    $<BUILD_INTERFACE:intf_pub>
+)
+
 target_compile_definitions(queue_obj PRIVATE
     DRV_HOST
     $<$<STREQUAL:${PRODUCT},ascend910B>:CFG_FEATURE_REQ_DMA_SRC_DST_ADDR_ALIGN>
     CFG_FEATURE_HOST_SUPPORT_LOCAL_QUEUE
     $<$<IN_LIST:${PRODUCT},${support_ub}>:CFG_FEATURE_QUE_SUPPORT_UB>
-    $<$<AND:$<STREQUAL:${PRODUCT},ascend910_95>,$<STREQUAL:${CMAKE_HOST_SYSTEM_PROCESSOR},aarch64>>:SSAPI_USE_MAMI>
-)
-
-target_link_libraries(queue_obj PRIVATE
-    $<BUILD_INTERFACE:intf_pub>
+    $<$<AND:$<STREQUAL:${PRODUCT},ascend950>,$<STREQUAL:${CMAKE_HOST_SYSTEM_PROCESSOR},aarch64>>:SSAPI_USE_MAMI>
 )
 
 add_subdirectory(core)

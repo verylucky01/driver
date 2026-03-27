@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -108,12 +108,12 @@ enum devdrv_dts_addr_index {
 struct devdrv_ts_pdata {
     u32 tsid;
 
-    void __iomem *sram_vaddr;
-    u8 __iomem *ts_mbox_send_vaddr;
-    u8 __iomem *ts_mbox_rcv_vaddr;
-    u32 __iomem *ts_sysctl_vaddr;
-    void __iomem *doorbell_vaddr;
-    void __iomem *stars_ctrl_vaddr;
+    void __ka_mm_iomem *sram_vaddr;
+    u8 __ka_mm_iomem *ts_mbox_send_vaddr;
+    u8 __ka_mm_iomem *ts_mbox_rcv_vaddr;
+    u32 __ka_mm_iomem *ts_sysctl_vaddr;
+    void __ka_mm_iomem *doorbell_vaddr;
+    void __ka_mm_iomem *stars_ctrl_vaddr;
 
     phys_addr_t sram_paddr;
     phys_addr_t ts_mbox_send_paddr;
@@ -168,9 +168,9 @@ struct devdrv_platform_info {
 
     u32 occupy_bitmap;
 
-    void __iomem *gicv3_base;
-    void __iomem *sysctl_base;
-    void __iomem *disp_base;
+    void __ka_mm_iomem *gicv3_base;
+    void __ka_mm_iomem *sysctl_base;
+    void __ka_mm_iomem *disp_base;
 
     u32 sclid;
     u32 ts_cluster;

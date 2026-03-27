@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,9 +10,9 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
- 
-#include "msg_chan_main.h"
+
 #include "ka_kernel_def_pub.h"
+#include "msg_chan_main.h"
 
 int devdrv_register_rao_client(u32 dev_id, enum devdrv_rao_client_type type, u64 va, u64 len,
     enum devdrv_rao_permission_type perm)
@@ -22,7 +22,7 @@ int devdrv_register_rao_client(u32 dev_id, enum devdrv_rao_client_type type, u64
     struct devdrv_comm_dev_ops *dev_ops = devdrv_add_ops_ref();
     if (dev_ops == NULL) {
         devdrv_err("Get rao dev_ops fail. (dev_id=%u; type=%d)\n", dev_id, type);
-        return -EINVAL;
+        return -ENODEV;
     }
     (void)uda_udevid_to_add_id(dev_id, &index_id);
     ret = dev_ops->ops.register_rao_client(index_id, type, va, len, perm);
@@ -38,7 +38,7 @@ int devdrv_unregister_rao_client(u32 dev_id, enum devdrv_rao_client_type type)
     struct devdrv_comm_dev_ops *dev_ops = devdrv_add_ops_ref();
     if (dev_ops == NULL) {
         devdrv_err("Get rao dev_ops fail. (dev_id=%u; type=%d)\n", dev_id, type);
-        return -EINVAL;
+        return -ENODEV;
     }
     (void)uda_udevid_to_add_id(dev_id, &index_id);
 

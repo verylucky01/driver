@@ -206,8 +206,8 @@ int dcmi_set_npu_device_share_enable(int card_id, int device_id, int enable_flag
 
     err = dsmi_set_device_info(device_logic_id, device_share_main_cmd, device_share_sub_cmd,
         (void *)&enable_flag, (unsigned int)sizeof(int));
-    if (err != DCMI_OK) {
-        gplog(LOG_ERR, "call dsmi_set_device_info failed. erris %d.", err);
+    if (err != DSMI_OK) {
+        gplog(LOG_ERR, "call dsmi_set_device_info failed. err is %d.", err);
         return dcmi_convert_error_code(err);
     }
 
@@ -469,7 +469,7 @@ int dcmi_str2int(int *ptmp_num, const char *str)
         }
     }
 
-    num = strtol(tmp_str, &end_ptr, DCMI_DEC_TO_STR_BASE);
+    num = (int)strtol(tmp_str, &end_ptr, DCMI_DEC_TO_STR_BASE);
     /* 转换后num为0，但实际传入tmp_str不为'0...0'时，说明传入参数有误 */
     if (num == 0) {
         do {
@@ -772,7 +772,7 @@ STATIC int dcmi_clear_npu_syslog_cfg_inner(int device_count, int *device_id_list
 int dcmi_clear_npu_syslog_cfg()
 {
     int ret, device_count = 0;
-    FILE *fp = NULL;
+    FILE *fp;
     int device_id_list[MAX_DEVICE_NUM] = {0};
 
     ret = dcmi_get_npu_device_list((int *)&device_id_list[0], MAX_DEVICE_NUM, &device_count);
@@ -929,22 +929,26 @@ int dcmi_save_device_share_cfg(int card_id, int device_id, int enable_value)
 
     if ((!dcmi_board_chip_type_is_ascend_910_93()) && (!dcmi_board_chip_type_is_ascend_310p()) &&
         (!dcmi_board_chip_type_is_ascend_910b())) {
-        gplog(LOG_OP, "This device does not support save device-share config recover mode %s.",
+        gplog(LOG_ERR, "This device does not support save device-share config recover mode %s.",
             (enable_value == DCMI_CFG_RECOVER_ENABLE) ? "enable" : "disable");
         return DCMI_ERR_CODE_NOT_SUPPORT;
-    } else if ((dcmi_is_in_phy_privileged_docker_root() == TRUE) || (dcmi_is_in_phy_machine_root() == TRUE)) {
-        err = dcmi_cfg_get_device_share_config_recover_mode(&recover_enable);
-        if (err != DCMI_OK) {
-            gplog(LOG_ERR, "dcmi_cfg_get_device_share_config_recover_mode failed. err is %d", err);
-            return err;
-        }
+    }
+    if ((!dcmi_is_in_phy_privileged_docker_root()) && (!dcmi_is_in_phy_machine_root())) {
+        gplog(LOG_ERR, "The current user does not have the permission to save device-share config recover mode.");
+        return DCMI_ERR_CODE_OPER_NOT_PERMITTED;
+    }
+    
+    err = dcmi_cfg_get_device_share_config_recover_mode(&recover_enable);
+    if (err != DCMI_OK) {
+        gplog(LOG_ERR, "dcmi_cfg_get_device_share_config_recover_mode failed. err is %d", err);
+        return err;
+    }
 
-        if (recover_enable == DCMI_CFG_RECOVER_ENABLE) {
-            err = dcmi_cfg_insert_set_device_share_cmdline(card_id, device_id, enable_value);
-            if (err != DCMI_OK) {
-                gplog(LOG_ERR, "dcmi_cfg_insert_set_device_share_cmdline failed. err is %d", err);
-                return err;
-            }
+    if (recover_enable == DCMI_CFG_RECOVER_ENABLE) {
+        err = dcmi_cfg_insert_set_device_share_cmdline(card_id, device_id, enable_value);
+        if (err != DCMI_OK) {
+            gplog(LOG_ERR, "dcmi_cfg_insert_set_device_share_cmdline failed. err is %d", err);
+            return err;
         }
     }
     return DCMI_OK;
@@ -1055,8 +1059,8 @@ int dcmi_set_npu_device_info(
     }
 
     ret = dcmi_get_device_logic_id(&device_logic_id, card_id, device_id);
-    if (ret != DSMI_OK) {
-        gplog(LOG_ERR, "call dsmi_set_device_info failed. err is %d.", ret);
+    if (ret != DCMI_OK) {
+        gplog(LOG_ERR, "call dcmi_get_device_logic_id failed. err is %d.", ret);
         return ret;
     }
 

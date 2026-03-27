@@ -23,7 +23,8 @@ enum {
     RUNTIME_MODULE_ID = 7,       /* Runtime */
     CCE_MODULE_ID = 8,           /* CCE */
     HLT_MODULE_ID = 9,           /* Used for hlt test */
-    DEVMM_MODULE_ID = 22,        /* Dlog memory managent */
+    DEVMM_MODULE_ID = 22,        /* Dev memory managent */
+    TSDRV_MODULE_ID = 23,        /* Ts driver */
     LIBMEDIA_MODULE_ID = 24,     /* Libmedia */
     CCECPU_MODULE_ID = 25,       /* aicpu shedule */
     ASCENDDK_MODULE_ID = 26,     /* AscendDK */
@@ -82,6 +83,7 @@ enum {
             [CCE_MODULE_ID] = "CCE",                    \
             [HLT_MODULE_ID] = "HLT",                    \
             [DEVMM_MODULE_ID] = "DEVMM",                \
+            [TSDRV_MODULE_ID] = "TSDRV",                \
             [LIBMEDIA_MODULE_ID] = "LIBMEDIA",          \
             [CCECPU_MODULE_ID] = "CCECPU",              \
             [ASCENDDK_MODULE_ID] = "ASCENDDK",          \
@@ -145,7 +147,8 @@ typedef enum {
 typedef enum {
     MEM_HANDLE_TYPE_NONE = 0x0,
     MEM_HANDLE_TYPE_FABRIC = 0x1,
-    MEM_HANDLE_TYPE_MAX = 0x2,
+    MEM_HANDLE_TYPE_POSIX = 0x2,
+    MEM_HANDLE_TYPE_MAX = 0x3,
 } drv_mem_handle_type;
 
 struct ShareHandleAttr {

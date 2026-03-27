@@ -7,9 +7,9 @@
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 # ------------------------------------------------------------------------------------------------------------
-set(drv_virtmng_host_stub_depends drv_seclib_host asdrv_pbl ascend_kernel_open_adapt)
+set(asdrv_vvmng_depends drv_seclib_host asdrv_pbl ascend_kernel_open_adapt)
 
-add_host_ko(LOCAL_MODULE drv_virtmng_host_stub
+add_host_ko(LOCAL_MODULE asdrv_vvmng
 			KO_SRC_FOLDER ${CMAKE_CURRENT_SOURCE_DIR}
 			MAKE_ARGS ${MAKE_ARGS}
-			TARGETE_DPENDS "${drv_virtmng_host_stub_depends}")
+			TARGETE_DPENDS "${asdrv_vvmng_depends}")

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,6 +14,7 @@
 #ifndef _HDCDRV_HOST_H_
 #define _HDCDRV_HOST_H_
 
+#include "ka_task_pub.h"
 #include "hdcdrv_adapter.h"
 #include "hdcdrv_host_adapt.h"
 
@@ -26,7 +27,6 @@
 #define HDCDRV_HOTRESET_CHECK_MAX_CNT 500
 #endif
 #define HDCDRV_HOTRESET_CHECK_DELAY_MS 40
-#include "ka_task_pub.h"
 
 typedef int (*container_virtual_to_physical_devid)(u32, u32 *, u32 *);
 typedef int (*devdrv_manager_get_run_env)(ka_mnt_namespace_t *mnt_ns);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,10 +11,11 @@
  * GNU General Public License for more details.
  */
 
+#include "ka_kernel_def_pub.h"
+#include "ka_compiler_pub.h"
+#include "ka_pci_pub.h"
 #include "pcivnic_host.h"
 #include "pcivnic_main.h"
-#include "ka_kernel_def_pub.h"
-#include "ka_pci_pub.h"
 
 #define PCI_VENDOR_ID_HUAWEI 0x19e5
 
@@ -35,11 +36,13 @@ static const ka_pci_device_id_t g_devdrv_pcivnic_tbl[] = {{ KA_PCI_VDEVICE(HUAWE
     { 0x203F, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
     { 0x20C6, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
     { 0x203F, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+    { 0x20E9, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+    { 0x20E9, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
     {}};
 KA_MODULE_DEVICE_TABLE(pci, g_devdrv_pcivnic_tbl);
 /*lint +e508 */
 
-STATIC int __init pcivnic_init_module(void)
+STATIC int __ka_init pcivnic_init_module(void)
 {
     struct pcivnic_netdev *vnic_dev = NULL;
     int ret;
@@ -68,7 +71,7 @@ STATIC int __init pcivnic_init_module(void)
     return 0;
 }
 
-STATIC void __exit pcivnic_exit_module(void)
+STATIC void __ka_exit pcivnic_exit_module(void)
 {
     int ret;
 

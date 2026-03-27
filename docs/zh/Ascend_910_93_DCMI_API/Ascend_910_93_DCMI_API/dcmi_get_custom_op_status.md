@@ -148,7 +148,7 @@
 
 **调用示例<a name="section184903171142"></a>**
 
-```c
+```
 … 
 int enable_flag = 0;
 int card_id = 0;
@@ -161,3 +161,4 @@ if (ret != 0) {
 }
 …
 ```
+

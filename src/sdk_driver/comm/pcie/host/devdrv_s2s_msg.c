@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,6 +11,9 @@
  * GNU General Public License for more details.
  */
 
+#include "ka_kernel_def_pub.h"
+#include "ka_memory_pub.h"
+#include "ka_barrier_pub.h"
 #include "devdrv_dma.h"
 #include "devdrv_ctrl.h"
 #include "devdrv_common_msg.h"
@@ -24,9 +27,6 @@
 #include "devdrv_s2s_msg.h"
 #include "devdrv_adapt.h"
 #include "pbl/pbl_uda.h"
-#include "ka_kernel_def_pub.h"
-#include "ka_memory_pub.h"
-#include "ka_barrier_pub.h"
 
 #define SUPER_SERVER_BASE_ADDR 0x300000000000   // remote addr base
 
@@ -80,7 +80,7 @@ void devdrv_set_s2s_chan_pre_reset(u32 dev_id)
     }
 }
 
-int devdrv_register_s2s_msg_proc_func(enum devdrv_s2s_msg_type msg_type, s2s_msg_recv func)
+int devdrv_pci_register_s2s_msg_proc_func(enum devdrv_s2s_msg_type msg_type, s2s_msg_recv func)
 {
     if ((u32)msg_type >= DEVDRV_S2S_MSG_TYPE_MAX) {
         devdrv_err("Msg type is not support yet. (msg_type=%d)\n", (int)msg_type);
@@ -101,9 +101,8 @@ int devdrv_register_s2s_msg_proc_func(enum devdrv_s2s_msg_type msg_type, s2s_msg
 
     return 0;
 }
-KA_EXPORT_SYMBOL(devdrv_register_s2s_msg_proc_func);
 
-int devdrv_unregister_s2s_msg_proc_func(enum devdrv_s2s_msg_type msg_type)
+int devdrv_pci_unregister_s2s_msg_proc_func(enum devdrv_s2s_msg_type msg_type)
 {
     if ((u32)msg_type >= DEVDRV_S2S_MSG_TYPE_MAX) {
         devdrv_err("Msg type is not support yet. (msg_type=%d)\n", (int)msg_type);
@@ -118,7 +117,6 @@ int devdrv_unregister_s2s_msg_proc_func(enum devdrv_s2s_msg_type msg_type)
 
     return 0;
 }
-KA_EXPORT_SYMBOL(devdrv_unregister_s2s_msg_proc_func);
 
 STATIC void devdrv_fill_sq_data(struct devdrv_s2s_msg_chan *chan, enum devdrv_s2s_msg_type msg_type,
     struct devdrv_s2s_msg_send_data_para *data_para, u32 in_len, struct spod_info s)
@@ -480,7 +478,7 @@ STATIC void devdrv_s2s_msg_send_unlock(struct devdrv_s2s_msg_chan *chan, u32 msg
     }
 }
 
-int devdrv_s2s_msg_send(u32 devid, u32 sdid, enum devdrv_s2s_msg_type msg_type, u32 direction,
+int devdrv_pci_s2s_msg_send(u32 devid, u32 sdid, enum devdrv_s2s_msg_type msg_type, u32 direction,
     struct data_input_info *data_info)
 {
     struct devdrv_s2s_msg_send_data_para data_para = {0};
@@ -534,7 +532,6 @@ int devdrv_s2s_msg_send(u32 devid, u32 sdid, enum devdrv_s2s_msg_type msg_type, 
 
     return ret;
 }
-KA_EXPORT_SYMBOL(devdrv_s2s_msg_send);
 
 STATIC int devdrv_s2s_check_recv_para(u32 devid, enum devdrv_s2s_msg_type msg_type,
     struct data_recv_info *data_info)
@@ -562,7 +559,7 @@ STATIC int devdrv_s2s_check_recv_para(u32 devid, enum devdrv_s2s_msg_type msg_ty
     return 0;
 }
 
-int devdrv_s2s_async_msg_recv(u32 devid, u32 sdid, enum devdrv_s2s_msg_type msg_type,
+int devdrv_pci_s2s_async_msg_recv(u32 devid, u32 sdid, enum devdrv_s2s_msg_type msg_type,
     struct data_recv_info *data_info)
 {
     struct devdrv_pci_ctrl *pci_ctrl = NULL;
@@ -628,7 +625,6 @@ msg_exit:
 
     return ret;
 }
-KA_EXPORT_SYMBOL(devdrv_s2s_async_msg_recv);
 
 STATIC phys_addr_t devdrv_s2s_get_msg_cq_addr(u32 dev_id, u32 chan_id)
 {
@@ -738,7 +734,7 @@ int devdrv_s2s_non_trans_msg_recv(void *msg_chan, void *data, u32 in_data_len, u
         resq_time = ka_system_jiffies_to_msecs(ka_jiffies - call_start);
         if (resq_time > DEVDRV_S2S_CB_TIME) {
             devdrv_info("Get resq_time. (dev_id=%u; msg_type=%u; resq_time=%ums; cpu=%d)\n",
-                devid, msg_type, resq_time, ka_system_smp_processor_id());
+                devid, msg_type, resq_time, ka_system_raw_smp_processor_id());
         }
         ka_task_up_read(&g_register_func_sem[msg_type]);
 
@@ -901,13 +897,13 @@ STATIC int devdrv_init_s2s_chan_sdma_addr(struct sdid_parse_info dst_sdid_info, 
 STATIC void devdrv_s2s_msg_chan_mem_uninit(struct devdrv_msg_dev *msg_dev, struct devdrv_s2s_msg_chan *msg_chan)
 {
     if (msg_chan->sq.ack_buf != NULL) {
-        hal_kernel_devdrv_dma_free_coherent(msg_dev->dev, DEVDRV_S2S_HOST_MSG_SIZE, (void*)msg_chan->sq.ack_buf, msg_chan->sq.ack_addr);
+        devdrv_pci_dma_free_coherent(msg_dev->dev, DEVDRV_S2S_HOST_MSG_SIZE, (void*)msg_chan->sq.ack_buf, msg_chan->sq.ack_addr);
         msg_chan->sq.ack_buf = NULL;
         msg_chan->sq.ack_addr = (~(ka_dma_addr_t)0);
     }
 
     if (msg_chan->sq.data_buf != NULL) {
-        hal_kernel_devdrv_dma_free_coherent(msg_dev->dev, DEVDRV_S2S_HOST_MSG_SIZE, (void*)msg_chan->sq.data_buf,
+        devdrv_pci_dma_free_coherent(msg_dev->dev, DEVDRV_S2S_HOST_MSG_SIZE, (void*)msg_chan->sq.data_buf,
             msg_chan->sq.data_buf_addr);
         msg_chan->sq.data_buf = NULL;
         msg_chan->sq.data_buf_addr = (~(ka_dma_addr_t)0);
@@ -927,17 +923,17 @@ STATIC int devdrv_s2s_msg_chan_mem_init(struct devdrv_msg_dev *msg_dev, struct d
     int ret = 0;
 
     // service data transfer through data_buf
-    msg_chan->sq.data_buf = (struct devdrv_s2s_msg *)hal_kernel_devdrv_dma_alloc_coherent(msg_dev->dev, DEVDRV_S2S_HOST_MSG_SIZE,
+    msg_chan->sq.data_buf = (struct devdrv_s2s_msg *)devdrv_pci_dma_alloc_coherent(msg_dev->dev, DEVDRV_S2S_HOST_MSG_SIZE,
         &msg_chan->sq.data_buf_addr, KA_GFP_KERNEL);
     if (msg_chan->sq.data_buf == NULL) {
         devdrv_err("sq data_buf alloc failed.(devid=%u; chan=%u)\n", msg_chan->devid, msg_chan->chan_id);
         return -ENOMEM;
     }
 
-    msg_chan->sq.ack_buf = (struct devdrv_s2s_msg *)hal_kernel_devdrv_dma_alloc_coherent(msg_dev->dev, DEVDRV_S2S_HOST_MSG_SIZE,
+    msg_chan->sq.ack_buf = (struct devdrv_s2s_msg *)devdrv_pci_dma_alloc_coherent(msg_dev->dev, DEVDRV_S2S_HOST_MSG_SIZE,
         &msg_chan->sq.ack_addr, KA_GFP_KERNEL);
     if (msg_chan->sq.ack_buf == NULL) {
-        hal_kernel_devdrv_dma_free_coherent(msg_dev->dev, DEVDRV_S2S_HOST_MSG_SIZE, (void*)msg_chan->sq.data_buf,
+        devdrv_pci_dma_free_coherent(msg_dev->dev, DEVDRV_S2S_HOST_MSG_SIZE, (void*)msg_chan->sq.data_buf,
             msg_chan->sq.data_buf_addr);
         msg_chan->sq.data_buf = NULL;
         msg_chan->sq.data_buf_addr = (~(ka_dma_addr_t)0);

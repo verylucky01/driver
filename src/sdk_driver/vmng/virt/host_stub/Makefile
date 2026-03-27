@@ -7,13 +7,13 @@
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 # ------------------------------------------------------------------------------------------------------------
-MODULE_NAME := drv_virtmng_host_stub
+MODULE_NAME := asdrv_vvmng
 obj-m += ${MODULE_NAME}.o
 ${MODULE_NAME}-objs := virtmnghost_ctrl_stub.o virtmnghost_msg_common_stub.o virtmnghost_vpc_stub.o
 
 EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/pbl/dev_urd/dc
 EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/inc
-EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/vmng/command
+EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/vmng/command/msg
 EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/vmng/inc
 EXTRA_CFLAGS += -I$(C_SEC_INCLUDE)
 EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/pbl/dev_urd

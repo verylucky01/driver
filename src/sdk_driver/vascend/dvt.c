@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,16 +10,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
-#include <linux/init.h>
-#include <linux/types.h>
-#include <linux/kernel.h>
-#include <linux/module.h>
-#include <linux/kthread.h>
-#include <linux/vfio.h>
-
-#include <linux/slab.h>
-#include <linux/module.h>
 
 #include "kvmdt.h"
 #include "mmio.h"
@@ -186,39 +176,39 @@ static struct vdavinci_type types_910_93_v3[] = {
 };
 
 /* 36core, 128G */
-static struct vdavinci_type types_910d_bin0[] = {
-    {"vir16_7c_60g", TYPE_VIR16_7C_60G_BIN0, VF_MMIO_BAR0_SIZE_910D,
-     VF_MMIO_BAR2_SIZE_910D, VF_MMIO_BAR4_SIZE_910D, 16, 60, 7, 2, 4, 2, 0, 0, 1},
-    {"vir08_3c_30g", TYPE_VIR08_3C_30G_BIN0, VF_MMIO_BAR0_SIZE_910D,
-     VF_MMIO_BAR2_SIZE_910D, VF_MMIO_BAR4_SIZE_910D, 8, 30, 3, 1, 2, 1, 0, 0, 1},
-    {"vir04_1c_15g", TYPE_VIR04_1C_15G_BIN0, VF_MMIO_BAR0_SIZE_910D,
-     VF_MMIO_BAR2_SIZE_910D, VF_MMIO_BAR4_SIZE_910D, 4, 15, 1, 0, 0, 0, 0, 0, 1},
+static struct vdavinci_type types_950_bin0[] = {
+    {"vir16_7c_60g", TYPE_VIR16_7C_60G_BIN0, VF_MMIO_BAR0_SIZE_950,
+     VF_MMIO_BAR2_SIZE_950, VF_MMIO_BAR4_SIZE_950, 16, 60, 7, 2, 4, 2, 0, 0, 1},
+    {"vir08_3c_30g", TYPE_VIR08_3C_30G_BIN0, VF_MMIO_BAR0_SIZE_950,
+     VF_MMIO_BAR2_SIZE_950, VF_MMIO_BAR4_SIZE_950, 8, 30, 3, 1, 2, 1, 0, 0, 1},
+    {"vir04_1c_15g", TYPE_VIR04_1C_15G_BIN0, VF_MMIO_BAR0_SIZE_950,
+     VF_MMIO_BAR2_SIZE_950, VF_MMIO_BAR4_SIZE_950, 4, 15, 1, 0, 0, 0, 0, 0, 1},
 };
  
 /* 32core, 128G */
-static struct vdavinci_type types_910d_bin1[] = {
-    {"vir16_7c_60g", TYPE_VIR16_7C_60G_BIN1, VF_MMIO_BAR0_SIZE_910D,
-     VF_MMIO_BAR2_SIZE_910D, VF_MMIO_BAR4_SIZE_910D, 16, 60, 5, 2, 4, 2, 0, 0, 1},
-    {"vir08_3c_30g", TYPE_VIR08_3C_30G_BIN1, VF_MMIO_BAR0_SIZE_910D,
-     VF_MMIO_BAR2_SIZE_910D, VF_MMIO_BAR4_SIZE_910D, 8, 30, 2, 1, 2, 1, 0, 0, 1},
-    {"vir04_1c_15g", TYPE_VIR04_1C_15G_BIN1, VF_MMIO_BAR0_SIZE_910D,
-     VF_MMIO_BAR2_SIZE_910D, VF_MMIO_BAR4_SIZE_910D, 4, 15, 1, 0, 0, 0, 0, 0, 1},
+static struct vdavinci_type types_950_bin1[] = {
+    {"vir16_7c_60g", TYPE_VIR16_7C_60G_BIN1, VF_MMIO_BAR0_SIZE_950,
+     VF_MMIO_BAR2_SIZE_950, VF_MMIO_BAR4_SIZE_950, 16, 60, 5, 2, 4, 2, 0, 0, 1},
+    {"vir08_3c_30g", TYPE_VIR08_3C_30G_BIN1, VF_MMIO_BAR0_SIZE_950,
+     VF_MMIO_BAR2_SIZE_950, VF_MMIO_BAR4_SIZE_950, 8, 30, 2, 1, 2, 1, 0, 0, 1},
+    {"vir04_1c_15g", TYPE_VIR04_1C_15G_BIN1, VF_MMIO_BAR0_SIZE_950,
+     VF_MMIO_BAR2_SIZE_950, VF_MMIO_BAR4_SIZE_950, 4, 15, 1, 0, 0, 0, 0, 0, 1},
 };
  
 /* 28core, 128G */
-static struct vdavinci_type types_910d_bin2[] = {
-    {"vir14_5c_60g", TYPE_VIR14_5C_60G_BIN2, VF_MMIO_BAR0_SIZE_910D,
-     VF_MMIO_BAR2_SIZE_910D, VF_MMIO_BAR4_SIZE_910D, 14, 60, 5, 1, 4, 1, 0, 0, 1},
-    {"vir07_2c_30g", TYPE_VIR07_2C_30G_BIN2, VF_MMIO_BAR0_SIZE_910D,
-     VF_MMIO_BAR2_SIZE_910D, VF_MMIO_BAR4_SIZE_910D, 7, 30, 2, 0, 0, 0, 0, 0, 1},
+static struct vdavinci_type types_950_bin2[] = {
+    {"vir14_5c_60g", TYPE_VIR14_5C_60G_BIN2, VF_MMIO_BAR0_SIZE_950,
+     VF_MMIO_BAR2_SIZE_950, VF_MMIO_BAR4_SIZE_950, 14, 60, 5, 1, 4, 1, 0, 0, 1},
+    {"vir07_2c_30g", TYPE_VIR07_2C_30G_BIN2, VF_MMIO_BAR0_SIZE_950,
+     VF_MMIO_BAR2_SIZE_950, VF_MMIO_BAR4_SIZE_950, 7, 30, 2, 0, 0, 0, 0, 0, 1},
 };
  
 /* 28core, 112G */
-static struct vdavinci_type types_910d_bin3[] = {
-    {"vir14_5c_52g", TYPE_VIR14_5C_52G_BIN3, VF_MMIO_BAR0_SIZE_910D,
-     VF_MMIO_BAR2_SIZE_910D, VF_MMIO_BAR4_SIZE_910D, 14, 52, 5, 1, 4, 1, 0, 0, 1},
-    {"vir07_2c_26g", TYPE_VIR07_2C_26G_BIN3, VF_MMIO_BAR0_SIZE_910D,
-     VF_MMIO_BAR2_SIZE_910D, VF_MMIO_BAR4_SIZE_910D, 7, 26, 2, 0, 0, 0, 0, 0, 1},
+static struct vdavinci_type types_950_bin3[] = {
+    {"vir14_5c_52g", TYPE_VIR14_5C_52G_BIN3, VF_MMIO_BAR0_SIZE_950,
+     VF_MMIO_BAR2_SIZE_950, VF_MMIO_BAR4_SIZE_950, 14, 52, 5, 1, 4, 1, 0, 0, 1},
+    {"vir07_2c_26g", TYPE_VIR07_2C_26G_BIN3, VF_MMIO_BAR0_SIZE_950,
+     VF_MMIO_BAR2_SIZE_950, VF_MMIO_BAR4_SIZE_950, 7, 26, 2, 0, 0, 0, 0, 0, 1},
 };
 
 struct types_num {
@@ -239,10 +229,10 @@ static const struct types_num vdavinci_types_num[] = {
     {PCI_DEVICE_ID_ASCEND910_93, 24, 64, TYPE_MAX_910_93_V1, types_910_93_v1},
     {PCI_DEVICE_ID_ASCEND910_93, 20, 32, TYPE_MAX_910_93_V2, types_910_93_v2},
     {PCI_DEVICE_ID_ASCEND910_93, 20, 64, TYPE_MAX_910_93_V3, types_910_93_v3},
-    {PCI_DEVICE_ID_ASCEND910D, 36, 128, TYPE_MAX_910D_BIN0, types_910d_bin0},
-    {PCI_DEVICE_ID_ASCEND910D, 32, 128, TYPE_MAX_910D_BIN1, types_910d_bin1},
-    {PCI_DEVICE_ID_ASCEND910D, 28, 128, TYPE_MAX_910D_BIN2, types_910d_bin2},
-    {PCI_DEVICE_ID_ASCEND910D, 28, 112, TYPE_MAX_910D_BIN3, types_910d_bin3},
+    {PCI_DEVICE_ID_ASCEND950, 36, 128, TYPE_MAX_950_BIN0, types_950_bin0},
+    {PCI_DEVICE_ID_ASCEND950, 32, 128, TYPE_MAX_950_BIN1, types_950_bin1},
+    {PCI_DEVICE_ID_ASCEND950, 28, 128, TYPE_MAX_950_BIN2, types_950_bin2},
+    {PCI_DEVICE_ID_ASCEND950, 28, 112, TYPE_MAX_950_BIN3, types_950_bin3},
     {}
 };
 
@@ -254,14 +244,14 @@ struct mmio_init_ops vdavinci_mmio_pf_devices_ops[] = {
     { PCI_DEVICE_ID_ASCEND910, hw_vdavinci_910_mmio_init, hw_vdavinci_910_mmio_uninit},
     { PCI_DEVICE_ID_ASCEND910B, hw_vdavinci_910b_mmio_init, hw_vdavinci_910b_mmio_uninit},
     { PCI_DEVICE_ID_ASCEND910_93, hw_vdavinci_910_93_mmio_init, hw_vdavinci_910_93_mmio_uninit},
-    { PCI_DEVICE_ID_ASCEND910D, hw_vdavinci_910d_mmio_init, hw_vdavinci_910d_mmio_uninit},
+    { PCI_DEVICE_ID_ASCEND950, hw_vdavinci_950_mmio_init, hw_vdavinci_950_mmio_uninit},
     { }
 };
 
 struct mmio_init_ops vdavinci_mmio_vf_devices_ops[] = {
     { PCI_DEVICE_ID_ASCEND910B, hw_vdavinci_910b_vf_mmio_init, hw_vdavinci_910b_vf_mmio_uninit},
     { PCI_DEVICE_ID_ASCEND910_93, hw_vdavinci_910_93_vf_mmio_init, hw_vdavinci_910_93_vf_mmio_uninit},
-    { PCI_DEVICE_ID_ASCEND910D, hw_vdavinci_910d_vf_mmio_init, hw_vdavinci_910d_vf_mmio_uninit},
+    { PCI_DEVICE_ID_ASCEND950, hw_vdavinci_950_vf_mmio_init, hw_vdavinci_950_vf_mmio_uninit},
     { }
 };
 
@@ -269,7 +259,7 @@ static const struct pci_device_id g_vascend_tbl[] = {{ PCI_VDEVICE(HUAWEI, PCI_D
                                                      { PCI_VDEVICE(HUAWEI, PCI_DEVICE_ID_ASCEND910), 0 },
                                                      { PCI_VDEVICE(HUAWEI, PCI_DEVICE_ID_ASCEND910B), 0 },
                                                      { PCI_VDEVICE(HUAWEI, PCI_DEVICE_ID_ASCEND910_93), 0 },
-                                                     { PCI_VDEVICE(HUAWEI, PCI_DEVICE_ID_ASCEND910D), 0 },
+                                                     { PCI_VDEVICE(HUAWEI, PCI_DEVICE_ID_ASCEND950), 0 },
                                                      {}};
 MODULE_DEVICE_TABLE(pci, g_vascend_tbl);
 
@@ -298,8 +288,18 @@ static struct vdavinci_drv_ops g_vascend_drv_ops = {
     .vdavinci_get_reserve_iova_for_check = get_reserve_iova_for_check,
 };
 
-static inline bool hw_vdavinci_dma_pool_support(struct device *dev)
+static inline bool hw_vdavinci_smmu_check(struct hw_dvt *dvt, struct device *dev)
 {
+    struct iommu_domain *domain = NULL;
+
+    if (!hw_vdavinci_sriov_support(dvt)) {
+        return true;
+    }
+    domain = iommu_get_domain_for_dev(dev);
+    if (domain == NULL) {
+        return false;
+    }
+
     return true;
 }
 
@@ -588,69 +588,6 @@ int hw_dvt_set_mmio_ops(struct hw_dvt *dvt, struct mmio_init_ops *ops)
     return -ENOTSUPP;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6,1,0)
-STATIC int hw_dvt_init_vdavinci_type_groups(struct hw_dvt *dvt)
-{
-    unsigned int i;
-    struct hw_vdavinci_type *type = NULL;
-
-    dvt->mdev_types = kcalloc(dvt->vdavinci_type_num * dvt->dev_num,
-                              sizeof(*dvt->mdev_types), GFP_KERNEL);
-    if (dvt->mdev_types == NULL) {
-        return -ENOMEM;
-    }
-
-    for (i = 0; i < dvt->vdavinci_type_num * dvt->dev_num; i++) {
-        type = &dvt->types[i];
-
-        dvt->mdev_types[i] = &type->mtype;
-        dvt->mdev_types[i]->sysfs_name = type->name;
-    }
-
-    return 0;
-}
-#else
-STATIC int hw_dvt_init_vdavinci_type_groups(struct hw_dvt *dvt)
-{
-    unsigned int i, j;
-    struct hw_vdavinci_type *type = NULL;
-    struct attribute_group *group = NULL;
-
-    /* we need put a NULL pointer at the end of supported_type_groups
-     * array, vfio-mdev module use the NULL pointer as the arrary end.
-     */
-    dvt->groups = kcalloc(dvt->vdavinci_type_num * dvt->dev_num + 1,
-                          sizeof(struct attribute_group *), GFP_KERNEL);
-    if (dvt->groups == NULL) {
-        return -ENOMEM;
-    }
-
-    for (i = 0; i < dvt->vdavinci_type_num * dvt->dev_num; i++) {
-        type = &dvt->types[i];
-
-        group = kzalloc(sizeof(struct attribute_group), GFP_KERNEL);
-        if (WARN_ON(!group)) {
-            goto unwind;
-        }
-
-        group->name = type->name;
-        group->attrs = get_hw_vdavinci_type_attrs();
-        dvt->groups[i] = group;
-    }
-    return 0;
-
-unwind:
-    for (j = 0; j < i; j++) {
-        kfree(dvt->groups[j]);
-        dvt->groups[j] = NULL;
-    }
-
-    kfree(dvt->groups);
-    dvt->groups = NULL;
-    return -ENOMEM;
-}
-#endif
-
 bool davinci_vfg_support(unsigned short vendor, unsigned short device)
 {
     static struct hw_device_info devices[] = {
@@ -730,27 +667,6 @@ STATIC void davinci_vfg_info_remove(struct pci_dev *pcidev)
     sysfs_remove_group(&pcidev->dev.kobj, &davinci_vfg_attr_group);
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6,1,0)
-STATIC void hw_dvt_cleanup_vdavinci_type_groups(struct hw_dvt *dvt)
-{
-    kfree(dvt->mdev_types);
-    dvt->mdev_types = NULL;
-}
-#else
-STATIC void hw_dvt_cleanup_vdavinci_type_groups(struct hw_dvt *dvt)
-{
-    int i;
-
-    for (i = 0; i < dvt->vdavinci_type_num * dvt->dev_num; i++) {
-        kfree(dvt->groups[i]);
-        dvt->groups[i] = NULL;
-    }
-
-    kfree(dvt->groups);
-    dvt->groups = NULL;
-}
-#endif
-
 struct hw_vdavinci_ops g_hw_vdavinci_ops = {
     .emulate_cfg_read = hw_vdavinci_emulate_cfg_read,
     .emulate_cfg_write = hw_vdavinci_emulate_cfg_write,
@@ -765,16 +681,19 @@ struct hw_vdavinci_ops g_hw_vdavinci_ops = {
     .dvt_find_vdavinci_type = hw_dvt_find_vdavinci_type,
 };
 
-STATIC int hw_dvt_init_device_info(struct hw_dvt *dvt, struct vdavinci_priv *vdavinci_priv)
+STATIC int hw_dvt_init_device_info(struct hw_dvt *dvt)
 {
+    struct vdavinci_priv *vdavinci_priv = dvt->vdavinci_priv;
     struct pci_dev *pdev = container_of(vdavinci_priv->dev, struct pci_dev, dev);
     struct pci_driver *pdrv = pdev->driver;
     int ret = 0;
-    vdavinci_priv->dvt = dvt;
-    dvt->vdavinci_priv = vdavinci_priv;
- 
+
     dvt->vendor = pdev->vendor;
     dvt->device = pdev->device;
+    if (!hw_vdavinci_smmu_check(dvt, vdavinci_priv->dev)) {
+        vascend_warn(&pdev->dev, "iommu is not enable, vdavinci is not support for this device");
+        return -ENOTSUPP;
+    }
     ret = hw_dvt_set_mmio_ops(dvt, vdavinci_mmio_pf_devices_ops);
     if (ret) {
         vascend_warn(&pdev->dev, "vdavinci is not support for this device: 0x%x\n",
@@ -796,14 +715,14 @@ STATIC int hw_dvt_init_device_info(struct hw_dvt *dvt, struct vdavinci_priv *vda
     return 0;
 }
 
-STATIC void hw_dvt_clean_device_info(struct hw_dvt *dvt, struct vdavinci_priv *vdavinci_priv)
+STATIC void hw_dvt_clean_device_info(struct hw_dvt *dvt)
 {
+    struct vdavinci_priv *vdavinci_priv = dvt->vdavinci_priv;
     struct pci_dev *pdev = container_of(vdavinci_priv->dev, struct pci_dev, dev);
     struct pci_driver *pdrv = pdev->driver;
+
     mutex_destroy(&dvt->lock);
     dvt->mmio_init = NULL;
-    kfree(dvt);
-    vdavinci_priv->dvt = NULL;
     pdrv->sriov_configure = NULL;
 }
 
@@ -934,7 +853,7 @@ void hw_dvt_uninit_dev_pf_info(struct hw_dvt *dvt)
 }
 
 STATIC int hw_dvt_init_dev_pf_num(struct hw_dvt **dev_dvt,
-    struct vdavinci_priv *vdavinci_priv)
+                                  struct vdavinci_priv *vdavinci_priv)
 {
     unsigned int dev_num;
     struct hw_dvt *dvt;
@@ -953,7 +872,64 @@ STATIC int hw_dvt_init_dev_pf_num(struct hw_dvt **dev_dvt,
     dvt->dev_num = dev_num;
     *dev_dvt = dvt;
 
+    vdavinci_priv->dvt = dvt;
+    dvt->vdavinci_priv = vdavinci_priv;
+
     return 0;
+}
+
+STATIC void hw_dvt_uninit_dev_pf_num(struct hw_dvt *dvt,
+                                     struct vdavinci_priv *vdavinci_priv)
+{
+    if (vdavinci_priv->dvt != dvt) {
+        vascend_err(vdavinci_priv->dev, "dvt does not match\n");
+        return;
+    }
+    dvt->dev_num = 0;
+    dvt->vdavinci_priv = NULL;
+    kfree(vdavinci_priv->dvt);
+    vdavinci_priv->dvt = NULL;
+}
+
+STATIC int hw_dvt_setup_device(struct hw_dvt *dvt)
+{
+    int ret = 0;
+    struct vdavinci_priv *vdavinci_priv = dvt->vdavinci_priv;
+
+    mutex_init(&dvt->lock);
+    ret = hw_dvt_init_device_info(dvt);
+    if (ret != 0) {
+        goto out_mutex;
+    }
+
+    ret = hw_dvt_init_dev_pf_info(dvt);
+    if (ret != 0) {
+        goto out_clean_dvt;
+    }
+
+    ret = hw_dvt_init_vdavinci_types(dvt);
+    if (ret != 0) {
+        vascend_warn(vdavinci_priv->dev, "vdavinci might be not support, ret: %d\n", ret);
+        goto out_clean_pf;
+    }
+
+    return 0;
+
+out_clean_pf:
+    hw_dvt_uninit_dev_pf_info(dvt);
+out_clean_dvt:
+    hw_dvt_clean_device_info(dvt);
+out_mutex:
+    mutex_destroy(&dvt->lock);
+    return ret;
+}
+
+STATIC void hw_dvt_cleanup_device(struct hw_dvt *dvt)
+{
+    hw_dvt_clean_vdavinci_types(dvt);
+    hw_dvt_uninit_dev_pf_info(dvt);
+    hw_dvt_clean_device_info(dvt);
+    mutex_destroy(&dvt->lock);
 }
 
 int hw_dvt_init_device(struct vdavinci_priv *vdavinci_priv)
@@ -970,37 +946,19 @@ int hw_dvt_init_device(struct vdavinci_priv *vdavinci_priv)
     }
 
     ret = hw_dvt_init_dev_pf_num(&dvt, vdavinci_priv);
-    if (ret) {
+    if (ret != 0) {
         goto out_module;
     }
 
-    mutex_init(&dvt->lock);
-    ret = hw_dvt_init_device_info(dvt, vdavinci_priv);
-    if (ret) {
-        goto out_clean_dvt;
-    }
-
-    ret = hw_dvt_init_dev_pf_info(dvt);
-    if (ret) {
-        goto out_clean_dvt;
-    }
-
-    ret = hw_dvt_init_vdavinci_types(dvt);
-    if (ret) {
-        vascend_warn(vdavinci_priv->dev, "vdavinci might be not support, ret: %d\n", ret);
-        goto out_clean_pf;
-    }
-
-    ret = hw_dvt_init_vdavinci_type_groups(dvt);
-    if (ret) {
-        vascend_err(vdavinci_priv->dev, "Failed to init vdavinci type groups: %d\n", ret);
-        goto out_clean_types;
+    ret = hw_dvt_setup_device(dvt);
+    if (ret != 0) {
+        goto out_dev_pf;
     }
 
     ret = hw_dvt_register_mdev(dvt, &g_hw_kvmdt_ops);
-    if (ret) {
+    if (ret != 0) {
         vascend_err(vdavinci_priv->dev, "Failed to register hypervisor: %d\n", ret);
-        goto out_clean_type_groups;
+        goto out_clenup_dvt;
     }
 
     hw_dvt_debugfs_init(dvt);
@@ -1014,14 +972,10 @@ int hw_dvt_init_device(struct vdavinci_priv *vdavinci_priv)
 
 out_clean_debugfs:
     hw_dvt_debugfs_clean(dvt);
-out_clean_type_groups:
-    hw_dvt_cleanup_vdavinci_type_groups(dvt);
-out_clean_types:
-    hw_dvt_clean_vdavinci_types(dvt);
-out_clean_pf:
-    hw_dvt_uninit_dev_pf_info(dvt);
-out_clean_dvt:
-    hw_dvt_clean_device_info(dvt, vdavinci_priv);
+out_clenup_dvt:
+    hw_dvt_cleanup_device(dvt);
+out_dev_pf:
+    hw_dvt_uninit_dev_pf_num(dvt, vdavinci_priv);
 out_module:
     module_put(THIS_MODULE);
     return ret;
@@ -1076,14 +1030,10 @@ int hw_dvt_uninit_device(struct vdavinci_priv *vdavinci_priv)
     pdev = container_of(vdavinci_priv->dev, struct pci_dev, dev);
     hw_dvt_cleanup_sriov(vdavinci_priv);
     davinci_vfg_info_remove(pdev);
-    hw_dvt_unregister_mdev(dvt, &g_hw_kvmdt_ops);
-    hw_dvt_cleanup_vdavinci_type_groups(dvt);
-    hw_dvt_clean_vdavinci_types(dvt);
-    hw_dvt_uninit_dev_pf_info(dvt);
     hw_dvt_debugfs_clean(dvt);
-    mutex_destroy(&dvt->lock);
-    kfree(vdavinci_priv->dvt);
-    vdavinci_priv->dvt = NULL;
+    hw_dvt_unregister_mdev(dvt, &g_hw_kvmdt_ops);
+    hw_dvt_cleanup_device(dvt);
+    hw_dvt_uninit_dev_pf_num(dvt, vdavinci_priv);
     module_put(THIS_MODULE);
 
     vascend_info(vdavinci_priv->dev, "unregister mdev success\n");
@@ -1101,11 +1051,45 @@ struct device *vdavinci_resource_dev(struct hw_vdavinci *vdavinci)
     return vdavinci->dev.resource_dev;
 }
 
+/**
+ * first, return the vf device otherwise return mdev parent device
+ */
+struct device *vdavinci_get_device(struct hw_vdavinci *vdavinci)
+{
+    struct device *dev = vdavinci_resource_dev(vdavinci);
+    if (!dev) {
+        dev = get_mdev_parent(vdavinci->vdev.mdev);
+    }
+
+    return dev;
+}
+
+struct device *vdavinci_to_dev(struct hw_vdavinci *vdavinci)
+{
+    struct device *dev = NULL;
+
+    if (vdavinci == NULL) {
+        return NULL;
+    }
+
+    dev = vdavinci_resource_dev(vdavinci);
+    if (dev) {
+        return dev;
+    }
+
+    dev = vdavinci->dvt->vdavinci_priv->dev;
+    if (dev) {
+        return dev;
+    }
+
+    return get_mdev_parent(vdavinci->vdev.mdev);
+}
+
 bool hw_vdavinci_sriov_support(struct hw_dvt *dvt)
 {
     if (dvt->device == PCI_DEVICE_ID_ASCEND910B ||
         dvt->device == PCI_DEVICE_ID_ASCEND910_93 ||
-        dvt->device == PCI_DEVICE_ID_ASCEND910D) {
+        dvt->device == PCI_DEVICE_ID_ASCEND950) {
         return true;
     }
 

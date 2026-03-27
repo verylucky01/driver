@@ -423,6 +423,7 @@ typedef enum {
     INFO_TYPE_UB_QOS_INFO,
     INFO_TYPE_UB_CONFIG_INFO,
     INFO_TYPE_QOS_MASTER_CONFIG,
+    INFO_TYPE_EVENT_RESUME,
 } DEV_INFO_TYPE;
 
 /**
@@ -446,6 +447,8 @@ typedef enum {
 typedef enum {
     PHY_INFO_TYPE_CHIPTYPE = 0,
     PHY_INFO_TYPE_MASTER_ID,
+    PHY_INFO_TYPE_PHY_CHIP_ID,
+    PHY_INFO_TYPE_PHY_DIE_ID,
 } PHY_DEV_INFO_TYPE;
 
 typedef enum {
@@ -966,7 +969,9 @@ typedef enum {
     HAL_DMS_DEV_TYPE_CFG_MGR = 0x61A,
     HAL_DMS_DEV_TYPE_DATA_GW = 0x61D,
     HAL_DMS_DEV_TYPE_RESMGR = 0x623,
+    HAL_DMS_DEV_TYPE_MAMI_DEV_CTRL = 0x624,
     HAL_DMS_DEV_TYPE_DRV_KERNEL = 0x625,
+    HAL_DMS_DEV_TYPE_UBCFGLITE = 0x626,
     HAL_DMS_DEV_TYPE_MAX
 } HAL_DMS_DEVICE_NODE_TYPE;
 
@@ -1173,6 +1178,13 @@ enum {
     HAL_STRESS_ADJ_MATA,
     HAL_STRESS_ADJ_CPU,
     HAL_STRESS_ADJ_HBM,
+    HAL_STRESS_ADJ_HBM0V5,
+    HAL_STRESS_ADJ_SIOE,
+    HAL_STRESS_ADJ_SDS1V0,
+    HAL_STRESS_ADJ_SDS0V75,
+    HAL_STRESS_ADJ_PERI,
+    HAL_STRESS_ADJ_PLL,
+    HAL_STRESS_ADJ_DVDD,
     HAL_STRESS_ADJ_MAX
 };
 
@@ -1253,6 +1265,8 @@ typedef enum {
 * --------------------------------------------------------------------------------------------------------
 * MODULE_TYPE_QOS           |  INFO_TYPE_CONFIG           |   qos config information    |                |
 * --------------------------------------------------------------------------------------------------------
+* MODULE_TYPE_QOS           |  INFO_TYPE_QOS_MASTER_CONFIG|   qos master cfg information|                |
+* --------------------------------------------------------------------------------------------------------
 * MODULE_TYPE_AICORE        |  INFO_TYPE_CURRENT_FREQ     |   ai core current frequency |                |
 * --------------------------------------------------------------------------------------------------------
 * MODULE_TYPE_MEMORY        |  INFO_TYPE_UCE_VA           |   UCE VA num and VA info    |                |
@@ -1325,6 +1339,8 @@ struct hal_ub_status {
 * --------------------------------------------------------------------------------------------------------
 * MODULE_TYPE_SYSTEM        |  INFO_TYPE_SDK_EX_VERSION   |    SDK extend version       | used in device |
 * --------------------------------------------------------------------------------------------------------
+* MODULE_TYPE_SYSTEM        |  INFO_TYPE_EVENT_RESUME     |    Fault event resume       | used in host   |
+* --------------------------------------------------------------------------------------------------------
 * @param [in] devId  Device ID, when parameter infoType is set to INFO_TYPE_MASTERID, need to use physical device ID.
 *             In other cases, need to use logical device ID.
 *             Note: The physical ID used by INFO_TYPE_MASTERID is a known issue.
@@ -1338,16 +1354,24 @@ struct hal_ub_status {
 DLLEXPORT drvError_t halSetDeviceInfoByBuff(uint32_t devId, int32_t moduleType,
                                             int32_t infoType, void *buf, int32_t size);
 
+struct hal_fault_event_resume {
+    unsigned int event_id;
+    unsigned short node_type;
+    unsigned char node_id;
+    unsigned char resv[9];
+};
+
 /**
 * @ingroup driver
 * @brief Get device info using physical device id
 * @attention each  moduleType  and infoType will get a different
 * if the type you input is not compatitable with the table below, then will return fail
+* moduleType            |        infoType           |    value                |   attention    |
 * ------------------------------------------------------------------------------------------
-* moduleType            |        infoType         |    value                |   attention    |
-* ------------------------------------------------------------------------------------------
-* MODULE_TYPE_SYSTEM    | PHY_INFO_TYPE_CHIPTYPE  |   chip type             | used in host   |
-* MODULE_TYPE_SYSTEM    | PHY_INFO_TYPE_MASTER_ID |   masterId              | used in host   |
+* MODULE_TYPE_SYSTEM    | PHY_INFO_TYPE_CHIPTYPE    |   chip type             | used in host   |
+* MODULE_TYPE_SYSTEM    | PHY_INFO_TYPE_MASTER_ID   |   master id             | used in host   |
+* MODULE_TYPE_SYSTEM    | PHY_INFO_TYPE_PHY_CHIP_ID |   physical chip id      |                |
+* MODULE_TYPE_SYSTEM    | PHY_INFO_TYPE_PHY_DIE_ID  |   physical die id       |                |
 * ------------------------------------------------------------------------------------------
 * @param [in] phyId  Device physical ID
 * @param [in] moduleType  See enum DEV_MODULE_TYPE
@@ -1625,7 +1649,7 @@ DLLEXPORT drvError_t drvMemWrite(uint32_t devId, MEM_CTRL_TYPE memType, uint32_t
 
 /**
  * @ingroup driver
- * @brief p2p Enable interface
+ * @brief p2p Enable mem interface
  * @attention
  * 1. Both directions must be set to take effect, and support sdma and vnic interworking.
  * 2. When using device access host memory, the MAX enable number will be reduced.
@@ -1638,6 +1662,7 @@ DLLEXPORT drvError_t drvMemWrite(uint32_t devId, MEM_CTRL_TYPE memType, uint32_t
  * Ascend910A1      |        0~15        |        8          |
  * Ascend910A2      |        0~15        |        8          |
  * Ascend910A3      |        0~15        |        8          |
+ * Ascend950        |        0~15        |        16         |
  * Ascend310P       |  0/2/4...34/36/38  |        8          |
  * Ascend310P Duo   |        0~39        |        8(shared)  |
  * Ascend310B       |     Not Support    |    Not Support    |
@@ -1651,7 +1676,7 @@ DLLEXPORT drvError_t halDeviceEnableP2P(uint32_t dev, uint32_t peer_dev, uint32_
 
 /**
  * @ingroup driver
- * @brief p2p Disable interface
+ * @brief p2p Disable mem interface
  * @attention
  * 1. Both directions must be set to take effect, and support sdma and vnic interworking.
  * 2. When using device access host memory, the MAX enable number will be reduced.
@@ -1664,6 +1689,7 @@ DLLEXPORT drvError_t halDeviceEnableP2P(uint32_t dev, uint32_t peer_dev, uint32_
  * Ascend910A1      |        0~15        |        8          |
  * Ascend910A2      |        0~15        |        8          |
  * Ascend910A3      |        0~15        |        8          |
+ * Ascend950        |        0~15        |        16         |
  * Ascend310P       |  0/2/4...34/36/38  |        8          |
  * Ascend310P Duo   |        0~39        |        8(shared)  |
  * Ascend310B       |     Not Support    |    Not Support    |
@@ -1696,6 +1722,60 @@ DLLEXPORT drvError_t drvGetP2PStatus(uint32_t dev, uint32_t peer_dev, uint32_t *
  * @return   0 for success, others for fail
  */
 DLLEXPORT drvError_t halDeviceCanAccessPeer(int *can_access_peer, uint32_t dev, uint32_t peer_dev);
+
+/**
+ * @ingroup driver
+ * @brief p2p notify Enable interface
+ * @attention
+ * 1. Two dev only need set once to take effect.
+ * 2. When using halDeviceEnableP2P to set mem, the notify MAX enable number will be reduced.
+ * 3. The two devices of Ascend310P Duo share 16 MAX enable number.
+ * 4. dev and peer_dev cannot be equal or share the same PCIE device.
+ * 5. VF devices are not supported.
+ * -----------------------------------------------------------
+ * Chip Type        |   Support phy_id   | MAX enable number |
+ * ------------------ ----------------------------------------
+ * Ascend910A1      |        0~15        |        16         |
+ * Ascend910A2      |        0~15        |        16         |
+ * Ascend910A3      |        0~15        |        16         |
+ * Ascend950        |        0~15        |        16         |
+ * Ascend310P       |  0/2/4...34/36/38  |        16         |
+ * Ascend310P Duo   |        0~39        |        16(shared) |
+ * Ascend310B       |     Not Support    |    Not Support    |
+ * -----------------------------------------------------------
+ * @param [in]  phy_dev : local dev's physical device id
+ * @param [in]  peer_phy_dev : dest dev's physical device id
+ * @param [in]  flag : reserve para fill 0
+ * @return   0 for success, others for fail
+ */
+DLLEXPORT drvError_t halDeviceEnableP2PNotify(uint32_t phy_dev, uint32_t peer_phy_dev, uint32_t flag);
+
+/**
+ * @ingroup driver
+ * @brief p2p notify Disable interface
+ * @attention
+ * 1. Two dev only need set once to take effect.
+ * 2. When using halDeviceEnableP2P to set mem, the notify MAX enable number will be reduced.
+ * 3. The two devices of Ascend310P Duo share 16 MAX enable number.
+ * 4. dev and peer_dev cannot be equal or share the same PCIE device.
+ * 5. VF devices are not supported.
+ * -----------------------------------------------------------
+ * Chip Type        |   Support phy_id   | MAX enable number |
+ * ------------------ ----------------------------------------
+ * Ascend910A1      |        0~15        |        16         |
+ * Ascend910A2      |        0~15        |        16         |
+ * Ascend910A3      |        0~15        |        16         |
+ * Ascend950        |        0~15        |        16         |
+ * Ascend310P       |  0/2/4...34/36/38  |        16         |
+ * Ascend310P Duo   |        0~39        |        16(shared) |
+ * Ascend310B       |     Not Support    |    Not Support    |
+ * -----------------------------------------------------------
+ * @param [in]  phy_dev : local dev's physical device id
+ * @param [in]  peer_phy_dev : dest dev's physical device id
+ * @param [in]  flag : reserve para fill 0
+ * @return   0 for success, others for fail
+ */
+DLLEXPORT drvError_t halDeviceDisableP2PNotify(uint32_t phy_dev, uint32_t peer_phy_dev, uint32_t flag);
 
 /**
 * @ingroup driver
@@ -1892,6 +1972,8 @@ typedef drvError_t DVresult;
 #define DV_MEM_LOCK_DEV_DVPP    0x0020
 #define DV_MEM_LOCK_HOST_AGENT  0x0040
 #define DV_MEM_USER_MALLOC      0x0080
+#define DV_MEM_USER_REGISTER    0x0100
+#define DV_MEM_UVM              0x0200
 
 #define DV_MEM_RESV 8
 struct DVattribute {
@@ -1903,6 +1985,10 @@ struct DVattribute {
     /**< DV_MEM_LOCK_DEV_DVPP   : dev_dvpp mapped memory & lock dev */
     /**< DV_MEM_LOCK_HOST_AGENT : host agent mapped memory & lock host */
     /**< DV_MEM_USER_MALLOC     : not svm addr range, default user malloc */
+    /**< DV_MEM_USER_REGISTER   :
+     * not svm addr range, need to call halSupportFeature(devid, FEATURE_SVM_MEM_REGISTER_QUERY_AND_GET_ATTR) firstly,
+     * then call halHostRegister. only in this way can get this mem type.
+     */
     UINT32 memType;
     UINT32 resv1;
     UINT32 resv2;
@@ -1926,7 +2012,7 @@ struct DVattribute {
  * 1. After applying for memory, you need to call the advise interface to allocate physical memory, and then
  * call this interface. That is, the user should ensure that the page table has been established in the space where
  * the virtual address is located to ensure that the corresponding physical address is correctly obtained
- * @attention: Ascend910_95 is not supported
+ * @attention: Ascend950 is not supported
  * @param [in] vptr:  unsigned 64-bit integer, the device memory address must be the shared memory requested
  * @param [out] pptr: unsigned 64-bit integer. The corresponding physical address is returned. The value is valid
  * when the return is successful
@@ -1962,6 +2048,7 @@ DLLEXPORT DV_OFF_ONLINE DVresult drvMemSmmuQuery(DVdevice device, UINT32 *SSID);
  *  1. The memory to be initialized needs to be on the Host or both on the Device side
  *  2. The memory management module is not responsible for the length check of ByteCount. Users need to ensure
  *  that the length is legal.
+ *  3. Memset readonly memory may result in unexpected behavior.
  * @param [in] dst:  unsigned 64-bit integer, memory address to be initialized
  * @param [in] destMax:  the maximum number of valid initial memory values that can be set
  * @param [in] value:  8-bit unsigned, initial value set
@@ -1980,6 +2067,7 @@ DLLEXPORT DV_OFF_ONLINE DVresult drvMemsetD8(DVdeviceptr dst, size_t destMax, UI
  * 2. (offline) This interface cannot process data larger than 2G.
  * 3. Share memory address not support D2D copy, including ipc open and memory export, use may result in unexpected
  * behavior.
+ * 4. Copying readonly memory may result in unexpected behavior.
  * @param [in] dst: unsigned 64-bit integer, memory address to be initialized
  * @param [in] dest_max: the maximum number of valid initial memory values that can be set
  * @param [in] src: 16-bit unsigned, initial value set
@@ -1995,6 +2083,7 @@ DLLEXPORT DV_OFF_ONLINE DVresult drvMemcpy(DVdeviceptr dst, size_t dest_max, DVd
  * @attention
  * 1. The destination buffer must have enough space to store the contents of the source buffer to be copied.
  * 2. Only support d2h copy.
+ * 3. Copying readonly memory may result in unexpected behavior.
  * @param [in] dst: destination address
  * @param [in] dst_size: destination memory region size
  * @param [in] src: source address
@@ -2012,7 +2101,8 @@ DLLEXPORT drvError_t halMemcpy(void *dst, size_t dst_size, void *src, size_t cou
  * 1. The destination buffer must have enough space to store the contents of the source buffer to be copied.
  * 2. (offline) (virtual machine logical grouping) not support
  * 3. The max num of async copy tasks being processed simultaneously is 65535.
- * @attention Ascend910_95 is not supported
+ * 4. Copying readonly memory may result in unexpected behavior.
+ * @attention Ascend950 is not supported
  * @param [in] dst:  unsigned 64-bit integer, memory address to be initialized
  * @param [in] dest_max:  the maximum number of valid initial memory values that can be set
  * @param [in] value:  16-bit unsigned, initial value set
@@ -2031,7 +2121,7 @@ DLLEXPORT DV_OFF_ONLINE DVresult halMemCpyAsync(
  * 1. The destination buffer must have enough space to store the contents of the source buffer to be copied.
  * 2. (offline) (virtual machine logical grouping) not support
  * 3. The copyFd will be free after wait finish, so the same copyFd can only be wait finish once.
- * @attention: Ascend910_95 is not supported
+ * @attention: Ascend950 is not supported
  * @param [in] copy_fd:  get from halMemCpyAsync, Asynchronously copy Fd
  * @return DRV_ERROR_NONE : success
  * @return DRV_ERROR_INVALID_HANDLE : Internal error, copy failed
@@ -2042,6 +2132,7 @@ DLLEXPORT DV_OFF_ONLINE DVresult halMemCpyAsyncWaitFinish(uint64_t copy_fd) ASCE
  * @ingroup driver
  * @brief Copy the 2D data in the source buffer to the destination buffer
  * @attention The destination buffer must have enough space to store the contents of the source buffer to be copied.
+ * 1. Copying readonly memory may result in unexpected behavior.
  * @param [in|out] p_copy:  see struct MEMCPY2D
  * @return DRV_ERROR_NONE : success
  * @return DRV_ERROR_XXX  : copy failed
@@ -2055,6 +2146,7 @@ DLLEXPORT DV_ONLINE drvError_t halMemcpy2D(struct MEMCPY2D *p_copy) ASCEND_HAL_W
  * 1. The destination buffer must have enough space to store the contents of the source buffer to be copied.
  * 2. Only support d2h/h2d copy.
  * 3. Array max size is 4096.
+ * 4. Copying readonly memory may result in unexpected behavior.
  * @param [in] dst: destination address array
  * @param [in] src: source address array
  * @param [in] size: copy size array
@@ -2072,7 +2164,7 @@ DLLEXPORT DV_ONLINE DVresult halMemcpyBatch(uint64_t dst[], uint64_t src[], size
  * @attention This function is suitable for large size of memcpy. It fallback to normal
  * memcpy_s if the sdma version of memcpy failed. This copy interface can not be used
  * in p2p scenario.
- * @attention: Ascend910_95 is not supported
+ * @attention: Ascend950 is not supported
  * @param [in] dst: destination address
  * @param [in] dst_size: destination memory region size
  * @param [in] src: source address
@@ -2141,7 +2233,7 @@ DLLEXPORT DV_ONLINE DVresult halMemDestroyAddrBatch(struct DMA_ADDR *ptr[], uint
  * @ingroup driver
  * @brief Submit DMA the physical address information of the DMA copy
  * @attention Available online, not offline. This interface is used with drvMemConvertAddr.
- * @attention Ascend910_95 is not supported
+ * @attention Ascend950 is not supported
  * @param [in] dma_addr : information to be DMA copy
  * @param [in] flag: submit DMA copy use synchronize or asynchronous mode, use enum MEMCPY_SUMBIT_TYPE
  * @return DRV_ERROR_NONE : success
@@ -2153,7 +2245,7 @@ DLLEXPORT DV_ONLINE DVresult halMemcpySumbit(struct DMA_ADDR *dma_addr, int flag
  * @ingroup driver
  * @brief Wait the physical address information of the DMA copy asynchronously finish
  * @attention Available online, not offline. This interface is used with halMemcpySumbit.
- * @attention Ascend910_95 is not supported
+ * @attention Ascend950 is not supported
  * @param [in] dma_addr : information to be wait dma finish
  * @return DRV_ERROR_NONE : success
  * @return DV_ERROR_XXX : DMA copy fail
@@ -2172,7 +2264,7 @@ DLLEXPORT DV_ONLINE DVresult halMemcpyWait(struct DMA_ADDR *dma_addr);
  * 6. devPtr must be aligned by page size.
  * 7. Share mem addr not support prefetch, including ipc open and mem export, use may result in unexpected behavior.
  * 8. Not support vmm va, use may result in unexpected behavior.
- * 9. Prefetch addr not support sdma copy in ascend910_95, ascend910_96, which may lead to unpredictable behavior.
+ * 9. Prefetch addr not support sdma copy in ascend950, ascend910_96, which may lead to unpredictable behavior.
  * @param [in] dev_ptr: memory to prefetch
  * @param [in] len: prefetch size
  * @param [in] device: destination device for prefetching data
@@ -2188,7 +2280,7 @@ DLLEXPORT DV_ONLINE DVresult drvMemPrefetchToDevice(DVdeviceptr dev_ptr, size_t 
  * 1. Vptr must be device memory, and must be directly allocated for calling the memory management interface, without offset.
  * 2. The length of the name array and name_len must be greater than 64.
  * 3. Not support vmm va, use may result in unexpected behavior.
- * 4. For Ascend910_95, Ascend910_96, should config ubmem firstly.
+ * 4. For Ascend950, Ascend910_96, should config ubmem firstly.
  * @param [in] vptr: virtual memory to be shared
  * @param [in] byte_count: user-defined length to be shared
  * @param [in] name_len: the maximum length of the name array
@@ -2213,7 +2305,7 @@ DLLEXPORT DV_ONLINE DVresult halShmemDestroyHandle(const char *name);
  * @brief Configure the whitelist of nodes with ipc mem shared memory
  * @attention Available online, not offline. mutually exclusive with halShmemSetAttribute interface.
  * 1. The maximum number of PIDs that can be set for a shmem is:
- *     for Ascend910_95, Ascend910_55, Ascend910_96, is 65535;
+ *     for Ascend950, Ascend910_55, Ascend910_96, is 65535;
  *     for Ascend310B, Ascend910, Ascend310P, Ascend910B, Ascend910_93, is 32768.
  * @param [in] name: name used for sharing between processes
  * @param [in] pid: host pid whitelist array
@@ -2242,7 +2334,7 @@ DLLEXPORT DV_ONLINE DVresult halShmemSetPodPid(const char *name, uint32_t sdid, 
  * @attention
  * 1、Available online, not offline.
  * 2、Ipc not support access double pgtable offset addr.
- * 3、Ipc not support sdma copy in ascend910_95, ascend910_96, which may lead to unpredictable behavior.
+ * 3、Ipc not support sdma copy in ascend950, ascend910_96, which may lead to unpredictable behavior.
  * @param [in] name: name used for sharing between processes
  * @param [out] vptr: virtual address with access to shared memory
  * @return DRV_ERROR_NONE : success
@@ -2256,7 +2348,7 @@ DLLEXPORT DV_ONLINE DVresult halShmemOpenHandle(const char *name, DVdeviceptr *v
  * @attention
  * 1. Available online, not offline.
  * 2. Ipc not support access double pgtable offset addr.
- * 3. Ipc not support sdma copy in ascend910_95, ascend910_96, which may lead to unpredictable behavior.
+ * 3. Ipc not support sdma copy in ascend950, ascend910_96, which may lead to unpredictable behavior.
  * @param [in] name: name used for sharing between processes
  * @param [in] dev_id: logic devid
  * @param [out] vptr: virtual address with access to shared memory
@@ -2423,6 +2515,19 @@ DLLEXPORT drvError_t halHostUnregisterEx(void *src_ptr, UINT32 devid, UINT32 fla
 
 /**
  * @ingroup driver
+ * @brief This command is used to get device pointer that had been registered.
+ * @attention 
+ * 1. Need to call halSupportFeature(devid, FEATURE_SVM_MEM_REGISTER_QUERY_AND_GET_ATTR) firstly, then call halHostRegister.
+ *    Only in this way can get device pointer.
+ * @param [in] src_ptr: requested the src share memory pointer.
+ * @param [in] devid:  requested input device id when srcPtr isn't in svm range.
+ * @param [out] dst_ptr: level-2 pointer that stores the address of the allocated dst memory pointer.
+ * @return DRV_ERROR_NONE : success
+ * @return DV_ERROR_XXX : get device pointer fail
+ */
+DLLEXPORT drvError_t halMemHostGetDevPointer(void *src_ptr, uint32_t devid, void **dst_ptr);
+/**
+ * @ingroup driver
  * @brief This command is used to query accelerators to access host memory 
  * @attention null
  * @param [in] devid:  device id.
@@ -2512,7 +2617,9 @@ DLLEXPORT DV_ONLINE drvError_t halCheckProcessStatusEx(
 /**
  * @ingroup driver
  * @brief This command is used to get reserved addr range.
- * @attention Only support ONLINE scene.
+ * @attention
+ * 1. Only support ONLINE scene.
+ * 2. Should be called after halMemAgentOpen.
  * @param [in] type: type of reserved addr range.
  * @param [in] flag: flag corresponding to type to get reserved addr range.
  * @param [out] ptr: reserved addr range start va.
@@ -2535,14 +2642,14 @@ DLLEXPORT DV_ONLINE drvError_t halMemGetAddressReserveRange(
  * 3. The halMemFree interface has a cache mechanism. The address is actually cached after be released.
  *    As a result, the specified cached address fails to be applied for.
  * 4. For Ascend310B,Ascend910,Ascend310P,Ascend910B,Ascend910_93,
- *    The maximum virtual memory(no page) applied for at a time is 128GB.
- * 5. Flag=MEM_RSV_TYPE_REMOTE_MAP or MEM_RSV_TYPE_DEVICE_SHARE only support specified address reserve.
+ *    1) The maximum virtual memory(no page) applied for at a time is 128GB.
+ *    2) Flag=MEM_RSV_TYPE_REMOTE_MAP or MEM_RSV_TYPE_DEVICE_SHARE only support specified address reserve.
  * @param [in] size: size of the reserved virtual address range requested.
  * @param [in] alignment: currently unused, must be zero.
  * @param [in] addr: addr==NULL, normal address reserve.
  *                 addr!=NULL, specified address reserve, should in specified address alloc range, and be 2M aligned.
  *                 when size is bigger than 1G, addr must be 1G aligned
- * @param [in] flag: flag of the address to create, current only support pg_type.
+ * @param [in] flag: flag of the address to create.
  * @param [out] ptr: resulting pointer to start of virtual address range allocated.
  * @return DRV_ERROR_NONE : success
  * @return DV_ERROR_XXX : fail
@@ -2603,7 +2710,7 @@ DLLEXPORT drvError_t halMemRetainAllocationHandle(drv_mem_handle_t **handle, voi
  * @attention
  * 1. Only support ONLINE scene.
  * 2. If page type is MEM_GIANT_PAGE_TYPE, size and ptr must be aligned by 1G.
- * 3. Shared scene not support sdma copy in ascend910_95, ascend910_96, which may lead to unpredictable behavior.
+ * 3. Shared scene not support sdma copy in ascend950, ascend910_96, which may lead to unpredictable behavior.
  * @param [in] ptr: address where memory will be mapped, must be aligned by 2M.
  * @param [in] size: size of the memory mapping, must be aligned by 2M.
  * @param [in] offset: currently unused, must be zero.
@@ -2817,6 +2924,45 @@ DLLEXPORT drvError_t halMemGetAllocationGranularity(
 * @return DV_ERROR_XXX : fail
 */
 DLLEXPORT drvError_t halMemGetAddressRange(DVdeviceptr ptr, DVdeviceptr *pbase, size_t *psize);
+
+/**
+* @ingroup driver
+* @brief Get memory allocation properties from handle.
+* @param [in] handle - memory handle.
+* @param [out] prop - memory allocation properties.
+* @return DRV_ERROR_NONE : success
+* @return DV_ERROR_XXX : fail
+*/
+DLLEXPORT drvError_t halMemGetAllocationPropertiesFromHandle(struct drv_mem_prop *prop, drv_mem_handle_t *handle);
+
+/**
+ * @ingroup driver
+ * @brief This command is used to register a memory range as a UB segment.
+ * @attention
+ * 1. Only support ONLINE scene.
+ * 2. devid indicates the device where the input address belongs.
+ * 3. Only addresses allocated by halMemAlloc or locally mapped by halMemMap are supported.
+ * 4. Repeated registration of the same address is not supported.
+ * 5. Token_value is not enabled when registering this segment.
+ * @param [in] devid: requested input device id where the address belongs.
+ * @param [in] va: requested start virtual address to be registered.
+ * @param [in] size: requested byte size.
+ * @return DRV_ERROR_NONE : success
+ * @return DV_ERROR_XXX : register fail
+ */
+DLLEXPORT drvError_t halMemRegUbSegment(uint32_t devid, uint64_t va, uint64_t size);
+
+/**
+ * @ingroup driver
+ * @brief This command is used to unregister a registered UB segment.
+ * @attention
+ * 1. devid and va must be consistent with the corresponding halMemRegUbSegment call.
+ * @param [in] devid: requested input device id.
+ * @param [in] va: requested start virtual address to be unregistered.
+ * @return DRV_ERROR_NONE : success
+ * @return DV_ERROR_XXX : unregister fail
+ */
+DLLEXPORT drvError_t halMemUnRegUbSegment(uint32_t devid, uint64_t va);
 
 struct MemPhyInfo {
 #ifndef __linux
@@ -3978,18 +4124,29 @@ DLLEXPORT drvError_t halBuffProcCacheFree(unsigned long flag);
 * @param [out] DqsPoolInfo *poolInfo: dqs mbuf pool info
 * @return   0 for success, others for fail
 */
-DLLEXPORT drvError_t halBuffGetDQSPooInfo(struct mempool_t *mp, DqsPoolInfo *poolInfo);
+DLLEXPORT drvError_t halBuffGetDQSPoolInfo(struct mempool_t *mp, DqsPoolInfo *poolInfo);
 
 /**
 * @ingroup driver
 * @brief Get dqs mbuf pool operation(alloc/free/copyref) addr and mbuf pool memory info by dqs pool id.
 * @attention This function is only can be called on platform supporting dqs mbuf.Furthermore, this function
-*  can only be called if the mempool type is dqs mbuf pool, and should be called by non-owner process.
+*  can only be called if the mempool type is dqs mbuf pool.
 * @param [in] poolId: dqs mempool id
 * @param [out] DqsPoolInfo *poolInfo: dqs mbuf pool info
 * @return   0 for success, others for fail
 */
-DLLEXPORT drvError_t halBuffGetDQSPooInfoById(unsigned int poolId, DqsPoolInfo *poolInfo);
+DLLEXPORT drvError_t halBuffGetDQSPoolInfoById(unsigned int poolId, DqsPoolInfo *poolInfo);
+
+/**
+* @ingroup driver
+* @brief Get dqs mbuf pool operation(alloc/free/copyref) addr and mbuf pool memory info by Mbuf.
+* @attention This function is only can be called on platform supporting dqs mbuf.Furthermore, this function
+*  can only be called if the mempool type is dqs mbuf pool.
+* @param [in] mbuf: Mbuf Identity
+* @param [out] DqsPoolInfo *poolInfo: dqs mbuf pool info
+* @return   0 for success, others for fail
+*/
+DLLEXPORT drvError_t halMbufGetDQSPoolInfo(Mbuf *mbuf, DqsPoolInfo *poolInfo);
 
 /**
 * @ingroup driver
@@ -4020,16 +4177,6 @@ DLLEXPORT drvError_t halBuffDestoryInterGrp(unsigned int grpId) ASCEND_HAL_WEAK;
 * @return   0 for success, others for fail
 */
 DLLEXPORT drvError_t halMbufGetDqsHandle(Mbuf *mbuf,  uint64_t *handle);
-
-/**
-* @ingroup driver
-* @brief Get DQS pool id by Mbuf addr
-* @attention null
-* @param [in] Mbuf *mbuf: Mbuf addr
-* @param [out] uint32_t *pool_id: DQS pool id
-* @return   0 for success, others for fail
-*/
-DLLEXPORT int halMbufGetDqsPoolId(Mbuf *mbuf, uint32_t *pool_id);
 
 /*=========================== Tsdrv ===========================*/
 /*============================add from aicpufw_drv_msg.h"==========================================*/
@@ -4167,7 +4314,7 @@ typedef enum tagDrvResourceType {
     DRV_RESOURCE_CMO_ID,
     DRV_RESOURCE_SQ_ID,
     DRV_RESOURCE_CQ_ID,
-    DRV_RESOURCE_CNT_NOTIFY_ID,    /* add start ascend910_95 */
+    DRV_RESOURCE_CNT_NOTIFY_ID,    /* add start ascend950 */
     DRV_RESOURCE_INVALID_ID,
 } drvResourceType_t;
 
@@ -5556,6 +5703,19 @@ enum vmng_split_mode {
  * @return   0 for success, others for fail
  */
 DLLEXPORT drvError_t halGetDeviceSplitMode(unsigned int dev_id, unsigned int *mode);
+
+typedef struct {
+    uint64_t poolId;
+    uint32_t devId;
+} soma_mem_pool_t;
+ 
+typedef struct {
+    drv_mem_handle_type handle_type;
+    struct drv_mem_prop mem_prop;
+    uint64_t va;
+    uint64_t maxSize;
+} soma_mem_pool_prop;
+     
 
 #ifdef __cplusplus
 }

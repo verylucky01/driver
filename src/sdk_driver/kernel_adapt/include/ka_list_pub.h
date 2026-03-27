@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,7 +13,7 @@
 #ifndef KA_LIST_PUB_H
 #define KA_LIST_PUB_H
 
-#include <stdbool.h>
+#include <linux/types.h>
 #include <linux/list.h>
 
 #include "ka_common_pub.h"

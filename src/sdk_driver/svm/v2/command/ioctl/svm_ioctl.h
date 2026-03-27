@@ -122,6 +122,14 @@ struct devmm_mem_advise_para {
     uint32_t advise;
 };
 
+struct devmm_mem_managed_advise_para {
+    uint64_t ptr;
+    size_t size;
+    uint32_t advise;
+    int type;
+    int id;
+};
+
 struct devmm_mem_prefetch_para {
     uint64_t devPtr;
     size_t count;
@@ -441,6 +449,7 @@ struct devmm_mem_import_para {
     uint32_t module_id;                     /* output */
     uint32_t pg_type;                       /* output */
     uint64_t pg_num;                        /* output */
+    uint32_t mem_type;                      /* output */
 };
 
 struct devmm_mem_set_pid_para {
@@ -484,6 +493,7 @@ struct devmm_resv_addr_info_query_para {
 struct devmm_ioctl_arg {
     struct devmm_devid head;
     union {
+        /* svm ioctl arg*/
         struct devmm_setup_dev_para setup_dev_para;
         struct devmm_mem_alloc_host_para alloc_para;
         struct devmm_mem_free_host_para free_para;
@@ -615,15 +625,22 @@ struct devmm_ioctl_arg {
 #define DEVMM_SVM_RESERVE_ADDR_INFO_QUERY   _IOWR(DEVMM_SVM_MAGIC, 63, struct devmm_ioctl_arg)
 #define DEVMM_SVM_PREPARE_CLOSE_DEVICE      _IOW(DEVMM_SVM_MAGIC, 64, struct devmm_ioctl_arg)
 #define DEVMM_SVM_MEMCPY_BATCH              _IOW(DEVMM_SVM_MAGIC, 65, struct devmm_ioctl_arg)
+#define DEVMM_SVM_SOMA_POOL_CREATE          _IOW(DEVMM_SVM_MAGIC, 66, struct devmm_ioctl_arg)
+#define DEVMM_SVM_SOMA_POOL_DESTROY         _IOW(DEVMM_SVM_MAGIC, 67, struct devmm_ioctl_arg)
+#define DEVMM_SVM_SOMA_POOL_MALLOC          _IOW(DEVMM_SVM_MAGIC, 71, struct devmm_ioctl_arg)
+#define DEVMM_SVM_SOMA_POOL_FREE            _IOW(DEVMM_SVM_MAGIC, 72, struct devmm_ioctl_arg)
+#define DEVMM_SVM_SOMA_POOL_TRIM            _IOWR(DEVMM_SVM_MAGIC, 73, struct devmm_ioctl_arg)
 
-#define DEVMM_SVM_CMD_USE_PRIVATE_MAX_CMD   66 /* above this svm process must inited */
+#define DEVMM_SVM_CMD_USE_PRIVATE_MAX_CMD   100 /* above this svm process must inited */
+  
+#define DEVMM_SVM_ALLOC_PROC_STRUCT         _IOW(DEVMM_SVM_MAGIC, 101, struct devmm_ioctl_arg)
+#define DEVMM_SVM_DEV_SET_SIBLING           _IOW(DEVMM_SVM_MAGIC, 102, struct devmm_ioctl_arg)
+#define DEVMM_SVM_DEV_BIND_SIBLING          _IOW(DEVMM_SVM_MAGIC, 103, struct devmm_ioctl_arg)
+#define DEVMM_SVM_GET_MMAP_INFO             _IOWR(DEVMM_SVM_MAGIC, 104, struct devmm_ioctl_arg)
+#define DEVMM_SVM_MEM_MAP_CAP               _IOWR(DEVMM_SVM_MAGIC, 105, struct devmm_ioctl_arg)
 
-#define DEVMM_SVM_ALLOC_PROC_STRUCT         _IOW(DEVMM_SVM_MAGIC, 67, struct devmm_ioctl_arg)
-#define DEVMM_SVM_DEV_SET_SIBLING           _IOW(DEVMM_SVM_MAGIC, 68, struct devmm_ioctl_arg)
-#define DEVMM_SVM_DEV_BIND_SIBLING          _IOW(DEVMM_SVM_MAGIC, 69, struct devmm_ioctl_arg)
-#define DEVMM_SVM_GET_MMAP_INFO             _IOWR(DEVMM_SVM_MAGIC, 70, struct devmm_ioctl_arg)
-#define DEVMM_SVM_MEM_MAP_CAP               _IOWR(DEVMM_SVM_MAGIC, 71, struct devmm_ioctl_arg)
-#define DEVMM_SVM_CMD_MAX_CMD               72     /* max cmd id */
+
+#define DEVMM_SVM_CMD_MAX_CMD               106     /* max cmd id */
 
 #define DEVMM_SVM_GET_DEVPID_BY_HOSTPID 0 /* define for dbg server compile */
 #define DEVMM_SVM_WAIT_DEVICE_PROCESS   0 /* define for dbg server compile */

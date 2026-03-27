@@ -138,6 +138,7 @@ typedef enum event_id {
     EVENT_DRV_MSG_EX,            /* 27-events of driver for ccpu */
     /* Add a new event here */
     EVENT_TEST,               /* Reserve for test */
+    EVENT_STARS_DQS_ERR = 46, /* tsfw send stars and dqs err to hicaid */
     EVENT_HCCP_MSG = 47,   /* ccu kill msg of ts and hccp */
     EVENT_USR_START = 48,
     EVENT_USR_END = 63,
@@ -161,9 +162,9 @@ typedef enum drv_subevent_id {
     DRV_SUBEVENT_FINISH_CALLBACK_MSG,
     DRV_SUBEVENT_QUEUE_DFX_MSG,
     DRV_SUBEVENT_QUEUE_ALIVE_MSG,
+    DRV_SUBEVENT_QUEUE_RESET_MSG,
     DRV_SUBEVENT_QUEUE_COMM_MSG_START,
-    DRV_SUBEVENT_QUEUE_RESET_MSG = DRV_SUBEVENT_QUEUE_COMM_MSG_START,
-    DRV_SUBEVENT_QUEUE_EXPORT_INTER_DEV_MSG,
+    DRV_SUBEVENT_QUEUE_EXPORT_INTER_DEV_MSG = DRV_SUBEVENT_QUEUE_COMM_MSG_START,
     DRV_SUBEVENT_QUEUE_UNEXPORT_INTER_DEV_MSG,
     DRV_SUBEVENT_QUEUE_IMPORT_MSG,
     DRV_SUBEVENT_QUEUE_IMPORT_INTER_DEV_MSG,
@@ -173,7 +174,6 @@ typedef enum drv_subevent_id {
     DRV_SUBEVENT_QUERY_MSG,
     DRV_SUBEVENT_GET_QUEUE_STATUS_MSG,
     DRV_SUBEVENT_ATTACH_INTER_DEV_MSG,
-    DRV_SUBEVENT_SET_DEV_MSG,
     DRV_SUBEVENT_QUEUE_COMM_MSG_BUTT,
     DRV_SUBEVENT_QUEUE_MAX_NUM = DRV_SUBEVENT_QUEUE_COMM_MSG_BUTT,
     DRV_SUBEVENT_TRS_ALLOC_RES_ID_MSG = 32,
@@ -552,6 +552,21 @@ struct log_out_handle {
     unsigned int logLevel;
 };
 
+// register error message
+typedef int32_t (*register_format_err_msg_func)(const char *error_msg, unsigned long error_msg_len);
+// report predefined error message
+typedef int32_t (*report_predefined_err_msg_func)(const char *error_code, const char **key, const char **value,
+                                                  unsigned long arg_num);
+// report inner error message
+typedef int32_t (*report_inner_err_msg_func)(const char *file_name, const char *func, uint32_t line,
+                                             const char *error_code, const char *format, ...);
+struct err_msg_report_handle {
+    register_format_err_msg_func register_format_func;
+    report_predefined_err_msg_func predefined_report_func;
+    report_inner_err_msg_func inner_report_func;
+    int32_t is_registered;
+};
+
 struct PoolInfo {
     unsigned long dataPoolSize;
     void *dataPoolStart;
@@ -597,7 +612,9 @@ struct MemPoolUsedStatus {
 
 typedef struct {
     unsigned int poolId;
-    unsigned int pool_depth;
+    unsigned int poolDepth;
+    unsigned int dataPoolAlign;
+    unsigned long dataPoolHugePageFlag;
     unsigned long long dataPoolBaseAddr;
     unsigned int dataPoolBlkSize;
     unsigned int dataPoolBlkObjSize;
@@ -638,7 +655,7 @@ typedef struct {
 #define MEM_HOST_AGENT_VAL     0X4
 #define MEM_RESERVE_VAL        0X5
 #define MEM_HOST_UVA_VAL       0X6
-#define MEM_MAX_VAL            0X7
+#define MEM_MAX_VAL            0X8
 #define MEM_SVM                (MEM_SVM_VAL << MEM_VIRT_BIT)
 #define MEM_DEV                (MEM_DEV_VAL << MEM_VIRT_BIT)
 #define MEM_HOST               (MEM_HOST_VAL << MEM_VIRT_BIT)
@@ -681,7 +698,7 @@ typedef struct {
  */
 #define MEM_PAGE_GIANT_BIT     31
 #define MEM_PAGE_GIANT         (0X1UL << MEM_PAGE_GIANT_BIT)
-/* device cp only, not support share(prefetch/register/ipc) and op(host ldst/memcpy/memset) */
+/* device cp only, not support share(prefetch/register/ipc/p2p) and op(host ldst/memcpy/memset) */
 #define MEM_DEV_CP_ONLY_BIT    32
 #define MEM_DEV_CP_ONLY        (0X1UL << MEM_DEV_CP_ONLY_BIT)
 /* align size 5 bits width 20-24bit */
@@ -744,6 +761,8 @@ enum DEVMM_MEMCPY2D_TYPE {
 enum ADVISE_MEM_TYPE {
     ADVISE_PERSISTENT = 0,
     ADVISE_DEV_MEM = 1,
+    ADVISE_ACCESS_READONLY = 2,
+    ADVISE_ACCESS_READWRITE = 3,
     ADVISE_TYPE_MAX
 };
 
@@ -975,6 +994,14 @@ enum drv_mem_type {
     MEM_MAX_TYPE
 };
 
+enum drv_mem_trans_type {
+    MEM_TRANS_TYPE_SDMA = 0,
+    MEM_TRANS_TYPE_PCIE_DMA,
+    MEM_TRANS_TYPE_HCCS, /* No practical use, reserved for compatibility. */
+    MEM_TRANS_TYPE_UB_DMA,
+    MEM_TRANS_TYPE_MAX,
+};
+
 #define SVM_INVALID_MODULE_ID       0xffff
 /*=========================== Memory Manage End =======================*/
 
@@ -1064,7 +1091,8 @@ struct sq_switch_stream_info {
     uint32_t sq_id;
     uint32_t stream_id;
     uint32_t sq_depth;
-    uint32_t rsv[3];
+    uint32_t rsv;
+    void *stream_mem;
 };
 
 #define RESOURCE_CONFIG_INFO_LENGTH 7
@@ -1171,7 +1199,7 @@ struct halAsyncDmaInputPara {
     drvSqCqType_t type;
     uint32_t tsId;          /* default is 0 */
     uint32_t sqId;
-    uint32_t dir;           /* copy direction */
+    uint32_t dir;           /* reserved copy direction, the real dir is convert by src/dst addr */
     uint32_t len;           /* copy length */
     enum drv_async_dma_type async_dma_type;
     uint8_t *src;           /* source address */
@@ -1217,7 +1245,7 @@ struct halAsyncDmaInput2DPara {
     drvSqCqType_t type;
     unsigned int tsId;              /* default is 0 */
     unsigned int sqId;
-    unsigned int dir;               /* copy direction */
+    unsigned int dir;               /* reserved copy direction, the real dir is convert by src/dst addr */
     unsigned long long *dst;        /* destination memory address */
     unsigned long long dpitch;      /* pitch of destination memory */
     unsigned long long *src;        /* source memory address */
@@ -1242,7 +1270,7 @@ struct halAsyncDmaInputBatchPara {
     drvSqCqType_t type;
     unsigned int tsId;              /* default is 0 */
     unsigned int sqId;
-    unsigned int dir;               /* copy direction */
+    unsigned int dir;               /* reserved copy direction, the real dir is convert by src/dst addr */
     unsigned long long *dst;        /* destination memory address array */
     unsigned long long *src;        /* source memory address array */
     unsigned long long *len;        /* cpy size array */
@@ -1311,6 +1339,10 @@ typedef enum tagDrvFeature {
     FEATURE_TRSDRV_IS_SQ_SUPPORT_DYNAMIC_BIND_VERSION = 7,
     FEATURE_SVM_MEM_HOST_UVA = 8,
     FEATURE_DMS_GET_QOS_MASTER_CONFIG = 9,
+    FEATURE_DMS_QUERY_CHIP_DIE_ID = 10, /* Query by physical device id */
+    /* need to be called once to enable feature before calling svm register interface, then support query and get attr */
+    FEATURE_SVM_MEM_REGISTER_QUERY_AND_GET_ATTR = 11,
+    FEATURE_APM_RES_MAP_REMOTE = 12,
     FEATURE_MAX
 } drvFeature_t;
 /*=============================== query feature END ===============================*/
@@ -1381,6 +1413,7 @@ enum devdrv_module_type {
     HAL_MODULE_TYPE_LIDAR_DP,
     HAL_MODULE_TYPE_ADSPC,
     HAL_MODULE_TYPE_APM,
+    HAL_MODULE_TYPE_ASDRV_UB,
     HAL_MODULE_TYPE_MAX,
 };
 

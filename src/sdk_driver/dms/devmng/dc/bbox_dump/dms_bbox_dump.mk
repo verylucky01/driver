@@ -7,7 +7,7 @@
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 # ------------------------------------------------------------------------------------------------------------
-ifneq ($(filter $(PRODUCT), ascend910_95),)
+ifneq ($(filter $(PRODUCT), ascend950),)
 	EXTRA_CFLAGS += -DDRV_HOST
 	EXTRA_CFLAGS += -DCFG_SOC_PLATFORM_CLOUD_V4
 	asdrv_dms-y += devmng/dc/bbox_dump/dms_bbox_dump.o

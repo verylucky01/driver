@@ -21,11 +21,11 @@ set(TRS_SRC_FILES
 )
 
 list(APPEND TRS_SRC_FILES
-    $<$<OR:$<STREQUAL:${PRODUCT},ascend910B>,$<STREQUAL:${PRODUCT},ascend910_95>>:${BASE_DIR}/shr_id/trs_shr_id_spod_user.c>
-    $<$<OR:$<STREQUAL:${PRODUCT},ascend910B>,$<STREQUAL:${PRODUCT},ascend910_95>>:${BASE_DIR}/remote/master/trs_master_event.c>
-    $<$<STREQUAL:${PRODUCT},ascend910_95>:${BASE_DIR}/remote/master/trs_sq_mem_raw.c>
-    $<$<STREQUAL:${PRODUCT},ascend910_95>:${BASE_DIR}/remote/master/trs_sq_mem_cache.c>
-    $<$<STREQUAL:${PRODUCT},ascend910_95>:${BASE_DIR}/remote/master/trs_sqcq_mem.c>
+    $<$<OR:$<STREQUAL:${PRODUCT},ascend910B>,$<STREQUAL:${PRODUCT},ascend950>>:${BASE_DIR}/shr_id/trs_shr_id_spod_user.c>
+    $<$<OR:$<STREQUAL:${PRODUCT},ascend910B>,$<STREQUAL:${PRODUCT},ascend950>>:${BASE_DIR}/remote/master/trs_master_event.c>
+    $<$<STREQUAL:${PRODUCT},ascend950>:${BASE_DIR}/remote/master/trs_sq_mem_raw.c>
+    $<$<STREQUAL:${PRODUCT},ascend950>:${BASE_DIR}/remote/master/trs_sq_mem_cache.c>
+    $<$<STREQUAL:${PRODUCT},ascend950>:${BASE_DIR}/remote/master/trs_sqcq_mem.c>
 )
 
 
@@ -56,8 +56,9 @@ target_include_directories(trs_drv_obj PRIVATE
     ${DRIVER_KERNEL_DIR}/dms/command/ioctl
     ${DRIVER_USER_DIR}/inc/dms
     ${DRIVER_USER_DIR}/trs/core/command/msg
+    ${DRIVER_USER_DIR}/buff/dc/comm/lib
 
-    $<$<STREQUAL:${PRODUCT},ascend910_95>:${DRIVER_USER_DIR}/../../../../ubengine/ssapi/kernelspace/urma/code/include>
+    $<$<STREQUAL:${PRODUCT},ascend950>:${DRIVER_USER_DIR}/../../../../ubengine/ssapi/kernelspace/urma/code/include>
 )
 
 target_link_libraries(trs_drv_obj PRIVATE
@@ -76,14 +77,15 @@ target_compile_definitions(trs_drv_obj PRIVATE
     $<$<STREQUAL:${PRODUCT},ascend910B>:CFG_FEATURE_RUNTIME_NO_THREAD>
     $<$<STREQUAL:${PRODUCT},ascend910B>:CFG_FEATURE_CALLBACK_EVENT>
     $<$<STREQUAL:${PRODUCT},ascend910B>:CFG_FEATURE_SUPPORT_STREAM_TASK>
-    # 910_95
-    $<$<STREQUAL:${PRODUCT},ascend910_95>:CFG_SOC_PLATFORM_CLOUD>
-    $<$<STREQUAL:${PRODUCT},ascend910_95>:CFG_SOC_PLATFORM_CLOUD_V4>
-    $<$<STREQUAL:${PRODUCT},ascend910_95>:CFG_FEATURE_EVENT_ESCHED_ACTIVE_STREAM>
-    $<$<STREQUAL:${PRODUCT},ascend910_95>:CFG_FEATURE_SQCQ_RESET>
-    $<$<STREQUAL:${PRODUCT},ascend910_95>:CFG_FEATURE_SQ_SEND_LOCK>
-    $<$<STREQUAL:${PRODUCT},ascend910_95>:CFG_FEATURE_RUNTIME_NO_THREAD>
-    $<$<STREQUAL:${PRODUCT},ascend910_95>:CFG_FEATURE_CALLBACK_EVENT>
-    $<$<STREQUAL:${PRODUCT},ascend910_95>:SSAPI_USE_MAMI>
+    # 950
+    $<$<STREQUAL:${PRODUCT},ascend950>:CFG_SOC_PLATFORM_CLOUD>
+    $<$<STREQUAL:${PRODUCT},ascend950>:CFG_SOC_PLATFORM_CLOUD_V4>
+    $<$<STREQUAL:${PRODUCT},ascend950>:CFG_FEATURE_EVENT_ESCHED_ACTIVE_STREAM>
+    $<$<STREQUAL:${PRODUCT},ascend950>:CFG_FEATURE_SQCQ_RESET>
+    $<$<STREQUAL:${PRODUCT},ascend950>:CFG_FEATURE_SQ_SEND_LOCK>
+    $<$<STREQUAL:${PRODUCT},ascend950>:CFG_FEATURE_RUNTIME_NO_THREAD>
+    $<$<STREQUAL:${PRODUCT},ascend950>:CFG_FEATURE_CALLBACK_EVENT>
+    $<$<STREQUAL:${PRODUCT},ascend950>:SSAPI_USE_MAMI>
+    $<$<STREQUAL:${PRODUCT},ascend950>:CFG_FEATURE_SUPPORT_STREAM_TASK>
     $<$<STREQUAL:${ENABLE_UBE},true>:CFG_FEATURE_SUPPORT_UB>
 )

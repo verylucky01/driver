@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -45,6 +45,7 @@ struct trs_chan_hw_sq_ctx {
 struct trs_chan_hw_cq_ctx {
     int chan_id;
     u32 irq_index;
+    bool valid;
 };
 
 struct trs_chan_maint_sq_ctx {
@@ -55,9 +56,17 @@ struct trs_chan_maint_cq_ctx{
     int chan_id;
 };
 
+#define TRS_CHAN_GUARD_WORK_DELAY_MS 100
+#define TRS_CHAN_GUARD_WORK_MAGIC 0x9876CDEF
+struct trs_chan_guard_work {
+    u32 work_magic;
+    ka_delayed_work_t cq_guard_work;
+    struct trs_chan_ts_inst *ts_inst;
+};
+
 struct trs_chan_ts_inst {
     struct kref_safe ref;
-    ka_task_spinlock_t lock;
+    ka_mutex_t mutex;
     ka_idr_t chan_idr;
     int hw_type;
     u32 chan_num;
@@ -75,8 +84,10 @@ struct trs_chan_ts_inst {
     struct trs_chan_hw_cq_ctx *hw_cq_ctx;
     struct trs_chan_maint_sq_ctx *maint_sq_ctx;
     struct trs_chan_maint_cq_ctx *maint_cq_ctx;
-    struct proc_dir_entry *entry;
+    struct trs_chan_guard_work guard_work;
+    ka_proc_dir_entry_t *entry;
     bool trace_enable;
+    int location;
 };
 
 struct trs_chan_ts_inst *trs_chan_ts_inst_get(struct trs_id_inst *inst);

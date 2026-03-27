@@ -38,6 +38,7 @@ usage()
   echo "Examples:"
   echo "    bash build.sh --pkg --soc=ascend910b"
   echo "    bash build.sh --pkg --soc=ascend910_93"
+  echo "    bash build.sh --pkg --soc=ascend950"
 }
 
 get_product()
@@ -51,6 +52,9 @@ get_product()
     ascend910_93)
       PRODUCT=ascend910B
       ASCEND910_93_EX=TRUE
+      ;;
+    ascend950)
+      PRODUCT=ascend950
       ;;
     *)
       echo "Unknown COMPUTE_UNIT: ${COMPUTE_UNIT}"
@@ -159,6 +163,11 @@ checkopts()
 }
 checkopts "$@"
 
+if [ "${PRODUCT}" = "ascend950" ]; then
+  # current only support --demo
+  ENABLE_BUILD_PRODUCT="FALSE"
+fi
+
 mk_dir() {
   local create_dir="$1"  # the target to make
 
@@ -189,14 +198,13 @@ prepare_src()
   mv scripts/package/driver/common/conf/itf_ver.conf scripts/package/driver/common/conf/itf_ver.conf.org
   cp scripts/package/custom/driver/common/conf/itf_ver.conf scripts/package/driver/common/conf/itf_ver.conf
 
+  cp scripts/package/driver/ascend910B/driver.xml scripts/package/driver/ascend910B/driver.xml.org
   if [ "${ASCEND910_93_EX}" = "TRUE" ]; then
-    cp scripts/package/driver/ascend910_93/driver.xml scripts/package/driver/ascend910_93/driver.xml.org
     cp scripts/package/custom/driver/ascend910_93/scripts/specific_func.inc scripts/package/driver/ascend910_93/scripts/specific_func.inc
-    python3 ./scripts/package/custom/copy_xml.py scripts/package/driver/ascend910_93/driver.xml scripts/package/custom/driver/ascend910_93/driver.xml
-    python3 ./scripts/package/custom/copy_xml.py scripts/package/driver/ascend910_93/driver.xml scripts/package/custom/driver/ascend910B/driver_atlas.xml
+    python3 ./scripts/package/custom/copy_xml.py scripts/package/driver/ascend910B/driver.xml scripts/package/custom/driver/ascend910_93/driver.xml
+    python3 ./scripts/package/custom/copy_xml.py scripts/package/driver/ascend910B/driver.xml scripts/package/custom/driver/ascend910B/driver_atlas.xml
     COMPATIBLE_VERSION=$(grep -rn "ascend910_93" scripts/package/custom/driver/common/compatible_version.conf | cut -d":" -f3)
   else
-    cp scripts/package/driver/ascend910B/driver.xml scripts/package/driver/ascend910B/driver.xml.org
     cp scripts/package/custom/driver/ascend910B/scripts/specific_func.inc scripts/package/driver/ascend910B/scripts/specific_func.inc
     python3 ./scripts/package/custom/copy_xml.py scripts/package/driver/ascend910B/driver.xml scripts/package/custom/driver/ascend910B/driver.xml
     python3 ./scripts/package/custom/copy_xml.py scripts/package/driver/ascend910B/driver.xml scripts/package/custom/driver/ascend910B/driver_atlas.xml
@@ -231,13 +239,7 @@ clean_src()
   mv ./src/sdk_driver/dms/devmng/product/dms_product.mk.org ./src/sdk_driver/dms/devmng/product/dms_product.mk
   mv ./scripts/package/driver/ascend910_93/scripts/specific_func.inc.org ./scripts/package/driver/ascend910_93/scripts/specific_func.inc
   mv ./scripts/package/driver/ascend910B/scripts/specific_func.inc.org ./scripts/package/driver/ascend910B/scripts/specific_func.inc
-
-  if [ "${ASCEND910_93_EX}" = "TRUE" ]; then
-    mv scripts/package/driver/ascend910_93/driver.xml.org scripts/package/driver/ascend910_93/driver.xml
-  else
-    mv scripts/package/driver/ascend910B/driver.xml.org scripts/package/driver/ascend910B/driver.xml
-  fi
-
+  mv scripts/package/driver/ascend910B/driver.xml.org scripts/package/driver/ascend910B/driver.xml
   mv scripts/package/driver/ascend910B/scripts/sys_version/sys_version.conf.org scripts/package/driver/ascend910B/scripts/sys_version/sys_version.conf
   mv scripts/package/driver/common/conf/itf_ver.conf.org scripts/package/driver/common/conf/itf_ver.conf
   rm -f scripts/package/custom/version.info
@@ -245,8 +247,8 @@ clean_src()
 }
 
 cleanup() {
-  clean_src
-  exit 0
+    clean_src
+    exit 0
 }
 
 # cleanup temporary source files after pressing Ctrl+C
@@ -347,9 +349,9 @@ build_npu_driver || { echo "npu_driver build failed."; clean_src; exit -1; }
 echo "---------------- npu_driver build finished ----------------"
 
 if [[ "X$ENABLE_GE_UT" = "Xn" && "$ENABLE_PACKAGE" = "TRUE" ]]; then
-    echo "-------------- npu_driver package generate start ----------------"
-    generate_package
-    echo "-------------- npu_driver package generate finished -------------"
+  echo "-------------- npu_driver package generate start ----------------"
+  generate_package
+  echo "-------------- npu_driver package generate finished -------------"
 fi
 
 clean_src

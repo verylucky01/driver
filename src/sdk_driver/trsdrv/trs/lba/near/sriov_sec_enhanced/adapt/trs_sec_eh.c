@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -21,6 +21,7 @@
 #include "trs_chan_mem_pool.h"
 #include "trs_host_msg.h"
 #include "trs_host_comm.h"
+#include "trs_host_accelerator_util.h"
 #include "trs_pub_def.h"
 #include "trs_sec_eh_core.h"
 #include "trs_sec_eh_vpc.h"
@@ -35,8 +36,10 @@ static const ka_pci_device_id_t sec_eh_adapt_tbl[] = {
     {KA_PCI_VDEVICE(HUAWEI, 0xd806), 0},
     { 0x20C6, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
     { 0x203F, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+    { 0x20E9, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
     { 0x20C6, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
     { 0x203F, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+    { 0x20E9, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
     {}
 };
 KA_MODULE_DEVICE_TABLE(pci, sec_eh_adapt_tbl);
@@ -87,13 +90,13 @@ struct devdrv_non_trans_msg_chan_info *trs_get_msg_chan_info(void)
 
 /*
  * module_feature_auto_init_dev adds features as follows:
- * 0. trs_host_msg_init, trs_res_map_ops_init(only ascend910_95)
- * 1. trs_sec_eh_vpc_init, trs_ts_doorbell_init(ascend910_95 not need)
- * 3. trs_id_init, trs_host_group_init(only ascend910_95)
+ * 0. trs_host_msg_init, trs_res_map_ops_init(only ascend950)
+ * 1. trs_sec_eh_vpc_init, trs_ts_doorbell_init(ascend950 not need)
+ * 3. trs_id_init, trs_host_group_init(only ascend950)
  * 4. trs_chan_init
  * 5. trs_core_init
  * 6. trs_res_ops_init
- * 7. trs_ts_status_init(ascend910_95 not need)
+ * 7. trs_ts_status_init(ascend950 not need)
  */
 static int trs_sec_eh_ts_inst_notifier(struct trs_id_inst *inst, enum uda_notified_action action)
 {
@@ -163,6 +166,7 @@ fail:
 int init_trs_sec_eh(void)
 {
     struct uda_dev_type type;
+    trs_accelerator_util_init();
     uda_davinci_near_real_entity_type_pack(&type);
     return uda_notifier_register(TRS_SEC_EH_NOTIFIER, &type, UDA_PRI2, trs_sec_eh_notifier_func);
 }
@@ -173,4 +177,5 @@ void exit_trs_sec_eh(void)
     uda_davinci_near_real_entity_type_pack(&type);
     (void)uda_notifier_unregister(TRS_SEC_EH_NOTIFIER, &type);
     trs_chan_mem_node_recycle();
+    trs_accelerator_util_uninit();
 }

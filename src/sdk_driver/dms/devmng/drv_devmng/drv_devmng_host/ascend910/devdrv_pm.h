@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,9 +14,8 @@
 #ifndef DEVDRV_PM_H
 #define DEVDRV_PM_H
 
-#include <linux/hrtimer.h>
-#include <linux/list.h>
-#include <linux/workqueue.h>
+#include "ka_list_pub.h"
+#include "ka_task_pub.h"
 
 #include "tsdrv_status.h"
 #include "devdrv_common.h"
@@ -34,10 +33,10 @@ struct devdrv_aicore_info {
     u32 dev_id;
     u32 inited_flag;
     const void *exception_info;
-    struct hrtimer hrtimer;
+    ka_hrtimer_t hrtimer;
     ka_ktime_t kt;
-    struct work_struct work;
-    struct workqueue_struct *aicore_info_wq;
+    ka_work_struct_t work;
+    ka_workqueue_struct_t *aicore_info_wq;
 };
 
 struct devdrv_pm {
@@ -45,7 +44,7 @@ struct devdrv_pm {
     int (*resume)(u32 devid);
     int (*ts_status_notify)(u32 devid, u32 status);
     int run_stage; /* 0-platform call, 1-sleep call */
-    struct list_head list;
+    ka_list_head_t list;
 };
 
 struct devdrv_pm *devdrv_manager_register_pm(int (*suspend)(u32 devid), int (*resume)(u32 devid));

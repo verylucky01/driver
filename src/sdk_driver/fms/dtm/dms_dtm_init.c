@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,50 +11,23 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/io.h>
-#include <linux/kernel.h>
-#include <linux/slab.h>
-#include <linux/uaccess.h>
-#include <linux/mutex.h>
-#include <linux/cdev.h>
-#include <linux/platform_device.h>
-#include <linux/delay.h>
-#include <linux/bitops.h>
-#include <linux/suspend.h>
-#include <linux/notifier.h>
-#include <linux/version.h>
-#include <linux/list.h>
-#include <linux/ioctl.h>
-#include <linux/module.h>
-#include <linux/atomic.h>
-#include <linux/poll.h>
-#include <linux/sort.h>
-#include <linux/vmalloc.h>
-#include <linux/of_address.h>
-#include <linux/of.h>
-
 #include "securec.h"
-
-#include "fms/fms_dtm.h"
-#include "fms_define.h"
-#include "pbl_mem_alloc_interface.h"
-#include "dms_dtm_init.h"
 #include "ka_list_pub.h"
 #include "ka_memory_pub.h"
 #include "ka_task_pub.h"
 #include "ka_driver_pub.h"
 #include "ka_base_pub.h"
 #include "ka_kernel_def_pub.h"
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0)
-#include <linux/namei.h>
-#endif
+#include "fms/fms_dtm.h"
+#include "fms_define.h"
+#include "pbl_mem_alloc_interface.h"
+#include "dms_dtm_init.h"
 
 #define HOST_LOCAL 1000
 
 struct state_item_list {
     struct state_item item;
-    struct list_head list;
+    ka_list_head_t list;
 };
 
 static struct dms_system_ctrl_block *g_dms_system_ccb = NULL;
@@ -69,7 +42,7 @@ static void dms_state_table_list_node_init(struct state_item_list *item_node, ui
     item_node->item.node_id = node_id;
 }
 
-static void dms_state_table_parse_node(struct list_head *dms_node_list, struct device_node *node, uint32_t *cnt)
+static void dms_state_table_parse_node(ka_list_head_t *dms_node_list, ka_device_node_t *node, uint32_t *cnt)
 {
     struct state_item_list *item_node = NULL;
     uint32_t *id = NULL;
@@ -142,9 +115,9 @@ int state_item_cmp(const void *a, const void *b)
 
 static void dms_init_device_state_table(void)
 {
-    struct list_head dms_node_list = {};
-    struct device_node *np = NULL;
-    struct device_node *child = NULL;
+    ka_list_head_t dms_node_list = {};
+    ka_device_node_t *np = NULL;
+    ka_device_node_t *child = NULL;
     struct state_item_list *item_node = NULL;
     struct state_item_list *temp_node = NULL;
     uint32_t cnt = 0, i = 0;
@@ -156,7 +129,7 @@ static void dms_init_device_state_table(void)
         return;
     }
 
-    for_each_child_of_node(np, child) {
+    ka_driver_for_each_child_of_node(np, child) {
         dms_state_table_parse_node(&dms_node_list, child, &cnt);
     }
     ka_driver_of_node_put(np);

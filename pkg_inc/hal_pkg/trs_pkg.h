@@ -127,7 +127,16 @@ enum res_addr_type {
     RES_ADDR_TYPE_HCCP_URMA_JETTY,
     RES_ADDR_TYPE_HCCP_URMA_JFC,
     RES_ADDR_TYPE_HCCP_URMA_DB,
+    RES_ADDR_TYPE_NDA_URMA_DB,
     RES_ADDR_TYPE_MAX
+};
+
+#define TRS_RES_MAP_RSV_LEN 8
+struct trs_res_map_priv {
+    unsigned int flag;
+    unsigned int local_devid;
+    unsigned int remote_devid;
+    unsigned int rsv[TRS_RES_MAP_RSV_LEN];
 };
 
 #define RES_ADDR_INFO_RSV_LEN 2
@@ -171,7 +180,7 @@ typedef enum tagDrvIdType {
     DRV_MODEL_ID,
     DRV_NOTIFY_ID,
     DRV_CMO_ID,
-    DRV_CNT_NOTIFY_ID,    /* add start ascend910_95 */
+    DRV_CNT_NOTIFY_ID,    /* add start ascend950 */
     DRV_SQ_ID,
     DRV_CQ_ID,
     DRV_INVALID_ID,

@@ -13,6 +13,8 @@
 #include "dsmi_inner_interface.h"
 
 #define DMS_SUBCMD_GET_WORK_MODE 1
+#define DMS_SUBCMD_GET_CARD_MULTI_DIE_POLICY 11
+#define DMS_SUBCMD_SET_CARD_MULTI_DIE_POLICY 12
 #define DMS_SUBCMD_GET_VRD_INFO 2
 #define DMS_SUBCMD_GET_MAINBOARD_ID 5
 
@@ -32,5 +34,7 @@ typedef struct device_vrd_status_info {
 } DeviceVrdStatusInfo;
 
 int dms_get_work_mode(unsigned int *work_mode);
+int dms_get_multi_die_policy(unsigned int *out);
+int dms_set_multi_die_policy(unsigned int policy);
 int dms_get_mainboard_id(unsigned int device_id, unsigned int *mainboard_id);
 #endif

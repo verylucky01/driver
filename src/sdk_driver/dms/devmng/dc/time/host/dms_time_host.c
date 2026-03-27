@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,9 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
-#include <linux/slab.h>
-#include <linux/kallsyms.h>
+#include "ka_common_pub.h"
+#include "ka_system_pub.h"
 
 #include "devdrv_manager_common.h"
 #include "dms_timer.h"
@@ -221,7 +220,7 @@ STATIC int dms_send_timezone(u32 dev_id, const char *new_timezone, u16 read_size
 
 STATIC int dms_time_read_timezone(u32 dev_id, char *buf, u16 *read_size)
 {
-    struct file *fp = NULL;
+    ka_file_t *fp = NULL;
     loff_t pos = 0;
     long read_bytes;
 
@@ -301,8 +300,8 @@ STATIC int dms_wall_time_sync(u32 dev_id)
 {
     int ret;
     int out_len = 0;
-    struct timespec send_wall_time;
-    struct timespec check_wall_time;
+    ka_timespec_t send_wall_time;
+    ka_timespec_t check_wall_time;
     unsigned long new_time = 0;
     struct dms_h2d_msg time_msg;
     struct dms_walltime_info *send_time_info = NULL;
@@ -385,7 +384,7 @@ int dms_time_sync_init(u32 dev_id)
     struct dms_timer_task time_sync_task = {0};
     struct dms_time_sync_info *time_sync_info = NULL;
 
-#ifdef CFG_FEATURE_ASCEND910_95_API_ADAPT_STUB
+#ifdef CFG_FEATURE_ASCEND950_API_ADAPT_STUB
     if (uda_is_phy_dev(dev_id) == false) {
         return 0;
     }
@@ -422,7 +421,7 @@ int dms_time_sync_init(u32 dev_id)
 
 void dms_time_sync_exit(u32 dev_id)
 {
-#ifdef CFG_FEATURE_ASCEND910_95_API_ADAPT_STUB
+#ifdef CFG_FEATURE_ASCEND950_API_ADAPT_STUB
     if (uda_is_phy_dev(dev_id) == false) {
         return;
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -35,14 +35,14 @@ ka_device_t *hal_kernel_devdrv_get_pci_dev_by_devid(u32 udevid)
     return NULL;
 }
 
-dma_addr_t hal_kernel_devdrv_dma_map_single(ka_device_t *dev, void *ptr, size_t size,
-    enum dma_data_direction dir)
+ka_dma_addr_t hal_kernel_devdrv_dma_map_single(ka_device_t *dev, void *ptr, size_t size,
+    ka_dma_data_direction_t dir)
 {
-    return (dma_addr_t)NULL;
+    return (ka_dma_addr_t)NULL;
 }
 
-void hal_kernel_devdrv_dma_unmap_single(ka_device_t *dev, dma_addr_t addr, size_t size,
-    enum dma_data_direction dir)
+void hal_kernel_devdrv_dma_unmap_single(ka_device_t *dev, ka_dma_addr_t addr, size_t size,
+    ka_dma_data_direction_t dir)
 {
 }
 #endif
@@ -50,7 +50,7 @@ void hal_kernel_devdrv_dma_unmap_single(ka_device_t *dev, dma_addr_t addr, size_
 /* stub for david ub scene end */
 
 static void *trs_chan_mem_alloc_dma(struct trs_id_inst *inst, ka_device_t *dev,
-    size_t size, dma_addr_t *dma_addr, enum dma_data_direction dir)
+    size_t size, ka_dma_addr_t *dma_addr, ka_dma_data_direction_t dir)
 {
     void *vaddr = NULL;
 
@@ -60,7 +60,7 @@ static void *trs_chan_mem_alloc_dma(struct trs_id_inst *inst, ka_device_t *dev,
             return NULL;
         }
 
-        *dma_addr = hal_kernel_devdrv_dma_map_single(dev, vaddr, size, DMA_BIDIRECTIONAL);
+        *dma_addr = hal_kernel_devdrv_dma_map_single(dev, vaddr, size, KA_DMA_BIDIRECTIONAL);
         if (ka_mm_dma_mapping_error(dev, *dma_addr)) {
             ka_free_pages_exact_ex(vaddr, size);
             return NULL;
@@ -73,14 +73,14 @@ static void *trs_chan_mem_alloc_dma(struct trs_id_inst *inst, ka_device_t *dev,
 static void *trs_chan_mem_alloc_ddr_dma(struct trs_id_inst *inst, size_t size, phys_addr_t *paddr)
 {
     return trs_chan_mem_alloc_dma(inst, hal_kernel_devdrv_get_pci_dev_by_devid(inst->devid),
-        size, (dma_addr_t *)paddr, DMA_BIDIRECTIONAL);
+        size, (ka_dma_addr_t *)paddr, KA_DMA_BIDIRECTIONAL);
 }
 
 static void trs_chan_mem_free_dma(struct trs_id_inst *inst, ka_device_t *dev, void *vaddr,
-    dma_addr_t dma_addr, size_t size)
+    ka_dma_addr_t dma_addr, size_t size)
 {
     if (dev != NULL) {
-        hal_kernel_devdrv_dma_unmap_single(dev, dma_addr, size, DMA_BIDIRECTIONAL);
+        hal_kernel_devdrv_dma_unmap_single(dev, dma_addr, size, KA_DMA_BIDIRECTIONAL);
     }
 
     ka_free_pages_exact_ex(vaddr, size);
@@ -88,7 +88,7 @@ static void trs_chan_mem_free_dma(struct trs_id_inst *inst, ka_device_t *dev, vo
 
 static void trs_chan_mem_free_ddr_dma(struct trs_id_inst *inst, void *vaddr, size_t size, phys_addr_t paddr)
 {
-    trs_chan_mem_free_dma(inst, hal_kernel_devdrv_get_pci_dev_by_devid(inst->devid), vaddr, (dma_addr_t)paddr, size);
+    trs_chan_mem_free_dma(inst, hal_kernel_devdrv_get_pci_dev_by_devid(inst->devid), vaddr, (ka_dma_addr_t)paddr, size);
 }
 
 static void *trs_chan_mem_alloc_ddr_phy(struct trs_id_inst *inst, size_t size, phys_addr_t *paddr)
@@ -258,7 +258,7 @@ static void *trs_chan_mem_get_svm_mem(struct trs_id_inst *inst, size_t size, voi
     struct trs_chan_mem_attr *mem_attr)
 {
 #ifdef CFG_FEATURE_SQ_SUPPORT_SVM_MEM
-    struct svm_pa_seg_wraper pa_seg;
+    svm_pa_seg_wraper_t pa_seg;
     u64 seg_num = 1;
     void *vaddr = NULL;
     int ret;
@@ -475,12 +475,12 @@ void trs_chan_ops_flush_sqe_cache(struct trs_id_inst *inst, u32 mem_type, void *
     if (devdrv_get_connect_protocol(inst->devid) != CONNECT_PROTOCOL_UB) {
         u32 sq_mem_side = trs_chan_get_sqcq_mem_side(mem_type);
         if (trs_chan_mem_is_dev_mem(sq_mem_side) == false) {
-            dma_addr_t dma_addr = (dma_addr_t)pa;
+            ka_dma_addr_t dma_addr = (ka_dma_addr_t)pa;
             dev = hal_kernel_devdrv_get_pci_dev_by_devid(inst->devid);
             if (dev == NULL) {
                 return;
             }
-            dma_sync_single_for_device(dev, dma_addr, len, DMA_TO_DEVICE);
+            ka_mm_dma_sync_single_for_device(dev, dma_addr, len, KA_DMA_TO_DEVICE);
         }
     }
 }
@@ -501,12 +501,12 @@ void trs_chan_ops_invalid_cqe_cache(struct trs_id_inst *inst, u32 mem_type, void
 
     if (devdrv_get_connect_protocol(inst->devid) != CONNECT_PROTOCOL_UB) {
         if (trs_chan_mem_is_dev_mem(trs_soc_get_cq_mem_side(inst)) == false) {
-            dma_addr_t dma_addr = (dma_addr_t)pa;
+            ka_dma_addr_t dma_addr = (ka_dma_addr_t)pa;
             dev = hal_kernel_devdrv_get_pci_dev_by_devid(inst->devid);
             if (dev == NULL) {
                 return;
             }
-            dma_sync_single_for_cpu(dev, dma_addr, len, DMA_FROM_DEVICE);
+            ka_mm_dma_sync_single_for_cpu(dev, dma_addr, len, KA_DMA_FROM_DEVICE);
         }
     }
 }

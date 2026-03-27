@@ -167,7 +167,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001251107197_zh-cn_topic_0000001178054654_zh-cn_topic_0000001101450892_toc533412083"></a>**
 
-```c
+```
 int ret = 0;
 int card_id = 0x3;
 int device_id = 0;
@@ -179,3 +179,4 @@ if (ret != 0){
 }
 …
 ```
+

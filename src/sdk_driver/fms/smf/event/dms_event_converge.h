@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -17,6 +17,8 @@
 #include "dms/dms_shm_info.h"
 #include "dms_event_distribute.h"
 #include "fms/fms_smf.h"
+#include "ka_list_pub.h"
+#include "ka_common_pub.h"
 
 #define DMS_EVENT_CODE_ENVIRONMENT_HOST (0x1U << 30)
 #define DMS_EVENT_CODE_ENVIRONMENT_DEVICE (0x2U << 30)
@@ -47,12 +49,12 @@
 #endif
 
 struct dms_mask_event {
-    struct list_head node;
+    ka_list_head_t node;
     unsigned int event_id;
 };
 
 struct dms_event_sensor_reported {
-    struct list_head node;
+    ka_list_head_t node;
     unsigned int event_id;
     int pid;
     int main_event_serial;
@@ -69,7 +71,7 @@ typedef struct dms_event_converge_node {
     struct dms_event_converge_node *parent;
     struct dms_event_converge_node *child_head;
     struct dms_event_converge_node *bro_next;
-    struct hlist_node hnode;
+    ka_hlist_node_t hnode;
     unsigned int event_id;
 
     int event_serial_num[ASCEND_DEV_MAX_NUM];

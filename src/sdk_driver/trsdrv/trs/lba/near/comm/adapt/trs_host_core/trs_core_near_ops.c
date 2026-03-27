@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,6 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
+#include "ascend_hal_define.h"
 #include "trs_core.h"
 #include "soc_adapt.h"
 #include "trs_host_msg.h"
@@ -94,22 +95,37 @@ static int res_addr_type_to_id_type[RES_ADDR_TYPE_MAX] = {
 bool trs_host_res_is_belong_to_proc(int master_tgid, int slave_tgid, u32 udevid, struct res_map_info_in *res_info)
 {
     struct trs_id_inst inst;
+    u32 res_id = res_info->res_id & 0xFFFFF; /* 0xFFFFF: first 20bits for res id */
 
     trs_id_inst_pack(&inst, udevid, res_info->id);
-    if (trs_res_is_belong_to_proc(&inst, master_tgid, res_addr_type_to_id_type[res_info->res_type], res_info->res_id)) {
+    if (trs_res_is_belong_to_proc(&inst, master_tgid, res_addr_type_to_id_type[res_info->res_type], res_id)) {
         trs_debug("Res id belong to master process. (master_tgid=%d; slave_tgid=%d; type=%d; id=%d)\n",
-            master_tgid, slave_tgid, res_info->res_type, res_info->res_id);
+            master_tgid, slave_tgid, res_info->res_type, res_id);
         return true;
+    }
+
+    if (res_info->priv != NULL) {
+        struct trs_id_inst remote_inst;
+        struct trs_res_map_priv *priv = (struct trs_res_map_priv *)res_info->priv;
+        trs_id_inst_pack(&remote_inst, priv->remote_devid, res_info->id);
+        if ((priv->flag & TSDRV_FLAG_REMOTE_ID) != 0) {
+            if (trs_res_is_belong_to_proc(&remote_inst, master_tgid, res_addr_type_to_id_type[res_info->res_type],
+                res_id)) {
+                trs_debug("Res id belong to remote process. (master_tgid=%d; slave_tgid=%d; type=%d; id=%d)\n",
+                    master_tgid, slave_tgid, res_info->res_type, res_id);
+                return true;
+            }
+        }
     }
 #ifndef EMU_ST
     /* res id belongs to cp1 in MC2 */
-    if (trs_host_res_id_check(&inst, res_addr_type_to_id_type[res_info->res_type], res_info->res_id) == 0) {
+    if (trs_host_res_id_check(&inst, res_addr_type_to_id_type[res_info->res_type], res_id) == 0) {
         trs_debug("Res id belong to cp1 process. (master_tgid=%d; slave_tgid=%d; type=%d; id=%d)\n",
-            master_tgid, slave_tgid, res_info->res_type, res_info->res_id);
+            master_tgid, slave_tgid, res_info->res_type, res_id);
         return true;
     }
     trs_err("Res id not belong to master process. (master_tgid=%d; slave_tgid=%d; type=%d; id=%d)\n",
-            master_tgid, slave_tgid, res_info->res_type, res_info->res_id);
+            master_tgid, slave_tgid, res_info->res_type, res_id);
     return false;
 #endif
 }
@@ -122,4 +138,21 @@ void *trs_core_ops_cq_mem_alloc(struct trs_id_inst *inst, size_t size)
 void trs_core_ops_cq_mem_free(struct trs_id_inst *inst, void *vaddr, size_t size)
 {
     trs_vfree(vaddr);
+}
+
+int trs_core_ops_mem_update(struct trs_id_inst *inst, u64 in_addr, u64 *out_addr, int flag)
+{
+    int ret;
+    if (flag == 0) {
+        ret = devdrv_devmem_addr_d2h(inst->devid, in_addr, (phys_addr_t *)out_addr);
+        if (ret != 0) {
+            trs_err("Failed to get bar. (ret=%d; devid=%u)\n", ret, inst->devid);
+        }
+    } else {
+        ret = devdrv_devmem_addr_h2d(inst->devid, in_addr, (phys_addr_t *)out_addr);
+        if (ret != 0) {
+            trs_err("Failed to get pa. (ret=%d; devid=%u)\n", ret, inst->devid);
+        }
+    }
+    return ret;
 }

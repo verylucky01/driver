@@ -60,10 +60,12 @@ drvError_t dms_get_phy_devices_topology(unsigned int dev_id1, unsigned int dev_i
         return DRV_ERROR_PARA_ERROR;
     }
 
+#ifndef CFG_FEATURE_ERR_CODE_NOT_OPTIMIZATION
     if (dev_id1 >= ASCEND_DEV_MAX_NUM || dev_id2 >= ASCEND_DEV_MAX_NUM) {
         DMS_ERR("Invalid device ID. (dev_id1=%u; dev_id2=%u; max_dev_num=%d)\n", dev_id1, dev_id2, ASCEND_DEV_MAX_NUM);
         return DRV_ERROR_PARA_ERROR;
     }
+#endif
 
     in.dev_id1 = dev_id1;
     in.dev_id2 = dev_id2;

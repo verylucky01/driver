@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,7 +11,9 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/kernel.h>
+#include "ka_memory_pub.h"
+#include "ka_task_pub.h"
+#include "ka_base_pub.h"
 
 #include "pbl/pbl_feature_loader.h"
 #include "pbl/pbl_runenv_config.h"
@@ -27,7 +29,7 @@ int dms_host_get_sign_flag(void *feature, char *in, u32 in_len, char *out, u32 o
 int dms_host_set_sign_cert(void *feature, char *in, u32 in_len, char *out, u32 out_len);
 int dms_host_get_sign_cert(void *feature, char *in, u32 in_len, char *out, u32 out_len);
 
-struct mutex g_cert_sync_lock[MAX_DEVICE_NUM];
+ka_mutex_t g_cert_sync_lock[MAX_DEVICE_NUM];
 
 BEGIN_DMS_MODULE_DECLARATION(DMS_CUSTOM_FORWARD_CMD_NAME)
 BEGIN_FEATURE_COMMAND()
@@ -201,28 +203,28 @@ int dms_host_set_sign_cert(void *feature, char *in, u32 in_len, char *out, u32 o
         return -EINVAL;
     }
 
-    mutex_lock(&g_cert_sync_lock[phy_id]);
+    ka_task_mutex_lock(&g_cert_sync_lock[phy_id]);
 
     ret = dms_send_msg_to_device_by_h2d_multi_packets(feature, in, in_len, in, in_len);
     if (ret != 0) {
         dms_ex_notsupport_err(ret, "Failed to send msg to device. (ret=%d)\n", ret);
-        mutex_unlock(&g_cert_sync_lock[phy_id]);
+        ka_task_mutex_unlock(&g_cert_sync_lock[phy_id]);
         return ret;
     }
 
-    buf = (char *)dbl_kzalloc(cfg_in->buff_size, GFP_KERNEL | __GFP_ACCOUNT);
+    buf = (char *)dbl_kzalloc(cfg_in->buff_size, KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
     if (buf == NULL) {
         dms_err("Alloc memory for file failed. (phy_id=%u; buff_size=%u)\n", phy_id, cfg_in->buff_size);
-        mutex_unlock(&g_cert_sync_lock[phy_id]);
+        ka_task_mutex_unlock(&g_cert_sync_lock[phy_id]);
         return -ENOMEM;
     }
 
-    ret = copy_from_user(buf, cfg_in->buff, cfg_in->buff_size);
+    ret = ka_base_copy_from_user(buf, cfg_in->buff, cfg_in->buff_size);
     if (ret != 0) {
         dms_err("Copy from user fail.(ret=%d;param_size=%u)\n", ret, cfg_in->buff_size);
         dbl_kfree(buf);
         buf = NULL;
-        mutex_unlock(&g_cert_sync_lock[phy_id]);
+        ka_task_mutex_unlock(&g_cert_sync_lock[phy_id]);
         return -EINVAL;
     }
 
@@ -231,13 +233,13 @@ int dms_host_set_sign_cert(void *feature, char *in, u32 in_len, char *out, u32 o
         dms_err("Failed to save sign cert to file. (phy_id=%u; ret=%d)\n", phy_id, ret);
         dbl_kfree(buf);
         buf = NULL;
-        mutex_unlock(&g_cert_sync_lock[phy_id]);
+        ka_task_mutex_unlock(&g_cert_sync_lock[phy_id]);
         return ret;
     }
 
     dbl_kfree(buf);
     buf = NULL;
-    mutex_unlock(&g_cert_sync_lock[phy_id]);
+    ka_task_mutex_unlock(&g_cert_sync_lock[phy_id]);
     return 0;
 }
 
@@ -303,7 +305,7 @@ int dms_host_get_sign_cert(void *feature, char *in, u32 in_len, char *out, u32 o
         return -EINVAL;
     }
 
-    buf = (char *)dbl_kzalloc(file_size, GFP_KERNEL | __GFP_ACCOUNT);
+    buf = (char *)dbl_kzalloc(file_size, KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
     if (buf == NULL) {
         dms_err("Alloc memory for file failed. (phy_id=%u; file_size=0x%llx)\n", phy_id, file_size);
         return -ENOMEM;
@@ -317,7 +319,7 @@ int dms_host_get_sign_cert(void *feature, char *in, u32 in_len, char *out, u32 o
         return -EINVAL;
     }
 
-    ret = copy_to_user(cfg_in->buff, buf, file_size);
+    ret = ka_base_copy_to_user(cfg_in->buff, buf, file_size);
     if (ret != 0) {
         dms_err("Copy from user fail.(ret=%d;param_size=%llx)\n", ret, file_size);
         dbl_kfree(buf);
@@ -450,7 +452,7 @@ int dms_custom_init_device_cert_flag(u32 dev_id)
         return -EINVAL;
     }
 
-    buf = (char *)dbl_kzalloc((size_t)file_size + 1, GFP_KERNEL | __GFP_ACCOUNT);
+    buf = (char *)dbl_kzalloc((size_t)file_size + 1, KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
     if (buf == NULL) {
         dms_err("Alloc memory for file failed. (dev_id=%u; file_size=0x%llx)\n", dev_id, file_size);
         return -ENOMEM;
@@ -518,7 +520,7 @@ int dms_custom_init_device_cert_file(u32 dev_id, CUSTOM_FILE_TYPE file_type)
         return -EINVAL;
     }
 
-    buf = (char *)dbl_kzalloc((size_t)file_size, GFP_KERNEL | __GFP_ACCOUNT);
+    buf = (char *)dbl_kzalloc((size_t)file_size, KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
     if (buf == NULL) {
         dms_err("Alloc memory for file failed. (dev_id=%u; file_type=%d; file_size=0x%llx)\n",
             dev_id,
@@ -551,7 +553,7 @@ STATIC int dms_host_clear_cert_info(u32 udev_id)
     const char *default_flag_str = "verify_flag=5";
     char file_default_data = '0';
  
-    ret = dms_save_sign_flag_to_file(udev_id, (char *)default_flag_str, strlen(default_flag_str));
+    ret = dms_save_sign_flag_to_file(udev_id, (char *)default_flag_str, ka_base_strlen(default_flag_str));
     if (ret != 0) {
         dms_err("Set sign flag to default value failed. (dev_id=%u; ret=%d)\n", udev_id, ret);
         return ret;
@@ -570,7 +572,7 @@ STATIC int dms_custom_dev_init(u32 udev_id)
     int ret;
 
     dms_info("dms_custom_dev_init start.\n");
-    mutex_init(&g_cert_sync_lock[udev_id]);
+    ka_task_mutex_init(&g_cert_sync_lock[udev_id]);
     ret = dms_custom_init_device_cert_flag(udev_id);
     if (ret != 0) {
         dms_warn("Init device cert flag unsuccessfully. (udev_id=%u; ret=%d)\n", udev_id, ret);
@@ -598,6 +600,6 @@ DECLAER_FEATURE_AUTO_INIT_DEV(dms_custom_dev_init, FEATURE_LOADER_STAGE_5);
 STATIC void dms_custom_dev_exit(u32 udev_id)
 {
     dms_info("Dms custom dev exit. (udev_id=%u)\n", udev_id);
-    mutex_destroy(&g_cert_sync_lock[udev_id]);
+    ka_task_mutex_destroy(&g_cert_sync_lock[udev_id]);
 }
 DECLAER_FEATURE_AUTO_UNINIT_DEV(dms_custom_dev_exit, FEATURE_LOADER_STAGE_5);

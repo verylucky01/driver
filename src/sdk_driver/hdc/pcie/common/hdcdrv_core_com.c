@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,22 +11,9 @@
  * GNU General Public License for more details.
  */
 
-#ifdef CFG_FEATURE_PFSTAT
-#include "hdcdrv_pfstat.h"
-#endif
 #include "ka_kernel_def_pub.h"
 #include "ka_task_pub.h"
 #include "ka_driver_pub.h"
-#include "hdcdrv_core_com.h"
-#include "hdcdrv_cmd_ioctl.h"
-#include "hdcdrv_cmd_msg.h"
-#include "hdcdrv_mem_com.h"
-#include "comm_kernel_interface.h"
-
-#ifdef CFG_FEATURE_VFIO
-#include "vmng_kernel_interface.h"
-#endif
-
 #include "ka_system_pub.h"
 #include "ka_common_pub.h"
 #include "ka_fs_pub.h"
@@ -37,6 +24,19 @@
 #include "ka_task_pub.h"
 #include "ka_list_pub.h"
 #include "ka_memory_pub.h"
+
+#ifdef CFG_FEATURE_PFSTAT
+#include "hdcdrv_pfstat.h"
+#endif
+#include "hdcdrv_core_com.h"
+#include "hdcdrv_cmd_ioctl.h"
+#include "hdcdrv_cmd_msg.h"
+#include "hdcdrv_mem_com.h"
+#include "comm_kernel_interface.h"
+
+#ifdef CFG_FEATURE_VFIO
+#include "vmng_kernel_interface.h"
+#endif
 
 u32 hdcdrv_cmd_size_table[HDCDRV_CMD_MAX] = {0};
 STATIC bool hdcdrv_is_kernel_thread(void)
@@ -298,7 +298,11 @@ int hdcdrv_send_mem_info(struct hdcdrv_fast_mem *mem, int devid, int flag)
 #endif
 
     for (i = 0; i < msg->phy_addr_num; i++) {
+#ifdef CFG_FEATURE_OVER_XCOM
+        msg->mem[i].addr = mem->mem[i].phy_addr;
+#else
         msg->mem[i].addr = mem->mem[i].addr;
+#endif
         msg->mem[i].len = mem->mem[i].len;
         msg->mem[i].resv = 0;
     }
@@ -429,6 +433,7 @@ void hdcdrv_unbind_mem_ctx(struct hdcdrv_fast_node *f_node)
         f_node->mem_fd_node->ctx_fmem = NULL;
         ka_task_spin_unlock_bh(&ctx_fmem->mem_lock);
         hdcdrv_kfree(node, KA_SUB_MODULE_TYPE_1);
+        node = NULL;
     }
 
     f_node->mem_fd_node = NULL;
@@ -505,6 +510,7 @@ void hdcdrv_release_free_mem(struct hdcdrv_ctx_fmem *ctx_fmem)
         } else {
             hdcdrv_fast_mem_free_abnormal(&entry->f_info);
             hdcdrv_kfree(entry, KA_SUB_MODULE_TYPE_1);
+            entry = NULL;
         }
     }
 }

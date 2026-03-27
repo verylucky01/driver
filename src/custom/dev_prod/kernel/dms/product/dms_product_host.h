@@ -17,6 +17,8 @@
 #include "comm_kernel_interface.h"
 
 int devdrv_get_work_mode(void *feature, char *in, u32 in_len, char *out, u32 out_len);
+int devdrv_get_card_multi_die_policy(void *feature, char *in, u32 in_len, char *out, u32 out_len);
+int devdrv_set_card_multi_die_policy(void *feature, char *in, u32 in_len, char *out, u32 out_len);
 #ifdef CFG_SOC_PLATFORM_CLOUD
 extern int devdrv_manager_get_amp_smp_mode(u32 *amp_or_smp);
 #endif

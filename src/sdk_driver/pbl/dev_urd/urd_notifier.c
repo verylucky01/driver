@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,10 +11,6 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/kernel.h>
-#include <linux/uaccess.h>
-#include <linux/notifier.h>
-#include <linux/export.h>
 #include "urd_notifier.h"
 #include "ka_dfx_pub.h"
 #include "ka_kernel_def_pub.h"
@@ -22,20 +18,20 @@
  * URD interface notification chain, which is used to
  * notify other modules of user process startup and exit events
  */
-static RAW_NOTIFIER_HEAD(g_urd_notifier_chain);
+static KA_DFX_RAW_NOTIFIER_HEAD(g_urd_notifier_chain);
 
 int urd_notifier_call(u64 mode, void* data)
 {
     return ka_dfx_raw_notifier_call_chain(&g_urd_notifier_chain, mode, data);
 }
 
-int urd_register_notifier(struct notifier_block* nb)
+int urd_register_notifier(ka_notifier_block_t* nb)
 {
     return ka_dfx_raw_notifier_chain_register(&g_urd_notifier_chain, nb);
 }
 KA_EXPORT_SYMBOL_GPL(urd_register_notifier);
 
-int urd_unregister_notifier(struct notifier_block* nb)
+int urd_unregister_notifier(ka_notifier_block_t* nb)
 {
     return ka_dfx_raw_notifier_chain_unregister(&g_urd_notifier_chain, nb);
 }

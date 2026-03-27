@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,11 +11,7 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/gpio.h>
-#include <linux/mutex.h>
-#include <linux/string.h>
-#include <linux/uaccess.h>
-
+#include "ka_driver_pub.h"
 #include "dms_define.h"
 #include "dms_template.h"
 #include "dms/dms_cmd_def.h"
@@ -100,20 +96,20 @@ STATIC s32 dms_get_gpio_status(void *feature, char *in,
         return -EINVAL;
     }
     gpio_num = arg->gpio_num;
-    if (!gpio_is_valid(gpio_num)) {
+    if (!ka_driver_gpio_is_valid(gpio_num)) {
         dms_err("Invalid GPIO. (num=%u)\n", gpio_num);
         return -EINVAL;
     }
 
-    ret = gpio_request(gpio_num, DEVDRV_GPIO_NAME);
+    ret = ka_driver_gpio_request(gpio_num, DEVDRV_GPIO_NAME);
     if (ret != 0) {
         dms_err("GPIO request failed. (num=%u)\n", gpio_num);
         return ret;
     }
 
-    gpio_val = gpio_get_value(gpio_num);
+    gpio_val = (unsigned int)ka_driver_gpio_get_value(gpio_num);
 
-    (void)gpio_free(gpio_num);
+    (void)ka_driver_gpio_free(gpio_num);
 
     *status = gpio_val;
     return 0;

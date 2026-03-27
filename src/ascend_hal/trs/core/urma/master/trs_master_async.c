@@ -22,6 +22,7 @@
 #include "trs_master_urma.h"
 #include "trs_master_async.h"
 #include "trs_urma_async.h"
+#include "trs_res.h"
 
 struct udma_sqe_ctl_tmp {
     uint32_t sqe_bb_idx : 16;
@@ -112,64 +113,37 @@ void trs_swap_endian(uint8_t dst[], uint8_t src[], uint32_t size)
 #endif
 }
 
-static struct trs_async_ctx *trs_get_d2d_async_ctx(uint32_t remote_devid, struct trs_d2d_ctx_list *d2d_ctx_list)
-{
-    struct trs_async_ctx *ctx = NULL;
-    struct list_head *node, *next;
-
-    list_for_each_safe(node, next, &d2d_ctx_list->head) {
-        ctx = list_entry(node, struct trs_async_ctx, node);
-        if (ctx->recv_devid == remote_devid) {
-            return ctx;
-        }
-    }
-    return NULL;
-}
-
-static void trs_get_async_send_recv_addr(uint32_t dev_id, struct trs_async_ctx *async_ctx,
-    struct halAsyncDmaInputPara *in, uint64_t *send_addr, uint64_t *recv_addr)
+static void trs_get_async_send_recv_addr(struct trs_async_devid *async_devid,
+    struct trs_async_dma_input_para *in, uint64_t *send_addr, uint64_t *recv_addr)
 {
     if (in->dir == TRS_ASYNC_HOST_TO_DEVICE) {
-        *send_addr = (uint64_t)(uintptr_t)in->dst;
-        *recv_addr = (uint64_t)(uintptr_t)in->src;
+        *send_addr = (uint64_t)(uintptr_t)in->async_normal_in->dst;
+        *recv_addr = (uint64_t)(uintptr_t)in->async_normal_in->src;
     } else if (in->dir == TRS_ASYNC_DEVICE_TO_HOST) {
-        *send_addr = (uint64_t)(uintptr_t)in->src;
-        *recv_addr = (uint64_t)(uintptr_t)in->dst;
+        *send_addr = (uint64_t)(uintptr_t)in->async_normal_in->src;
+        *recv_addr = (uint64_t)(uintptr_t)in->async_normal_in->dst;
     } else { /* TRS_ASYNC_DEVICE_TO_DEVICE) */
-        if (dev_id == async_ctx->dst_devid) {
-            *send_addr = (uint64_t)(uintptr_t)in->dst;
-            *recv_addr = (uint64_t)(uintptr_t)in->src;
+        if (async_devid->local_devid == async_devid->dst_devid) {
+            *send_addr = (uint64_t)(uintptr_t)in->async_normal_in->dst;
+            *recv_addr = (uint64_t)(uintptr_t)in->async_normal_in->src;
         } else {
-            *send_addr = (uint64_t)(uintptr_t)in->src;
-            *recv_addr = (uint64_t)(uintptr_t)in->dst;
+            *send_addr = (uint64_t)(uintptr_t)in->async_normal_in->src;
+            *recv_addr = (uint64_t)(uintptr_t)in->async_normal_in->dst;
         }
     }
 }
 
-static struct trs_async_ctx *trs_get_async_ctx(struct trs_urma_ctx *urma_ctx, uint32_t dir, uint32_t remote_dev_id,
+static struct trs_async_ctx *trs_get_async_ctx(struct trs_urma_ctx *urma_ctx, uint32_t dir,
     enum trs_async_dma_type async_dma_type)
 {
     if (dir == TRS_ASYNC_DEVICE_TO_DEVICE) {
-        struct trs_async_ctx *ctx = NULL;
-        (void)pthread_mutex_lock(&urma_ctx->d2d_ctx_list.d2d_mutex);
-        ctx = trs_get_d2d_async_ctx(remote_dev_id, &urma_ctx->d2d_ctx_list);
-        if (ctx == NULL) {
-            (void)pthread_mutex_unlock(&urma_ctx->d2d_ctx_list.d2d_mutex);
-        }
-        return ctx;
+        return &urma_ctx->d2d_async_ctx;
     } else {
         if ((async_dma_type == TRS_ASYNC_DMA_TYPE_2D) || (async_dma_type == TRS_ASYNC_DMA_TYPE_BATCH)) {
             return &urma_ctx->batch_2d_async_ctx;
         } else {
             return &urma_ctx->async_ctx;
         }
-    }
-}
-
-static void trs_put_async_ctx(struct trs_urma_ctx *urma_ctx, uint32_t dir, struct trs_async_ctx *ctx)
-{
-    if ((dir == TRS_ASYNC_DEVICE_TO_DEVICE) && (ctx != NULL)) {
-        (void)pthread_mutex_unlock(&urma_ctx->d2d_ctx_list.d2d_mutex);
     }
 }
 
@@ -259,15 +233,18 @@ static int trs_check_async_devid_dir(struct trs_async_dma_input_para *in, uint32
     }
 
     if ((async_type == TRS_ASYNC_DMA_TYPE_SQE_UPDATE) && (dir != TRS_ASYNC_HOST_TO_DEVICE)) {
+        trs_err("Invalid async_type or dir. (async_type=%d; dir=%u)\n", async_type, dir);
         return DRV_ERROR_PARA_ERROR;
     }
 
     if (dir == TRS_ASYNC_HOST_TO_DEVICE) {
         if (dst_devid != local_devid) {
+            trs_err("Invalid devid. (dst_devid=%u; local_devid=%u)\n", dst_devid, local_devid);
             return DRV_ERROR_PARA_ERROR;
         }
     } else if (dir == TRS_ASYNC_DEVICE_TO_HOST) {
         if (src_devid != local_devid) {
+            trs_err("Invalid devid. (src_devid=%u; local_devid=%u)\n", src_devid, local_devid);
             return DRV_ERROR_PARA_ERROR;
         }
     } else if (dir == TRS_ASYNC_DEVICE_TO_DEVICE) {
@@ -440,8 +417,8 @@ static int trs_remote_fill_async_dma_wqe(struct trs_async_devid *async_devid, st
     return (drvError_t)result;
 }
 
-static int _trs_fill_async_dma_direct_wqe(uint32_t dev_id, struct trs_urma_ctx *urma_ctx, struct trs_async_ctx *async_ctx,
-    struct trs_async_dma_wqe_info *wqe_info, struct halAsyncDmaInputPara *in)
+static int _trs_fill_async_dma_direct_wqe(struct trs_async_devid *async_devid, struct trs_urma_ctx *urma_ctx,
+    struct trs_async_dma_wqe_info *wqe_info, struct trs_async_dma_input_para *in)
 {
     struct udma_sqe_ctl_tmp *sqe = (struct udma_sqe_ctl_tmp *)(void *)wqe_info->wqe;
     struct udma_wqe_sge_tmp *sge = (struct udma_wqe_sge_tmp *)((void *)wqe_info->wqe + sizeof(struct udma_sqe_ctl_tmp));
@@ -450,9 +427,9 @@ static int _trs_fill_async_dma_direct_wqe(uint32_t dev_id, struct trs_urma_ctx *
     uint64_t send_addr, recv_addr;
     int ret;
 
-    trs_get_async_send_recv_addr(dev_id, async_ctx, in, &send_addr, &recv_addr);
+    trs_get_async_send_recv_addr(async_devid, in, &send_addr, &recv_addr);
 
-    ret = trs_get_segment(urma_ctx, recv_addr, (uint64_t)in->len, wqe_info, &seg, &token);
+    ret = trs_get_segment(urma_ctx, recv_addr, (uint64_t)in->async_normal_in->len, wqe_info, &seg, &token);
     if (ret != 0) {
         trs_err("Failed to get segment. (vaddr=0x%llx; dir=%u; ret=%d)\n", recv_addr, in->dir, ret);
         return ret;
@@ -465,30 +442,31 @@ static int _trs_fill_async_dma_direct_wqe(uint32_t dev_id, struct trs_urma_ctx *
     sqe->rmt_addr_h_or_token_value = (uint32_t)(recv_addr >> 32) &(0xFFFFFFFF); // 32: right bits
 
     /* read/write: JFS segment */
-    sge->length = in->len;
+    sge->length = in->async_normal_in->len;
     sge->token_id = 0;
     sge->va = send_addr;
 
     return 0;
 }
 
-static uint32_t trs_get_async_dwqe_opcode(uint32_t dev_id, struct trs_async_ctx *async_ctx, uint32_t dir)
+static uint32_t trs_get_async_dwqe_opcode(uint32_t dev_id, struct trs_async_devid *async_devid, uint32_t dir)
 {
     if (dir == TRS_ASYNC_HOST_TO_DEVICE) {
         return 0x6; // 0x6:read
     } else if (dir == TRS_ASYNC_DEVICE_TO_HOST) {
         return 0x3; // 0x3:write
     } else if (dir == TRS_ASYNC_DEVICE_TO_DEVICE) {
-        return (dev_id == async_ctx->dst_devid) ? 0x6 : 0x3;  // 0x6:read; 0x3:write
+        return (dev_id == async_devid->dst_devid) ? 0x6 : 0x3;  // 0x6:read; 0x3:write
     } else {
         return 0xFFFF; // 0xFFFF: invalid opcode
     }
 }
 
-static int trs_fill_async_dma_direct_wqe(uint32_t dev_id, struct trs_urma_ctx *urma_ctx, struct trs_async_ctx *async_ctx,
-    struct trs_async_dma_wqe_info *wqe_info, struct halAsyncDmaInputPara *in)
+static int trs_fill_async_dma_direct_wqe(struct trs_async_devid *async_devid, struct trs_urma_ctx *urma_ctx,
+    struct trs_async_ctx *async_ctx, struct trs_async_dma_wqe_info *wqe_info, struct trs_async_dma_input_para *in)
 {
     struct udma_sqe_ctl_tmp *sqe = (struct udma_sqe_ctl_tmp *)(void *)wqe_info->wqe;
+    uint32_t dev_id = async_devid->local_devid;
     int ret = 0;
 
     sqe->sqe_bb_idx = async_ctx->pi;
@@ -508,7 +486,7 @@ static int trs_fill_async_dma_direct_wqe(uint32_t dev_id, struct trs_urma_ctx *u
     if (in->dir == TRS_ASYNC_DEVICE_TO_DEVICE) {
         struct trs_d2d_dev_ctx *d2d_dev_ctx = NULL;
         trs_dev_ctx_mutex_lock(wqe_info->remote_dev_id);
-        d2d_dev_ctx = trs_getd2d_dev_ctx(wqe_info->remote_dev_id, dev_id);
+        d2d_dev_ctx = trs_get_d2d_dev_ctx(wqe_info->remote_dev_id);
         sqe->tpn = d2d_dev_ctx->tpn;
         trs_swap_endian((uint8_t *)sqe->rmt_eid, d2d_dev_ctx->dst_jetty_id.eid.raw, URMA_EID_SIZE);
         trs_dev_ctx_mutex_un_lock(wqe_info->remote_dev_id);
@@ -516,8 +494,8 @@ static int trs_fill_async_dma_direct_wqe(uint32_t dev_id, struct trs_urma_ctx *u
         sqe->tpn = async_ctx->tpn;
         trs_swap_endian((uint8_t *)sqe->rmt_eid, urma_ctx->trs_jfr.jfr->urma_ctx->eid.raw, URMA_EID_SIZE);
     }
-    sqe->opcode = trs_get_async_dwqe_opcode(dev_id, async_ctx, in->dir);
-    ret = _trs_fill_async_dma_direct_wqe(dev_id, urma_ctx, async_ctx, wqe_info, in);
+    sqe->opcode = trs_get_async_dwqe_opcode(dev_id, async_devid, in->dir);
+    ret = _trs_fill_async_dma_direct_wqe(async_devid, urma_ctx, wqe_info, in);
     if (ret != 0) {
         return ret;
     }
@@ -568,46 +546,58 @@ static int trs_check_async_jetty_credit(struct trs_async_ctx *async_ctx, uint32_
     return 0;
 }
 
-static int trs_fill_async_dma_wqe(struct trs_async_devid *async_devid, struct sqcq_usr_info *sq_info, struct trs_async_dma_wqe_info *wqe_info,
-    struct trs_async_dma_input_para *in, struct halAsyncDmaOutputPara *out)
+static int trs_fill_async_dma_wqe(struct trs_async_devid *async_devid, struct sqcq_usr_info *sq_info,
+    struct trs_async_dma_wqe_info *wqe_info, struct trs_async_dma_input_para *in, struct halAsyncDmaOutputPara *out)
 {
     struct trs_urma_ctx *urma_ctx = sq_info->urma_ctx;
     bool is_direct_wqe = trs_is_async_direct_wqe(sq_info->flag, in->async_dma_type);
     bool is_wqe_sink = trs_is_async_jetty_wqe_sink(sq_info->flag);
-    struct trs_async_ctx *async_ctx = trs_get_async_ctx(urma_ctx, in->dir, wqe_info->remote_dev_id, in->async_dma_type);
+    struct trs_async_ctx *async_ctx = trs_get_async_ctx(urma_ctx, in->dir, in->async_dma_type);
     uint32_t wr_num = trs_get_async_post_wr_num(in, is_direct_wqe);
-    uint32_t dev_id = async_devid->local_devid;
     uint32_t last_pi = async_ctx->pi;
     int ret = 0;
 
     ret = trs_check_async_jetty_credit(async_ctx, wr_num, is_direct_wqe);
     if (ret != 0) {
-        trs_put_async_ctx(urma_ctx, in->dir, async_ctx);
         return ret;
     }
 
     async_ctx->pi = ((async_ctx->pi + wr_num) % TRS_UB_PI_CI_DEPTH);
     if (is_direct_wqe == true) {
-        ret = trs_fill_async_dma_direct_wqe(dev_id, urma_ctx, async_ctx, wqe_info, in->async_normal_in);
+        ret = trs_fill_async_dma_direct_wqe(async_devid, urma_ctx, async_ctx, wqe_info, in);
     } else {
         ret = trs_remote_fill_async_dma_wqe(async_devid, urma_ctx, in);
     }
 
     if (ret != 0) {
         async_ctx->pi = last_pi;
-        trs_put_async_ctx(urma_ctx, in->dir, async_ctx);
         return ret;
     }
 
     out->jettyId = async_ctx->src_jetty_id.id;
-    out->pi = (is_wqe_sink == false) ? async_ctx->pi : wr_num; /* absolute in single task, relative in task sinking*/
+    out->pi = (is_wqe_sink == false) ? async_ctx->pi : wr_num; /* absolute in single task, relative in task sinking */
     out->functionId = async_ctx->func_id;
     out->dieId = async_ctx->die_id;
     out->fixedSize = (in->async_dma_type == TRS_ASYNC_DMA_TYPE_BATCH) ? in->async_batch_in->count :
         ((in->async_dma_type == TRS_ASYNC_DMA_TYPE_2D) ? in->async_2d_in->width * in->async_2d_in->height : 1);
 
-    trs_put_async_ctx(urma_ctx, in->dir, async_ctx);
     return 0;
+}
+
+static inline uint64_t trs_get_sq_bind_remote_que_addr(uint32_t dev_id, uint32_t ts_id, struct sqcq_usr_info *sq_info)
+{
+    if (((struct trs_urma_ctx *)sq_info->urma_ctx)->remote_sq_que_addr != 0) {
+        return ((struct trs_urma_ctx *)sq_info->urma_ctx)->remote_sq_que_addr;
+    }
+
+    if (sq_info->switch_stream_flag) {
+        struct res_id_usr_info *stream_usr_info = trs_get_res_id_info(dev_id, ts_id, DRV_STREAM_ID, sq_info->stream_id);
+        if ((stream_usr_info != NULL) && (stream_usr_info->valid != 0)) {
+            return stream_usr_info->res_addr;
+        }
+    }
+
+    return (uintptr_t)NULL;
 }
 
 static int trs_fill_h2d_async_dma_wqe(struct trs_async_devid *async_devid, struct sqcq_usr_info *sq_info,
@@ -618,14 +608,16 @@ static int trs_fill_h2d_async_dma_wqe(struct trs_async_devid *async_devid, struc
     int ret;
 
     if (in->async_dma_type == TRS_ASYNC_DMA_TYPE_SQE_UPDATE) {
-        struct trs_urma_ctx *urma_ctx = NULL;
-        struct sqcq_usr_info *update_sq_info = trs_get_sq_info(async_devid->local_devid, in->tsId, in->type, sqid);
+        struct sqcq_usr_info *update_sq_info = NULL;
+        uint64_t remote_sq_que_addr = 0;
+
+        update_sq_info = trs_get_sq_info(async_devid->local_devid, in->tsId, in->type, sqid);
         if ((update_sq_info == NULL) || (update_sq_info->urma_ctx == NULL)) {
             trs_err("Invalid para. (devid=%u; tsId=%u; type=%d; sqid=%u)\n",
                 async_devid->local_devid, in->tsId, in->type, sqid);
             return DRV_ERROR_INVALID_VALUE;
         }
-        urma_ctx = (struct trs_urma_ctx *)update_sq_info->urma_ctx;
+
         sqe_pos = in->async_normal_in->info.sqe_pos;
         if ((sqe_pos >= update_sq_info->depth) ||
             (in->async_normal_in->len > (update_sq_info->depth - sqe_pos) * update_sq_info->e_size)) {
@@ -634,10 +626,16 @@ static int trs_fill_h2d_async_dma_wqe(struct trs_async_devid *async_devid, struc
             return DRV_ERROR_PARA_ERROR;
         }
 
-        in->async_normal_in->dst = (u8 *)(uintptr_t)urma_ctx->remote_sq_que_addr + sqe_pos * update_sq_info->e_size;
+        remote_sq_que_addr = trs_get_sq_bind_remote_que_addr(async_devid->local_devid, 0, update_sq_info);
+        if (remote_sq_que_addr == 0) {
+            trs_err("Sq queue not inited. (devid=%u; type=%d; sqid=%u)\n", async_devid->local_devid, in->type, sqid);
+            return DRV_ERROR_PARA_ERROR;
+        }
+
+        in->async_normal_in->dst = (u8 *)(uintptr_t)remote_sq_que_addr + sqe_pos * update_sq_info->e_size;
         trs_debug("(devid=%u; sqid=%u; sqe_pos=%u; sqe_size=%u; len=%u; remote_sq_que_addr=0x%llx; dst=0x%llx)\n",
             async_devid->local_devid, sqid, sqe_pos, update_sq_info->e_size, in->async_normal_in->len,
-            urma_ctx->remote_sq_que_addr, (u64)(uintptr_t)in->async_normal_in->dst);
+            remote_sq_que_addr, (u64)(uintptr_t)in->async_normal_in->dst);
     }
 
     ret = trs_fill_async_dma_wqe(async_devid, sq_info, wqe_info, in, out);
@@ -746,8 +744,6 @@ static int trs_create_local_d2d_jetty(struct trs_async_devid *d2d_async_devid, u
     alloc_info.flag = flag;
     alloc_info.pos = TRS_ASYNC_SEND_SIDE;
     alloc_info.sq_id = sq_id;
-    alloc_info.recv_dev_id = d2d_async_devid->remote_devid;
-    (void)memcpy_s(alloc_info.eid, sizeof(alloc_info.eid), d2d_async_devid->local_eid, sizeof(d2d_async_devid->local_eid));
     ret = trs_alloc_device_jetty(d2d_async_devid->local_devid, &alloc_info, &sync_msg);
     if (ret != 0) {
         trs_err("Failed to alloc device jetty. (local_devid=%u; sq_id=%u)\n", d2d_async_devid->local_devid, sq_id);
@@ -759,12 +755,11 @@ static int trs_create_local_d2d_jetty(struct trs_async_devid *d2d_async_devid, u
     return 0;
 }
 
-static int trs_destroy_local_d2d_jetty(uint32_t local_devid, uint32_t remote_devid, uint32_t sq_id)
+static int trs_destroy_local_d2d_jetty(uint32_t local_devid, uint32_t sq_id)
 {
     struct trs_d2d_send_info free_info = {0};
     free_info.pos = TRS_ASYNC_SEND_SIDE;
     free_info.sq_id = sq_id;
-    free_info.recv_dev_id = remote_devid;
     return trs_free_device_jetty(local_devid, &free_info);
 }
 
@@ -777,8 +772,6 @@ static int trs_create_remote_d2d_jetty(struct trs_async_devid *d2d_async_devid, 
 
     alloc_info.flag = flag;
     alloc_info.pos = TRS_ASYNC_RECV_SIDE;
-    alloc_info.send_dev_id = d2d_async_devid->local_devid;
-    (void)memcpy_s(alloc_info.eid, sizeof(alloc_info.eid), d2d_async_devid->remote_eid, sizeof(d2d_async_devid->remote_eid));
     ret = trs_alloc_device_jetty(d2d_async_devid->remote_devid, &alloc_info, &sync_msg);
     if (ret != 0) {
         trs_err("Failed to alloc remote jetty. (ret=%d; remote_devid=%u; flag=0x%x)\n",
@@ -804,67 +797,53 @@ static int trs_create_remote_d2d_jetty(struct trs_async_devid *d2d_async_devid, 
 
 int trs_destroy_remote_d2d_jetty(uint32_t dev_id)
 {
+    struct trs_d2d_dev_ctx *d2d_dev_ctx = trs_get_d2d_dev_ctx(dev_id);
     struct trs_d2d_send_info info = {0};
-    uint32_t local_devid;
     int ret;
+
+    if (d2d_dev_ctx == NULL) {
+        return 0;
+    }
 
     info.pos = TRS_ASYNC_RECV_SIDE;
     trs_dev_ctx_mutex_lock(dev_id);
-    for (local_devid = 0; local_devid < TRS_DEV_NUM; local_devid++) {
-        struct trs_d2d_dev_ctx *d2d_dev_ctx = trs_getd2d_dev_ctx(dev_id, local_devid);
-        if (d2d_dev_ctx == NULL) {
-            continue;
-        }
-        info.send_dev_id = local_devid;
-        ret = trs_free_device_jetty(dev_id, &info);
-        if (ret != 0) {
-            trs_dev_ctx_mutex_un_lock(dev_id);
-            trs_err("Failed to free remote jetty. (dev_id=%u; ret=%d)\n", dev_id, ret);
-            return ret;
-        }
-        free(d2d_dev_ctx);
-        trs_setd2d_dev_ctx(dev_id, local_devid, NULL);
+    ret = trs_free_device_jetty(dev_id, &info);
+    if (ret != 0) {
+        trs_dev_ctx_mutex_un_lock(dev_id);
+        trs_err("Failed to free remote jetty. (dev_id=%u; ret=%d)\n", dev_id, ret);
+        return ret;
     }
+    trs_set_d2d_dev_ctx(dev_id, NULL);
+    free(d2d_dev_ctx);
     trs_dev_ctx_mutex_un_lock(dev_id);
     return 0;
 }
 
-static int trs_d2d_async_ctx_create(struct trs_async_devid *d2d_async_devid, struct trs_d2d_ctx_list *d2d_ctx_list,
+static int trs_d2d_async_ctx_create(struct trs_urma_ctx *urma_ctx, struct trs_async_devid *d2d_async_devid,
     uint32_t sq_id, uint32_t flag)
 {
     uint32_t local_devid = d2d_async_devid->local_devid;
     uint32_t remote_devid = d2d_async_devid->remote_devid;
-    struct trs_async_ctx *async_ctx = NULL;
-    struct trs_async_ctx *async_ctx_tmp = NULL;
-    int ret;
+    struct trs_async_ctx *async_ctx = &urma_ctx->d2d_async_ctx;
+    int ret, create_local_flag = 0;
 
-    (void)pthread_mutex_lock(&d2d_ctx_list->d2d_mutex);
-    async_ctx = trs_get_d2d_async_ctx(remote_devid, d2d_ctx_list);
-    if (async_ctx == NULL) {
-        async_ctx_tmp = (struct trs_async_ctx *)calloc(1, sizeof(struct trs_async_ctx));
-        if (async_ctx_tmp == NULL) {
-            (void)pthread_mutex_unlock(&d2d_ctx_list->d2d_mutex);
-            trs_err("Alloc async_ctx failed. (local_devid=%u)\n", local_devid);
-            return DRV_ERROR_OUT_OF_MEMORY;
-        }
-        ret = trs_create_local_d2d_jetty(d2d_async_devid, sq_id, flag, async_ctx_tmp);
+    (void)pthread_mutex_lock(&urma_ctx->ctx_mutex);
+    if (!async_ctx->init_flag) {
+        ret = trs_create_local_d2d_jetty(d2d_async_devid, sq_id, flag, async_ctx);
         if (ret != 0) {
-            free(async_ctx_tmp);
-            (void)pthread_mutex_unlock(&d2d_ctx_list->d2d_mutex);
+            (void)pthread_mutex_unlock(&urma_ctx->ctx_mutex);
             trs_err("Failed to create local jetty. (local_devid=%u; ret=%d; flag=0x%x)\n", local_devid, ret, flag);
             return ret;
         }
-        async_ctx_tmp->src_devid = d2d_async_devid->src_devid;
-        async_ctx_tmp->dst_devid = d2d_async_devid->dst_devid;
-        async_ctx_tmp->recv_devid = remote_devid;
-        drv_user_list_add_tail(&async_ctx_tmp->node, &d2d_ctx_list->head);
-        trs_debug("Create local jetty success. (local_devid=%u; flag=0x%x; jetty_id=%u; fun_id=%u; die_id=%u)\n",
-            local_devid, flag, async_ctx_tmp->src_jetty_id.id, async_ctx_tmp->func_id, async_ctx_tmp->die_id);
+        async_ctx->init_flag = true;
+        create_local_flag = 1;
+        trs_debug("Create local jetty success. (devid=%u; flag=0x%x; sq_id=%u; jetty_id=%u; fun_id=%u; die_id=%u)\n",
+            local_devid, flag, sq_id, async_ctx->src_jetty_id.id, async_ctx->func_id, async_ctx->die_id);
     }
-    (void)pthread_mutex_unlock(&d2d_ctx_list->d2d_mutex);
+    (void)pthread_mutex_unlock(&urma_ctx->ctx_mutex);
 
     trs_dev_ctx_mutex_lock(remote_devid);
-    if (trs_getd2d_dev_ctx(remote_devid, local_devid) == NULL) {
+    if (trs_get_d2d_dev_ctx(remote_devid) == NULL) {
         struct trs_d2d_dev_ctx *d2d_dev_ctx = (struct trs_d2d_dev_ctx *)calloc(1, sizeof(struct trs_d2d_dev_ctx));
         if (d2d_dev_ctx == NULL) {
             trs_err("Alloc d2d_dev_ctx failed. (remote_devid=%u)\n", remote_devid);
@@ -878,7 +857,7 @@ static int trs_d2d_async_ctx_create(struct trs_async_devid *d2d_async_devid, str
             free(d2d_dev_ctx);
             goto free_local;
         }
-        trs_setd2d_dev_ctx(remote_devid, local_devid, (void *)d2d_dev_ctx);
+        trs_set_d2d_dev_ctx(remote_devid, (void *)d2d_dev_ctx);
         trs_debug("Create remote jetty success. (remote_devid=%u; sq_id=%u; flag=0x%x; jetty_id=%u)\n",
             remote_devid, sq_id, flag, d2d_dev_ctx->dst_jetty_id.id);
     }
@@ -888,35 +867,31 @@ static int trs_d2d_async_ctx_create(struct trs_async_devid *d2d_async_devid, str
 
 free_local:
     trs_dev_ctx_mutex_un_lock(remote_devid);
-    if (async_ctx_tmp != NULL) {
-        free(async_ctx_tmp);
-        (void)trs_destroy_local_d2d_jetty(local_devid, remote_devid, sq_id);
+    if (create_local_flag == 1) {
+        (void)pthread_mutex_lock(&urma_ctx->ctx_mutex);
+        (void)trs_destroy_local_d2d_jetty(local_devid, sq_id);
+        async_ctx->init_flag = false;
+        (void)pthread_mutex_unlock(&urma_ctx->ctx_mutex);
     }
     return ret;
 }
 
-static int trs_d2d_async_ctx_destroy(uint32_t dev_id, uint32_t sq_id, struct trs_d2d_ctx_list *d2d_ctx_list)
+static int trs_d2d_async_ctx_destroy(uint32_t dev_id, uint32_t sq_id, struct trs_urma_ctx *urma_ctx)
 {
-    struct trs_d2d_send_info info = {0};
-    struct trs_async_ctx *async_ctx = NULL;
-    struct list_head *node, *next;
     int ret;
 
-    info.pos = TRS_ASYNC_SEND_SIDE;
-    info.sq_id = sq_id;
-    list_for_each_safe(node, next, &d2d_ctx_list->head) {
-        async_ctx = list_entry(node, struct trs_async_ctx, node);
-        info.recv_dev_id = async_ctx->recv_devid;
-        ret = trs_destroy_local_d2d_jetty(dev_id, async_ctx->recv_devid, sq_id);
+    (void)pthread_mutex_lock(&urma_ctx->ctx_mutex);
+    if (urma_ctx->d2d_async_ctx.init_flag) {
+        ret = trs_destroy_local_d2d_jetty(dev_id, sq_id);
         if (ret != 0) {
+            (void)pthread_mutex_unlock(&urma_ctx->ctx_mutex);
             trs_err("Failed to destroy local jetty. (dev_id=%u; sq_id=%u; ret=%d)\n", dev_id, sq_id, ret);
             return ret;
         }
-        trs_debug("Destroy d2d jetty success. (dev_id=%u; sq_id=%u; recv_devid=%u; jetty_id=%u)\n",
-            dev_id, sq_id, info.recv_dev_id, async_ctx->src_jetty_id.id);
-        drv_user_list_del(&async_ctx->node);
-        free(async_ctx);
+        trs_debug("Destroy d2d jetty success. (dev_id=%u; sq_id=%u)\n", dev_id, sq_id);
+        urma_ctx->d2d_async_ctx.init_flag = false;
     }
+    (void)pthread_mutex_unlock(&urma_ctx->ctx_mutex);
 
     return 0;
 }
@@ -972,7 +947,7 @@ static int trs_async_init_async_ctx(struct trs_async_devid *async_devid, struct 
     int ret = 0;
 
     if (in->dir == TRS_ASYNC_DEVICE_TO_DEVICE) {
-        ret = trs_d2d_async_ctx_create(async_devid, &urma_ctx->d2d_ctx_list, in->sqId, sq_info->flag);
+        ret = trs_d2d_async_ctx_create(urma_ctx, async_devid, in->sqId, sq_info->flag);
         if (ret != 0) {
             return ret;
         }
@@ -1000,20 +975,13 @@ static int trs_async_init_async_ctx(struct trs_async_devid *async_devid, struct 
 int trs_async_uninit_async_ctx(uint32_t dev_id, uint32_t sq_id, void *master_ctx)
 {
     struct trs_urma_ctx *urma_ctx = (struct trs_urma_ctx *)master_ctx;
-    int ret = 0;
 
     if (urma_ctx->batch_2d_async_ctx.init_flag == true) {
         /* batch_2d jetty destroyed in sqcq remote free */
         urma_ctx->batch_2d_async_ctx.init_flag = false;
     }
 
-    (void)pthread_mutex_lock(&urma_ctx->d2d_ctx_list.d2d_mutex);
-    if (!drv_user_list_empty(&urma_ctx->d2d_ctx_list.head)) {
-        ret = trs_d2d_async_ctx_destroy(dev_id, sq_id, &urma_ctx->d2d_ctx_list);
-    }
-    (void)pthread_mutex_unlock(&urma_ctx->d2d_ctx_list.d2d_mutex);
-
-    return ret;
+    return trs_d2d_async_ctx_destroy(dev_id, sq_id, urma_ctx);
 }
 
 drvError_t trs_async_dma_wqe_create(uint32_t dev_id, struct trs_async_dma_input_para *in,
@@ -1090,7 +1058,7 @@ static drvError_t trs_async_dma_wqe_normal_destory(uint32_t dev_id, struct trs_u
         (void)urma_unregister_seg(wqe_info->async_tseg);
         trs_debug("Unregister seg. (dev_id=%u)\n", dev_id);
     }
-    async_ctx = trs_get_async_ctx(urma_ctx, wqe_info->dir, wqe_info->remote_dev_id, TRS_ASYNC_DMA_TYPE_NORMAL);
+    async_ctx = trs_get_async_ctx(urma_ctx, wqe_info->dir, TRS_ASYNC_DMA_TYPE_NORMAL);
     if (async_ctx == NULL) {
         trs_err("Not create. (dev_id=%u; sq_id=%u)\n", dev_id, para->sqId);
         return DRV_ERROR_UNINIT;
@@ -1099,7 +1067,6 @@ static drvError_t trs_async_dma_wqe_normal_destory(uint32_t dev_id, struct trs_u
     async_ctx->ci = (async_ctx->ci + 1) % trs_get_async_pi_ci_max(false);
     trs_debug("Async dma wqe destroy. (dev_id=%u; sq_id=%u; ci=%u; dir=%u)\n",
         dev_id, para->sqId, async_ctx->ci, wqe_info->dir);
-    trs_put_async_ctx(urma_ctx, wqe_info->dir, async_ctx);
     free(wqe_info);
     return 0;
 }
@@ -1151,12 +1118,34 @@ drvError_t trs_async_dma_wqe_destory(uint32_t dev_id, struct trs_async_dma_destr
     return ret;
 }
 
+drvError_t trs_async_ctx_pi_ci_reset(uint32_t dev_id, uint32_t sq_id)
+{
+    struct sqcq_usr_info *sq_info = NULL;
+    struct trs_urma_ctx *urma_ctx = NULL;
+
+    sq_info = trs_get_sq_info(dev_id, 0, DRV_NORMAL_TYPE, sq_id);
+    if (sq_info == NULL) {
+        trs_err("Invalid para. (dev_id=%u; sq_id=%u)\n", dev_id, sq_id);
+        return DRV_ERROR_INVALID_VALUE;
+    }
+
+    if (trs_is_async_jetty_wqe_sink(sq_info->flag) == false) {
+        return DRV_ERROR_NONE;
+    }
+
+    urma_ctx = (struct trs_urma_ctx *)sq_info->urma_ctx;
+    urma_ctx->async_ctx.pi = 0;
+    urma_ctx->async_ctx.ci = 0;
+
+    return DRV_ERROR_NONE;
+}
+
 drvError_t trs_sq_jetty_info_query(uint32_t dev_id, struct halSqCqQueryInfo *info)
 {
     struct sqcq_usr_info *sq_info = NULL;
     struct trs_async_ctx *async_ctx = NULL;
     struct trs_urma_ctx *urma_ctx = NULL;
-    uint32_t dir, remote_dev_id = 0;
+    uint32_t dir;
 
     sq_info = trs_get_sq_info(dev_id, info->tsId, info->type, info->sqId);
     if ((sq_info == NULL) || (sq_info->urma_ctx == NULL)) {
@@ -1171,7 +1160,7 @@ drvError_t trs_sq_jetty_info_query(uint32_t dev_id, struct halSqCqQueryInfo *inf
     urma_ctx = (struct trs_urma_ctx *)sq_info->urma_ctx;
     dir = (info->prop == DRV_SQCQ_PROP_D2D_ASYNC_JETTY_INFO) ? TRS_ASYNC_DEVICE_TO_DEVICE : TRS_ASYNC_HOST_TO_DEVICE;
 
-    async_ctx = trs_get_async_ctx(urma_ctx, dir, remote_dev_id, TRS_ASYNC_DMA_TYPE_NORMAL);
+    async_ctx = trs_get_async_ctx(urma_ctx, dir, TRS_ASYNC_DMA_TYPE_NORMAL);
     if (async_ctx == NULL) {
         trs_err("Failed to get async ctx. (dev_id=%u; sq_id=%u; prop=%d)\n", dev_id, info->sqId, info->prop);
         return DRV_ERROR_UNINIT;
@@ -1181,7 +1170,7 @@ drvError_t trs_sq_jetty_info_query(uint32_t dev_id, struct halSqCqQueryInfo *inf
     info->value[1] = async_ctx->src_jetty_id.id;                    /* 1: jetty id */
     info->value[2] = async_ctx->func_id;                            /* 2: func id */
     info->value[3] = async_ctx->die_id;                             /* 3: die id*/
-    trs_debug("Query jetty info. (devid=%u; sqid=%u; prop=%d; nop_num; jetty_id=%u; func_id=%u; die_id=%u)\n",
+    trs_debug("Query jetty info. (devid=%u; sqid=%u; prop=%d; nop_num=%u; jetty_id=%u; func_id=%u; die_id=%u)\n",
         dev_id, info->sqId, info->prop, info->value[0], info->value[1], info->value[2], info->value[3]);
 
     return DRV_ERROR_NONE;

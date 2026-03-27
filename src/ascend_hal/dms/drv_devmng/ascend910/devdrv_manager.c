@@ -31,9 +31,9 @@
 #include "dms_device_info.h"
 #include "dms_user_common.h"
 #include "ascend_dev_num.h"
-#include "dms/dms_qos_interface.h"
 #include "drv_devmng_adapt.h"
 #include "hbm_ctrl.h"
+#include "udis_user.h"
 
 #ifndef __linux
     #pragma comment(lib, "libc_sec.lib")
@@ -682,7 +682,7 @@ drvError_t drvGetDevInfo(uint32_t devId, struct devdrv_device_info *info)
     }
 
     info->ai_core_num = dev_info.ai_core_num;
-    info->ai_core_freq = dev_info.aicore_freq;
+    info->ai_core_freq = (unsigned int)dev_info.aicore_freq;
     info->ai_cpu_core_num = dev_info.ai_cpu_core_num;
     info->ctrl_cpu_ip = dev_info.ctrl_cpu_ip;
     info->ctrl_cpu_id = dev_info.ctrl_cpu_id;
@@ -701,7 +701,7 @@ drvError_t drvGetDevInfo(uint32_t devId, struct devdrv_device_info *info)
     info->chip_id = dev_info.chip_id;
     info->die_id = dev_info.die_id;
     info->vector_core_num = dev_info.vector_core_num;
-    info->vector_core_freq = dev_info.vector_core_freq;
+    info->vector_core_freq = (unsigned int)dev_info.vector_core_freq;
     info->addr_mode = dev_info.addr_mode;
     info->mainboard_id = dev_info.mainboard_id;
     info->product_type = dev_info.product_type;
@@ -810,7 +810,7 @@ STATIC drvError_t drv_get_h2d_dev_info(uint32_t devId, struct devdrv_device_info
 #endif
 
     info->ai_core_num = dev_info.ai_core_num;
-    info->ai_core_freq = dev_info.aicore_freq;
+    info->ai_core_freq = (unsigned int)dev_info.aicore_freq;
     info->ai_cpu_core_num = dev_info.ai_cpu_core_num;
     info->ctrl_cpu_ip = dev_info.ctrl_cpu_ip;
     info->ctrl_cpu_id = dev_info.ctrl_cpu_id;
@@ -945,11 +945,15 @@ STATIC drvError_t drv_get_system_info(uint32_t devId, int32_t info_type, int64_t
     switch (info_type) {
         case INFO_TYPE_ENV:
         case INFO_TYPE_CORE_NUM:
-        case INFO_TYPE_PHY_CHIP_ID:
-        case INFO_TYPE_PHY_DIE_ID:
         case INFO_TYPE_ADDR_MODE:
             return drv_get_info_from_dev_info(devId, info_type, value);
-
+        case INFO_TYPE_PHY_CHIP_ID:
+        case INFO_TYPE_PHY_DIE_ID:
+#ifdef CFG_FEATURE_SDID_INFO_FROM_SYSTOPO
+            return dms_get_spod_item(devId, info_type, value);
+#else
+            return drv_get_info_from_dev_info(devId, info_type, value);
+#endif
         case INFO_TYPE_MAINBOARD_ID:
 #ifdef CFG_FEATURE_HW_INFO_FROM_BIOS
             return drv_get_info_from_dev_info(devId, info_type, value);
@@ -968,7 +972,8 @@ STATIC drvError_t drv_get_system_info(uint32_t devId, int32_t info_type, int64_t
         case INFO_TYPE_MASTERID:
             ret = DmsGetMasterDevInTheSameOs(devId, &tmp);
             if (ret != 0) {
-                DEVDRV_DRV_ERR("drvGetMasterDeviceInTheSameOS failed. (dev_id=%u; ret=%d)\n", devId, ret);
+                DEVDRV_DRV_EX_NOTSUPPORT_ERR(ret, "drvGetMasterDeviceInTheSameOS failed. (dev_id=%u; ret=%d)\n",
+                    devId, ret);
                 return ret;
             }
 
@@ -982,7 +987,7 @@ STATIC drvError_t drv_get_system_info(uint32_t devId, int32_t info_type, int64_t
                 DEVDRV_DRV_ERR("drvGetDevInfo failed. (dev_id=%u; ret=%d)\n", devId, ret);
                 return ret;
             }
-            *value = (info_type == INFO_TYPE_SYS_COUNT ? info.cpu_system_count : info.monotonic_raw_time_ns);
+            *value = (int64_t)(info_type == INFO_TYPE_SYS_COUNT ? info.cpu_system_count : info.monotonic_raw_time_ns);
             break;
 
         case INFO_TYPE_HOST_OSC_FREQUE:
@@ -992,7 +997,7 @@ STATIC drvError_t drv_get_system_info(uint32_t devId, int32_t info_type, int64_t
                 return ret;
             }
 
-            *value = osc_freq;
+            *value = (int64_t)osc_freq;
             break;
         case INFO_TYPE_SDID:
         case INFO_TYPE_SERVER_ID:
@@ -1473,7 +1478,7 @@ STATIC drvError_t drv_get_pcieinfo(uint32_t devId, int32_t info_type, int64_t *v
             return ret;
         }
         /* obtain the lower eight bits of bus */
-        *value = (((((uint32_t)dev) & 0x1f) << PCIE_NUM) | ((uint32_t)(func) & 0x07) | (((uint32_t)(bus) & 0xff) << 8));
+        *value = (((((uint32_t)dev) & 0x1f) << PCIE_NUM) | ((uint32_t)(func) & 0x07) | (((uint32_t)(bus) & 0xff) << 8u));
     } else if (info_type == INFO_TYPE_P2P_CAPABILITY) {
         ret = DmsGetP2PCapbility(devId, (unsigned long long *)&val);
         if (ret != 0) {
@@ -1608,7 +1613,6 @@ STATIC drvError_t drv_get_qos_info(uint32_t devId, int32_t info_type, void *buf,
         default:
             DEVDRV_DRV_INFO("This version does not support this type. (dev_id=%u, Type=%d)\n", devId, info_type);
             return DRV_ERROR_INVALID_VALUE;
-
     }
     return DRV_ERROR_NONE;
 #else
@@ -1845,11 +1849,11 @@ STATIC drvError_t drv_get_system_info_ex(uint32_t devId, int32_t info_type, void
     return ret;
 }
 
-drvError_t halGetDeviceInfoByBuff(uint32_t devId, int32_t module_type, int32_t info_type, void *buf, int32_t *size)
+drvError_t halGetDeviceInfoByBuff(uint32_t devId, int32_t moduleType, int32_t infoType, void *buf, int32_t *size)
 {
     int ret;
-    DEV_MODULE_TYPE mtype = module_type;
-    DEV_INFO_TYPE itype = info_type;
+    DEV_MODULE_TYPE mtype = moduleType;
+    DEV_INFO_TYPE itype = infoType;
 
     if (devId >= ASCEND_DEV_MAX_NUM || buf == NULL || size == NULL) {
         DEVDRV_DRV_ERR("invalid parameter. (dev_id=%u, buf%s, size%s)\n",
@@ -1991,6 +1995,53 @@ STATIC drvError_t drv_set_sdk_ex_version(unsigned int dev_id, const void *buf, u
     return DRV_ERROR_NONE;
 }
 
+STATIC drvError_t drv_event_resume(unsigned int dev_id, const void *buf, unsigned int size)
+{
+#ifdef CFG_EDGE_HOST
+    struct urd_cmd cmd = {0};
+    struct urd_cmd_para cmd_para = {0};
+    struct dms_filter_st filter = {0};
+    struct dms_hal_device_info_stru in = {0};
+    struct dms_hal_device_info_stru out = {0};
+    int ret;
+
+    if ((buf == NULL) || (size != sizeof(struct hal_fault_event_resume))) {
+        DEVDRV_DRV_ERR("Invalid parameter. (dev_id=%u; buf=%s; size=%u; expect_size=%u)\n", dev_id,
+            (buf == NULL) ? "NULL" : "OK", size, sizeof(struct hal_fault_event_resume));
+        return DRV_ERROR_INVALID_VALUE;
+    }
+
+    in.dev_id = dev_id;
+    in.module_type = MODULE_TYPE_SYSTEM;
+    in.info_type = INFO_TYPE_EVENT_RESUME;
+    in.buff_size = size;
+    ret = memcpy_s((void *)in.payload, sizeof(struct hal_fault_event_resume), buf, size);
+    if (ret != 0) {
+        DEVDRV_DRV_ERR("Memcpy buf to payload failed. (dev_id=%u; ret=%d)\n", dev_id, ret);
+        return  DRV_ERROR_INNER_ERR;
+    }
+
+    DMS_MAKE_UP_FILTER_HAL_DEV_INFO_EX(&filter, MODULE_TYPE_SYSTEM, INFO_TYPE_EVENT_RESUME);
+    urd_usr_cmd_fill(&cmd, DMS_GET_SET_DEVICE_INFO_CMD, ZERO_CMD, &filter.filter[0], filter.filter_len);
+    urd_usr_cmd_para_fill(&cmd_para, (void *)&in, sizeof(struct dms_hal_device_info_stru),
+            (void *)&out, sizeof(struct dms_hal_device_info_stru));
+    ret = urd_dev_usr_cmd(dev_id, &cmd, &cmd_para);
+    if (ret != 0) {
+        DMS_EX_NOTSUPPORT_ERR(ret, "Resume fault event failed. (dev_id=%u; ret=%d)\n", dev_id, ret);
+        return ret;
+    }
+
+    DEVDRV_DRV_EVENT("Resume fault event success. (dev_id=%u)\n", dev_id);
+
+    return DRV_ERROR_NONE;
+#else
+    (void)dev_id;
+    (void)buf;
+    (void)size;
+    return DRV_ERROR_NOT_SUPPORT;
+#endif
+}
+
 STATIC drvError_t drv_set_system_info_ex(uint32_t devId, int32_t info_type, void *buf, unsigned int size)
 {
     int ret = DRV_ERROR_NOT_SUPPORT;
@@ -1999,23 +2050,28 @@ STATIC drvError_t drv_set_system_info_ex(uint32_t devId, int32_t info_type, void
         case INFO_TYPE_SDK_EX_VERSION:
             ret = drv_set_sdk_ex_version(devId, buf, size);
             break;
+
+        case INFO_TYPE_EVENT_RESUME:
+            ret = drv_event_resume(devId, buf, size);
+            break;
+
         default:
             return DRV_ERROR_NOT_SUPPORT;
     }
 
     if (ret != 0) {
-        DEVDRV_DRV_EX_NOTSUPPORT_ERR(ret, "Failed to set extend version info. (dev_id=%u, infoType=%d, ret=%d, size=%u)\n",
+        DEVDRV_DRV_EX_NOTSUPPORT_ERR(ret, "Failed to set system info. (dev_id=%u; infoType=%d; ret=%d; size=%u)\n",
             devId, info_type, ret, size);
     }
 
     return ret;
 }
 
-drvError_t halSetDeviceInfoByBuff(uint32_t devId, int32_t module_type, int32_t info_type, void *buf, int32_t size)
+drvError_t halSetDeviceInfoByBuff(uint32_t devId, int32_t moduleType, int32_t infoType, void *buf, int32_t size)
 {
     int ret;
-    DEV_MODULE_TYPE mtype = module_type;
-    DEV_INFO_TYPE itype = info_type;
+    DEV_MODULE_TYPE mtype = moduleType;
+    DEV_INFO_TYPE itype = infoType;
 
     if (devId >= ASCEND_DEV_MAX_NUM || buf == NULL || size <= 0) {
         DEVDRV_DRV_ERR("invalid parameter. (dev_id=%u;buf=%d;size=%d)\n", devId, buf != NULL, size);
@@ -2024,7 +2080,7 @@ drvError_t halSetDeviceInfoByBuff(uint32_t devId, int32_t module_type, int32_t i
 
     switch (mtype) {
         case MODULE_TYPE_LP:
-            ret = drv_set_lp_info(devId, itype, buf, size);
+            ret = drv_set_lp_info(devId, itype, buf, (unsigned int)size);
             break;
 
         case MODULE_TYPE_L2BUFF:
@@ -2052,26 +2108,34 @@ drvError_t halSetDeviceInfoByBuff(uint32_t devId, int32_t module_type, int32_t i
 static int hal_get_device_info_para_check(uint32_t devId, int32_t module_type, int32_t info_type, int64_t *value)
 {
     if ((module_type == MODULE_TYPE_SYSTEM) && (info_type == INFO_TYPE_SPOD_VNIC_IP)) {
-        /* input devId is sdid, no need check*/
-        return 0;
+        /* input devId is sdid, no need check */
+    } else if ((module_type == MODULE_TYPE_SYSTEM) && (info_type == INFO_TYPE_VNIC_IP)) {
+        if (devId >= ASCEND_HOST_PDEV_MAX_NUM) {
+            DEVDRV_DRV_ERR("Invalid parameter. (devId=%u; max_host_dev_id=%u)\n", devId, ASCEND_HOST_PDEV_MAX_NUM);
+            return DRV_ERROR_INVALID_VALUE;
+        }
+    } else {
+        if (devId >= ASCEND_DEV_MAX_NUM) {
+            DEVDRV_DRV_ERR("Invalid parameter. (devId=%u; max_dev_id=%u)\n", devId, ASCEND_DEV_MAX_NUM);
+            return DRV_ERROR_INVALID_VALUE;
+        }
     }
 
-    if (devId >= ASCEND_DEV_MAX_NUM || value == NULL) {
-        DEVDRV_DRV_ERR("Invalid parameter. (devId=%u; max_dev_id=%u; value_is_null=%d)\n",
-            devId, ASCEND_DEV_MAX_NUM, (value == NULL));
+    if (value == NULL) {
+        DEVDRV_DRV_ERR("Invalid parameter. (value_is_null=%d)\n", (value == NULL));
         return DRV_ERROR_INVALID_VALUE;
     }
 
     return 0;
 }
 
-drvError_t halGetDeviceInfo(uint32_t devId, int32_t module_type, int32_t info_type, int64_t *value)
+drvError_t halGetDeviceInfo(uint32_t devId, int32_t moduleType, int32_t infoType, int64_t *value)
 {
     int ret;
-    DEV_INFO_TYPE itype = info_type;
-    DEV_MODULE_TYPE mtype = module_type;
+    DEV_INFO_TYPE itype = infoType;
+    DEV_MODULE_TYPE mtype = moduleType;
 
-    if (hal_get_device_info_para_check(devId, module_type, info_type, value) != 0) {
+    if (hal_get_device_info_para_check(devId, moduleType, infoType, value) != 0) {
         return DRV_ERROR_INVALID_VALUE;
     }
 
@@ -2109,12 +2173,12 @@ drvError_t halGetDeviceInfo(uint32_t devId, int32_t module_type, int32_t info_ty
             break;
 
         case MODULE_TYPE_COMPUTING:
-            ret = drv_get_device_computing_power(devId, info_type, value);
+            ret = drv_get_device_computing_power(devId, infoType, value);
             break;
 
         case MODULE_TYPE_HOST_AICPU:
 #if (defined DRV_HOST) && (defined CFG_FEATURE_HOST_AICPU)
-            ret = drv_get_host_aicpu_info(devId, info_type, value);
+            ret = drv_get_host_aicpu_info(devId, infoType, value);
             break;
 #else
             return DRV_ERROR_NOT_SUPPORT;
@@ -2160,6 +2224,16 @@ STATIC drvError_t drv_get_sys_info_by_phy_id(uint32_t phy_id, int32_t info_type,
             }
             *value = (int64_t)tmp_value;
             break;
+        case PHY_INFO_TYPE_PHY_CHIP_ID:
+        case PHY_INFO_TYPE_PHY_DIE_ID:
+            ret = dms_get_phy_dev_info(phy_id, info_type, &tmp_value);
+            if (ret != 0) {
+                DEVDRV_DRV_EX_NOTSUPPORT_ERR(ret, "Failed to obtain physical device info. (phy_id=%u; ret=%d)\n",
+                    phy_id, ret);
+                return ret;
+            }
+            *value = (int64_t)tmp_value;
+            break;
         default:
             DEVDRV_DRV_ERR("invalid parameter. (info_type=%d; phy_id=%u)\n", info_type, phy_id);
             return DRV_ERROR_INVALID_VALUE;
@@ -2168,20 +2242,20 @@ STATIC drvError_t drv_get_sys_info_by_phy_id(uint32_t phy_id, int32_t info_type,
     return DRV_ERROR_NONE;
 }
 
-drvError_t halGetPhyDeviceInfo(uint32_t phy_id, int32_t module_type, int32_t info_type, int64_t *value)
+drvError_t halGetPhyDeviceInfo(uint32_t phyId, int32_t moduleType, int32_t infoType, int64_t *value)
 {
     int ret;
-    DEV_MODULE_TYPE mtype = module_type;
-    DEV_INFO_TYPE itype = info_type;
+    DEV_MODULE_TYPE mtype = moduleType;
+    DEV_INFO_TYPE itype = infoType;
 
-    if (phy_id >= ASCEND_DEV_MAX_NUM || value == NULL) {
-        DEVDRV_DRV_ERR("invalid parameter, value is NULL or phy_id(%u) is invalid\n", phy_id);
+    if (phyId >= ASCEND_DEV_MAX_NUM || value == NULL) {
+        DEVDRV_DRV_ERR("invalid parameter, value is NULL or phy_id(%u) is invalid\n", phyId);
         return DRV_ERROR_INVALID_VALUE;
     }
 
     switch (mtype) {
         case MODULE_TYPE_SYSTEM:
-            ret = drv_get_sys_info_by_phy_id(phy_id, itype, value);
+            ret = drv_get_sys_info_by_phy_id(phyId, itype, value);
             break;
 
         default:
@@ -2190,13 +2264,13 @@ drvError_t halGetPhyDeviceInfo(uint32_t phy_id, int32_t module_type, int32_t inf
     }
     if (ret != 0) {
         DEVDRV_DRV_EX_NOTSUPPORT_ERR(ret, "Get device info failed. (ret=%d; module_type=%d; info_type=%d; phy_id=%u)\n",
-                       ret, mtype, itype, phy_id);
+                       ret, mtype, itype, phyId);
         return ret;
     }
     return DRV_ERROR_NONE;
 }
 
-drvError_t halGetPairDevicesInfo(uint32_t devId, uint32_t other_dev_id, int32_t info_type, int64_t *value)
+drvError_t halGetPairDevicesInfo(uint32_t devId, uint32_t otherDevId, int32_t infoType, int64_t *value)
 {
 #ifdef DRV_HOST
     int ret;
@@ -2207,37 +2281,36 @@ drvError_t halGetPairDevicesInfo(uint32_t devId, uint32_t other_dev_id, int32_t 
         return DRV_ERROR_INVALID_VALUE;
     }
 
-    if ((drvCheckDevid(devId) != 0) || (drvCheckDevid(other_dev_id) != 0)) {
-        DEVDRV_DRV_ERR("Device id check failed. (devId=%u; other_dev_id=%u)\n", devId, other_dev_id);
+    if ((drvCheckDevid(devId) != 0) || (drvCheckDevid(otherDevId) != 0)) {
+        DEVDRV_DRV_ERR("Device id check failed. (devId=%u; other_dev_id=%u)\n", devId, otherDevId);
         return DRV_ERROR_INVALID_VALUE;
     }
 
-    if (info_type == DEVS_INFO_TYPE_TOPOLOGY) {
-        ret = dms_get_device_topology(devId, other_dev_id, &topology_type);
+    if (infoType == DEVS_INFO_TYPE_TOPOLOGY) {
+        ret = dms_get_device_topology(devId, otherDevId, &topology_type);
         if (ret != 0) {
             DEVDRV_DRV_EX_NOTSUPPORT_ERR(ret, "Get device topology failed. (dev_id=%u; dev_id_other=%u; ret=%d)\n",
-                devId, other_dev_id, ret);
+                devId, otherDevId, ret);
             return ret;
         }
 
         *value = topology_type;
-        DEVDRV_DRV_DEBUG("Get topology type success. (dev_id=%u; dev_id_other=%u)\n", devId, other_dev_id);
+        DEVDRV_DRV_DEBUG("Get topology type success. (dev_id=%u; dev_id_other=%u)\n", devId, otherDevId);
     } else {
-        DEVDRV_DRV_ERR("Invalid info type. (info_type=%d)\n", info_type);
+        DEVDRV_DRV_ERR("Invalid info type. (info_type=%d)\n", infoType);
         return DRV_ERROR_INVALID_VALUE;
     }
 
     return DRV_ERROR_NONE;
 #else
     (void)devId;
-    (void)other_dev_id;
-    (void)info_type;
+    (void)otherDevId;
+    (void)infoType;
     (void)value;
     return DRV_ERROR_NOT_SUPPORT;
 #endif
 }
-
-drvError_t halGetPairPhyDevicesInfo(uint32_t phyDevid, uint32_t other_phy_devid, int32_t info_type, int64_t *value)
+drvError_t halGetPairPhyDevicesInfo(uint32_t devId, uint32_t otherDevId, int32_t infoType, int64_t *value)
 {
 #if (defined CFG_FEATURE_PHY_DEVICES_TOPO) && (defined DRV_HOST)
     int ret;
@@ -2248,11 +2321,11 @@ drvError_t halGetPairPhyDevicesInfo(uint32_t phyDevid, uint32_t other_phy_devid,
         return DRV_ERROR_INVALID_VALUE;
     }
 
-    if (info_type == DEVS_INFO_TYPE_TOPOLOGY) {
-        ret = dms_get_phy_devices_topology(phyDevid, other_phy_devid, &topology_type);
+    if (infoType == DEVS_INFO_TYPE_TOPOLOGY) {
+        ret = dms_get_phy_devices_topology(devId, otherDevId, &topology_type);
         if (ret != 0) {
             DEVDRV_DRV_EX_NOTSUPPORT_ERR(ret, "Failed to get devices topology info."
-                "(dev_id=%u; dev_id_other=%u; ret=%d)\n", phyDevid, other_phy_devid, ret);
+                "(dev_id=%u; dev_id_other=%u; ret=%d)\n", devId, otherDevId, ret);
             return ret;
         }
 
@@ -2263,9 +2336,9 @@ drvError_t halGetPairPhyDevicesInfo(uint32_t phyDevid, uint32_t other_phy_devid,
 
     return DRV_ERROR_NONE;
 #else
-    (void)phyDevid;
-    (void)other_phy_devid;
-    (void)info_type;
+    (void)devId;
+    (void)otherDevId;
+    (void)infoType;
     (void)value;
     return DRV_ERROR_NOT_SUPPORT;
 #endif
@@ -2368,12 +2441,58 @@ STATIC int drv_get_resource_info_ioctl(u32 devid, struct dsmi_resource_para *par
     return 0;
 }
 
+STATIC int udis_get_resource_info(u32 devid, struct dsmi_resource_para *para, struct dsmi_resource_info *info)
+{
+    int ret = 0;
+    struct udis_dev_info udis_info = {0};
+
+    if (para->owner_type == DSMI_PROCESS_RESOURCE && para->resource_type == DSMI_DEV_PROCESS_MEM) {
+        udis_info.module_type = UDIS_MODULE_SVM;
+        ret = sprintf_s(udis_info.name, UDIS_MAX_NAME_LEN, "%08xmem", para->owner_id);
+        if (ret < 0) {
+            DEVDRV_DRV_ERR("Failed to invoke sprintf_s to copy info name. (device_id=%d; ret=%d)\n",
+                devid, ret);
+            return DRV_ERROR_PARA_ERROR;
+        }
+    } else {
+        return DRV_ERROR_NOT_SUPPORT;
+    }
+
+    ret = udis_get_device_info(devid, &udis_info);
+    if (ret != 0) {
+        DEVDRV_DRV_EX_NOTSUPPORT_ERR(ret, "Failed to get udis info. (dev_id=%d; module_type=%u; name=%s; ret=%d)\n",
+            devid, udis_info.module_type, udis_info.name, ret);
+        return ret;
+    }
+
+    if (udis_info.data_len != info->buf_len) {
+        DEVDRV_DRV_ERR("Data len is not equal to bufsize(dev_id=%d; module_type=%u; name=%s; data_len=%u, buf_size=%u)\n",
+            devid, udis_info.module_type, udis_info.name, udis_info.data_len, info->buf_len);
+        return DRV_ERROR_PARA_ERROR;
+    }
+
+    ret = memcpy_s(info->buf, info->buf_len, udis_info.data, udis_info.data_len);
+    if (ret != 0) {
+        DEVDRV_DRV_ERR("Failed to invoke memcpy_s to copy data. (dev_id=%d; module_type=%u; name=%s; ret=%d)\n",
+            devid, udis_info.module_type, udis_info.name, ret);
+        return DRV_ERROR_PARA_ERROR;
+    }
+
+    DEVDRV_DRV_DEBUG("success udis get resource info. (dev_id=%d; name=%s)\n", devid, udis_info.name);
+    return 0;
+}
+
 drvError_t drvGetDeviceResourceInfo(u32 devid, struct dsmi_resource_para *para, struct dsmi_resource_info *info)
 {
     int ret = 0;
 
     ret = drv_resource_info_para_check(devid, para, info);
     if (ret != 0) {
+        return ret;
+    }
+
+    ret = udis_get_resource_info(devid, para, info);
+    if (ret == 0) {
         return ret;
     }
 
@@ -2843,7 +2962,7 @@ drvError_t drvDeviceResetInform(uint32_t devid)
 }
 
 #ifdef CFG_SOC_PLATFORM_CLOUD
-drvError_t drvGetDeviceModuleStatus(uint32_t devId, drvModuleStatus_t *module_status)
+drvError_t drvGetDeviceModuleStatus(uint32_t devId, drvModuleStatus_t *moduleStatus)
 {
     struct devdrv_module_status status = {0};
     int ret;
@@ -2856,7 +2975,7 @@ drvError_t drvGetDeviceModuleStatus(uint32_t devId, drvModuleStatus_t *module_st
 
     status.devid = devId;
 #else
-drvError_t drvGetDeviceModuleStatus(drvModuleStatus_t *module_status)
+drvError_t drvGetDeviceModuleStatus(drvModuleStatus_t *moduleStatus)
 {
     struct devdrv_module_status status = {0};
     int ret;
@@ -2865,12 +2984,12 @@ drvError_t drvGetDeviceModuleStatus(drvModuleStatus_t *module_status)
     status.devid = 0;
 #endif
 
-    if (module_status == NULL) {
+    if (moduleStatus == NULL) {
         DEVDRV_DRV_ERR("moduleStatus is NULL.\n");
         return DRV_ERROR_INVALID_HANDLE;
     }
 
-    ret = memset_s((void *)module_status, sizeof(drvModuleStatus_t), 0, sizeof(drvModuleStatus_t));
+    ret = memset_s((void *)moduleStatus, sizeof(drvModuleStatus_t), 0, sizeof(drvModuleStatus_t));
     if (ret != EOK) {
         DEVDRV_DRV_ERR("memset_s failed, ret(%d).\n", ret);
         return DRV_ERROR_INVALID_VALUE;
@@ -2884,29 +3003,29 @@ drvError_t drvGetDeviceModuleStatus(drvModuleStatus_t *module_status)
     }
 
     /* cloud hasn't lpm3, value about lpm3 always be 0 */
-    module_status->ai_core_error_bitmap = status.ai_core_error_bitmap;
-    module_status->lpm3_start_fail = status.lpm3_start_fail;
-    module_status->lpm3_lost_heart_beat = status.lpm3_lost_heart_beat;
-    module_status->ts_start_fail = status.ts_start_fail;
-    module_status->ts_lost_heart_beat = status.ts_lost_heart_beat;
-    module_status->ts_sram_broken = status.ts_sram_broken;
-    module_status->ts_sdma_broken = status.ts_sdma_broken;
-    module_status->ts_bs_broken = status.ts_bs_broken;
-    module_status->ts_l2_buf0_broken = status.ts_l2_buf0_broken;
-    module_status->ts_l2_buf1_broken = status.ts_l2_buf1_broken;
-    module_status->ts_spcie_broken = status.ts_spcie_broken;
-    module_status->ts_ai_core_broken = status.ts_ai_core_broken;
-    module_status->ts_hwts_broken = status.ts_hwts_broken;
-    module_status->ts_doorbell_broken = status.ts_doorbell_broken;
+    moduleStatus->ai_core_error_bitmap = status.ai_core_error_bitmap;
+    moduleStatus->lpm3_start_fail = status.lpm3_start_fail;
+    moduleStatus->lpm3_lost_heart_beat = status.lpm3_lost_heart_beat;
+    moduleStatus->ts_start_fail = status.ts_start_fail;
+    moduleStatus->ts_lost_heart_beat = status.ts_lost_heart_beat;
+    moduleStatus->ts_sram_broken = status.ts_sram_broken;
+    moduleStatus->ts_sdma_broken = status.ts_sdma_broken;
+    moduleStatus->ts_bs_broken = status.ts_bs_broken;
+    moduleStatus->ts_l2_buf0_broken = status.ts_l2_buf0_broken;
+    moduleStatus->ts_l2_buf1_broken = status.ts_l2_buf1_broken;
+    moduleStatus->ts_spcie_broken = status.ts_spcie_broken;
+    moduleStatus->ts_ai_core_broken = status.ts_ai_core_broken;
+    moduleStatus->ts_hwts_broken = status.ts_hwts_broken;
+    moduleStatus->ts_doorbell_broken = status.ts_doorbell_broken;
 
     return DRV_ERROR_NONE;
 }
 
-drvError_t drvGetCpuInfo(uint32_t devId, drvCpuInfo_t *cpu_info)
+drvError_t drvGetCpuInfo(uint32_t devId, drvCpuInfo_t *cpuInfo)
 {
     int ret;
 
-    if (cpu_info == NULL) {
+    if (cpuInfo == NULL) {
         DEVDRV_DRV_ERR("cpuInfo is NULL. devid(%u)\n", devId);
         return DRV_ERROR_INVALID_HANDLE;
     }
@@ -2916,7 +3035,7 @@ drvError_t drvGetCpuInfo(uint32_t devId, drvCpuInfo_t *cpu_info)
         return DRV_ERROR_INVALID_VALUE;
     }
 
-    ret = DmsGetCpuInfo(devId, cpu_info);
+    ret = DmsGetCpuInfo(devId, cpuInfo);
     if (ret != 0) {
         DEVDRV_DRV_EX_NOTSUPPORT_ERR(ret, "dms get cpu info failed. (devid=%u; ret=%d)\n", devId, ret);
         return ret;
@@ -2955,7 +3074,7 @@ int drvGetRuntimeApiVer(void)
 }
 #endif
 
-drvError_t halGetOnlineDevList(unsigned int *dev_buf, unsigned int buf_cnt, unsigned int *dev_cnt)
+drvError_t halGetOnlineDevList(unsigned int *devBuf, unsigned int bufCnt, unsigned int *devCnt)
 {
     int ret;
     int i = 0;
@@ -2963,7 +3082,7 @@ drvError_t halGetOnlineDevList(unsigned int *dev_buf, unsigned int buf_cnt, unsi
     unsigned int dev_buf_tmp[ASCEND_DEV_MAX_NUM] = {0};
     unsigned int valid_dev_num = 0;
 
-    if ((dev_buf == NULL) || (dev_cnt == NULL)) {
+    if ((devBuf == NULL) || (devCnt == NULL)) {
         DEVDRV_DRV_ERR("input para is NULL.\n");
         return DRV_ERROR_INVALID_VALUE;
     }
@@ -2991,16 +3110,16 @@ drvError_t halGetOnlineDevList(unsigned int *dev_buf, unsigned int buf_cnt, unsi
         }
     }
 
-    if (buf_cnt < valid_dev_num) {
-        DEVDRV_DRV_ERR("buf_cnt[%u] is shorter than actual dev_num[%u].\n", buf_cnt, valid_dev_num);
+    if (bufCnt < valid_dev_num) {
+        DEVDRV_DRV_ERR("buf_cnt[%u] is shorter than actual dev_num[%u].\n", bufCnt, valid_dev_num);
         return DRV_ERROR_INVALID_VALUE;
     }
 
-    *dev_cnt = valid_dev_num;
-    ret = memcpy_s(dev_buf, buf_cnt * sizeof(unsigned int),
-                   dev_buf_tmp, *dev_cnt * sizeof(unsigned int));
+    *devCnt = valid_dev_num;
+    ret = memcpy_s(devBuf, bufCnt * sizeof(unsigned int),
+                   dev_buf_tmp, *devCnt * sizeof(unsigned int));
     if (ret != EOK) {
-        DEVDRV_DRV_ERR("buf_cnt[%u] is shorter than actual dev_num[%u].\n", buf_cnt, valid_dev_num);
+        DEVDRV_DRV_ERR("buf_cnt[%u] is shorter than actual dev_num[%u].\n", bufCnt, valid_dev_num);
         return DRV_ERROR_NO_DEVICE;
     }
 
@@ -3245,7 +3364,7 @@ drvError_t drvQueryProcessHostPid(int pid, unsigned int *chip_id, unsigned int *
 }
 #endif
 
-drvError_t drvMngGetConsoleLogLevel(unsigned int *log_level)
+drvError_t drvMngGetConsoleLogLevel(unsigned int *logLevel)
 {
     int error = 0;
     mmProcess fd;
@@ -3257,7 +3376,7 @@ drvError_t drvMngGetConsoleLogLevel(unsigned int *log_level)
         return DRV_ERROR_INVALID_HANDLE;
     }
 
-    ret = ioctl(fd, DEVDRV_MANAGER_GET_CONSOLE_LOG_LEVEL, log_level);
+    ret = ioctl(fd, DEVDRV_MANAGER_GET_CONSOLE_LOG_LEVEL, logLevel);
     if (ret != 0) {
         if (__errno_location() != NULL) {
             error = errno;
@@ -3315,14 +3434,14 @@ drvError_t drvUpdateDeviceStatus(unsigned int dev_id, unsigned int device_status
     return DRV_ERROR_NONE;
 }
 
-drvError_t drvDeviceHealthStatus(uint32_t devId, unsigned int *health_status)
+drvError_t drvDeviceHealthStatus(uint32_t devId, unsigned int *healthStatus)
 {
     int ret;
     mmIoctlBuf para_buf = {0};
     struct devdrv_device_health_status para = {0};
 
-    if (devId >= ASCEND_DEV_MAX_NUM || health_status == NULL) {
-        DEVDRV_DRV_ERR("Parameter is invalid. (devId=%u; status_is_null=%d)\n", devId, (health_status == NULL));
+    if (devId >= ASCEND_DEV_MAX_NUM || healthStatus == NULL) {
+        DEVDRV_DRV_ERR("Parameter is invalid. (devId=%u; status_is_null=%d)\n", devId, (healthStatus == NULL));
         return DRV_ERROR_INVALID_VALUE;
     }
 
@@ -3334,7 +3453,7 @@ drvError_t drvDeviceHealthStatus(uint32_t devId, unsigned int *health_status)
         return DRV_ERROR_IOCRL_FAIL;
     }
 
-    *health_status = para.device_health_status;
+    *healthStatus = para.device_health_status;
 
     return DRV_ERROR_NONE;
 }
@@ -3676,9 +3795,14 @@ drvError_t drvQueryDeviceInfo(unsigned int dev_id, unsigned int main_cmd,
 #if (defined DRV_HOST) && (defined CFG_FEATURE_HOST_AICPU)
         {DSMI_MAIN_CMD_HOST_AICPU, DSMI_SUB_CMD_HOST_AICPU_INFO, DmsGetHostAicpuInfo},
         {DSMI_MAIN_CMD_HCCS, DSMI_HCCS_CMD_GET_CREDIT_INFO, DmsGetDeviceInfoEx},
+#endif
+#if (defined DRV_HOST) && (defined CFG_FEATURE_HOST_TS)
         {DSMI_MAIN_CMD_TS, DSMI_TS_SUB_CMD_COMMON_MSG, DmsGetTsInfoEx},
 #endif
         {DSMI_MAIN_CMD_CHIP_INF, DSMI_CHIP_INF_SUB_CMD_SPOD_INFO, dms_get_spod_info},
+#ifdef CFG_FEATURE_GET_DEV_INDEX_IN_GROUP
+        {DSMI_MAIN_CMD_CHIP_INF, DSMI_CHIP_INF_SUB_CMD_INDEX_IN_GROUP, DmsGetIndexInGroup},
+#endif
         {DSMI_MAIN_CMD_HCCS, DSMI_HCCS_CMD_GET_PING_INFO, dms_get_spod_ping_info},
 #if (defined DRV_HOST)
         {DSMI_MAIN_CMD_CHIP_INF, DSMI_CHIP_INF_SUB_CMD_SPOD_NODE_STATUS, dms_get_spod_node_status},
@@ -3721,6 +3845,8 @@ drvError_t drvSetDeviceInfo(unsigned int dev_id, unsigned int main_cmd,
 #endif
 #if (defined DRV_HOST) && (defined CFG_FEATURE_HOST_AICPU)
         {DSMI_MAIN_CMD_HOST_AICPU, DSMI_SUB_CMD_HOST_AICPU_INFO, DmsSetHostAicpuInfo},
+#endif
+#if (defined DRV_HOST) && (defined CFG_FEATURE_HOST_TS)
         {DSMI_MAIN_CMD_TS, DSMI_TS_SUB_CMD_COMMON_MSG, DmsSetTsInfo},
 #endif
 #if (defined DRV_HOST)
@@ -3862,12 +3988,12 @@ int halGetDeviceVfList(unsigned int devId, unsigned int *vf_list, unsigned int l
     return DRV_ERROR_NONE;
 }
 
-drvError_t halGetChipInfo(unsigned int devId, halChipInfo *chip_info)
+drvError_t halGetChipInfo(unsigned int devId, halChipInfo *chipInfo)
 {
     int ret;
     struct dms_query_chip_info query_info = {0};
 
-    if (chip_info == NULL) {
+    if (chipInfo == NULL) {
         DEVDRV_DRV_ERR("Chip info is null. (dev_id=%u)\n", devId);
         return DRV_ERROR_PARA_ERROR;
     }
@@ -3888,7 +4014,7 @@ drvError_t halGetChipInfo(unsigned int devId, halChipInfo *chip_info)
         return DRV_ERROR_PARA_ERROR;
     }
 
-    *chip_info = *(halChipInfo *)(&query_info.info);
+    *chipInfo = *(halChipInfo *)(&query_info.info);
     return DRV_ERROR_NONE;
 }
 

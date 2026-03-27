@@ -537,7 +537,7 @@ int dcmi_get_device_network_health(int card_id, int device_id, enum dcmi_rdfx_de
         gplog(LOG_ERR, "result is NULL");
         return DCMI_ERR_CODE_INVALID_PARAMETER;
     }
-    if (dcmi_board_chip_type_is_ascend_910b_300i_a2() == TRUE) {
+    if (dcmi_board_chip_type_is_ascend_910b_300i_a2() || dcmi_board_chip_type_is_ascend_910_95_card()) {
         gplog(LOG_OP, "This device does not support get device network health.");
         return DCMI_ERR_CODE_NOT_SUPPORT;
     }
@@ -959,8 +959,8 @@ int dcmi_get_device_mac(int card_id, int device_id, int mac_id, char *mac_addr, 
         return err;
     }
 
-    if (dcmi_board_chip_type_is_ascend_910b_300i_a2() == TRUE) {
-        gplog(LOG_ERR, "This device does not support get device mac.");
+    if (dcmi_board_chip_type_is_ascend_910b_300i_a2() || dcmi_board_chip_type_is_ascend_910_95_card()) {
+        gplog(LOG_OP, "This device does not support get device mac.");
         return DCMI_ERR_CODE_NOT_SUPPORT;
     }
 
@@ -1057,7 +1057,7 @@ int dcmi_get_device_ip(int card_id, int device_id, enum dcmi_port_type input_typ
     }
 
     if (dcmi_board_chip_type_is_ascend_310b() == TRUE ||
-        dcmi_board_chip_type_is_ascend_910b_300i_a2() == TRUE) {
+        dcmi_board_chip_type_is_ascend_910b_300i_a2() == TRUE || dcmi_board_chip_type_is_ascend_910_95_card() == TRUE) {
         gplog(LOG_OP, "This device does not support get device ip.");
         return DCMI_ERR_CODE_NOT_SUPPORT;
     }
@@ -1095,7 +1095,7 @@ int dcmi_get_device_share_enable(int card_id, int device_id, int *enable_flag)
     if (device_type == NPU_TYPE) {
         return dcmi_get_npu_device_share_enable(card_id, device_id, enable_flag);
     } else {
-        gplog(LOG_INFO, "device_type is not support.%d.", device_type);
+        gplog(LOG_INFO, "device_type %d is not support.", device_type);
         return DCMI_ERR_CODE_NOT_SUPPORT;
     }
 }
@@ -1124,7 +1124,7 @@ int dcmi_get_device_share_config_recover_mode(unsigned int *enable_flag)
     err = dcmi_cfg_get_device_share_config_recover_mode(enable_flag);
     if (err != DCMI_OK) {
         gplog(LOG_ERR, "get config recover enable_flag failed. err=%d", err);
-        return DCMI_ERR_CODE_INNER_ERR;
+        return err;
     }
     return DCMI_OK;
 }
@@ -1291,4 +1291,47 @@ int dcmi_get_custom_op_config_recover_mode(unsigned int *mode)
         return DCMI_ERR_CODE_INNER_ERR;
     }
     return DCMI_OK;
+}
+
+int dcmi_get_ub_port_link_status_info(int card_id, int device_id, struct dcmi_ub_port_link_status *ub_status)
+{
+    int ret;
+    unsigned int env_flag;
+    enum dcmi_unit_type device_type = NPU_TYPE;
+
+    ret = dcmi_get_environment_flag(&env_flag);
+    if (ret != DCMI_OK) {
+        gplog(LOG_ERR, "call dcmi_get_environment_flag failed. err is %d.", ret);
+        return ret;
+    }
+
+    // 查询仅支持物理机、特权容器、虚拟机
+    if (!(env_flag == ENV_PHYSICAL || env_flag == ENV_PHYSICAL_PRIVILEGED_CONTAINER || env_flag == ENV_VIRTUAL)) {
+        gplog(LOG_ERR, "This command cannot be executed on a plain container or a VM-based container.");
+        return DCMI_ERR_CODE_OPER_NOT_PERMITTED;
+    }
+
+    if (ub_status == NULL) {
+        gplog(LOG_ERR, "ub_status is NULL.");
+        return DCMI_ERR_CODE_INVALID_PARAMETER;
+    }
+
+    // 当前仅支持A5标卡
+    if (!dcmi_board_chip_type_is_ascend_910_95_card()) {
+        gplog(LOG_OP, "This device does not support get ub port status info.");
+        return DCMI_ERR_CODE_NOT_SUPPORT;
+    }
+
+    ret = dcmi_get_device_type(card_id, device_id, &device_type);
+    if (ret != DCMI_OK) {
+        gplog(LOG_ERR, "dcmi_get_device_type failed. err is %d.", ret);
+        return ret;
+    }
+
+    if (device_type == NPU_TYPE) {
+        return dcmi_get_npu_ub_port_link_status_info(card_id, device_id, ub_status);
+    } else {
+        gplog(LOG_ERR, "device_type %d is not support.", device_type);
+        return DCMI_ERR_CODE_NOT_SUPPORT;
+    }
 }

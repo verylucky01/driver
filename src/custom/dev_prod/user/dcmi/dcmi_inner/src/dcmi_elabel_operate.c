@@ -116,9 +116,20 @@ static int dcmi_elabel_item_set_default(unsigned int i)
 static const struct dcmi_elabel_item *dcmi_elabel_find_item(unsigned char item_id)
 {
     unsigned int elabel_index;
-    for (elabel_index = 0; elabel_index < sizeof(elabel_items) / sizeof(elabel_items[0]); elabel_index++) {
-        if (elabel_items[elabel_index].item_id == item_id) {
-            return &elabel_items[elabel_index];
+    const struct dcmi_elabel_item *items;
+    int count;
+
+    if (dcmi_board_chip_type_is_ascend_910_95()) {
+        items = elabel_items_v2;
+        count = sizeof(elabel_items_v2) / sizeof(elabel_items_v2[0]);
+    } else {
+        items = elabel_items;
+        count = sizeof(elabel_items) / sizeof(elabel_items[0]);
+    }
+
+    for (elabel_index = 0; elabel_index < count; elabel_index++) {
+        if (items[elabel_index].item_id == item_id) {
+            return &items[elabel_index];
         }
     }
     return NULL;
@@ -621,4 +632,49 @@ int dcmi_cpu_get_device_elabel_info(int card_id, struct dcmi_elabel_info *elabel
 #else
     return DCMI_OK;
 #endif
+}
+
+int dcmi_ao_get_elabel_info(int card_id, int device_id, unsigned char item_id, char *data, unsigned short data_size)
+{
+    int ret;
+    const struct dcmi_elabel_item *item = {0};
+    struct dcmi_elabel_field_bytes *item_data = {0};
+    unsigned int len = sizeof(struct dcmi_elabel_data_v2);
+    struct dcmi_elabel_data_v2 *elabel_data = malloc(len);
+    if (elabel_data == NULL) {
+        gplog(LOG_ERR, "elabel_data malloc failed.");
+        return DCMI_ERR_CODE_MEM_OPERATE_FAIL;
+    }
+
+    item = dcmi_elabel_find_item(item_id);
+    if (item == NULL) {
+        gplog(LOG_ERR, "dcmi_elabel_init: no item %u", item_id);
+        free(elabel_data);
+        elabel_data = NULL;
+        return DCMI_ERR_CODE_INNER_ERR;
+    }
+
+    ret = dcmi_get_npu_device_info(card_id, device_id, DCMI_MAIN_CMD_CHIP_INF, DCMI_CHIP_INF_SUB_CMD_CUST_BOARD_INF,
+         elabel_data, &len);
+    if (ret != DCMI_OK) {
+        gplog(LOG_ERR, "call dcmi_get_npu_device_info failed. ret is %d", ret);
+        free(elabel_data);
+        elabel_data = NULL;
+        return ret;
+    }
+
+    item_data = (struct dcmi_elabel_field_bytes *)((unsigned char *)elabel_data + item->offset);
+
+    ret = memcpy_s(data, data_size, item_data->data, item_data->len);
+    if (ret != EOK) {
+        gplog(LOG_ERR, "call memcpy_s failed. ret is %d", ret);
+        free(elabel_data);
+        elabel_data = NULL;
+        return DCMI_ERR_CODE_SECURE_FUN_FAIL;
+    }
+
+    free(elabel_data);
+    elabel_data = NULL;
+
+    return DCMI_OK;
 }

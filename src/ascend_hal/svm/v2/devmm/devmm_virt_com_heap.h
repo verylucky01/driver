@@ -90,7 +90,9 @@ typedef struct drv_mem_handle {
 
     uint32_t pg_type;
     uint32_t phy_mem_type;
-    bool is_shared;
+
+    struct drv_mem_prop prop;
+    bool support_restore;
     uint64_t ref;
     uint64_t map_ref; /* halMemMap, map_ref+1 */
 } drv_mem_handle_t;

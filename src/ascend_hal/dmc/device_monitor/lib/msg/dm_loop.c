@@ -224,19 +224,16 @@ int selfloop_init(DM_INTF_S **my_intf, DM_CB_S *cb, const DM_ADDR_ST *my_addr, c
     DRV_CHECK_RETV_DO_SOMETHING((ret == 0), ret, DEV_MON_ERR("strncpy_s error\n"));
     name[sizeof(name) - 1] = 0;
     intf = dm_get_intf(cb, name, sizeof(name));
-    DRV_CHECK_DO_SOMETHING(intf == NULL,
-                           DEV_MON_ERR("duplicate interface [%s]\r\n", name); return EBUSY);
+    DRV_CHECK_DO_SOMETHING(intf == NULL, DEV_MON_ERR("duplicate interface [%s]\r\n", name); return EBUSY);
 
     intf = malloc(sizeof(*intf));
     DRV_CHECK_DO_SOMETHING(intf != NULL, return ENOMEM);
 
     ret = memset_s((void *)intf, sizeof(*intf), 0, sizeof(*intf));
-    DRV_CHECK_DO_SOMETHING(ret == 0,
-                           free(intf); intf = NULL; DEV_MON_ERR("memset_s fail:%d\n", ret); return ret);
+    DRV_CHECK_DO_SOMETHING(ret == 0, free(intf); intf = NULL; DEV_MON_ERR("memset_s fail:%d\n", ret); return ret);
 
     ret = strncpy_s(intf->name, sizeof(intf->name), name, sizeof(name) - 1);
-    DRV_CHECK_RETV_DO_SOMETHING((ret == 0),
-                                ret, free(intf); intf = NULL; DEV_MON_ERR("strncpy_s error\n"));
+    DRV_CHECK_RETV_DO_SOMETHING((ret == 0), ret, free(intf); intf = NULL; DEV_MON_ERR("strncpy_s error\n"));
     intf->name[DM_INTF_NAME_LEN - 1] = '\0';
 
     if (my_addr == NULL) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -45,6 +45,14 @@ typedef struct nid_info {
     nid_size_t size;
     u32 nid_mask;
 } nid_info_t;
+
+struct dbl_dev_base_info {
+    u32 chip_id;
+    u32 die_id;
+    u32 addr_mode;
+    u32 multi_die;
+    int dev_ready;
+};
 
 /**
 * @driver base layer interface
@@ -195,5 +203,35 @@ int hal_kernel_dbl_get_ts_nid(u32 devid, int nids[], int num);
 * @return     : memctrl type
 */
 int dbl_nid_get_memctrl_type(void);
+
+/**
+* @driver base layer interface
+* @description: set base device info.
+* @attention  : For device.
+* @param [in] : dev_id(u32), dev_base_info(struct dbl_dev_base_info dev_base_info)
+* @param [out]: NULL
+* @return     : NULL
+*/
+void dbl_set_dev_base_info(u32 dev_id, struct dbl_dev_base_info dev_base_info);
+
+/**
+* @driver base layer interface
+* @description: get base device info.
+* @attention  : For device.
+* @param [in] : dev_id(u32)
+* @param [out]: NULL
+* @return     : dev_base_info(struct dbl_dev_base_info *)
+*/
+struct dbl_dev_base_info *dbl_get_dev_base_info(u32 dev_id);
+
+/**
+* @driver base layer interface
+* @description: init base device info.
+* @attention  : For device.
+* @param [in] : dev_id(u32)
+* @param [out]: NULL
+* @return     : NULL
+*/
+void dbl_dev_base_info_init(u32 dev_id);
 
 #endif /* PBL_CHIP_CONFIGT_H */

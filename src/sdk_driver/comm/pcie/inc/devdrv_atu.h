@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,8 +14,8 @@
 #ifndef _DEVDRV_ATU_H_
 #define _DEVDRV_ATU_H_
 
-#include "devdrv_msg_def.h"
 #include "ka_memory_pub.h"
+#include "devdrv_msg_def.h"
 
 #define ATU_INVALID 0
 #define ATU_VALID 1
@@ -85,17 +85,17 @@ struct devdrv_cfg_tx_atu_para {
 void devdrv_tx_atu_init(void);
 u32 devdrv_alloc_atu_id(u32 local_devid, u32 host_devid, u32 dst_host_devid, u32 atu_type, u64 target_size);
 u32 devdrv_get_atu_id(u32 local_devid, u32 host_devid, u32 dst_host_devid, u32 atu_type);
-int devdrv_mem_rx_atu_init(u32 devid, void __iomem *apb_base, struct devdrv_iob_atu atu[], int num);
-int devdrv_rsv_mem_rx_atu_init(u32 devid, const void __iomem *apb_base, struct devdrv_iob_atu atu[], int num);
-int devdrv_io_rx_atu_init(u32 devid, const void __iomem *apb_base, struct devdrv_iob_atu atu[], int num);
-int devdrv_set_tx_atu(void __iomem *apb_base, struct devdrv_cfg_tx_atu_para *tx_para,
-    struct devdrv_tx_atu_cfg_cmd *cmd_data, struct devdrv_shr_para __iomem *para,
+int devdrv_mem_rx_atu_init(u32 devid, void __ka_mm_iomem *apb_base, struct devdrv_iob_atu atu[], int num);
+int devdrv_rsv_mem_rx_atu_init(u32 devid, const void __ka_mm_iomem *apb_base, struct devdrv_iob_atu atu[], int num);
+int devdrv_io_rx_atu_init(u32 devid, const void __ka_mm_iomem *apb_base, struct devdrv_iob_atu atu[], int num);
+int devdrv_set_tx_atu(void __ka_mm_iomem *apb_base, struct devdrv_cfg_tx_atu_para *tx_para,
+    struct devdrv_tx_atu_cfg_cmd *cmd_data, struct devdrv_shr_para __ka_mm_iomem *para,
     struct devdrv_tx_atu_cfg_cmd *reply_data);
-int devdrv_get_dev_tx_atu(const void __iomem *apb_base, struct devdrv_iob_atu atu[], u32 len,
+int devdrv_get_dev_tx_atu(const void __ka_mm_iomem *apb_base, struct devdrv_iob_atu atu[], u32 len,
     const struct devdrv_cfg_tx_atu_para *tx_para, u64 phy_addr);
-int devdrv_del_dev_tx_atu(void __iomem *apb_base, struct devdrv_iob_atu atu[], u32 len,
+int devdrv_del_dev_tx_atu(void __ka_mm_iomem *apb_base, struct devdrv_iob_atu atu[], u32 len,
     struct devdrv_cfg_tx_atu_para *tx_para, u64 target_addr);
-int devdrv_del_dev_h2d_tx_atu(void __iomem *apb_base, struct devdrv_iob_atu atu[], u32 len,
+int devdrv_del_dev_h2d_tx_atu(void __ka_mm_iomem *apb_base, struct devdrv_iob_atu atu[], u32 len,
     const struct devdrv_cfg_tx_atu_para *tx_para, ka_dma_addr_t target_addr);
 u32 devdrv_get_h2d_atu_id(u32 devid, ka_dma_addr_t addr);
 void devdrv_tx_atu_print_cfg_info(void);

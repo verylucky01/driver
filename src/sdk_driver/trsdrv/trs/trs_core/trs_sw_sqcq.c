@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -147,7 +147,7 @@ int trs_sw_sqcq_alloc(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst *ts
     para->sqId = sq_info.sqid;
     para->cqId = cq_info.cqid;
 
-    trs_sq_ctx_init(inst, &ts_inst->sw_sq_ctx[sq_info.sqid], para, U32_MAX, chan_id);
+    trs_sq_ctx_init(inst, &ts_inst->sw_sq_ctx[sq_info.sqid], para, KA_U32_MAX, chan_id);
     trs_cq_ctx_init(&ts_inst->sw_cq_ctx[cq_info.cqid], logic_cqid, chan_id);
 
     trs_logic_set_cqe_version(ts_inst, logic_cqid, LOGIC_CQE_VERSION_V2);

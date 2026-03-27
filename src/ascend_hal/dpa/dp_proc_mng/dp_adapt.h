@@ -20,6 +20,7 @@ drvError_t dp_proc_mng_get_dev_info(uint32_t *dev_num, uint32_t *ids);
 int dp_proc_mng_get_fd(uint32_t dev_id);
 void dp_proc_mng_prof_stop(struct prof_sample_stop_para *para);
 bool dp_proc_support_bind_cgroup(void);
+uint64_t dp_proc_mng_get_module_used_size(uint32_t devid, uint32_t module_id);
 
 #endif
 

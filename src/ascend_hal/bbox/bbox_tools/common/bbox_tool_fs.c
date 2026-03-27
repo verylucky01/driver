@@ -158,7 +158,6 @@ s32 bbox_save_buf_to_fs(const char *log_path, const char *file_name,
     while (len_temp) {
         ret = bbox_write(fd, (const void *)((const char *)(buf) + offset), len_temp);
         if (ret <= 0) {
-            BBOX_ERR("bbox_write file %s exception.", path);
             bbox_close(fd);
             return ret;
         }

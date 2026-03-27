@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,13 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
-#include <linux/delay.h>
-#include <linux/device.h>
-#include <linux/pm.h>
-#include <linux/slab.h>
-#include <linux/fs.h>
-#include <linux/kallsyms.h>
+#include "ka_task_pub.h"
+#include "ka_common_pub.h"
 
 #include "devdrv_mailbox.h"
 #include "devdrv_common.h"
@@ -52,7 +47,7 @@
 #endif
 
 #define DEVDRV_H2D_CYCLE 6
-struct workqueue_struct *g_aicore_info_wq = NULL;
+ka_workqueue_struct_t *g_aicore_info_wq = NULL;
 struct devdrv_aicore_info *g_aicore_info[ASCEND_DEV_MAX_NUM];
 
 struct devdrv_pm *devdrv_manager_register_pm(int (*suspend)(u32 devid), int (*resume)(u32 devid))
@@ -112,8 +107,8 @@ KA_EXPORT_SYMBOL(devdrv_manager_unregister_pm);
 STATIC int devdrv_host_manager_suspend(struct devdrv_info *info)
 {
     struct devdrv_manager_info *d_info = NULL;
-    struct list_head *pos = NULL, *n = NULL;
-    struct list_head *stop = NULL;
+    ka_list_head_t *pos = NULL, *n = NULL;
+    ka_list_head_t *stop = NULL;
     struct devdrv_pm *pm = NULL;
     u32 tsid = 0;
     int ret;
@@ -164,7 +159,7 @@ error:
 STATIC int devdrv_host_manager_resume(struct devdrv_info *info)
 {
     struct devdrv_manager_info *d_info = NULL;
-    struct list_head *pos = NULL, *n = NULL;
+    ka_list_head_t *pos = NULL, *n = NULL;
     struct devdrv_pm *pm = NULL;
     u32 tsid = 0;
 
@@ -200,7 +195,7 @@ int devdrv_host_manager_device_resume(struct devdrv_info *dev_info)
 void devdrv_host_manager_device_exception(struct devdrv_info *info)
 {
     struct devdrv_manager_info *d_info = NULL;
-    struct list_head *pos = NULL, *n = NULL;
+    ka_list_head_t *pos = NULL, *n = NULL;
     struct devdrv_pm *pm = NULL;
     u32 tsid = 0;
 
@@ -301,7 +296,7 @@ STATIC int is_cq_invalid(struct devdrv_aicore_msg *cq)
     return 0;
 }
 
-STATIC void devdrv_refresh_aicore_info_work(struct work_struct *work)
+STATIC void devdrv_refresh_aicore_info_work(ka_work_struct_t *work)
 {
     int ret;
     u32 out_len;
@@ -309,7 +304,7 @@ STATIC void devdrv_refresh_aicore_info_work(struct work_struct *work)
     struct devdrv_aicore_msg *h2d_msg = NULL;
     struct devdrv_aicore_info *info = NULL;
 
-    info = container_of(work, struct devdrv_aicore_info, work);
+    info = ka_container_of(work, struct devdrv_aicore_info, work);
 
     dev_manager_msg_info.header.msg_id = DEVDRV_MANAGER_CHAN_H2D_RERESH_AICORE_INFO;
     dev_manager_msg_info.header.valid = DEVDRV_MANAGER_MSG_VALID;
@@ -332,12 +327,12 @@ STATIC void devdrv_refresh_aicore_info_work(struct work_struct *work)
     }
 }
 
-STATIC enum hrtimer_restart devdrv_refresh_aicore_info(struct hrtimer *t)
+STATIC ka_hrtimer_restart_t devdrv_refresh_aicore_info(ka_hrtimer_t *t)
 {
     struct devdrv_aicore_info *info = NULL;
 #ifndef DEVDRV_MANAGER_HOST_UT_TEST
 
-    info = container_of(t, struct devdrv_aicore_info, hrtimer);
+    info = ka_container_of(t, struct devdrv_aicore_info, hrtimer);
 
     /* Call the heartbeat function of the new framework to determine the heartbeat status.
        When the heartbeat is lost, stop sending messages; otherwise, it will spam the chat */
@@ -382,8 +377,8 @@ int devdrv_refresh_aicore_info_init(u32 dev_id)
         return -ENOMEM;
     }
 
-    g_aicore_info[dev_id]->aicore_info_wq = alloc_ordered_workqueue("%s", WQ_HIGHPRI | WQ_MEM_RECLAIM,
-                                                                    "aicore_info_wq");
+    g_aicore_info[dev_id]->aicore_info_wq = ka_task_alloc_ordered_workqueue("%s", WQ_HIGHPRI | WQ_MEM_RECLAIM,
+                                                                            "aicore_info_wq");
     KA_TASK_INIT_WORK(&g_aicore_info[dev_id]->work, devdrv_refresh_aicore_info_work);
     g_aicore_info[dev_id]->dev_id = dev_id;
 

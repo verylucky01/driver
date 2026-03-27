@@ -86,13 +86,11 @@ drvError_t __attribute__((weak)) trs_async_dma_wqe_destory(uint32_t dev_id, stru
 }
 
 drvError_t __attribute__((weak)) trs_sq_task_send_urma(uint32_t dev_id, struct halTaskSendInfo *info,
-    struct sqcq_usr_info *sq_info, unsigned long long *trace_time_stamp, int time_arraylen)
+    struct sqcq_usr_info *sq_info)
 {
     (void)dev_id;
     (void)info;
     (void)sq_info;
-    (void)trace_time_stamp;
-    (void)time_arraylen;
     return DRV_ERROR_NOT_SUPPORT;
 }
 
@@ -118,6 +116,15 @@ drvError_t __attribute__((weak)) trs_sq_jetty_info_query(uint32_t devid, struct 
 {
     (void)devid;
     (void)info;
+    return DRV_ERROR_NOT_SUPPORT;
+}
+
+drvError_t __attribute__((weak)) trs_urma_sq_switch_stream_batch(uint32_t dev_id, struct sq_switch_stream_info *info,
+    uint32_t num)
+{
+    (void)dev_id;
+    (void)info;
+    (void)num;
     return DRV_ERROR_NOT_SUPPORT;
 }
 
@@ -166,23 +173,33 @@ drvError_t halResourceConfig(uint32_t devId, struct halResourceIdInputInfo *in, 
     }
 }
 
+#define TRS_STREAM_TASK_QUEUE_MAX_DEPTH 32768U
 drvError_t halStreamTaskFill(uint32_t dev_id, uint32_t stream_id, void *stream_mem, void *task_info, uint32_t task_cnt)
 {
+    drvError_t ret = 0;
+
     if (dev_id >= TRS_DEV_NUM) {
         trs_err("Invalid devId. (dev_id=%u)\n", dev_id);
         return DRV_ERROR_INVALID_VALUE;
     }
 
-    if ((stream_mem == NULL) || (task_info == NULL)) {
-        trs_err("Null ptr.\n");
+    if ((task_info == NULL) || (task_cnt == 0) || (task_cnt > TRS_STREAM_TASK_QUEUE_MAX_DEPTH)) {
+        trs_err("Null ptr or task_cnt invalid. (ptr_is_NULL=%d; task_cnt=%u)\n", (task_info == NULL), task_cnt);
         return DRV_ERROR_INVALID_VALUE;
     }
 
-    return trs_stream_task_fill(dev_id, stream_id, stream_mem, task_info, task_cnt);
+    trs_dev_ctx_stream_mutex_lock(dev_id);
+    ret = trs_stream_task_fill(dev_id, stream_id, stream_mem, task_info, task_cnt);
+    trs_dev_ctx_stream_mutex_unlock(dev_id);
+
+    return ret;
 }
 
 drvError_t halSqSwitchStreamBatch(uint32_t dev_id, struct sq_switch_stream_info *info, uint32_t num)
 {
+    int connection_type = TRS_CONNECT_PROTOCOL_UNKNOWN;
+    drvError_t ret = 0;
+
     if (dev_id >= TRS_DEV_NUM) {
         trs_err("Invalid devId. (dev_id=%u)\n", dev_id);
         return DRV_ERROR_INVALID_VALUE;
@@ -193,7 +210,31 @@ drvError_t halSqSwitchStreamBatch(uint32_t dev_id, struct sq_switch_stream_info 
         return DRV_ERROR_INVALID_VALUE;
     }
 
-    return trs_sq_switch_stream_batch(dev_id, info, num);
+    trs_dev_ctx_stream_mutex_lock(dev_id);
+    ret = trs_sq_switch_stream_batch(dev_id, info, num);
+    if (ret != 0) {
+        trs_dev_ctx_stream_mutex_unlock(dev_id);
+        return ret;
+    }
+
+    connection_type = trs_get_connection_type(dev_id);
+    switch (connection_type) {
+        case TRS_CONNECT_PROTOCOL_PCIE:
+        case TRS_CONNECT_PROTOCOL_HCCS:
+        case TRS_CONNECT_PROTOCOL_RC:
+            ret = DRV_ERROR_NONE;
+            break;
+        case TRS_CONNECT_PROTOCOL_UB:
+            ret = trs_urma_sq_switch_stream_batch(dev_id, info, num);
+            break;
+        default:
+            trs_err("Invalid connection type. (dev_id=%u; connection_type=%d)\n", dev_id, connection_type);
+            ret = DRV_ERROR_INVALID_DEVICE;
+            break;
+    }
+
+    trs_dev_ctx_stream_mutex_unlock(dev_id);
+    return ret;
 }
 
 drvError_t halSqCqAllocate(uint32_t devId, struct halSqCqInputInfo *in, struct halSqCqOutputInfo *out)
@@ -343,7 +384,7 @@ drvError_t halSqCqConfig(uint32_t devId, struct halSqCqConfigInfo *info)
 
     if (info->type == DRV_NORMAL_TYPE) {
         int connection_type = trs_get_connection_type(devId);
-        drvError_t ret;
+        drvError_t ret = 0;
         switch (connection_type) {
             case TRS_CONNECT_PROTOCOL_PCIE:
             case TRS_CONNECT_PROTOCOL_HCCS:
@@ -354,18 +395,15 @@ drvError_t halSqCqConfig(uint32_t devId, struct halSqCqConfigInfo *info)
                     (info->prop == DRV_SQCQ_PROP_SQ_RESUME)) {
                     return trs_sq_cq_config(devId, info);
                 }
-                if (info->prop == DRV_SQCQ_PROP_SQ_HEAD) {
-                    ret = trs_set_sq_info_head(devId, info->tsId, info->type, info->sqId, info->value[0]);
-                    if (ret != 0) {
-                        return ret;
-                    }
+
+                if ((info->prop == DRV_SQCQ_PROP_SQ_HEAD) || (info->prop == DRV_SQCQ_PROP_SQ_TAIL)) {
+                    ret = trs_sq_cq_config(devId, info);
                 }
-                if (info->prop == DRV_SQCQ_PROP_SQ_TAIL) {
-                    ret = trs_set_sq_info_tail(devId, info->tsId, info->type, info->sqId, info->value[0]);
-                    if (ret != 0) {
-                        return ret;
-                    }
+
+                if (ret != 0) {
+                    return ret;
                 }
+
                 return trs_sq_cq_config_sync(devId, info); /* UB scene: set sq register should complete remotely */
             default:
                 trs_err("Invalid connection type. (dev_id=%u; connection_type=%d)\n", devId, connection_type);
@@ -682,11 +720,7 @@ drvError_t halAsyncDmaDestroyBatch(uint32_t devId, struct halAsyncDmaDestroyBatc
 drvError_t halSqTaskSend(uint32_t devId, struct halTaskSendInfo *info)
 {
     struct sqcq_usr_info *sq_info = NULL;
-    unsigned long long trace_time_stamp[TRS_TASK_SEND_TRACE_TOTAL_NUM] = {0};
     int ret = 0;
-
-    TRS_TRACE_TIME_CONSUME_START(trs_is_task_trace_env_set(), trace_time_stamp, TRS_TASK_SEND_TRACE_TOTAL_NUM,
-        TRS_TASK_SEND_TIME_LIMIT);
 
     if (info == NULL) {
         trs_err("Null ptr.\n");
@@ -704,7 +738,7 @@ drvError_t halSqTaskSend(uint32_t devId, struct halTaskSendInfo *info)
         return DRV_ERROR_INVALID_VALUE;
     }
 
-    if (!trs_is_sq_support_send(sq_info)) {
+    if ((!trs_is_sq_support_send(sq_info)) || (trs_is_sq_init_without_sq_mem(sq_info->flag))) {
         trs_warn("Sq is only id type, not support task send. (dev_id=%u; ts_id=%u; sq_id=%u; flag=%u)\n",
             devId, info->tsId, info->sqId, sq_info->flag);
         return DRV_ERROR_NOT_SUPPORT;
@@ -719,7 +753,7 @@ drvError_t halSqTaskSend(uint32_t devId, struct halTaskSendInfo *info)
                 ret = trs_sq_task_send(devId, info, sq_info);
                 break;
             case TRS_CONNECT_PROTOCOL_UB:
-                ret = trs_sq_task_send_urma(devId, info, sq_info, trace_time_stamp + 1, TRS_TASK_SEND_TRACE_POINT_NUM);
+                ret = trs_sq_task_send_urma(devId, info, sq_info);
                 break;
             default:
                 trs_err("Invalid connection type. (dev_id=%u; connection_type=%d)\n", devId, connection_type);
@@ -729,7 +763,6 @@ drvError_t halSqTaskSend(uint32_t devId, struct halTaskSendInfo *info)
         ret = trs_sq_task_send(devId, info, sq_info);
     }
 
-    TRS_TRACE_TIME_CONSUME_END;
     return ret;
 }
 

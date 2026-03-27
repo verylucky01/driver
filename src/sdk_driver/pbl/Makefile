@@ -39,6 +39,7 @@ ifeq ($(DAVINCI_HIAI_DKMS),y)
         include $(HIAI_DKMS_DIR)/pbl/dev_urd/dev_urd.mk
         include $(HIAI_DKMS_DIR)/pbl/mem_ops/mem_ops.mk
         include ${HIAI_DKMS_DIR}/pbl/msg_chan/msg_chan.mk
+        include ${HIAI_DKMS_DIR}/pbl/chip_config/chip_config.mk
     else
         include $(HIAI_DKMS_DIR)/pbl/drv_davinci_intf_host/drv_davinci_intf.mk
         include $(HIAI_DKMS_DIR)/pbl/log_host/log_host.mk
@@ -48,6 +49,7 @@ ifeq ($(DAVINCI_HIAI_DKMS),y)
         include $(HIAI_DKMS_DIR)/pbl/mem_ops/mem_ops.mk
         include ${HIAI_DKMS_DIR}/pbl/soc_resmng/soc_resmng.mk
         include ${HIAI_DKMS_DIR}/pbl/msg_chan/msg_chan.mk
+        include ${HIAI_DKMS_DIR}/pbl/chip_config/chip_config.mk
     endif
 else
     ifeq ($(TARGET_TYPE), VPBL)
@@ -59,6 +61,7 @@ else
         include ${DRIVER_SOURCE_DIR}/pbl/dev_urd/dev_urd.mk
         include ${DRIVER_SOURCE_DIR}/pbl/mem_ops/mem_ops.mk
         include ${DRIVER_SOURCE_DIR}/pbl/msg_chan/msg_chan.mk
+        include ${DRIVER_SOURCE_DIR}/pbl/chip_config/chip_config.mk
     else
         include ${DRIVER_SOURCE_DIR}/pbl/drv_davinci_intf/drv_davinci_intf_host/drv_davinci_intf.mk
         include ${DRIVER_SOURCE_DIR}/pbl/log_host/log_host.mk
@@ -68,6 +71,7 @@ else
         include ${DRIVER_SOURCE_DIR}/pbl/mem_ops/mem_ops.mk
         include ${DRIVER_SOURCE_DIR}/pbl/soc_resmng/soc_resmng.mk
         include ${DRIVER_SOURCE_DIR}/pbl/msg_chan/msg_chan.mk
+        include ${DRIVER_SOURCE_DIR}/pbl/chip_config/chip_config.mk
     endif
     EXTRA_CFLAGS += -DCFG_ENV_HOST
 endif

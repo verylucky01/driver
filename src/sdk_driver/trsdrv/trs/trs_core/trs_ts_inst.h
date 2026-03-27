@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -43,8 +43,8 @@ struct trs_core_ts_inst {
     u32 support_proc_num; /* 0: The resources used by processes are not limited. */
     struct trs_id_inst inst;
     struct trs_core_adapt_ops ops;
-    struct rw_semaphore sem;
-    struct rw_semaphore ctrl_sem;
+    ka_rw_semaphore_t sem;
+    ka_rw_semaphore_t ctrl_sem;
     ka_atomic64_t cur_task_id;
     u32 irq_type;
     u32 sq_trigger_irq;
@@ -69,7 +69,7 @@ struct trs_core_ts_inst {
     struct trs_cb_ctx cb_ctx;
     struct trs_shm_ctx shm_ctx;
     struct trs_logic_cq_ctx logic_cq_ctx;
-    struct proc_dir_entry *entry;
+    ka_proc_dir_entry_t *entry;
     bool trace_enable;
     int location;
     u32 ts_inst_flag;

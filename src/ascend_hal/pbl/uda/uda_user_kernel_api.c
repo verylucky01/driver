@@ -648,7 +648,7 @@ int uda_user_get_phy_id_by_index(uint32_t devid, uint32_t *phyId)
     }
 }
 
-#ifdef CFG_FEATURE_ASCEND910_95_STUB
+#ifdef CFG_FEATURE_ASCEND950_STUB
 static int uda_get_index_by_phyid(unsigned long cmd, uint32_t phyId, uint32_t *devid)
 {
     uint32_t flag;
@@ -714,7 +714,7 @@ int uda_user_get_index_by_phy_id(uint32_t phyId, uint32_t *devid)
             /* The management process queries the information about the mia device from the physical machine.
             The mia device may be added or deleted. Therefore, the management process needs to query the information
             from the kernel in real time. */
-#ifndef CFG_FEATURE_ASCEND910_95_STUB
+#ifndef CFG_FEATURE_ASCEND950_STUB
             return uda_trans_devid(UDA_UDEVID_TO_DEVID, phyId, devid);
 #else
             return uda_get_index_by_phyid(UDA_UDEVID_TO_DEVID, phyId, devid);

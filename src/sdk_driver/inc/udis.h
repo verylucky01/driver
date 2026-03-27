@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -15,6 +15,15 @@
 #define _UDIS_H_
 
 #include <linux/types.h>
+#ifndef va_addr_t
+typedef unsigned long long va_addr_t;
+#endif
+
+typedef enum {
+    ADDR_ATTR_RAM = 0,
+    ADDR_ATTR_MMIO,
+    ADDR_ATTR_MAX
+} UDIS_ADDR_ATTR;
 
 typedef enum {
     UDIS_MODULE_DEVMNG = 0,
@@ -22,6 +31,7 @@ typedef enum {
     UDIS_MODULE_LP,
     UDIS_MODULE_SVM,
     UDIS_MODULE_NETWORK,
+    UDIS_MODULE_TS,
     UDIS_MODULE_MAX
 } UDIS_MODULE_TYPE;
 
@@ -55,12 +65,18 @@ struct udis_addr_info {
     unsigned int data_len;
     UDIS_UPDATE_TYPE update_type;
     unsigned int acc_ctrl;
-    char reserved[28];
+    va_addr_t user_addr;
+    UDIS_ADDR_ATTR user_addr_attr;
+    char reserved[16];
 };
+
+typedef int (*udis_trigger)(unsigned int udevid, struct udis_dev_info *udis_info);
 
 int hal_kernel_set_udis_info(unsigned int udevid, UDIS_MODULE_TYPE module_type, const struct udis_dev_info *udis_info);
 int hal_kernel_get_udis_info(unsigned int udevid, UDIS_MODULE_TYPE module_type, struct udis_dev_info *udis_info);
 int hal_kernel_register_udis_addr(unsigned int udevid, UDIS_MODULE_TYPE module_type, struct udis_addr_info *addr_info);
 int hal_kernel_unregister_udis_addr(unsigned int udevid, UDIS_MODULE_TYPE module_type, char name[]);
+int hal_kernel_register_udis_func(UDIS_MODULE_TYPE module_type, const char *name, udis_trigger func);
+int hal_kernel_unregister_udis_func(UDIS_MODULE_TYPE module_type, const char *name);
 
 #endif

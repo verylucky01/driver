@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -140,6 +140,16 @@ int dbl_get_cust_op_enhance_mode(unsigned int udevid,  unsigned int *mode);
 * @return     : 0(success) or other (failed)
 */
 int dbl_set_cust_op_enhance_mode(unsigned int udevid, unsigned int mode);
+
+/**
+* @driver base layer interface
+* @description: Get the container pid from host pid
+* @attention  : If not run in docker, container_pid is host_pid
+* @param [in] : host_pid(pid_t)
+* @param [out]: container_pid(pid_t)
+* @return     : 0(success) or other (failed)
+*/
+int dbl_host_pid_to_container_pid(pid_t host_pid, pid_t *container_pid);
 
 #endif /* PBL_RUNENV_CONFIG_H */
 

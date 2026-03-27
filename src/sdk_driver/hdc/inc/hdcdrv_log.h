@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -15,11 +15,10 @@
 #define _HDCDRV_LOG_H_
 
 #include "ka_system_pub.h"
-#include "dmc_kernel_interface.h"
-#include "hdcdrv_adapt.h"
-#include "ka_system_pub.h"
 #include "ka_dfx_pub.h"
 #include "ka_base_pub.h"
+#include "dmc_kernel_interface.h"
+#include "hdcdrv_adapt.h"
 
 static u64 g_log_count = 0;
 #define LOG_MS_PER_SECOND  1000
@@ -155,10 +154,11 @@ enum hdcdrv_limit_exclusive_log {
     HDCDRV_LIMIT_LOG_0x109,
     HDCDRV_LIMIT_LOG_0x10A,
     HDCDRV_LIMIT_LOG_0x10B,
+    HDCDRV_LIMIT_LOG_0x10C,
 
     HDCDRV_LIMIT_LOG_MAX
 };
-// not more than 10 kernel messages every 5s
+// not more than 5 kernel messages every 30s
 #define EXCLUSIVE_RATELIMIT_INTERVAL	(30 * KA_HZ)
 #define EXCLUSIVE_RATELIMIT_BURST		5
 #define hdcdrv_limit_exclusive(level, id, fmt, ...) do { \

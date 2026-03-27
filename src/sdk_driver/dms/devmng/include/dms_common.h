@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -16,13 +16,14 @@
 
 #include "dms/dms_cmd_def.h"
 #include "dms_msg.h"
+#include "ka_list_pub.h"
 
 struct dms_ctrl_cb {
-    struct list_head device_list;
+    ka_list_head_t device_list;
 };
 
 struct dms_info {
-    struct list_head list;
+    ka_list_head_t list;
     unsigned int plat_info; /* 0:device side, 1: host side */
     unsigned int machine_mode; /* 0:RC_MODE,  1: EP_MODE */
     unsigned int amp_or_smp; /* 0:AMP_MODE, 1: SMP_MODE */

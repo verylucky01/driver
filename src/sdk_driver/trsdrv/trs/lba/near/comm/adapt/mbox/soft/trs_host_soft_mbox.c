@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -18,7 +18,8 @@
 #include "trs_host_soft_mbox.h"
 #include "trs_sia_adapt_auto_init.h"
 
-static int trs_sqcq_ext_info_copy(struct trs_id_inst *inst, void *data, size_t size, struct trs_msg_data *msg_data)
+static int trs_soft_mbox_sqcq_ext_info_copy(struct trs_id_inst *inst, void *data, size_t size,
+    struct trs_msg_data *msg_data)
 {
     struct trs_normal_cqsq_mailbox *mbox_data = (struct trs_normal_cqsq_mailbox *)data;
     u32 info_len = sizeof(u32) * SQCQ_INFO_LENGTH;
@@ -49,6 +50,36 @@ static int trs_sqcq_ext_info_copy(struct trs_id_inst *inst, void *data, size_t s
     return 0;
 }
 
+static int trs_soft_mbox_mem_dispatch_ext_info_copy(struct trs_id_inst *inst, void *data, size_t size,
+    struct trs_msg_data *msg_data)
+{
+    struct trs_mem_dispatch_msg *mbox_data = (struct trs_mem_dispatch_msg *)data;
+    if (mbox_data->is_addr_ext) {
+        int ret = memcpy_s(msg_data->payload + size, TRS_MSG_DATA_LEN - size, mbox_data->addr, mbox_data->addr_len);
+        if (ret != 0) {
+            trs_err("Failed to memcpy info. (devid=%u)\n", inst->devid);
+            return ret;
+        }
+
+        msg_data->data_len += mbox_data->addr_len;
+    }
+
+    return 0;
+}
+
+static int trs_soft_mbox_ext_info_copy(struct trs_id_inst *inst, void *data, size_t size, struct trs_msg_data *msg_data)
+{
+    struct trs_mb_header *header = (struct trs_mb_header *)data;
+    if ((header->cmd_type == TRS_MBOX_CREATE_CQSQ_CALC) || (header->cmd_type == TRS_MBOX_RELEASE_CQSQ_CALC) ||
+        (header->cmd_type == TRS_MBOX_CREATE_TOPIC_SQCQ) || (header->cmd_type == TRS_MBOX_RELEASE_TOPIC_SQCQ)) {
+        return trs_soft_mbox_sqcq_ext_info_copy(inst, data, size, msg_data);
+    } else if (header->cmd_type == TRS_MBOX_MEM_DISPATCH) {
+        return trs_soft_mbox_mem_dispatch_ext_info_copy(inst, data, size, msg_data);
+    }
+
+    return 0;
+}
+
 int trs_soft_mbox_send(struct trs_id_inst *inst, u32 chan_id, void *data, size_t size, int timeout)
 {
     struct trs_mb_header *header = (struct trs_mb_header *)data;
@@ -69,13 +100,10 @@ int trs_soft_mbox_send(struct trs_id_inst *inst, u32 chan_id, void *data, size_t
         return ret;
     }
 
-    if ((header->cmd_type == TRS_MBOX_CREATE_CQSQ_CALC) || (header->cmd_type == TRS_MBOX_RELEASE_CQSQ_CALC) ||
-        (header->cmd_type == TRS_MBOX_CREATE_TOPIC_SQCQ) || (header->cmd_type == TRS_MBOX_RELEASE_TOPIC_SQCQ)) {
-        ret = trs_sqcq_ext_info_copy(inst, data, size, &msg_data);
-        if (ret != 0) {
-            trs_err("Failed to copy ext info. (devid=%u)\n", inst->devid);
-            return ret;
-        }
+    ret = trs_soft_mbox_ext_info_copy(inst, data, size, &msg_data);
+    if (ret != 0) {
+        trs_err("Failed to copy ext info. (devid=%u)\n", inst->devid);
+        return ret;
     }
 
     msg_len = sizeof(struct trs_msg_head) + sizeof(u64) + msg_data.data_len;

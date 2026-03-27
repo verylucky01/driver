@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -24,6 +24,7 @@
 
 #include "trs_shr_id_node.h"
 #include "trs_shr_id.h"
+#include "trs_core_adapt.h"
 
 #define TSDRV_WAKEUP_TIMEINTERVAL 500 /* 0.5s */
 
@@ -74,7 +75,7 @@ static void shr_id_hash_table_clean(struct shr_id_proc_ctx *proc_ctx)
 	ka_hlist_node_t *tmp = NULL;
     ka_hash_for_each_safe(proc_ctx->abnormal_ht.htable, bkt, tmp, cur, link) {
         ka_hash_del(&cur->link);
-        kfree(cur);
+        ka_mm_kfree(cur);
     }
 }
 
@@ -85,7 +86,7 @@ static void _shr_id_proc_del(struct shr_id_proc_ctx *proc_ctx)
     ka_task_write_unlock(&proc_lock);
 }
 
-struct shr_id_proc_ctx *shr_id_proc_create(pid_t pid)
+struct shr_id_proc_ctx *shr_id_proc_create(ka_pid_t pid)
 {
     size_t ctx_size = sizeof(struct shr_id_proc_ctx);
     struct shr_id_proc_ctx *proc_ctx = NULL;
@@ -116,7 +117,7 @@ void shr_id_proc_destroy(struct shr_id_proc_ctx *proc_ctx)
     trs_kfree(proc_ctx);
 }
 
-struct shr_id_proc_ctx *shr_id_find_proc(pid_t pid)
+struct shr_id_proc_ctx *shr_id_find_proc(ka_pid_t pid)
 {
     struct shr_id_proc_ctx *proc_ctx = NULL;
     int key = pid & PROC_HASH_TABLE_MASK;
@@ -170,7 +171,7 @@ static void shr_id_recycle_opened(struct shr_id_proc_ctx *proc_ctx)
         for (i = 0; i < proc_node->ref; i++) {
             ret |= shr_id_node_close(proc_node->name, proc_node->type, proc_ctx->pid);
 
-            if (need_resched()) {
+            if (ka_task_need_resched()) {
                 ka_task_cond_resched();
             }
         }
@@ -246,7 +247,7 @@ static void shr_id_proc_release(struct kref_safe *kref)
     shr_id_proc_destroy(proc_ctx);
 }
 
-static struct shr_id_proc_ctx *shr_id_proc_get(pid_t pid)
+static struct shr_id_proc_ctx *shr_id_proc_get(ka_pid_t pid)
 {
     struct shr_id_proc_ctx *proc_ctx = NULL;
 
@@ -266,7 +267,7 @@ static struct shr_id_proc_ctx *shr_id_proc_get(pid_t pid)
  * When a process's reference count reaches zero, it triggers the release process,
  * making it impossible to get process.
  */
-struct shr_id_proc_ctx *shr_id_proc_ctx_find(pid_t pid)
+struct shr_id_proc_ctx *shr_id_proc_ctx_find(ka_pid_t pid)
 {
     struct shr_id_proc_ctx *proc_ctx = NULL;
 
@@ -307,7 +308,7 @@ static struct shr_id_proc_node *shr_id_find_proc_node(struct shr_id_proc_ctx *pr
     head = shr_id_get_list_head(proc_ctx, op);
     ka_task_read_lock(&proc_ctx->lock);
     ka_list_for_each_entry_safe(proc_node, n, head, list) {
-        if (strcmp(proc_node->name, name) == 0) {
+        if (ka_base_strcmp(proc_node->name, name) == 0) {
             ka_task_read_unlock(&proc_ctx->lock);
             return proc_node;
         }
@@ -405,7 +406,7 @@ static void shr_id_del_from_proc(struct shr_id_proc_ctx *proc_ctx,
     ka_task_mutex_unlock(&proc_ctx->mutex);
 }
 
-int shr_id_wait_for_proc_exit(pid_t pid)
+int shr_id_wait_for_proc_exit(ka_pid_t pid)
 {
     int loop = 0;
 
@@ -508,7 +509,20 @@ static int shr_id_reomote_res_check(struct trs_id_inst *inst, int res_type, u32 
     return trs_res_id_check(inst, res_type, res_id);
 }
 
-static int shr_id_node_attr_pack(struct shr_id_node_op_attr *attr, pid_t pid, u64 start_time,
+static int shr_id_set_stars_die_id(u32 devid, u32 tsid, struct shr_id_node_op_attr *attr)
+{
+    int ret;
+
+    ret = trs_core_get_stars_die_id(devid, tsid, &attr->stars_die_id);
+    if (ret != 0) {
+        trs_err("Set stars die id failed. (devid=%u; tsid=%u; ret=%d)\n", devid, tsid, ret);
+        return -EINVAL;
+    }
+    trs_debug("Set stars die id. (devid=%u; tsid=%u; stars_die_id=%d)\n", devid, tsid, attr->stars_die_id);
+    return 0;
+}
+
+static int shr_id_node_attr_pack(struct shr_id_node_op_attr *attr, ka_pid_t pid, u64 start_time,
     struct shr_id_ioctl_info *ioctl_info)
 {
     u32 type = ioctl_info->id_type;
@@ -528,6 +542,11 @@ static int shr_id_node_attr_pack(struct shr_id_node_op_attr *attr, pid_t pid, u6
         attr->res_get = shr_id_res_get;
         attr->res_put = shr_id_res_put;
     }
+    ret = shr_id_set_stars_die_id(ioctl_info->devid, ioctl_info->tsid, attr);
+    if (ret != 0) {
+        return ret;
+    }
+
     trs_id_inst_pack(&attr->inst, ioctl_info->devid, ioctl_info->tsid);
     ret = shr_id_name_generate(&attr->inst, pid, (int)type, ioctl_info->shr_id, attr->name);
     if (ret != 0) {
@@ -731,6 +750,7 @@ int shr_id_open(struct shr_id_proc_ctx *proc_ctx, unsigned long arg)
     ioctl_info.tsid = attr.inst.tsid;
     ioctl_info.id_type = (u32)attr.type;
     ioctl_info.shr_id = (u32)attr.id;
+    ioctl_info.rsv[0] = attr.stars_die_id;
 
     if (ka_base_copy_to_user((void *)(uintptr_t)arg, &ioctl_info, sizeof(struct shr_id_ioctl_info)) != 0) {
         trs_err("Copy to user fail.\n");
@@ -820,7 +840,7 @@ bool shr_id_is_destroyed_in_process(int pid, unsigned long start_time)
         return false;
     }
 
-    if (time_before_eq((unsigned long)proc_ctx->start_time, start_time)) {
+    if (ka_system_time_before_eq((unsigned long)proc_ctx->start_time, start_time)) {
         if (ka_base_atomic_read(&proc_ctx->proc_in_release) == 0) {
             in_process = true;
         }

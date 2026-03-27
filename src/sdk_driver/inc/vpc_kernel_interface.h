@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,8 +14,7 @@
 #ifndef __VPC_KERNEL_INTERFACE_H__
 #define __VPC_KERNEL_INTERFACE_H__
 
-#include <linux/types.h>
-#include <linux/pci.h>
+#include "ka_pci_pub.h"
 
 #define VPC_VM_FID 0                            // set fid 0 when send vpc msg in vm
 #define VPC_DEFAULT_TIMEOUT 5000000             // default vpc timeout is 5 seconds
@@ -102,7 +101,7 @@ int vmnga_common_msg_send(u32 dev_id, enum vmng_msg_common_type cmn_type, struct
 #define VIRTMNGAGENT_MSIX_MAX 128
 
 struct vmnga_vpc_msix_info {
-    struct msix_entry *entries;
+    ka_msix_entry_t *entries;
     u32 msix_irq_num;
     u32 msix_irq_offset;
 };
@@ -117,7 +116,7 @@ struct vmnga_mmio {
 };
 
 struct vmng_vpc_unit {
-    struct pci_dev *pdev;                       /* pci dev */
+    ka_pci_dev_t *pdev;                       /* pci dev */
     struct vmnga_mmio mmio;
     struct vmnga_vpc_msix_info msix_info;       /* misx interrupts ctrl struct */
     u32 dev_id;

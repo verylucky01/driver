@@ -7,8 +7,9 @@
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 # ------------------------------------------------------------------------------------------------------------
+
 if (${PRODUCT} STREQUAL ascend910B)
     add_subdirectory(v2)
-elseif(${PRODUCT} STREQUAL ascend910_95)
+elseif(${PRODUCT} STREQUAL ascend950)
     add_subdirectory(v3)
 endif()

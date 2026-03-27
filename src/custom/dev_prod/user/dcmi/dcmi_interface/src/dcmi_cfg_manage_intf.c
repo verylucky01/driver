@@ -287,8 +287,8 @@ int dcmi_set_device_mac(int card_id, int device_id, int mac_id, const char *mac_
         return err;
     }
 
-    if (dcmi_board_chip_type_is_ascend_910b_300i_a2()) {
-        gplog(LOG_ERR, "board_type is 910b 300i a2 and does not support set device mac.");
+    if (dcmi_board_chip_type_is_ascend_910b_300i_a2() || dcmi_board_chip_type_is_ascend_910_95_card()) {
+        gplog(LOG_OP, "This device does not support set device mac.");
         return DCMI_ERR_CODE_NOT_SUPPORT;
     }
 
@@ -384,16 +384,15 @@ int dcmi_set_device_share_config_recover_mode(unsigned int enable_flag)
     }
 
     if ((enable_flag != DCMI_CFG_RECOVER_ENABLE) && (enable_flag != DCMI_CFG_RECOVER_DISABLE)) {
-        gplog(LOG_ERR, "enable_flag [%u] is invalid.", enable_flag);
-        gplog(LOG_OP,
-            "int dcmi_set_device_share_config_recover_mode() parameter enable_flag [%u] is invalid.", enable_flag);
+        gplog(LOG_ERR,
+            "dcmi_set_device_share_config_recover_mode: parameter enable_flag [%u] is invalid.", enable_flag);
         return DCMI_ERR_CODE_INVALID_PARAMETER;
     }
 
     ret = dcmi_cfg_set_device_share_config_recover_mode(enable_flag);
     if (ret != DCMI_OK) {
         gplog(LOG_ERR, "set device-share config recover enable_flag %u failed. ret=%d", enable_flag, ret);
-        return DCMI_ERR_CODE_INNER_ERR;
+        return ret;
     }
 
     gplog(LOG_OP, "dcmi set device-share config recover enable_flag %s success",
@@ -653,12 +652,8 @@ int dcmi_set_device_ip(int card_id, int device_id, enum dcmi_port_type input_typ
         return err;
     }
 
-    if (dcmi_board_chip_type_is_ascend_310b() == TRUE) {
-        gplog(LOG_OP, "This device does not support set device ip.");
-        return DCMI_ERR_CODE_NOT_SUPPORT;
-    }
-
-    if (dcmi_board_chip_type_is_ascend_910b_300i_a2() == TRUE) {
+    if (dcmi_board_chip_type_is_ascend_310b() == TRUE || dcmi_board_chip_type_is_ascend_910b_300i_a2() == TRUE ||
+        dcmi_board_chip_type_is_ascend_910_95_card() == TRUE) {
         gplog(LOG_OP, "This device does not support set device ip.");
         return DCMI_ERR_CODE_NOT_SUPPORT;
     }

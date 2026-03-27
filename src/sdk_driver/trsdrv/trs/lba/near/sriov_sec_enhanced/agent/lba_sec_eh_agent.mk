@@ -35,6 +35,6 @@ EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/trsdrv/trs/lba/near/sriov_sec_enhanced/ag
 
 EXTRA_CFLAGS += -DCFG_FEATURE_HOST_LOG
 EXTRA_CFLAGS += -DCFG_FEATURE_TRS_SEC_EH_AGENT
-ifneq ($(filter $(PRODUCT), ascend910B),)
+ifneq ($(filter $(PRODUCT), ascend910B ascend950),)
     EXTRA_CFLAGS += -DCFG_FEATURE_KA_ALLOC_INTERFACE
 endif

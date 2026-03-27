@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,16 +10,15 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-#include <linux/fs.h>
-#include <linux/slab.h>
-#include <linux/uaccess.h>
-#include <linux/module.h>
-#include <linux/pci.h>
-#include <linux/version.h>
-#include <linux/hashtable.h>
-#include <linux/mutex.h>
-#include <linux/jhash.h>
-#include <linux/delay.h> /* msleep */
+
+#include "ka_system_pub.h"
+#include "ka_driver_pub.h"
+#include "ka_kernel_def_pub.h"
+#include "ka_fs_pub.h"
+#include "ka_ioctl_pub.h"
+#include "ka_pci_pub.h"
+#include "ka_errno_pub.h"
+#include "ka_memory_pub.h"
 #ifdef CFG_FEATURE_EXTERNAL_CDEV
 #include "pbl/pbl_davinci_api.h"
 #endif
@@ -31,51 +30,50 @@
 #include "esched_sysfs.h"
 #include "esched_adapt.h"
 #include "esched_fops.h"
-#include "ka_system_pub.h"
-#include "ka_driver_pub.h"
-
 
 struct sched_char_dev char_dev;
 
 #ifdef CFG_ENV_HOST
 #define PCI_VENDOR_ID_HUAWEI 0x19e5
 #define DEVDRV_DIVERSITY_PCIE_VENDOR_ID 0xFFFF
-const struct pci_device_id g_esched_driver_tbl[] = {{ PCI_VDEVICE(HUAWEI, 0xd100), 0 },
-                                                    { PCI_VDEVICE(HUAWEI, 0xd105), 0 },
-                                                    { PCI_VDEVICE(HUAWEI, 0xa126), 0 },
-                                                    { PCI_VDEVICE(HUAWEI, 0xd801), 0 },
-                                                    { PCI_VDEVICE(HUAWEI, 0xd500), 0 },
-                                                    { PCI_VDEVICE(HUAWEI, 0xd501), 0 },
-                                                    { PCI_VDEVICE(HUAWEI, 0xd802), 0 },
-                                                    { PCI_VDEVICE(HUAWEI, 0xd803), 0 },
-                                                    { PCI_VDEVICE(HUAWEI, 0xd804), 0 },
-                                                    { PCI_VDEVICE(HUAWEI, 0xd805), 0 },
-                                                    { PCI_VDEVICE(HUAWEI, 0xd806), 0 },
-                                                    { PCI_VDEVICE(HUAWEI, 0xd807), 0 },
+const ka_pci_device_id_t g_esched_driver_tbl[] = {{ KA_PCI_VDEVICE(HUAWEI, 0xd100), 0 },
+                                                    { KA_PCI_VDEVICE(HUAWEI, 0xd105), 0 },
+                                                    { KA_PCI_VDEVICE(HUAWEI, 0xa126), 0 },
+                                                    { KA_PCI_VDEVICE(HUAWEI, 0xd801), 0 },
+                                                    { KA_PCI_VDEVICE(HUAWEI, 0xd500), 0 },
+                                                    { KA_PCI_VDEVICE(HUAWEI, 0xd501), 0 },
+                                                    { KA_PCI_VDEVICE(HUAWEI, 0xd802), 0 },
+                                                    { KA_PCI_VDEVICE(HUAWEI, 0xd803), 0 },
+                                                    { KA_PCI_VDEVICE(HUAWEI, 0xd804), 0 },
+                                                    { KA_PCI_VDEVICE(HUAWEI, 0xd805), 0 },
+                                                    { KA_PCI_VDEVICE(HUAWEI, 0xd806), 0 },
+                                                    { KA_PCI_VDEVICE(HUAWEI, 0xd807), 0 },
                                                     { DEVDRV_DIVERSITY_PCIE_VENDOR_ID, 0xd500,
-                                                      PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
-                                                    { 0x20C6, 0xd500, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-                                                    { 0x203F, 0xd500, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-                                                    { 0x20C6, 0xd802, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-                                                    { 0x203F, 0xd802, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+                                                      KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+                                                    { 0x20C6, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+                                                    { 0x203F, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+                                                    { 0x20C6, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+                                                    { 0x203F, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+                                                    { 0x20E9, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+                                                    { 0x20E9, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
                                                     {}};
-MODULE_DEVICE_TABLE(pci, g_esched_driver_tbl);
+KA_MODULE_DEVICE_TABLE(pci, g_esched_driver_tbl);
 #endif
 
 #define ESCHED_HASH_TABLE_BIT 10
 #define ESCHED_HASH_TABLE_MASK ((0x1 << ESCHED_HASH_TABLE_BIT) - 1)
 
-STATIC DEFINE_HASHTABLE(esched_task_table, ESCHED_HASH_TABLE_BIT);
-STATIC DEFINE_MUTEX(esched_task_mutex);
+STATIC KA_DEFINE_HASHTABLE(esched_task_table, ESCHED_HASH_TABLE_BIT);
+STATIC KA_TASK_DEFINE_MUTEX(esched_task_mutex);
 
-int32_t copy_from_user_safe(void *to, const void __user *from, unsigned long n)
+int32_t copy_from_user_safe(void *to, const void __ka_user *from, unsigned long n)
 {
     if ((from == NULL) || (n == 0)) {
         sched_err("The variable from is NULL or n is zero.\n");
         return DRV_ERROR_INNER_ERR;
     }
 
-    if (copy_from_user(to, (void *)from, n) != 0) {
+    if (ka_base_copy_from_user(to, (void *)from, n) != 0) {
         sched_err("Failed to invoke the copy_from_user. (size=%lu)\n", n);
         return DRV_ERROR_INNER_ERR;
     }
@@ -83,14 +81,14 @@ int32_t copy_from_user_safe(void *to, const void __user *from, unsigned long n)
     return 0;
 }
 
-int32_t copy_to_user_safe(void __user *to, const void *from, unsigned long n)
+int32_t copy_to_user_safe(void __ka_user *to, const void *from, unsigned long n)
 {
     if ((to == NULL) || (n == 0)) {
         sched_err("The variable to is NULL or n is zero.\n");
         return DRV_ERROR_INNER_ERR;
     }
 
-    if (copy_to_user(to, (void *)from, n) != 0) {
+    if (ka_base_copy_to_user(to, (void *)from, n) != 0) {
         sched_err("Failed to invoke the copy from user. (size=%lu)\n", n);
         return DRV_ERROR_INNER_ERR;
     }
@@ -136,11 +134,11 @@ STATIC int32_t sched_fop_proc_add_grp(u32 devid, unsigned long arg)
 
 STATIC int32_t sched_get_tgid_by_vpid(int32_t vpid, int32_t *tgid)
 {
-    struct task_struct *task = NULL;
+    ka_task_struct_t *task = NULL;
 
-    rcu_read_lock();
-    task = get_pid_task(find_vpid(vpid), PIDTYPE_PID);
-    rcu_read_unlock();
+    ka_task_rcu_read_lock();
+    task = ka_task_get_pid_task(ka_task_find_vpid(vpid), KA_PIDTYPE_PID);
+    ka_task_rcu_read_unlock();
     if (task == NULL) {
 #ifndef CFG_FEATURE_LOG_OPTIMIZE
         sched_err("Failed to get pid task. (vpid=%d)\n", vpid);
@@ -149,7 +147,7 @@ STATIC int32_t sched_get_tgid_by_vpid(int32_t vpid, int32_t *tgid)
     }
 
     *tgid = task->pid;
-    put_task_struct(task);
+    ka_task_put_task_struct(task);
 
     return DRV_ERROR_NONE;
 }
@@ -235,7 +233,7 @@ STATIC int32_t sched_fop_set_event_priority(u32 devid, unsigned long arg)
         return DRV_ERROR_COPY_USER_FAIL;
     }
 
-    return sched_set_event_priority(sched_ioctl_devid(devid, para.dev_id), current->tgid, para.event_id, para.pri);
+    return sched_set_event_priority(sched_ioctl_devid(devid, para.dev_id), ka_task_get_current()->tgid, para.event_id, para.pri);
 }
 
 STATIC int32_t sched_fop_set_process_priority(u32 devid, unsigned long arg)
@@ -246,7 +244,7 @@ STATIC int32_t sched_fop_set_process_priority(u32 devid, unsigned long arg)
         return DRV_ERROR_COPY_USER_FAIL;
     }
 
-    return sched_set_process_priority(sched_ioctl_devid(devid, para.dev_id), current->tgid, para.pri);
+    return sched_set_process_priority(sched_ioctl_devid(devid, para.dev_id), ka_task_get_current()->tgid, para.pri);
 }
 
 STATIC int32_t sched_fop_thread_subscribe_event(u32 devid, unsigned long arg)
@@ -257,7 +255,7 @@ STATIC int32_t sched_fop_thread_subscribe_event(u32 devid, unsigned long arg)
         return DRV_ERROR_COPY_USER_FAIL;
     }
 
-    return sched_thread_subscribe_event(sched_ioctl_devid(devid, para.dev_id), current->tgid, para.gid,
+    return sched_thread_subscribe_event(sched_ioctl_devid(devid, para.dev_id), ka_task_get_current()->tgid, para.gid,
         para.tid, para.event_bitmap);
 }
 
@@ -271,7 +269,7 @@ static int32_t sched_fop_grp_set_max_event_num(u32 devid, unsigned long arg)
         return DRV_ERROR_COPY_USER_FAIL;
     }
 
-    return sched_grp_set_max_event_num(sched_ioctl_devid(devid, para.dev_id), current->tgid, para.gid,
+    return sched_grp_set_max_event_num(sched_ioctl_devid(devid, para.dev_id), ka_task_get_current()->tgid, para.gid,
         para.event_id, para.max_num);
 }
 
@@ -293,9 +291,9 @@ STATIC int32_t sched_fop_get_exact_event(u32 devid, unsigned long arg)
     para_info.event.msg = para->msg;
     para_info.event.msg_len = para->msg_len;
 
-    ret = sched_get_exact_event(sched_ioctl_devid(devid, para->dev_id), current->tgid, para->grp_id,
+    ret = sched_get_exact_event(sched_ioctl_devid(devid, para->dev_id), ka_task_get_current()->tgid, para->grp_id,
         para->thread_id, para->event_id, &para_info.event);
-    if (unlikely(ret != 0)) {
+    if (ka_unlikely(ret != 0)) {
         return ret;
     }
 
@@ -335,7 +333,7 @@ STATIC int32_t sched_fop_ack_event(u32 devid, unsigned long arg)
     ack_para.subevent_id = para_info.subevent_id;
     ack_para.msg = msg;
     ack_para.msg_len = para_info.msg_len;
-    return sched_ack_event(sched_ioctl_devid(devid, para_info.dev_id), current->tgid, &ack_para);
+    return sched_ack_event(sched_ioctl_devid(devid, para_info.dev_id), ka_task_get_current()->tgid, &ack_para);
 }
 
 STATIC int32_t sched_fop_wait_event(u32 devid, unsigned long arg)
@@ -357,9 +355,9 @@ STATIC int32_t sched_fop_wait_event(u32 devid, unsigned long arg)
     para_info.event.msg = para->msg;
     para_info.event.msg_len = para->msg_len;
 
-    ret = sched_wait_event(sched_ioctl_devid(devid, para->dev_id), current->tgid, para->grp_id,
+    ret = sched_wait_event(sched_ioctl_devid(devid, para->dev_id), ka_task_get_current()->tgid, para->grp_id,
         para->thread_id, para->timeout, &para_info.event);
-    if (unlikely(ret != 0)) {
+    if (ka_unlikely(ret != 0)) {
         return ret;
     }
 
@@ -386,7 +384,7 @@ STATIC int32_t sched_fop_get_event_trace(u32 devid, unsigned long arg)
     }
 
     ret = sched_get_event_trace(sched_ioctl_devid(devid, para.dev_id), para.buff, para.buff_len, &para.data_len);
-    if (unlikely(ret != 0)) {
+    if (ka_unlikely(ret != 0)) {
         return ret;
     }
 
@@ -442,10 +440,10 @@ int32_t sched_publish_event_para_check(struct sched_published_event_info *event_
 #if defined (CFG_ENV_HOST) && !defined (EVENT_SCHED_UT) && !defined (EMU_ST)
 STATIC int32_t sched_proc_mnt_ns_check(u32 chip_id, int pid)
 {
-    struct mnt_namespace *mnt_ns = NULL;
+    ka_mnt_namespace_t *mnt_ns = NULL;
 
     mnt_ns = sched_get_proc_mnt_ns(chip_id, pid);
-    if (mnt_ns != current->nsproxy->mnt_ns) {
+    if (mnt_ns != ka_task_get_current()->nsproxy->mnt_ns) {
         sched_err("Not in the same container. (chip_id=%u, pid=%d)\n", chip_id, pid);
         return DRV_ERROR_NOT_SUPPORT;
     }
@@ -479,7 +477,7 @@ int hal_kernel_sched_register_event_pre_proc_handle(unsigned int event_id, SCHED
     sched_err("Event has already been registered too many handle. (event_id=%u)\n", event_id);
     return DRV_ERROR_PARA_ERROR;
 }
-EXPORT_SYMBOL_GPL(hal_kernel_sched_register_event_pre_proc_handle);
+KA_EXPORT_SYMBOL_GPL(hal_kernel_sched_register_event_pre_proc_handle);
 
 void hal_kernel_sched_unregister_event_pre_proc_handle(unsigned int event_id, SCHED_PROC_POS pos, sched_event_pre_proc handle)
 {
@@ -497,7 +495,7 @@ void hal_kernel_sched_unregister_event_pre_proc_handle(unsigned int event_id, SC
         }
     }
 }
-EXPORT_SYMBOL_GPL(hal_kernel_sched_unregister_event_pre_proc_handle);
+KA_EXPORT_SYMBOL_GPL(hal_kernel_sched_unregister_event_pre_proc_handle);
 
 int sched_submit_event_pre_proc(unsigned int dev_id, SCHED_PROC_POS pos,
     struct sched_published_event_info *event_info, struct sched_published_event_func *event_func)
@@ -533,8 +531,8 @@ STATIC int32_t sched_submit_single_event(struct sched_numa_node *node, u32 event
 STATIC int32_t sched_submit_multi_events(struct sched_numa_node *node, u32 event_src,
     struct sched_published_event_info *event_info, struct sched_published_event_func *event_func, unsigned long arg)
 {
-    struct sched_ioctl_para_submit *usr_arg = (struct sched_ioctl_para_submit __user *)(uintptr_t)arg;
-    u32 stamp = (u32)jiffies;
+    struct sched_ioctl_para_submit *usr_arg = (struct sched_ioctl_para_submit __ka_user *)(uintptr_t)arg;
+    u32 stamp = (u32)ka_jiffies;
     unsigned int succ_num;
     int ret;
 
@@ -555,7 +553,7 @@ STATIC int32_t sched_submit_multi_events(struct sched_numa_node *node, u32 event
     if (event_info->event_num == succ_num) {
         return 0;
     } else if (succ_num != 0) {
-        put_user(succ_num, &usr_arg->event_info.event_num);
+        ka_base_put_user(succ_num, &usr_arg->event_info.event_num);
         return 0;
     } else {
         return ret;
@@ -578,11 +576,11 @@ STATIC int32_t sched_submit_check_master_pid(u32 chip_id, u32 dest_pid)
         return ret;
     }
 
-    if (device_master_pid == current->tgid) {
+    if (device_master_pid == ka_task_get_current()->tgid) {
         return 0;
     }
 
-    ret = hal_kernel_devdrv_query_process_host_pid(current->tgid, &dev_id, &vfid, &host_master_pid, &type);;
+    ret = hal_kernel_devdrv_query_process_host_pid(ka_task_get_current()->tgid, &dev_id, &vfid, &host_master_pid, &type);;
     if (ret != 0) {
         sched_err("Query master tgid by host slave failed. (chip_id=%u; dest_pid=%u; device_master_pid=%u; ret=%d)\n",
             chip_id, dest_pid, device_master_pid, ret);
@@ -726,7 +724,7 @@ int32_t hal_kernel_sched_submit_event(uint32_t chip_id, struct sched_published_e
     esched_dev_put(node);
     return ret;
 }
-EXPORT_SYMBOL_GPL(hal_kernel_sched_submit_event);
+KA_EXPORT_SYMBOL_GPL(hal_kernel_sched_submit_event);
 
 int32_t sched_submit_event_to_thread(uint32_t chip_id, struct sched_published_event *event)
 {
@@ -763,7 +761,7 @@ int32_t sched_submit_event_to_thread(uint32_t chip_id, struct sched_published_ev
     esched_dev_put(node);
     return ret;
 }
-EXPORT_SYMBOL_GPL(sched_submit_event_to_thread);
+KA_EXPORT_SYMBOL_GPL(sched_submit_event_to_thread);
 
 STATIC int32_t sched_fop_attach_proc_to_chip(u32 devid, unsigned long arg)
 {
@@ -773,7 +771,7 @@ STATIC int32_t sched_fop_attach_proc_to_chip(u32 devid, unsigned long arg)
         return DRV_ERROR_COPY_USER_FAIL;
     }
 
-    return sched_add_process(sched_ioctl_devid(devid, para.dev_id), current->tgid);
+    return sched_add_process(sched_ioctl_devid(devid, para.dev_id), ka_task_get_current()->tgid);
 }
 
 STATIC int32_t sched_fop_dettach_proc_from_chip(u32 devid, unsigned long arg)
@@ -784,7 +782,7 @@ STATIC int32_t sched_fop_dettach_proc_from_chip(u32 devid, unsigned long arg)
         return DRV_ERROR_COPY_USER_FAIL;
     }
 
-    return sched_del_process(sched_ioctl_devid(devid, para.dev_id), current->tgid);
+    return sched_del_process(sched_ioctl_devid(devid, para.dev_id), ka_task_get_current()->tgid);
 }
 
 STATIC int32_t sched_fop_query_sched_mode(u32 devid, unsigned long arg)
@@ -796,7 +794,7 @@ STATIC int32_t sched_fop_query_sched_mode(u32 devid, unsigned long arg)
         return DRV_ERROR_COPY_USER_FAIL;
     }
 
-    ret= sched_query_sched_mode(sched_ioctl_devid(devid, para.dev_id), current->tgid, &para.sched_mode);
+    ret= sched_query_sched_mode(sched_ioctl_devid(devid, para.dev_id), ka_task_get_current()->tgid, &para.sched_mode);
     if (ret != 0) {
         return ret;
     }
@@ -809,25 +807,25 @@ STATIC int32_t sched_fop_query_sched_mode(u32 devid, unsigned long arg)
 }
 
 STATIC int32_t (* sched_ioctl_handler[SCHED_CMD_MAX_NR])(u32 devid, unsigned long arg) = {
-    [_IOC_NR(SCHED_SET_SCHED_CPU_ID)] = sched_fop_set_sched_cpu,
-    [_IOC_NR(SCHED_PROC_ADD_GRP_ID)] = sched_fop_proc_add_grp,
-    [_IOC_NR(SCHED_SET_EVENT_PRIORITY_ID)] = sched_fop_set_event_priority,
-    [_IOC_NR(SCHED_SET_PROCESS_PRIORITY_ID)] = sched_fop_set_process_priority,
-    [_IOC_NR(SCHED_THREAD_SUBSCRIBE_EVENT_ID)] = sched_fop_thread_subscribe_event,
-    [_IOC_NR(SCHED_GET_EXACT_EVENT_ID)] = sched_fop_get_exact_event,
-    [_IOC_NR(SCHED_ACK_EVENT_ID)] = sched_fop_ack_event,
-    [_IOC_NR(SCHED_WAIT_EVENT_ID)] = sched_fop_wait_event,
-    [_IOC_NR(SCHED_SUBMIT_EVENT_ID)] = sched_fop_submit_event,
-    [_IOC_NR(SCHED_ATTACH_PROCESS_TO_CHIP_ID)] = sched_fop_attach_proc_to_chip,
-    [_IOC_NR(SCHED_DETTACH_PROCESS_FROM_CHIP_ID)] = sched_fop_dettach_proc_from_chip,
-    [_IOC_NR(SCHED_GRP_SET_EVENT_MAX_NUM)] = sched_fop_grp_set_max_event_num,
-    [_IOC_NR(SCHED_QUERY_INFO)] = sched_fop_query_info,
-    [_IOC_NR(SCHED_QUERY_SYNC_MSG_TRACE)] = sched_fop_query_sync_msg_trace,
-    [_IOC_NR(SCHED_GET_NODE_EVENT_TRACE)] = sched_fop_get_event_trace,
+    [_KA_IOC_NR(SCHED_SET_SCHED_CPU_ID)] = sched_fop_set_sched_cpu,
+    [_KA_IOC_NR(SCHED_PROC_ADD_GRP_ID)] = sched_fop_proc_add_grp,
+    [_KA_IOC_NR(SCHED_SET_EVENT_PRIORITY_ID)] = sched_fop_set_event_priority,
+    [_KA_IOC_NR(SCHED_SET_PROCESS_PRIORITY_ID)] = sched_fop_set_process_priority,
+    [_KA_IOC_NR(SCHED_THREAD_SUBSCRIBE_EVENT_ID)] = sched_fop_thread_subscribe_event,
+    [_KA_IOC_NR(SCHED_GET_EXACT_EVENT_ID)] = sched_fop_get_exact_event,
+    [_KA_IOC_NR(SCHED_ACK_EVENT_ID)] = sched_fop_ack_event,
+    [_KA_IOC_NR(SCHED_WAIT_EVENT_ID)] = sched_fop_wait_event,
+    [_KA_IOC_NR(SCHED_SUBMIT_EVENT_ID)] = sched_fop_submit_event,
+    [_KA_IOC_NR(SCHED_ATTACH_PROCESS_TO_CHIP_ID)] = sched_fop_attach_proc_to_chip,
+    [_KA_IOC_NR(SCHED_DETTACH_PROCESS_FROM_CHIP_ID)] = sched_fop_dettach_proc_from_chip,
+    [_KA_IOC_NR(SCHED_GRP_SET_EVENT_MAX_NUM)] = sched_fop_grp_set_max_event_num,
+    [_KA_IOC_NR(SCHED_QUERY_INFO)] = sched_fop_query_info,
+    [_KA_IOC_NR(SCHED_QUERY_SYNC_MSG_TRACE)] = sched_fop_query_sync_msg_trace,
+    [_KA_IOC_NR(SCHED_GET_NODE_EVENT_TRACE)] = sched_fop_get_event_trace,
 #ifdef CFG_FEATURE_TRACE_RECOED
-    [_IOC_NR(SCHED_TRIGGER_SCHED_TRACE_RECORD_VALUE)] = sched_fop_trigger_sched_trace_record,
+    [_KA_IOC_NR(SCHED_TRIGGER_SCHED_TRACE_RECORD_VALUE)] = sched_fop_trigger_sched_trace_record,
 #endif
-    [_IOC_NR(SCHED_QUERY_SCHED_MODE)] = sched_fop_query_sched_mode,
+    [_KA_IOC_NR(SCHED_QUERY_SCHED_MODE)] = sched_fop_query_sched_mode,
 };
 
 void esched_register_ioctl_cmd_func(int nr, int32_t (*fn)(u32 devid, unsigned long arg))
@@ -840,7 +838,7 @@ STATIC struct sched_task *esched_task_hash_find(int pid, unsigned int devid)
     struct sched_task *task = NULL;
     int key = pid & ESCHED_HASH_TABLE_MASK;
 
-    hash_for_each_possible(esched_task_table, task, hnode, key)
+    ka_hash_for_each_possible(esched_task_table, task, hnode, key)
         if ((task->pid == pid) && (task->devid == devid)) {
             return task;
         }
@@ -852,7 +850,7 @@ STATIC void esched_task_hash_add(struct sched_task *task)
 {
     int key = task->pid & ESCHED_HASH_TABLE_MASK;
 
-    hash_add(esched_task_table, &task->hnode, key);
+    ka_hash_add(esched_task_table, &task->hnode, key);
 }
 
 STATIC void esched_task_hash_del(int pid, unsigned int devid)
@@ -860,9 +858,9 @@ STATIC void esched_task_hash_del(int pid, unsigned int devid)
     struct sched_task *task_tmp = NULL;
     int key = (pid) & ESCHED_HASH_TABLE_MASK;
     
-    hash_for_each_possible(esched_task_table, task_tmp, hnode, key)
+    ka_hash_for_each_possible(esched_task_table, task_tmp, hnode, key)
         if ((task_tmp->pid == pid) && (task_tmp->devid == devid)) {
-            hash_del(&task_tmp->hnode);
+            ka_hash_del(&task_tmp->hnode);
         }
 }
 STATIC int32_t esched_wait_task_release_finish(unsigned int devid)
@@ -871,13 +869,13 @@ STATIC int32_t esched_wait_task_release_finish(unsigned int devid)
     struct sched_task *task = NULL;
 
     while (timeout_cnt > 0) {
-        msleep(ESCHED_MSLEEP_TIME);
-        mutex_lock(&esched_task_mutex);
-        task = esched_task_hash_find((int)current->tgid, devid);
-        mutex_unlock(&esched_task_mutex);
+        ka_system_msleep(ESCHED_MSLEEP_TIME);
+        ka_task_mutex_lock(&esched_task_mutex);
+        task = esched_task_hash_find((int)ka_task_get_current()->tgid, devid);
+        ka_task_mutex_unlock(&esched_task_mutex);
         if (task == NULL) {
             sched_info("Wait pre release finish success. (devid=%u; pid=%u; remain_cnt=%u)\n",
-                devid, (unsigned int)current->tgid, (ESCHED_MAX_TIMEOUT_CNT - timeout_cnt));
+                devid, (unsigned int)ka_task_get_current()->tgid, (ESCHED_MAX_TIMEOUT_CNT - timeout_cnt));
             return DRV_ERROR_NONE;
         }
         timeout_cnt--;
@@ -885,7 +883,7 @@ STATIC int32_t esched_wait_task_release_finish(unsigned int devid)
     return DRV_ERROR_WAIT_TIMEOUT;
 }
 
-STATIC int32_t sched_fop_open(struct inode *inode, struct file *filep)
+STATIC int32_t sched_fop_open(ka_inode_t *inode, ka_file_t *filep)
 {
     struct sched_task *task = NULL;
     struct sched_numa_node *node;
@@ -897,37 +895,37 @@ STATIC int32_t sched_fop_open(struct inode *inode, struct file *filep)
 #ifdef CFG_FEATURE_EXTERNAL_CDEV
     devid = drv_davinci_get_device_id(filep);
 #endif
-    mutex_lock(&esched_task_mutex);
+    ka_task_mutex_lock(&esched_task_mutex);
 
-    task = esched_task_hash_find((int)current->tgid, devid);
+    task = esched_task_hash_find((int)ka_task_get_current()->tgid, devid);
     if ((task != NULL) && (task->status == TASK_RELEASE_INACTIVE)) {
-        mutex_unlock(&esched_task_mutex);
-        sched_err("esched has been opened by task.(pid=%d)\n", current->tgid);
+        ka_task_mutex_unlock(&esched_task_mutex);
+        sched_err("esched has been opened by task.(pid=%d)\n", ka_task_get_current()->tgid);
         return DRV_ERROR_OPEN_FAILED;
     }
 
     if ((task != NULL) && (task->status == TASK_RELEASE_ACTIVE)) {
-        mutex_unlock(&esched_task_mutex);
+        ka_task_mutex_unlock(&esched_task_mutex);
         ret = esched_wait_task_release_finish(devid);
         if (ret != DRV_ERROR_NONE) {
-            sched_err("Pre-esched task not be released.(pid=%d)\n", current->tgid);
+            sched_err("Pre-esched task not be released.(pid=%d)\n", ka_task_get_current()->tgid);
             return DRV_ERROR_OPEN_FAILED;
         }
-        mutex_lock(&esched_task_mutex);
+        ka_task_mutex_lock(&esched_task_mutex);
     }
 
-    task = kzalloc(sizeof(*task), GFP_KERNEL | __GFP_ACCOUNT);
-    if (unlikely(task == NULL)) {
-        mutex_unlock(&esched_task_mutex);
-        sched_err("esched alloc task memory failed.(pid=%d)\n", current->tgid);
+    task = ka_mm_kzalloc(sizeof(*task), KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
+    if (ka_unlikely(task == NULL)) {
+        ka_task_mutex_unlock(&esched_task_mutex);
+        sched_err("esched alloc task memory failed.(pid=%d)\n", ka_task_get_current()->tgid);
         return DRV_ERROR_OUT_OF_MEMORY;
     }
 
 #ifdef CFG_FEATURE_EXTERNAL_CDEV
     if (devid != uda_get_host_id()) {
         if (!uda_can_access_udevid(devid)) {
-            kfree(task);
-            mutex_unlock(&esched_task_mutex);
+            ka_mm_kfree(task);
+            ka_task_mutex_unlock(&esched_task_mutex);
             sched_err("Failed to check device in container. (devid=%u)\n", devid);
             return DRV_ERROR_INVALID_DEVICE;
         }
@@ -935,8 +933,8 @@ STATIC int32_t sched_fop_open(struct inode *inode, struct file *filep)
 
     node = esched_dev_get(devid);
     if (node == NULL) {
-        kfree(task);
-        mutex_unlock(&esched_task_mutex);
+        ka_mm_kfree(task);
+        ka_task_mutex_unlock(&esched_task_mutex);
         sched_err("Invalid device. (devid=%u)\n", devid);
         return DRV_ERROR_INVALID_DEVICE;
     }
@@ -945,17 +943,17 @@ STATIC int32_t sched_fop_open(struct inode *inode, struct file *filep)
 #endif
 
     task->devid = devid;
-    task->pid = current->tgid;
+    task->pid = ka_task_get_current()->tgid;
     task->status = TASK_RELEASE_INACTIVE;
     esched_task_hash_add(task);
     filep->private_data = (void *)task;
 
-    mutex_unlock(&esched_task_mutex);
+    ka_task_mutex_unlock(&esched_task_mutex);
 
     return 0;
 }
 
-STATIC int32_t sched_fop_release(struct inode *inode, struct file *filep)
+STATIC int32_t sched_fop_release(ka_inode_t *inode, ka_file_t *filep)
 {
 #ifndef CFG_SOC_PLATFORM_CLOUD_V4
     struct sched_task *task = filep->private_data;
@@ -992,11 +990,11 @@ STATIC int32_t sched_fop_release(struct inode *inode, struct file *filep)
     }
 #endif
 
-    mutex_lock(&esched_task_mutex);
+    ka_task_mutex_lock(&esched_task_mutex);
     esched_task_hash_del(pid, devid);
-    mutex_unlock(&esched_task_mutex);
+    ka_task_mutex_unlock(&esched_task_mutex);
  
-    kfree(task);
+    ka_mm_kfree(task);
     module_feature_auto_uninit_task(0, pid, NULL);
 #endif
 
@@ -1004,7 +1002,7 @@ STATIC int32_t sched_fop_release(struct inode *inode, struct file *filep)
 }
 
 #ifdef CFG_FEATURE_EXTERNAL_CDEV
-STATIC int sched_pre_release(struct file *filep, unsigned long mode)
+STATIC int sched_pre_release(ka_file_t *filep, unsigned long mode)
 {
     struct sched_task *task = filep->private_data;
 
@@ -1028,11 +1026,11 @@ STATIC int sched_pre_release(struct file *filep, unsigned long mode)
 
     esched_dev_put(node);
 
-    mutex_lock(&esched_task_mutex);
+    ka_task_mutex_lock(&esched_task_mutex);
     esched_task_hash_del(pid, devid);
-    mutex_unlock(&esched_task_mutex);
+    ka_task_mutex_unlock(&esched_task_mutex);
 
-    kfree(task);
+    ka_mm_kfree(task);
     module_feature_auto_uninit_task(0, pid, NULL);
 #else
     if (task == NULL) {
@@ -1048,20 +1046,20 @@ STATIC int sched_pre_release(struct file *filep, unsigned long mode)
 
 STATIC long _sched_fop_ioctl(uint32_t devid, uint32_t cmd, unsigned long arg)
 {
-    if (_IOC_NR(cmd) >= SCHED_CMD_MAX_NR) {
-        sched_err("The command is invalid, which is out of range. (cmd=%u)\n", _IOC_NR(cmd));
+    if (_KA_IOC_NR(cmd) >= SCHED_CMD_MAX_NR) {
+        sched_err("The command is invalid, which is out of range. (cmd=%u)\n", _KA_IOC_NR(cmd));
         return DRV_ERROR_INNER_ERR;
     }
 
-    if (sched_ioctl_handler[_IOC_NR(cmd)] == NULL) {
-        sched_err("The command is invalid. (cmd=%u)\n", _IOC_NR(cmd));
+    if (sched_ioctl_handler[_KA_IOC_NR(cmd)] == NULL) {
+        sched_err("The command is invalid. (cmd=%u)\n", _KA_IOC_NR(cmd));
         return DRV_ERROR_INNER_ERR;
     }
 
-    return sched_ioctl_handler[_IOC_NR(cmd)](devid, arg);
+    return sched_ioctl_handler[_KA_IOC_NR(cmd)](devid, arg);
 }
 
-STATIC long sched_fop_ioctl(struct file *filep, uint32_t cmd, unsigned long arg)
+STATIC long sched_fop_ioctl(ka_file_t *filep, uint32_t cmd, unsigned long arg)
 {
 #ifdef CFG_FEATURE_EXTERNAL_CDEV
     struct sched_numa_node *node = NULL;
@@ -1076,7 +1074,7 @@ STATIC long sched_fop_ioctl(struct file *filep, uint32_t cmd, unsigned long arg)
     }
     pid = (int)task->pid;
 
-    if (pid != current->tgid) { /* forked-process use father process fd, is not support */
+    if (pid != ka_task_get_current()->tgid) { /* forked-process use father process fd, is not support */
         return DRV_ERROR_FILE_OPS;
     }
 
@@ -1097,8 +1095,8 @@ STATIC long sched_fop_ioctl(struct file *filep, uint32_t cmd, unsigned long arg)
     return ret;
 }
 
-STATIC const struct file_operations event_sched_fops = {
-    .owner = THIS_MODULE,
+STATIC const ka_file_operations_t event_sched_fops = {
+    .owner = KA_THIS_MODULE,
     .open = sched_fop_open,
     .release = sched_fop_release,
     .unlocked_ioctl = sched_fop_ioctl,
@@ -1111,38 +1109,38 @@ static const struct notifier_operations event_notifier_ops = {
 #endif
 
 #if (!defined CFG_FEATURE_EXTERNAL_CDEV) 
-STATIC char *sched_devnode(struct device *dev, umode_t *mode)
+STATIC char *sched_devnode(ka_device_t *dev, umode_t *mode)
 {
     return NULL;
 }
-typedef char* (*const_sched_devnode)(const struct device *dev, umode_t *mode); // define function pointer
+typedef char* (*const_sched_devnode)(const ka_device_t *dev, umode_t *mode); // define function pointer
 
 STATIC int32_t sched_register_driver(void)
 {
     int32_t ret;
 
-    ret = alloc_chrdev_region(&char_dev.devno, 0, MINOR_DEV_COUNT, SCHED_CHAR_DEV_NAME);
+    ret = ka_fs_alloc_chrdev_region(&char_dev.devno, 0, MINOR_DEV_COUNT, SCHED_CHAR_DEV_NAME);
     if (ret < 0) {
         sched_err("Failed to invoke the alloc_chrdev_region. (ret=%d)\n", ret);
         return DRV_ERROR_INNER_ERR;
     }
 
-    cdev_init(&char_dev.cdev, &event_sched_fops);
-    char_dev.cdev.owner = THIS_MODULE;
+    ka_fs_cdev_init(&char_dev.cdev, &event_sched_fops);
+    char_dev.cdev.owner = KA_THIS_MODULE;
 
-    if (cdev_add(&char_dev.cdev, char_dev.devno, 1) != 0) {
+    if (ka_fs_cdev_add(&char_dev.cdev, char_dev.devno, 1) != 0) {
         sched_err("Failed to invoke the cdev_add. (devno=%u)\n", char_dev.devno);
         goto unregister_chrdev_region;
     }
 
-    char_dev.dev_class = ka_driver_class_create(THIS_MODULE, SCHED_CHAR_DEV_NAME);
-    if (IS_ERR(char_dev.dev_class)) {
+    char_dev.dev_class = ka_driver_class_create(KA_THIS_MODULE, SCHED_CHAR_DEV_NAME);
+    if (KA_IS_ERR(char_dev.dev_class)) {
         sched_err("Failed to invoke the class_create.\n");
         goto cdev_del;
     }
     ka_driver_class_set_devnode(char_dev.dev_class, sched_devnode);
-    char_dev.device = device_create(char_dev.dev_class, NULL, char_dev.devno, NULL, SCHED_CHAR_DEV_NAME);
-    if (IS_ERR(char_dev.device)) {
+    char_dev.device = ka_driver_device_create(char_dev.dev_class, NULL, char_dev.devno, NULL, SCHED_CHAR_DEV_NAME);
+    if (KA_IS_ERR(char_dev.device)) {
         sched_err("Failed to invoke the device_create.\n");
         goto class_destroy;
     }
@@ -1151,20 +1149,20 @@ STATIC int32_t sched_register_driver(void)
     return 0;
 
 class_destroy:
-    class_destroy(char_dev.dev_class);
+    ka_driver_class_destroy(char_dev.dev_class);
 cdev_del:
-    cdev_del(&char_dev.cdev);
+    ka_fs_cdev_del(&char_dev.cdev);
 unregister_chrdev_region:
-    unregister_chrdev_region(char_dev.devno, 1);
+    ka_fs_unregister_chrdev_region(char_dev.devno, 1);
     return DRV_ERROR_INNER_ERR;
 }
 
 STATIC void sched_unregister_driver(void)
 {
-    device_destroy(char_dev.dev_class, char_dev.devno);
-    class_destroy(char_dev.dev_class);
-    cdev_del(&char_dev.cdev);
-    unregister_chrdev_region(char_dev.devno, 1);
+    ka_driver_device_destroy(char_dev.dev_class, char_dev.devno);
+    ka_driver_class_destroy(char_dev.dev_class);
+    ka_fs_cdev_del(&char_dev.cdev);
+    ka_fs_unregister_chrdev_region(char_dev.devno, 1);
 }
 #endif
 
@@ -1206,7 +1204,7 @@ STATIC void sched_unregister_cdev(void)
 STATIC void sched_debugfs_init(void)
 {
 #if defined(CFG_FEATURE_EXTERNAL_CDEV)
-    struct device *dev = NULL;
+    ka_device_t *dev = NULL;
 
     dev = davinci_intf_get_owner_device();
     if (dev == NULL) {
@@ -1223,7 +1221,7 @@ STATIC void sched_debugfs_init(void)
 STATIC void sched_debugfs_uninit(void)
 {
 #if defined(CFG_FEATURE_EXTERNAL_CDEV)
-    struct device *dev = NULL;
+    ka_device_t *dev = NULL;
 
     dev = davinci_intf_get_owner_device();
     if (dev == NULL) {
@@ -1287,12 +1285,12 @@ STATIC void __exit sched_exit_module(void)
     sched_debug("Called sched_exit_module successfully.\n");
 }
 
-module_init(sched_init_module);
-module_exit(sched_exit_module);
+ka_module_init(sched_init_module);
+ka_module_exit(sched_exit_module);
 
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Huawei Tech. Co., Ltd.");
-MODULE_DESCRIPTION("SCHEDULER DRIVER");
+KA_MODULE_LICENSE("GPL");
+KA_MODULE_AUTHOR("Huawei Tech. Co., Ltd.");
+KA_MODULE_DESCRIPTION("SCHEDULER DRIVER");
 #if defined(CFG_FEATURE_HARDWARE_MIA) && defined(CFG_ENV_HOST)
-MODULE_SOFTDEP("pre: asdrv_vtrs");
+KA_MODULE_SOFTDEP("pre: asdrv_vtrs");
 #endif

@@ -252,6 +252,7 @@ const char *drv_log_get_module_str_inner(enum devdrv_module_type module)
         [HAL_MODULE_TYPE_COMMON] = "common",
         [HAL_MODULE_TYPE_LIDAR_DP] = "lidar_dp",
         [HAL_MODULE_TYPE_ADSPC] = "adspc",
+        [HAL_MODULE_TYPE_APM] = "apm",
     };
     uint32_t module_type = (uint32_t)module;
 
@@ -459,4 +460,49 @@ uint32_t get_log_level_shift_inner(uint32_t level)
  
 void (*get_log_print_inner(void))(int32_t, int32_t, const char *, ...) {
     return g_log_print_info.log_print;
+}
+
+static struct err_msg_report_handle g_report_err_msg_info;
+
+int32_t drv_log_report_err_msg_handle_register_impl(struct err_msg_report_handle *handle, size_t input_size)
+{
+    if (input_size != sizeof(struct err_msg_report_handle) || handle == NULL) {
+        return DRV_ERROR_INVALID_VALUE;
+    }
+    if (handle->register_format_func == NULL || handle->predefined_report_func == NULL ||
+        handle->inner_report_func == NULL) {
+        return DRV_ERROR_INVALID_VALUE;
+    }
+    if (g_report_err_msg_info.is_registered == 1) {
+        return DRV_ERROR_REPEATED_INIT;
+    }
+    g_report_err_msg_info.register_format_func = handle->register_format_func;
+    g_report_err_msg_info.predefined_report_func = handle->predefined_report_func;
+    g_report_err_msg_info.inner_report_func = handle->inner_report_func;
+    g_report_err_msg_info.is_registered = 1;
+    return DRV_ERROR_NONE;
+}
+
+int32_t drv_log_report_err_msg_handle_unregister_impl(void)
+{
+    g_report_err_msg_info.register_format_func = NULL;
+    g_report_err_msg_info.predefined_report_func = NULL;
+    g_report_err_msg_info.inner_report_func = NULL;
+    g_report_err_msg_info.is_registered = 0;
+    return DRV_ERROR_NONE;
+}
+
+register_format_err_msg_func get_format_err_msg_register_func_impl(void)
+{
+    return g_report_err_msg_info.register_format_func;
+}
+
+report_predefined_err_msg_func get_predefined_err_msg_report_func_impl(void)
+{
+    return g_report_err_msg_info.predefined_report_func;
+}
+
+report_inner_err_msg_func get_inner_err_msg_report_func_impl(void) 
+{ 
+    return g_report_err_msg_info.inner_report_func; 
 }

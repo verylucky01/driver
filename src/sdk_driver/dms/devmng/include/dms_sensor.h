@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,10 +14,7 @@
 #ifndef __DMS_SENSOR_H__
 #define __DMS_SENSOR_H__
 
-#include <linux/list.h>
-#include <linux/kthread.h>
-#include <linux/timer.h>
-#include <linux/mutex.h>
+#include "ka_system_pub.h"
 #include "dms_kernel_version_adapt.h"
 #include "dms/dms_interface.h"
 #include "kernel_version_adapt.h"
@@ -152,8 +149,8 @@ void dms_exit_dev_sensor_cb(struct dms_dev_sensor_cb *dev_sensor_cb);
 int dms_sensor_scan_one_node_object(struct dms_dev_sensor_cb *dev_sensor_cb,
     struct dms_node_sensor_cb *node_sensor_cb, struct dms_sensor_object_cb *psensor_obj_cb,
     struct dms_sensor_scan_time_recorder *ptime_recorder);
-unsigned long dms_get_time_change(ktime_t start, ktime_t end);
-unsigned long dms_get_time_change_ms(ktime_t start, ktime_t end);
+unsigned long dms_get_time_change(ka_ktime_t start, ka_ktime_t end);
+unsigned long dms_get_time_change_ms(ka_ktime_t start, ka_ktime_t end);
 int dms_mgnt_clockid_init(void);
 int dms_sensor_inject_fault(void *feature, char *in, u32 in_len, char *out, u32 out_len);
 int dms_sensor_get_fault_inject_info(void *feature, char *in, u32 in_len, char *out, u32 out_len);

@@ -18,6 +18,7 @@
 #include "pbl/pbl_uda.h"
 #include "devdrv_user_common.h"
 #include "devdrv_manager_common.h"
+#include "comm_kernel_interface.h"
 #include "devdrv_manager_dev_share.h"
 
 #define DEVDRV_GET_DEVICE_SHARE 0

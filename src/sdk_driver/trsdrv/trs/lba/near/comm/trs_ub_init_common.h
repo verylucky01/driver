@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -38,6 +38,7 @@
 #define TRS_UB_SQ_TAIL_BUFFER_SIZE      2U
 #define TRS_UB_SQ_BUFFER_SIZE           (TRS_UB_SQ_HEAD_BUFFER_SIZE + TRS_UB_SQ_TAIL_BUFFER_SIZE)
 #define TRS_UB_SQ_SEG_SIZE              (TRS_UB_SQ_BUFFER_SIZE * TRS_UB_HOST_SQ_MAX)
+#define TRS_UB_REG_SEG_SIZE             4096U
 
 struct trs_ub_seg {
     size_t seg_size;
@@ -93,16 +94,22 @@ struct trs_ub_dev {
     struct ubcore_device *ubc_dev;
     struct ubcore_eid_info eid_info;
     struct trs_jetty_info jetty_info[TRS_VF_MAX_NUM];
+    struct ubcore_target_seg *notify_tseg;
+    struct ubcore_target_seg *cnt_notify_tseg;
 #ifdef TRS_HOST
     struct trs_ub_seg sq_seg;
     struct trs_ub_cq_ctx cq_ctx[TRS_UB_HOST_CQ_MAX];
     ka_rwlock_t rw_lock;
+    struct trs_ub_seg reg_seg;
+    ka_rwlock_t reg_rw_lock;
     void *cq_irq_para;
     int (*cq_irq_handler)(int irq_type, int irq_index, void *para, u32 cqid[], u32 cq_num);
 #else
     u32 db_offset_len;
     uintptr_t db_base_addr;
     uintptr_t urpc_cqe_addr;
+    void *notify_kva;
+    void *cnt_notify_kva;
 #endif
 };
 
@@ -129,6 +136,8 @@ void trs_ub_cq_jetty_uninit(struct trs_ub_dev *ub_dev, u32 vfid);
 
 int trs_ub_create_jetty(struct trs_ub_dev *ub_dev, u32 vfid);
 void trs_ub_destroy_jetty(struct trs_ub_dev *ub_dev, u32 vfid);
+
+int trs_ub_stars_soc_res_ctrl(struct trs_id_inst *inst, u32 type, u32 id, u32 cmd);
 
 #endif /* TRS_UB_INIT_COMMON_H */
 

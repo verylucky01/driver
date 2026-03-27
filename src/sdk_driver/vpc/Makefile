@@ -25,7 +25,7 @@ endif
 
 EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/inc
 EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/kernel_adapt/include
-EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/vmng/command
+EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/vmng/command/msg
 EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/vmng/inc
 EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/vpc/common
 EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/kernel_adapt/include
@@ -44,7 +44,7 @@ EXTRA_CFLAGS += -isystem $(shell $(CC) -print-file-name=include)
 EXTRA_CFLAGS += -DCFG_FEATURE_KA_ALLOC_INTERFACE
 EXTRA_CFLAGS += -DCFG_FEATURE_HOST_LOG
 
-ifneq ($(filter $(PRODUCT), ascend910_95),)
+ifneq ($(filter $(PRODUCT), ascend950),)
 	EXTRA_CFLAGS += -DCFG_SOC_PLATFORM_CLOUD_V4
 endif
 

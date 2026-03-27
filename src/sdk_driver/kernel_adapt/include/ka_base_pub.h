@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -50,6 +50,9 @@
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 #include <linux/refcount.h>
 #endif
+#ifdef CFG_FEATURE_CLOCKID_CONFIG
+#include <linux/virt_wall_time.h>
+#endif
 #include <linux/irq.h>
 #include <linux/irqdesc.h>
 #if defined(__sw_64__)
@@ -74,9 +77,16 @@
 #include <linux/stat.h>
 #include <linux/posix_types.h>
 #include <linux/msi.h>
+#include <linux/radix-tree.h>
 #if LINUX_VERSION_CODE > KERNEL_VERSION(6, 6, 0)
 #include <linux/pci_regs.h>
 #endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
+#include <linux/bits.h>
+#else
+#include <linux/bitops.h>
+#endif
+#include <asm/unaligned.h>
 
 #include "ka_common_pub.h"
 #include "ka_custom_header_pub.h"
@@ -102,13 +112,16 @@ typedef struct rb_root ka_rb_root_t;
 typedef struct idr ka_idr_t;
 typedef struct ida ka_ida_t;
 
+typedef struct kfifo ka_kfifo_t;
 typedef struct __kfifo __ka_kfifo_t;
+typedef struct msi_desc ka_msi_desc_t;
 
 typedef struct dql ka_dql_t;
 typedef struct fasync_struct ka_fasync_struct_t;
 typedef struct proc_dir_entry ka_proc_dir_entry_t;
 typedef struct seq_operations ka_seq_operations_t;
 typedef struct poll_table_struct ka_poll_table_struct_t;
+typedef struct kobj_attribute ka_base_kobj_attribute_t;
 
 typedef struct module ka_module_t;
 #define __ka_poll_t __poll_t
@@ -116,10 +129,15 @@ typedef struct kref ka_kref_t;
 typedef struct refcount_struct ka_refcount_struct_t;
 typedef struct completion ka_completion_t;
 typedef struct cpumask ka_cpumask_t;
+typedef cpumask_var_t ka_cpumask_var_t;
 #define ka_gfp_t gfp_t
 #define ka_clockid_t clockid_t
 #define ka_dev_t dev_t
 typedef struct device_type ka_device_type_t;
+typedef va_list ka_va_list;
+#define ka_va_copy(d, s) va_copy(d, s)
+#define ka_va_end(v) va_end(v)
+#define ka_va_start(v, l) va_start(v, l)
 
 #define KA_BASE_ARRAY_SIZE(x)  ARRAY_SIZE(x)
 #define KA_BASE_ATOMIC_INIT(i) ATOMIC_INIT(i)
@@ -132,6 +150,12 @@ typedef struct device_type ka_device_type_t;
 #define ka_base_min(x, y)                   min(x, y)
 #define ka_base_min_t(type, x, y)           min_t(type, x, y)
 #define ka_base_max_t(type, x, y)           max_t(type, x, y)
+
+#ifndef BITS_PER_LONG_LONG
+#define KA_BITS_PER_LONG_LONG               64
+#else
+#define KA_BITS_PER_LONG_LONG               BITS_PER_LONG_LONG
+#endif
 
 #define KA_BITS_PER_BYTE                    BITS_PER_BYTE
 #define KA_BASE_BITS_PER_TYPE(type)         BITS_PER_TYPE(type)
@@ -215,9 +239,26 @@ static inline ka_rb_node_t **ka_base_get_rb_node_right_addr(ka_rb_node_t *node)
 #define ka_base_idr_get_next_ul(idr, nextid) idr_get_next_ul(idr, nextid)
 #define ka_base_idr_get_next(idr, nextid) idr_get_next(idr, nextid)
 #define ka_base_idr_find(idr, id) idr_find(idr, id)
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 #define ka_base_idr_remove(idr, id) idr_remove(idr, id)
+#else
+static inline void *ka_base_idr_remove(ka_idr_t *idp, int id)
+{
+    void *priv = NULL;
+
+    priv = idr_find(idp, id);
+    if (priv != NULL) {
+        idr_remove(idp, id);
+    }
+    return priv;
+}
+#endif
+
 #define ka_base_idr_init_base(idr, base) idr_init_base(idr, base)
 #define ka_base_idr_is_empty(idr) idr_is_empty(idr)
+#define ka_base_idr_lock(idr) idr_lock(idr)
+#define ka_base_idr_unlock(idr) idr_unlock(idr)
 
 #define ka_base_ida_destroy(ida) ida_destroy(ida)
 #define ka_base_ida_alloc_range(ida, min, max, gfp) ida_alloc_range(ida, min, max, gfp)
@@ -262,14 +303,46 @@ static inline void ka_base_set_kobj_parent(ka_kobject_t *kobj, ka_kobject_t *par
 
 typedef struct gen_pool ka_gen_pool_t;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)
+#define KA_BASE_DEFINE_GEN_POOL_ALGO(genpool_algo_func_name)      \
+static unsigned long ka_##genpool_algo_func_name(unsigned long *map,  \
+			unsigned long size, \
+			unsigned long start, \
+			unsigned int nr, \
+			void *data, ka_gen_pool_t *pool, \
+			unsigned long start_addr) \
+{ \
+    return genpool_algo_func_name(map, size, start, nr, data, pool, start_addr); \
+}
+#else
+#define KA_BASE_DEFINE_GEN_POOL_ALGO(genpool_algo_func_name) \
+static unsigned long ka_##genpool_algo_func_name(unsigned long *map, \
+			unsigned long size, \
+			unsigned long start, \
+			unsigned int nr, \
+			void *data, ka_gen_pool_t *pool) \
+{ \
+    return genpool_algo_func_name(map, size, start, nr, data, pool, 0); \
+}
+#endif
+
+#define KA_BASE_GEN_POOL_ALGO_NAME(genpool_algo_func_name)    (ka_##genpool_algo_func_name)
+
 #define ka_base_gen_pool_create(min_alloc_order, nid) gen_pool_create(min_alloc_order, nid)
 #define ka_base_gen_pool_destroy(pool) gen_pool_destroy(pool)
 #define ka_base_gen_pool_virt_to_phys(pool, addr) gen_pool_virt_to_phys(pool, addr)
+#define ka_base_gen_pool_add(pool, addr, size, nid) gen_pool_add(pool, addr, size, nid)
 #define ka_base_gen_pool_add_virt(pool, virt, phys, size, nid) gen_pool_add_virt(pool, virt, phys, size, nid)
 #define ka_base_gen_pool_avail(pool) gen_pool_avail(pool)
 #define ka_base_gen_pool_size(pool) gen_pool_size(pool)
 #define ka_base_gen_pool_alloc(pool, size) gen_pool_alloc(pool, size)
 #define ka_base_gen_pool_free(pool, addr, size) gen_pool_free(pool, addr, size)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)
+#define ka_base_gen_pool_first_fit(map, size, start, nr, data, pool, start_addr) gen_pool_first_fit(map, size, start, nr, data, pool, start_addr)
+#else
+#define ka_base_gen_pool_first_fit(map, size, start, nr, data, pool, start_addr) gen_pool_first_fit(map, size, start, nr, data, pool)
+#endif
+#define ka_base_gen_pool_set_algo(pool, algo, data) gen_pool_set_algo(pool, algo, data)
 
 #define ka_base_kasprintf kasprintf
 
@@ -285,6 +358,7 @@ typedef struct irq_poll ka_irq_poll_t;
 #define ka_base_irq_poll_sched(iop) irq_poll_sched(iop)
 #define ka_base_irq_poll_complete(iop) irq_poll_complete(iop)
 #define ka_base_irq_poll_disable(iop) irq_poll_disable(iop)
+#define ka_base_in_softirq() in_softirq()
 
 unsigned short const *ka_base_get_crc16_table(void);
 unsigned char const *_ka_base_get_ctype(void);
@@ -302,6 +376,7 @@ typedef struct scatterlist ka_scatterlist_t;
 #define ka_base_cpumask_next(n, srcp) cpumask_next(n, srcp)
 #define ka_base_cpumask_next_and(n, src1p, src2p) cpumask_next_and(n, src1p, src2p)
 #define ka_base_cpumask_next_wrap(n, mask, start, wrap) cpumask_next_wrap(n, mask, start, wrap)
+#define ka_base_for_each_cpu(cpu, mask) for_each_cpu(cpu, mask)
 #define ka_base_crc32_le(crc, p, len) crc32_le(crc, p, len)
 #define ka_base_crc32_le_shift(crc, len) crc32_le_shift(crc, len)
 #define ka_base_devm_ioremap(dev, resource_offset, resource_size) devm_ioremap(dev, resource_offset, resource_size)
@@ -316,6 +391,7 @@ typedef struct scatterlist ka_scatterlist_t;
 #define ka_base_pcim_iounmap(pdev, addr) pcim_iounmap(pdev, addr)
 #define ka_base_pcim_iounmap_regions(pdev, mask) pcim_iounmap_regions(pdev, mask)
 #define ka_base_dump_stack() dump_stack()
+#define ka_base_hweight64(w) hweight64(w)
 #define __ka_base_sw_hweight32(w) __sw_hweight32(w)
 #define __ka_base_sw_hweight64(w) __sw_hweight64(w)
 #define __ka_base_kfifo_out_peek_r(fifo, buf, len, recsize) __kfifo_out_peek_r(fifo, buf, len, recsize)
@@ -329,7 +405,7 @@ typedef struct scatterlist ka_scatterlist_t;
 #define ka_base_kfifo_alloc(fifo, size, gfp_mask) kfifo_alloc(fifo, size, gfp_mask)
 #define ka_base_kfifo_free(fifo) kfifo_free(fifo)
 #define ka_base_kfifo_is_empty(fifo) kfifo_is_empty(fifo)
-#define	ka_base_kfifo_is_full(fifo) kfifo_is_full(fifo)
+#define ka_base_kfifo_is_full(fifo) kfifo_is_full(fifo)
 #define ka_base_kfifo_out_peek(fifo, buf, n) kfifo_out_peek(fifo, buf, n)
 #define ka_base_kfifo_in(fifo, buf, n) kfifo_in(fifo, buf, n)
 #define ka_base_kfifo_out(fifo, buf, n) kfifo_out(fifo, buf, n)
@@ -355,6 +431,9 @@ typedef struct scatterlist ka_scatterlist_t;
 #define ka_base_radix_tree_lookup_slot(root, index) radix_tree_lookup_slot(root, index)
 #define ka_base_radix_tree_next_chunk(root, iter, flags) radix_tree_next_chunk(root, iter, flags)
 #define ka_base_radix_tree_tagged(root, tag) radix_tree_tagged(root, tag)
+#define ka_base_rbtree_postorder_for_each_entry_safe(node, tmp, rbtree, rbnode) rbtree_postorder_for_each_entry_safe(node, tmp, rbtree, rbnode)
+#define KA_BASE_RADIX_TREE(name, mask) RADIX_TREE(name, mask)
+
 #define ka_base_prandom_u32_state(state) prandom_u32_state(state)
 
 #define __ka_base_ratelimit(state) __ratelimit(state)
@@ -405,8 +484,21 @@ func_by_pdev ka_base_register_func_by_pdev(bool (*func_high_v)(ka_pci_dev_t *pde
 #define ka_base_kref_init(ka_kref_t) kref_init(ka_kref_t)
 #define ka_base_kref_get(ka_kref_t) kref_get(ka_kref_t)
 #define ka_base_kref_put(ka_kref_t, release) kref_put(ka_kref_t, release)
+#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 4, 0)
 #define ka_base_kref_read(ka_kref_t) kref_read(ka_kref_t)
+#else
+static inline unsigned int ka_base_kref_read(const ka_kref_t *kref)
+{
+    return atomic_read(&kref->refcount);
+}
+#endif
 #define ka_base_kref_get_unless_zero(ka_kref_t) kref_get_unless_zero(ka_kref_t)
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0)
+#define ka_base_refcount_dec_and_test(r) refcount_dec_and_test(r)
+#else
+#define ka_base_refcount_dec_and_test(r) atomic_sub_and_test(1, r)
+#endif
 
 #define ka_base_irq_set_affinity_hint(irq, mask) irq_set_affinity_hint(irq, mask)
 void *ka_base_pde_data(const ka_inode_t *inode);
@@ -428,12 +520,15 @@ void *ka_base_pde_data(const ka_inode_t *inode);
 #define ka_base_free_cpumask_var(mask) free_cpumask_var(mask)
 #define ka_base_cpulist_parse(buf, dstp) cpulist_parse(buf, dstp)
 #define ka_base_ffs(x) ffs(x)
+#define __ka_base_ffs(x) __ffs(x)
 #define ka_base_atomic_set(v, i) atomic_set(v, i)
 #define ka_base_atomic_dec_and_test(v) atomic_dec_and_test(v)
 #define ka_base_atomic_inc_return(v) atomic_inc_return(v)
 #define ka_base_atomic_read(v) atomic_read(v)
 #define ka_base_atomic_dec(v) atomic_dec(v)
+#define ka_base_atomic_dec_if_positive(v) atomic_dec_if_positive(v)
 #define ka_base_atomic_dec_return(v) atomic_dec_return(v)
+#define ka_base_atomic64_dec_return(v) atomic64_dec_return(v)
 #define ka_base_atomic_cmpxchg(v, old, newv) atomic_cmpxchg(v, old, newv)
 #define ka_base_atomic_xchg(v, i) atomic_xchg(v, i)
 #define KA_BASE_ATOMIC64_INIT(v) ATOMIC64_INIT(v)
@@ -454,10 +549,12 @@ void *ka_base_pde_data(const ka_inode_t *inode);
 #define ka_base_atomic64_add(i, v) atomic64_add(i, v)
 #define ka_base_atomic64_read(v) atomic64_read(v)
 #define ka_base_atomic64_set(v, i) atomic64_set(v, i)
+#define ka_base_atomic64_or(v, i) atomic64_or(v, i)
 #define ka_base_atomic_inc(v) atomic_inc(v)
 #define ka_base_atomic_add(i, v) atomic_add(i, v)
 #define ka_base_atomic_sub(i, v) atomic_sub(i, v)
 #define ka_base_atomic_add_return(i, v) atomic_add_return(i, v)
+#define ka_base_atomic_sub_return(i, v) atomic_sub_return(i, v)
 #define ka_base_device_attach(dev) device_attach(dev)
 #define ka_base_device_release_driver(dev) device_release_driver(dev)
 #define ka_base_kstrtoul(s, base, res) kstrtoul(s, base, res)
@@ -486,6 +583,7 @@ static inline ka_kobject_t *ka_base_get_device_kobj(ka_device_t *dev)
     return &dev->kobj;
 }
 
+#define ka_va_arg(vl, l) va_arg(vl, l)
 #define ka_base_hash_32(val, bits) hash_32(val, bits)
 #define ka_base_hash_long(val, bits) hash_long(val, bits)
 #define ka_base_jhash(key, length, initval) jhash(key, length, initval)
@@ -496,5 +594,20 @@ static inline ka_kobject_t *ka_base_get_device_kobj(ka_device_t *dev)
 #define ka_base_idr_for_each_entry(idr, entry, id) idr_for_each_entry(idr, entry, id)
 #define ka_base_for_each_sg(sglist, sg, nr, __i) for_each_sg(sglist, sg, nr, __i)
 #define ka_base_for_each_online_cpu(cpu)    for_each_online_cpu(cpu)
+
+static inline void ka_base_atomic_clear_mask(unsigned long mask, unsigned long *addr)
+{
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 3, 0)
+    atomic_and((int)(~mask), (ka_atomic_t *)addr);
+#else
+    atomic_clear_mask(mask, addr);
+#endif
+}
+
+#define KA_GENMASK(h, l) GENMASK(h, l)
+#define KA_GENMASK_ULL(h, l) GENMASK_ULL(h, l)
+
+#define ka_get_unaligned_be64(p) get_unaligned_be64(p)
+#define ka_put_unaligned_be64(val, p) put_unaligned_be64(val, p)
 
 #endif

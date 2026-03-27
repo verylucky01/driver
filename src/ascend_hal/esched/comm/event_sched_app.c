@@ -646,7 +646,7 @@ drvError_t halEschedSubmitEventSync(uint32_t devId, struct event_summary *event,
                     "sync_gid=%u; sync_event_id=%u; sync_subevent_id=%u; sync_tid=%u; timeout=%dms; current_tick=%llu)\n",
                     ret, event->pid, event->event_id, event->subevent_id, res.gid, res.event_id, res.subevent_id, res.tid, timeout, timestamp);
             }
-            if ((ret == DRV_ERROR_WAIT_TIMEOUT) && (event->event_id != EVENT_DRV_MSG_EX)) {
+            if (ret == DRV_ERROR_WAIT_TIMEOUT) {
                 esched_query_sync_msg_trace(devId, event, res.gid, res.tid);
             }
             esched_free_event_res(devId, event_type, &res);

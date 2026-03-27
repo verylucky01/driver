@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -31,7 +31,7 @@ STATIC int dbl_get_available_cpumask(const char *file_path, cpumask_var_t *cpuma
     int len, ret;
 
     /* read cpuset info from file */
-    file = ka_fs_filp_open(file_path, O_RDONLY, 0);
+    file = ka_fs_filp_open(file_path, KA_O_RDONLY, 0);
     if (KA_IS_ERR(file)) {
         soc_err("Failed to ka_fs_filp_open. \n");
         return -ENOENT;
@@ -45,11 +45,7 @@ STATIC int dbl_get_available_cpumask(const char *file_path, cpumask_var_t *cpuma
         return -ENOMEM;
     }
     /* read cpumask config */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0)
-    len = kernel_read(file, buf, CPU_INFO_SIZE - 1, &pos);
-#else
-    len = kernel_read(file, pos, buf, CPU_INFO_SIZE - 1);
-#endif
+    len = ka_fs_kernel_read(file, buf, CPU_INFO_SIZE - 1, &pos);
     ka_fs_filp_close(file, NULL);
     file = NULL;
     /* if len small or equal 0, return */
@@ -79,7 +75,7 @@ STATIC int dbl_get_available_cpumask(const char *file_path, cpumask_var_t *cpuma
 
 void dbl_get_available_cpu(u32 phy_bitmap, u32 *number, u32 *bitmap)
 {
-    cpumask_var_t available_cpumask;
+    ka_cpumask_var_t available_cpumask;
     unsigned long bitmap_tmp = 0;
     u32 available_bitmap = 0;
     u32 i = 0;
@@ -102,7 +98,7 @@ void dbl_get_available_cpu(u32 phy_bitmap, u32 *number, u32 *bitmap)
         return;
     }
 
-    for_each_cpu(i, available_cpumask) {
+    ka_base_for_each_cpu(i, available_cpumask) {
         available_bitmap |= (1U << i);
     }
 #endif

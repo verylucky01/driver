@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,13 +11,21 @@
  * GNU General Public License for more details.
  */
 
-#include "pbl/pbl_feature_loader.h"
-#include "pbl/pbl_uda.h"
-#include "pbl/pbl_soc_res.h"
-
 #include "ka_system_pub.h"
 #include "ka_memory_pub.h"
 #include "ka_pci_pub.h"
+#include "ka_pci_pub.h"
+#include "ka_task_pub.h"
+#include "ka_base_pub.h"
+#include "ka_system_pub.h"
+#include "ka_memory_pub.h"
+#include "ka_barrier_pub.h"
+#include "ka_common_pub.h"
+#include "ka_kernel_def_pub.h"
+
+#include "pbl/pbl_feature_loader.h"
+#include "pbl/pbl_uda.h"
+#include "pbl/pbl_soc_res.h"
 #include "virtmnghost_vpc_unit.h"
 #include "virtmnghost_unit.h"
 #include "virtmnghost_ctrl.h"
@@ -37,14 +45,6 @@
 #include "virtmnghost_proc_fs.h"
 #include "vmng_mem_alloc_interface.h"
 #include "virtmnghost_pci.h"
-#include "ka_pci_pub.h"
-#include "ka_task_pub.h"
-#include "ka_base_pub.h"
-#include "ka_system_pub.h"
-#include "ka_memory_pub.h"
-#include "ka_barrier_pub.h"
-#include "ka_common_pub.h"
-#include "ka_kernel_def_pub.h"
 
 static const ka_pci_device_id_t g_vmngh_tbl[] = {{ KA_PCI_VDEVICE(HUAWEI, HISI_EP_DEVICE_ID_MINIV2), 0 },
                                                    { KA_PCI_VDEVICE(HUAWEI, HISI_EP_DEVICE_ID_CLOUD), 0 },
@@ -56,7 +56,9 @@ static const ka_pci_device_id_t g_vmngh_tbl[] = {{ KA_PCI_VDEVICE(HUAWEI, HISI_E
                                                    { 0x203F, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
                                                    { 0x20C6, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
                                                    { 0x203F, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
-						   {}};
+                                                   { 0x20E9, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+                                                   { 0x20E9, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+                                                   {}};
 KA_MODULE_DEVICE_TABLE(pci, g_vmngh_tbl);
 
 ka_mutex_t g_vmngh_pci_mutex;
@@ -618,7 +620,7 @@ static void vmngh_start_timer_task(ka_timer_list_t *t)
         ka_system_add_timer(&(start_dev->wd_timer));
         vmng_debug("Startup timer rebuild. (devid=%u; fid=%u)\n", dev_id, fid);
     } else {
-        vmng_err("Startup timeout. (devid=%u; fid=%u)\n", dev_id, fid);
+        vmng_warn("Startup timeout. (devid=%u; fid=%u)\n", dev_id, fid);
         ka_base_atomic_set(&start_dev->start_flag, VMNG_TASK_TIMEOUT);
     }
 }
@@ -1646,7 +1648,7 @@ static int vmngh_vm_startup_irq(void *data)
     if (vd_dev->shr_para->start_flag == VMNG_VM_START_WAIT) {
         vmng_info("Start wait. (dev_id=%u; fid=%u)\n", vd_dev->dev_id, vd_dev->fid);
         ka_base_atomic_set(&(vd_dev->start_dev.start_flag), VMNG_TASK_SUCCESS);
-        ka_task_schedule_work_on(ka_system_smp_processor_id(), &vd_dev->start_work);
+        ka_task_schedule_work_on(ka_system_raw_smp_processor_id(), &vd_dev->start_work);
     }
     return 0;
 }
@@ -1994,7 +1996,7 @@ static void vmngh_uninit_pci_pdev(struct vmngh_pci_dev *vmngh_pcidev)
     vmngh_pcidev->vdev_ref = 0;
 }
 
-static bool vmngh_all_devices_are_valid(struct vmngh_pci_dev *vmngh_dev)
+STATIC bool vmngh_all_devices_are_valid(struct vmngh_pci_dev *vmngh_dev)
 {
     struct vmngh_ctrl_ops *ctrl_ops;
     int dev_num;
@@ -2198,7 +2200,7 @@ STATIC int vmngh_pci_init_instance(u32 dev_id, ka_device_t *dev)
     return 0;
 }
 
-static int vmngh_free_all_vdev(u32 dev_id)
+STATIC int vmngh_free_all_vdev(u32 dev_id)
 {
     u32 fid;
     struct vmngh_vd_dev *vd_dev = NULL;
@@ -2298,7 +2300,7 @@ exit:
 
 #define VMNG_ONLINE_NOTIFIER "vmng_online"
 #define VMNG_INFO_NOTIFIER "vmng_set_info"
-static int vmngh_sriov_dev_notifier_func(u32 udevid, enum uda_notified_action action)
+STATIC int vmngh_sriov_dev_notifier_func(u32 udevid, enum uda_notified_action action)
 {
     int ret = 0;
 

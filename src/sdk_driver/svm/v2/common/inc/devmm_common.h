@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -26,6 +26,7 @@
 #include "ka_system_pub.h"
 #include "ka_kernel_def_pub.h"
 #include "ka_compiler_pub.h"
+#include "ka_barrier_pub.h"
 
 #include "devmm_proc_info.h"
 #include "svm_proc_gfp.h"
@@ -56,10 +57,10 @@
 #define SVM_MASTER_HUGE_PAGE_SIZE 0x200000ULL  /* 0x200000 master use 2M huge page size */
 #define SVM_MASTER_GIANT_PAGE_SIZE 0x40000000ULL    /* 0x40000000 master use 1G giant page size */
 
-#if MAX_NUMNODES > 256
+#if KA_MAX_NUMNODES > 256
 #define SVM_MASTER_NUMA_MAX     256
 #else
-#define SVM_MASTER_NUMA_MAX     MAX_NUMNODES
+#define SVM_MASTER_NUMA_MAX     KA_MAX_NUMNODES
 #endif
 
 #define DEVMM_S2S_HOST_GLOBAL_BASE_OFFSET           0x800000000000   /* 128TB */
@@ -154,7 +155,7 @@ static inline bool devmm_pages_is_continue(ka_page_t *pre_page, ka_page_t *post_
 static inline void devmm_isb(void)
 {
 #if defined(__arm__) || defined(__aarch64__)
-    isb();
+    ka_isb();
 #endif
 }
 

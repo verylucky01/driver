@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,14 +11,14 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/errno.h>
-#include <linux/slab.h>
-#include <linux/sched.h>
-#include <linux/kthread.h>
-#include <linux/kfifo.h>
-#include <linux/delay.h>
-#include <linux/time.h>
-#include <linux/jiffies.h>
+#include "ka_dfx_pub.h"
+#include "ka_system_pub.h"
+#include "ka_list_pub.h"
+#include "ka_memory_pub.h"
+#include "ka_errno_pub.h"
+#include "ka_task_pub.h"
+#include "ka_base_pub.h"
+#include "ka_kernel_def_pub.h"
 #include "dms_kernel_version_adapt.h"
 #include "urd_feature.h"
 #include "dms_template.h"
@@ -39,14 +39,6 @@
 #endif
 #include "devdrv_common.h"
 #include "dms_event.h"
-#include "ka_dfx_pub.h"
-#include "ka_system_pub.h"
-#include "ka_list_pub.h"
-#include "ka_memory_pub.h"
-#include "ka_errno_pub.h"
-#include "ka_task_pub.h"
-#include "ka_base_pub.h"
-#include "ka_kernel_def_pub.h"
 
 #define DMS_EVENT_KFIFO_CELL (sizeof(struct dms_event_obj))
 #define DMS_EVENT_KFIFO_SIZE (DMS_EVENT_KFIFO_CELL * DMS_MAX_EVENT_NUM)
@@ -57,12 +49,12 @@
 #define DMS_EVENT_FRESH_TO_BAR 500
 
 struct {
-    struct task_struct *poll_task;
+    ka_task_struct_t *poll_task;
     ka_atomic_t poll_flag;
 
-    struct kfifo kfifo;
+    ka_kfifo_t kfifo;
     u32 event_num;
-    struct mutex lock;
+    ka_mutex_t lock;
     ka_wait_queue_head_t wait;
 } g_event_task;
 
@@ -452,7 +444,7 @@ STATIC int add_events_to_event_para(struct dms_event_para *dms_event, u32 event_
     return 0;
 }
 
-#ifdef CFG_HOST_ENV
+#ifdef CFG_EDGE_HOST
 STATIC int dms_get_remote_fault_event(u32 phy_id, struct devdrv_event_obj_para *event_para)
 {
     struct dms_event_para *dms_event_remote = NULL;
@@ -572,7 +564,7 @@ GET_EVENT_FAIL:
 STATIC int dms_get_all_fault_event(u32 phy_id, struct devdrv_event_obj_para *event_para)
 {
     int ret;
-#ifdef CFG_HOST_ENV
+#ifdef CFG_EDGE_HOST
     ret = dms_get_remote_fault_event(phy_id, event_para);
     if (ret != 0) {
         dms_err("Get remote event failed. (phy_id=%u)\n", phy_id);
@@ -654,7 +646,7 @@ int dms_event_clear_by_phyid(u32 phyid)
         return ret;
     }
 
-#if defined(CFG_FEATURE_GET_CURRENT_EVENTINFO) && defined(CFG_HOST_ENV)
+#if defined(CFG_FEATURE_GET_CURRENT_EVENTINFO) && defined(CFG_EDGE_HOST)
     dms_release_one_device_remote_event(phyid);
 #endif
     if (smf_event_distribute_to_bar(phyid) != 0) {
@@ -1312,7 +1304,7 @@ int dms_get_device_state(void *feature, char *in, u32 in_len, char *out, u32 out
 
 static int dms_event_poll_event(struct dms_event_obj *event_obj, u32 wait_time, u32 *event_num)
 {
-    if (wait_event_interruptible_timeout(g_event_task.wait, (g_event_task.event_num > 0), wait_time) == 0) {
+    if (ka_task_wait_event_interruptible_timeout(g_event_task.wait, (g_event_task.event_num > 0), wait_time) == 0) {
         return ETIMEDOUT;
     }
 
@@ -1497,7 +1489,7 @@ static int dms_event_task_init(void)
     }
     ka_base_kfifo_reset(&g_event_task.kfifo);
     ka_task_mutex_unlock(&g_event_task.lock);
-#if defined(CFG_FEATURE_EP_MODE) && !defined (CFG_HOST_ENV)
+#if defined(CFG_FEATURE_EP_MODE) && !defined (CFG_EDGE_HOST)
     ka_base_atomic_set(&g_event_task.poll_flag, EVENT_POLL_EXIT);
 #else
     ka_base_atomic_set(&g_event_task.poll_flag, EVENT_POLL_WORK);
@@ -1554,7 +1546,7 @@ out:
 void dms_event_ctrl_converge_list_free(struct dms_converge_event_list *event_list)
 {
     DMS_EVENT_NODE_STRU *exception_node = NULL;
-    struct list_head *pos = NULL, *n = NULL;
+    ka_list_head_t *pos = NULL, *n = NULL;
 
     ka_task_mutex_lock(&event_list->lock);
     event_list->event_num = 0;
@@ -1575,7 +1567,7 @@ void dms_event_ctrl_converge_list_free(struct dms_converge_event_list *event_lis
 void dms_event_sensor_reported_list_free(struct dms_sensor_reported_list *reported_list)
 {
     struct dms_event_sensor_reported *event_node = NULL;
-    struct list_head *pos = NULL, *n = NULL;
+    ka_list_head_t *pos = NULL, *n = NULL;
 
     ka_task_mutex_lock(&reported_list->lock);
     reported_list->reported_num = 0;
@@ -1734,7 +1726,7 @@ static int (*const dms_event_notifier_handle_func[DMS_DEVICE_NOTIFIER_MAX]) \
         [DMS_DEVICE_DOWN3] = NULL,
 };
 
-static int dms_event_notifier_handle(struct notifier_block *self,
+static int dms_event_notifier_handle(ka_notifier_block_t *self,
     unsigned long event, void *data)
 {
     struct devdrv_info *dev_info = (struct devdrv_info *)data;
@@ -1763,7 +1755,7 @@ static int dms_event_notifier_handle(struct notifier_block *self,
     return KA_NOTIFY_DONE;
 }
 
-static struct notifier_block dms_event_notifier = {
+static ka_notifier_block_t dms_event_notifier = {
     .notifier_call = dms_event_notifier_handle,
 };
 
@@ -1803,7 +1795,7 @@ int dms_event_init(void)
         goto register_notifier_fail;
     }
 
-#if defined(CFG_FEATURE_GET_CURRENT_EVENTINFO) && defined(CFG_HOST_ENV)
+#if defined(CFG_FEATURE_GET_CURRENT_EVENTINFO) && defined(CFG_EDGE_HOST)
     dms_device_fault_event_init();
 #endif
     CALL_INIT_MODULE(DMS_EVENT_CMD_NAME);
@@ -1825,7 +1817,7 @@ event_ctrl_init_fail:
 void dms_event_exit(void)
 {
     CALL_EXIT_MODULE(DMS_EVENT_CMD_NAME);
-#if defined(CFG_FEATURE_GET_CURRENT_EVENTINFO) && defined(CFG_HOST_ENV)
+#if defined(CFG_FEATURE_GET_CURRENT_EVENTINFO) && defined(CFG_EDGE_HOST)
     dms_device_fault_event_exit();
 #endif
     (void)dms_unregister_notifier(&dms_event_notifier);

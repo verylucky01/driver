@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,12 +11,11 @@
  * GNU General Public License for more details.
  */
 
-#include "virtmng_msg_admin.h"
-#include "virtmng_public_def.h"
-
 #include "ka_task_pub.h"
 #include "ka_barrier_pub.h"
 #include "ka_kernel_def_pub.h"
+#include "virtmng_msg_admin.h"
+#include "virtmng_public_def.h"
 
 int vmng_admin_msg_send(struct vmng_msg_chan_tx *msg_chan, struct vmng_tx_msg_proc_info *tx_info, u32 opcode_d1,
     u32 opcode_d2)

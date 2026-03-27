@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,9 +13,6 @@
 
 #ifndef ESCHED_DRV_H
 #define ESCHED_DRV_H
-
-#include <linux/spinlock.h>
-#include <linux/sched.h>
 
 #include "ascend_hal_define.h"
 #include "topic_sched_drv.h"
@@ -99,7 +96,7 @@ enum esched_topic_sched_version {
    than or equal to twice the number of CPUs. */
 #define TOPIC_SCHED_CPU_PORT_DEPTH 32
 struct topic_sched_cpu_port {
-    spinlock_t lock; /* Callers may submit tasks in software interrupts.  */
+    ka_task_spinlock_t lock; /* Callers may submit tasks in software interrupts.  */
     u32 port_id;
     u32 status;
     void *sq_base;
@@ -134,7 +131,7 @@ struct rtsq_sched_res {
     struct sqe_submit_chan_res sqe_submit[TOPIC_SCHED_MAX_RTSQ_NUM_PER_CLASS];
     u32 rtsq_num;
     u32 init_rtsq_index;
-    atomic_t cur_rtsq_index;
+    ka_atomic_t cur_rtsq_index;
 };
 
 struct rtsq_non_sched_res {
@@ -163,10 +160,11 @@ struct topic_data_chan {
     struct topic_sched_mailbox *wait_mb;
     struct topic_sched_mailbox *get_mb;
     struct topic_sched_cpu_port *cpu_port;
-    struct tasklet_struct sched_task;
+    ka_tasklet_struct_t sched_task;
     struct topic_data_chan_sched_record sched_record;
     int valid;
     int sched_mode; /* 0: hw sched, 1: hw+soft sched */
+    u32 chan_id;
     u32 mb_id;
     u32 mb_type;
     int wait_mb_status;
@@ -185,11 +183,11 @@ struct sched_thread_spec {
 };
 
 struct sched_hard_res {
-    struct mutex mutex;
-    void __iomem *io_base;
-    void __iomem *com_io_base;
-    void __iomem *int_io_base;
-    void __iomem *report_addr;
+    ka_mutex_t mutex;
+    void __ka_mm_iomem *io_base;
+    void __ka_mm_iomem *com_io_base;
+    void __ka_mm_iomem *int_io_base;
+    void __ka_mm_iomem *report_addr;
     struct sched_rtsq_res rtsq;
     u32 dev_id;
     u32 topic_sched_version;
@@ -199,7 +197,7 @@ struct sched_hard_res {
     int irq_reg_flag;
     u64 rsv_mem_pa;
     void *rsv_mem_va;
-    struct delayed_work init;
+    ka_delayed_work_t init;
     u32 init_flag;
     u32 intr_config_flag;
     u32 report_fault_flag;

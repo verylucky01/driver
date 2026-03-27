@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -27,7 +27,7 @@ struct trs_thread_bind_intr_ctx {
     u32 irq;
     u32 logic_cqid;
     ka_atomic_t *wait_flag; /* 1 valid, 0 invalid */
-    wait_queue_head_t *wait_queue;
+    ka_wait_queue_head_t *wait_queue;
 };
 
 struct trs_thread_bind_intr_mng {
@@ -63,7 +63,7 @@ struct trs_logic_cq {
     ka_mutex_t mutex;
     ka_atomic_t wakeup_num;
     ka_atomic_t wait_thread_num;
-    wait_queue_head_t wait_queue;
+    ka_wait_queue_head_t wait_queue;
     struct trs_logic_cq_stat stat;
 };
 

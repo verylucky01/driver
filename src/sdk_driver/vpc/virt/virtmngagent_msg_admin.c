@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,6 +11,8 @@
  * GNU General Public License for more details.
  */
 
+#include "ka_kernel_def_pub.h"
+#include "ka_task_pub.h"
 #include "virtmngagent_msg_admin.h"
 #include "virtmngagent_msg.h"
 #include "virtmngagent_vpc.h"
@@ -18,8 +20,6 @@
 #include "virtmng_msg_admin.h"
 #include "virtmng_public_def.h"
 #include "virtmng_resource.h"
-#include "ka_kernel_def_pub.h"
-#include "ka_task_pub.h"
 
 STATIC int vmnga_admin_para_check(const struct vmng_msg_dev *msg_dev,
     const struct vmng_msg_chan_rx_proc_info *proc_info)

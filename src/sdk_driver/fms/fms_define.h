@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,6 +14,7 @@
 #define FMS_DEFINE
 
 #include "dmc_kernel_interface.h"
+#include "ka_dfx_pub.h"
 
 #ifdef STATIC_SKIP
 #define STATIC
@@ -58,12 +59,12 @@
 } while (0)
 #else
 #define dms_fault_mng_event(assertion, fmt, ...) do {                       \
-    u64 ts = local_clock();                                                 \
+    u64 ts = ka_system_local_clock();                                                 \
     u64 rem_nsec = do_div(ts, 1000000000);                                  \
     drv_slog_event("fault_manager", "[%5lu.%06lu] " fmt, ts, rem_nsec / 1000, ##__VA_ARGS__);   \
 } while (0)
 #endif
-#define dms_fmng_event(args...) (void)printk(KERN_NOTICE "[fault_manager] " args)
-#define dms_fmng_err(args...) (void)printk(KERN_ERR "[fault_manager] " args)
+#define dms_fmng_event(args...) (void)ka_dfx_printk(KA_KERN_NOTICE "[fault_manager] " args)
+#define dms_fmng_err(args...) (void)ka_dfx_printk(KA_KERN_ERR "[fault_manager] " args)
 
 #endif

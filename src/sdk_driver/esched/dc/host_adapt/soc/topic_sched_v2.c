@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,12 +11,6 @@
  * GNU General Public License for more details.
  */
 #ifndef EMU_ST
-
-#include <asm/io.h>
-#include <linux/kthread.h>
-#include <linux/slab.h>
-#include <linux/delay.h>
-#include <linux/vmalloc.h>
 
 #include "tsdrv_interface.h"
 #include "comm_kernel_interface.h"
@@ -45,13 +39,13 @@
 #define STARS_TOPIC_HOST_AICPU_INT_STS_NS(vf_id)                    (0x000A40 + (vf_id) * 0x10000)
 #define STARS_TOPIC_HOST_AICPU_INT_CLR_NS(vf_id)                    (0x000A48 + (vf_id) * 0x10000)
 
-void topic_sched_host_aicpu_intr_mask_set_v2(void __iomem *io_base, u32 mask_index, u32 vf_id, u32 val)
+void topic_sched_host_aicpu_intr_mask_set_v2(void __ka_mm_iomem *io_base, u32 mask_index, u32 vf_id, u32 val)
 {
     u32 vf_id_tmp = ESCHED_DRV_REASSIGN_VFID(vf_id);
     esched_drv_reg_wr(io_base, STARS_TOPIC_HOST_AICPU_INT_MASK0_NS(mask_index, vf_id_tmp), val);
 }
 
-bool topic_sched_host_aicpu_is_mb_valid_v2(const void __iomem *io_base, u32 mb_id, u32 vf_id)
+bool topic_sched_host_aicpu_is_mb_valid_v2(const void __ka_mm_iomem *io_base, u32 mb_id, u32 vf_id)
 {
     u32 val;
 
@@ -61,31 +55,31 @@ bool topic_sched_host_aicpu_is_mb_valid_v2(const void __iomem *io_base, u32 mb_i
     return ((val & 0x1) == 1);
 }
 
-void topic_sched_host_aicpu_intr_clr_v2(void __iomem *io_base, u32 intr_index, u32 vf_id, u32 val)
+void topic_sched_host_aicpu_intr_clr_v2(void __ka_mm_iomem *io_base, u32 intr_index, u32 vf_id, u32 val)
 {
     u32 vf_id_tmp = ESCHED_DRV_REASSIGN_VFID(vf_id);
     esched_drv_reg_wr(io_base, STARS_TOPIC_HOST_AICPU_INT_CLR0_NS(intr_index, vf_id_tmp), val);
 }
 
-void topic_sched_host_aicpu_intr_enable_v2(void __iomem *io_base, u32 cpu_index, u32 vf_id)
+void topic_sched_host_aicpu_intr_enable_v2(void __ka_mm_iomem *io_base, u32 cpu_index, u32 vf_id)
 {
     u32 vf_id_tmp = ESCHED_DRV_REASSIGN_VFID(vf_id);
     esched_drv_reg_wr(io_base, STARS_TOPIC_VF_HOST_AICPU_INT_EN_NS(cpu_index, vf_id_tmp), 0x1);
 }
 
-void topic_sched_host_aicpu_int_all_status_v2(const void __iomem *io_base, u32 *val, u32 vf_id)
+void topic_sched_host_aicpu_int_all_status_v2(const void __ka_mm_iomem *io_base, u32 *val, u32 vf_id)
 {
     u32 vf_id_tmp = ESCHED_DRV_REASSIGN_VFID(vf_id);
     esched_drv_reg_rd(io_base, STARS_TOPIC_HOST_AICPU_INT_STS_NS(vf_id_tmp), val);
 }
 
-void topic_sched_host_aicpu_intr_all_clr_v2(void __iomem *io_base, u32 val, u32 vf_id)
+void topic_sched_host_aicpu_intr_all_clr_v2(void __ka_mm_iomem *io_base, u32 val, u32 vf_id)
 {
     u32 vf_id_tmp = ESCHED_DRV_REASSIGN_VFID(vf_id);
     esched_drv_reg_wr(io_base, STARS_TOPIC_HOST_AICPU_INT_CLR_NS(vf_id_tmp), val);
 }
 
-void topic_sched_host_aicpu_int_status_v2(const void __iomem *io_base, u32 intr_index, u32 *val, u32 vf_id)
+void topic_sched_host_aicpu_int_status_v2(const void __ka_mm_iomem *io_base, u32 intr_index, u32 *val, u32 vf_id)
 {
     u32 vf_id_tmp = ESCHED_DRV_REASSIGN_VFID(vf_id);
     esched_drv_reg_rd(io_base, STARS_TOPIC_HOST_AICPU_INT_STS0_NS(intr_index, vf_id_tmp), val);
@@ -123,7 +117,7 @@ int esched_drv_host_map_addr_v2(u32 dev_id, struct sched_hard_res *res)
         return ret;
     }
 
-    res->io_base = ioremap(io_base.io_base, io_base.io_base_size);
+    res->io_base = ka_mm_ioremap(io_base.io_base, io_base.io_base_size);
     if (res->io_base == NULL) {
         sched_err("Failed to invoke the ioremap. (dev_id=%u; size=0x%x)\n", res->dev_id, (u32)io_base.io_base_size);
         return -ENOMEM;
@@ -138,7 +132,7 @@ int esched_drv_host_map_addr_v2(u32 dev_id, struct sched_hard_res *res)
     }
 
     res->rsv_mem_pa = rsv_mem.rsv_mem;
-    res->rsv_mem_va = ioremap(res->rsv_mem_pa, rsv_mem.rsv_mem_size);
+    res->rsv_mem_va = ka_mm_ioremap(res->rsv_mem_pa, rsv_mem.rsv_mem_size);
     if (res->rsv_mem_va == NULL) {
         sched_err("Failed to invoke the ioremap. (dev_id=%u; size=0x%x)\n", res->dev_id, (u32)rsv_mem.rsv_mem_size);
         ret = -ENOMEM;
@@ -151,7 +145,7 @@ int esched_drv_host_map_addr_v2(u32 dev_id, struct sched_hard_res *res)
         goto iounmap_rsv_mem;
     }
 
-    res->report_addr = ioremap(io_base.io_base, io_base.io_base_size);
+    res->report_addr = ka_mm_ioremap(io_base.io_base, io_base.io_base_size);
     if (res->report_addr == NULL) {
         sched_err("Failed to invoke the ioremap. (dev_id=%u; size=0x%x)\n", res->dev_id, (u32)io_base.io_base_size);
         ret = -ENOMEM;
@@ -160,10 +154,10 @@ int esched_drv_host_map_addr_v2(u32 dev_id, struct sched_hard_res *res)
 
     return 0;
 iounmap_rsv_mem:
-    iounmap(res->rsv_mem_va);
+    ka_mm_iounmap(res->rsv_mem_va);
     res->rsv_mem_va = NULL;
 iounmap_io_base:
-    iounmap(res->io_base);
+    ka_mm_iounmap(res->io_base);
     res->io_base = NULL;
     return ret;
 }
@@ -171,22 +165,22 @@ iounmap_io_base:
 void esched_host_iounmap_v2(struct sched_hard_res *res)
 {
     if (res->report_addr != NULL) {
-        iounmap(res->report_addr);
+        ka_mm_iounmap(res->report_addr);
         res->report_addr = NULL;
     }
 
     if (res->rsv_mem_va != NULL) {
-        iounmap(res->rsv_mem_va);
+        ka_mm_iounmap(res->rsv_mem_va);
         res->rsv_mem_va = NULL;
     }
 
     if (res->int_io_base != NULL) {
-        iounmap(res->int_io_base);
+        ka_mm_iounmap(res->int_io_base);
         res->int_io_base = NULL;
     }
 
     if (res->io_base != NULL) {
-        iounmap(res->io_base);
+        ka_mm_iounmap(res->io_base);
         res->io_base = NULL;
     }
 }

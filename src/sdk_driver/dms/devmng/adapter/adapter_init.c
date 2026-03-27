@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,17 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
-#include <linux/kernel.h>
-#include <linux/slab.h>
-#include <linux/types.h>
-#include <linux/printk.h>
-#include <linux/delay.h>
-#include <linux/version.h>
-#include <linux/notifier.h>
-#include <linux/pci.h>
-#include <linux/module.h>
-
+#include "ka_pci_pub.h"
 #include "ka_common_pub.h"
 #include "ka_kernel_def_pub.h"
 #include "ka_task_pub.h"
@@ -127,7 +117,7 @@ struct module_adapter_cb adap_cb[] = {
 {UB_KO_NAME, ubbus_ops, (sizeof(ubbus_ops)/sizeof(struct symbol_list)), &g_ubbus_adpat},
 };
 
-static const struct pci_device_id devdrv_driver_tbl[] = {
+static const ka_pci_device_id_t devdrv_driver_tbl[] = {
     { KA_PCI_VDEVICE(HUAWEI, 0xd806), 0 },
     { KA_PCI_VDEVICE(HUAWEI, 0xd807), 0 },
     { DEVDRV_DIVERSITY_PCIE_VENDOR_ID, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
@@ -173,7 +163,7 @@ void put_adapter(struct bus_adpater_stu *adap)
     ka_task_up_read(&adap->rw_lock);
 }
 
-static void init_module_function(struct module *mod)
+static void init_module_function(ka_module_t *mod)
 {
     int i;
     for (i=0; i < (sizeof(adap_cb)/sizeof(struct module_adapter_cb)); i++) {
@@ -184,7 +174,7 @@ static void init_module_function(struct module *mod)
     }
 }
 
-static void uninit_module_function(struct module *mod)
+static void uninit_module_function(ka_module_t *mod)
 {
     int i;
     for (i=0; i < (sizeof(adap_cb)/sizeof(struct module_adapter_cb)); i++) {
@@ -195,10 +185,10 @@ static void uninit_module_function(struct module *mod)
     }
 }
 
-static int adapter_module_callback(struct notifier_block *nb,
+static int adapter_module_callback(ka_notifier_block_t *nb,
     unsigned long val, void *data)
 {
-    struct module *mod = data;
+    ka_module_t *mod = data;
     if (mod == NULL) {
         return KA_NOTIFY_DONE;
     }
@@ -214,24 +204,24 @@ static int adapter_module_callback(struct notifier_block *nb,
     }
     return KA_NOTIFY_DONE;
 }
-static struct notifier_block g_adapter_module_nb = {
+static ka_notifier_block_t g_adapter_module_nb = {
     .notifier_call = adapter_module_callback,
     .priority = 0
 };
 
-int __init ascend_adapter_init(void)
+int KA_MODULE_INIT ascend_adapter_init(void)
 {
     int err, i;
     for (i = 0; i < (sizeof(adap_cb)/sizeof(struct module_adapter_cb)); i++) {
         ka_task_init_rwsem(&adap_cb[i].adap->rw_lock);
     }
-    err = register_module_notifier(&g_adapter_module_nb);
+    err = ka_dfx_register_module_notifier(&g_adapter_module_nb);
     return err;
 }
 
-void __exit ascend_adapter_exit(void)
+void KA_MODULE_EXIT ascend_adapter_exit(void)
 {
-    unregister_module_notifier(&g_adapter_module_nb);
+    ka_dfx_unregister_module_notifier(&g_adapter_module_nb);
     return;
 }
 

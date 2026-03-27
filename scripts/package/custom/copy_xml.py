@@ -13,10 +13,19 @@
 #-*- coding: utf-8 -*-
 #----------------------------------------------------------------------------
 # Purpose: merge driver.xml
+# Rule:
+# 1. If the XML element (e.g, '<file_info> </file_info>') does not exist or is different,
+#    add the entire element (without checking sub-attributes).
+# 2. If the XML element (e.g, '<file_info> </file_info>') are the same,
+#    the entire element is ignored (no need to check the sub-attributes).
+# 3. If the attributes (e.g, '<file />') except src_path are the same, update the value of src_path.
 #----------------------------------------------------------------------------
 import os
 import sys
 import xml.etree.ElementTree as ET
+import logging
+logging.basicConfig(level=logging.INFO)
+
 
 class CommentedTreeBuilder(ET.TreeBuilder):
     def __init__(self, *args, **kwargs):
@@ -28,17 +37,33 @@ class CommentedTreeBuilder(ET.TreeBuilder):
         self.end(ET.Comment)
 
 
+def compare_attribs(src, dst, exclude_attr=None):
+    exclude_attr = exclude_attr if exclude_attr else []
+    src_attrs = {k: v for k, v in src.attrib.items() if k not in exclude_attr}
+    dst_attrs = {k: v for k, v in dst.attrib.items() if k not in exclude_attr}
+    return src_attrs == dst_attrs
+
+
 def copy_node_to_filesystem(it_root_node, root_node):
     for it_n in it_root_node:
         tag = it_n.tag
         attrib = it_n.attrib
         des_node = root_node.findall(tag)
         if len(des_node) == 0:
+            logging.debug("Add node: %s, %s", it_n.tag, it_n.attrib)
             root_node.append(it_n)
         else:
             flag = True
             node = None
             for n in des_node:
+                # update the src_path attribute when the src_path of the file is different.
+                if tag == 'file' and it_n.get('src_path') is not None and compare_attribs(it_n, n, 'src_path') == True:
+                    logging.debug("Update src_path attr from %s to %s", it_n.attrib, n.attrib)
+                    n.set('src_path', it_n.get('src_path'))
+                    node = n
+                    flag = False
+                    break
+
                 if attrib == n.attrib:
                     node = n
                     flag = False
@@ -47,6 +72,7 @@ def copy_node_to_filesystem(it_root_node, root_node):
                     if tag == "path":
                         n.attrib['install_type'] = attrib['install_type']
             if flag:
+                logging.debug("Append node: %s, %s", it_n.tag, it_n.attrib)
                 root_node.append(it_n)
             else:
                 copy_node_to_filesystem(it_n, node)
@@ -82,7 +108,7 @@ def adjust_xml(xml_file, xml_it_file):
 
 def main():
     if len(sys.argv) != 3:
-        sys.exit(-1)  
+        sys.exit(-1)
     base_path_xml = sys.argv[1]
     it_path_xml = sys.argv[2]
     adjust_xml(base_path_xml, it_path_xml)

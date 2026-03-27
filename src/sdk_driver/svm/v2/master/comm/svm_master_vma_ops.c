@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -214,64 +214,40 @@ STATIC int devmm_svm_vm_fault_host(ka_vm_area_struct_t *vma, ka_vm_fault_struct_
     return ret;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
-STATIC ka_vm_fault_t devmm_svm_vmf_fault_host(ka_vm_fault_struct_t *vmf)
-{
-    return (ka_vm_fault_t)devmm_svm_vm_fault_host(vmf->vma, vmf);
-}
-#endif
+KA_DEFINE_VM_OPS_FAULT_FUNC(devmm_svm_vm_fault_host)
 
 #ifndef EMU_ST
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 3, 0)
 static int devmm_mremap(ka_vm_area_struct_t *area)
 {
     return -EACCES;
 }
 #endif
-#endif
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
-static vm_fault_t devmm_mkf_write(struct vm_fault *vmf)
+#ifndef EMU_ST
+static int devmm_mk_write(ka_vm_area_struct_t *vma, ka_vm_fault_struct_t *vmf)
 {
-    u64 start = vmf->address;
-    devmm_drv_debug("Host mem enter devmm_mkf_write. (start=0x%llx)\n", start);
- 
-    return VM_FAULT_SIGSEGV;
-}
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
-static int devmm_mkf_write(struct vm_fault *vmf)
-{
-    u64 start = vmf->address;
-    devmm_drv_debug("Host mem enter devmm_mkf_write. (start=0x%llx)\n", start);
- 
-    return VM_FAULT_SIGSEGV;
-}
-#else
-static int devmm_mk_write(struct vm_area_struct *vma, struct vm_fault *vmf)
-{
-    u64 start = vma->vm_start + (vmf->pgoff << PAGE_SHIFT);
+    u64 start = 0;
+
+    /* KERNEL VERSION >= 4.11.0, vma is NULL */
+    if (vma == NULL) {
+        start = ka_mm_get_vm_fault_address(vmf);
+    } else {
+        start = ka_mm_get_vm_start(vma) + (vmf->pgoff << KA_MM_PAGE_SHIFT);
+    }
     devmm_drv_debug("Host mem enter devmm_mk_write. (start=0x%llx)\n", start);
     
-    return VM_FAULT_SIGSEGV;
+    return KA_VM_FAULT_SIGSEGV;
 }
+
+KA_DEFINE_VM_OPS_PFN_MKWRITE_FUNC(devmm_mk_write)
 #endif
- 
+
 static ka_vm_operations_struct_t svm_master_vma_ops = {
     .open = devmm_vm_open,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
-    .fault = devmm_svm_vmf_fault_host,
-#else
-    .fault = devmm_svm_vm_fault_host,
-#endif
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
-    .pfn_mkwrite = devmm_mkf_write,
-#else
-    .pfn_mkwrite = devmm_mk_write,
-#endif
+    ka_vm_ops_init_fault(devmm_svm_vm_fault_host)
 #ifndef EMU_ST
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 3, 0)
-    .mremap = devmm_mremap,
-#endif
+    ka_vm_ops_init_pfn_mkwrite(devmm_mk_write)
+    ka_vm_ops_init_mremap(devmm_mremap)
 #endif
 };
 
@@ -279,4 +255,3 @@ void devmm_svm_setup_vma_ops(ka_vm_area_struct_t *vma)
 {
     ka_mm_set_vm_ops(vma, &svm_master_vma_ops);
 }
-

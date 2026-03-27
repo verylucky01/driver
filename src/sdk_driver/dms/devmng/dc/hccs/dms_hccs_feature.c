@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,11 +10,12 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-#include <linux/mutex.h>
-#include <linux/securec.h>
-#include <asm/io.h>
-#include <linux/uaccess.h>
 
+#include "ka_type.h"
+#include "ka_memory_pub.h"
+#include "ka_base_pub.h"
+#include "ka_kernel_def_pub.h"
+#include "ka_task_pub.h"
 #include "devdrv_user_common.h"
 #include "dms_define.h"
 #include "dms/dms_cmd_def.h"
@@ -25,10 +26,6 @@
 #include "devdrv_common.h"
 #include "ascend_kernel_hal.h"
 #include "ascend_platform.h"
-#include "ka_memory_pub.h"
-#include "ka_base_pub.h"
-#include "ka_kernel_def_pub.h"
-#include "ka_task_pub.h"
 #include "dms_hccs_feature.h"
 
 #ifdef CFG_FEATURE_HCCS_GET_STATISTIC_BY_CHANNEL
@@ -36,12 +33,12 @@ STATIC const unsigned long hdlc_phy_addr[PCS_NUM] = {HDLC0_BASE_ADDR};
 
 unsigned int hccs_reg_read(unsigned long vir_addr)
 {
-    void __iomem *p_dst = NULL;
+    void __ka_mm_iomem *p_dst = NULL;
     unsigned int val = 0;
 
-    p_dst = (void __iomem *)(uintptr_t)vir_addr;
+    p_dst = (void __ka_mm_iomem *)(uintptr_t)vir_addr;
     if (p_dst != NULL) {
-        val = ka_mm_readl((const volatile void __iomem *)p_dst);
+        val = ka_mm_readl((const volatile void __ka_mm_iomem *)p_dst);
     }
 
     devdrv_drv_debug("rd,addr:0x%016lX:0x%08X\n", vir_addr, val);
@@ -51,11 +48,11 @@ unsigned int hccs_reg_read(unsigned long vir_addr)
 
 void hccs_reg_write(unsigned long vir_addr, unsigned int val)
 {
-    void __iomem *p_dst = NULL;
+    void __ka_mm_iomem *p_dst = NULL;
 
-    p_dst = (void __iomem *)(uintptr_t)vir_addr;
+    p_dst = (void __ka_mm_iomem *)(uintptr_t)vir_addr;
     if (p_dst != NULL) {
-        ka_mm_writel(val, (volatile void __iomem *)p_dst);
+        ka_mm_writel(val, (volatile void __ka_mm_iomem *)p_dst);
     }
 }
 #else
@@ -142,7 +139,7 @@ int dms_get_hpcs_status_by_dev_id(unsigned int dev_id, unsigned long long pcs_bi
 {
     int i;
     u32 pcs_status_reg;
-    void __iomem *hccs_base_addr = NULL;
+    void __ka_mm_iomem *hccs_base_addr = NULL;
 
     for (i = 0; i < PCS_NUM; i++) {
         if (!(pcs_bitmap & (1 << i))) {
@@ -176,7 +173,7 @@ int dms_get_hdlc_status_by_dev_id(unsigned int dev_id, unsigned long long pcs_bi
 {
     int i;
     u32 hdlc_status_reg;
-    void __iomem *hccs_base_addr = NULL;
+    void __ka_mm_iomem *hccs_base_addr = NULL;
 
     for (i = 0; i < PCS_NUM; i++) {
         if (!(pcs_bitmap & (1 << i))) {
@@ -276,7 +273,7 @@ int dms_get_hccs_lane_details(unsigned int dev_id, hccs_lane_info_t *hccs_lane_i
     int i = 0, j = 0, ret;
     u8 pcs_bitmap = 0;
     u32 die_id, chip_id, pcs_status_reg;
-    void __iomem *hccs_base_addr = NULL;
+    void __ka_mm_iomem *hccs_base_addr = NULL;
     devdrv_hardware_info_t hardware_info = {0};
 
     if (hccs_lane_info == NULL) {
@@ -363,7 +360,7 @@ STATIC int dms_get_hccs_lane_info(struct dms_get_device_info_in *in, unsigned in
 #define HCCS_STATISTIC_TIMER_EXPIRE_MS 500
 #define HCCS_STATISTIC_READ_ERR_MAX_CNT 6   /* 500ms * 6 */
 
-#define DMS_TIMER_TASK_INVALID_ID UINT_MAX
+#define DMS_TIMER_TASK_INVALID_ID KA_UINT_MAX
 
 #define UINT32_BIT_WIDTH 32
 
@@ -386,7 +383,7 @@ struct hccs_statistic_cache {
     int read_status;
     unsigned int read_err_cnt;
     unsigned int task_id;
-    struct mutex lock;
+    ka_mutex_t lock;
 #ifdef CFG_FEATURE_HCCS_GET_STATISTIC_BY_CHANNEL
     unsigned long long chan_tx_cnt[PCS_NUM][HCCS_CHANNEL_NUM];
     unsigned long long chan_rx_cnt[PCS_NUM][HCCS_CHANNEL_NUM];
@@ -422,7 +419,7 @@ STATIC int read_hccs_statistic_info(unsigned int dev_id, struct hccs_statistic_c
 #else
     unsigned long link_index;
 #endif
-    void __iomem *hccs_base_addr = NULL;
+    void __ka_mm_iomem *hccs_base_addr = NULL;
     devdrv_hardware_info_t hardware_info = {0};
 
     if (dev_id >= ASCEND_PDEV_MAX_NUM) {

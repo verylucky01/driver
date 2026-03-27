@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,7 +13,7 @@
 
 #ifndef __DMS_HOTRESET_H
 #define __DMS_HOTRESET_H
-#include <linux/rwsem.h>
+#include "ka_common_pub.h"
 #include "dms_template.h"
 #include "devdrv_common.h"
 
@@ -38,7 +38,7 @@ EXIT_MODULE_FUNC(DMS_MODULE_BASIC_POWER_INFO);
 struct hotreset_task_info {
     unsigned long task_flag;
     unsigned long task_ref_cnt;
-    struct rw_semaphore task_rw_sema;
+    ka_rw_semaphore_t task_rw_sema;
 };
 
 int dms_power_hotreset_init(void);

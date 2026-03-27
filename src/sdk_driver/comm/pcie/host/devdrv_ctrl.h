@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,10 +14,10 @@
 #ifndef _DEVDRV_CTRL_H_
 #define _DEVDRV_CTRL_H_
 
+#include "ka_memory_pub.h"
 #include "comm_kernel_interface.h"
 #include "devdrv_msg.h"
 #include "devdrv_pci.h"
-#include "ka_memory_pub.h"
 
 #define DEVDRV_MAX_DELAY_COUNT 20
 #define DEVDRV_HOT_RESET_DELAY 3
@@ -148,6 +148,10 @@ struct devdrv_h2d_attr_info {
     u32 valid;
 };
 
+struct devdrv_p2p_config_info {
+    u32 cnt;
+};
+
 #define DEVDRV_RES_GEAR_RESV_NUM  5
 
 struct devdrv_res_gear {
@@ -188,7 +192,6 @@ u32 devdrv_get_devid_by_dev(const struct devdrv_msg_dev *msg_dev);
 int devdrv_register_pci_devctrl(struct devdrv_pci_ctrl *pci_ctrl);
 void devdrv_set_device_boot_status(struct devdrv_pci_ctrl *pci_ctrl, u32 status);
 
-void devdrv_set_host_phy_mach_flag(u32 udevid, u32 host_flag);
 int devdrv_dev_online(struct devdrv_pci_ctrl *pci_ctrl);
 void devdrv_dev_offline(struct devdrv_pci_ctrl *pci_ctrl);
 int devdrv_ctrl_init(void);
@@ -241,9 +244,9 @@ int devdrv_get_runtime_runningplat(u32 udevid, u64 *running_plat);
 int devdrv_set_runtime_runningplat(u32 udevid, u64 running_plat);
 int devdrv_pcie_hotreset_assemble(u32 index_id);
 int devdrv_pcie_prereset(u32 index_id);
-int devdrv_pcie_unbind_atomic(u32 dev_id);
-int devdrv_pcie_reset_atomic(u32 dev_id);
-int devdrv_pcie_remove_atomic(u32 dev_id);
+int devdrv_pcie_unbind_atomic(u32 index_id);
+int devdrv_pcie_reset_atomic(u32 index_id);
+int devdrv_pcie_remove_atomic(u32 index_id);
 int devdrv_hotreset_atomic_rescan(u32 dev_id);
 
 #ifdef CFG_FEATURE_SRIOV
@@ -274,8 +277,8 @@ int devdrv_pcie_get_dev_topology(u32 index_id, u32 peer_index_id, int *topo_type
 int devdrv_get_pcie_id_info_inner(u32 index_id, struct devdrv_base_device_info *dev_info);
 
 bool devdrv_is_p2p_enabled_inner(u32 index_id, u32 peer_index_id);
-int devdrv_enable_p2p_inner(int pid, u32 index_id, u32 peer_index_id);
-int devdrv_disable_p2p_inner(int pid, u32 index_id, u32 peer_index_id);
+int devdrv_enable_p2p_inner(int pid, u32 index_id, u32 peer_index_id, u32 p2p_type);
+int devdrv_disable_p2p_inner(int pid, u32 index_id, u32 peer_index_id, u32 p2p_type);
 int devdrv_get_p2p_capability_inner(u32 index_id, u64 *capability);
 int devdrv_get_p2p_access_status_inner(u32 index_id, u32 peer_index_id, int *status);
 void devdrv_set_bar_wc_flag_inner(u32 index_id, u32 value);

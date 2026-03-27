@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,6 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
+#include "ka_base_pub.h"
 #include "trs_stars_func_com.h"
 #include "stars_event_tbl_ns.h"
 #include "stars_notify_tbl.h"
@@ -47,7 +48,7 @@ int trs_stars_func_event_id_check_and_reset(struct trs_id_inst *inst, u32 id)
 int trs_stars_func_notify_id_record(struct trs_id_inst *inst, u32 id)
 {
     if ((trs_stars_get_notify_tbl_flag(inst, id) != 1) &&
-        (trs_stars_get_notify_tbl_flag(inst, id) != INT_MAX)) {
+        (trs_stars_get_notify_tbl_flag(inst, id) != KA_INT_MAX)) {
         trs_stars_set_notify_tbl_flag(inst, id, 1);
         trs_debug("Notify record success. (id=%u)\n", id);
         return 0;

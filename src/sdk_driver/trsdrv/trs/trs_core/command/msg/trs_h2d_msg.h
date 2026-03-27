@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -70,6 +70,7 @@ enum trs_msg_cmd_type {
     TRS_MSG_TS_CQ_PROCESS,
     TRS_MSG_RAS_REPORT,
     TRS_MSG_NOTICE_PROC_RECYCLE,
+    TRS_MSG_RES_NUM_QUERY,
     TRS_MSG_MAX
 };
 
@@ -167,10 +168,13 @@ struct trs_msg_jetty_info {
     struct ubcore_seg cq_seg;
     struct ubcore_seg sq_seg;
     struct ubcore_eid_info eid_info;
+    struct ubcore_seg notify_seg;
+    struct ubcore_seg cnt_notify_seg;
     u32 die_id;
     u32 func_id;
     u32 vfid;
     u32 token_value;
+    u32 rmt_token_value;
     u32 rsv[4];
 };
 
@@ -279,6 +283,9 @@ struct trs_msg_ts_cq_process {
 #define TRS_MBOX_SQ_TASK_SEND               54U
 #define TRS_MBOX_CQ_REPORT_RECV             55U
 #define TRS_MBOX_QUERY_SQ_STATUS            56U
+#define TRS_MBOX_QUERY_CORE_RATE_START      57U
+#define TRS_MBOX_QUERY_CORE_RATE_END        58U
+#define TRS_MBOX_CORE_RATE_SHARE_MEMORY     59U
 #define TRS_MBOX_MEM_DISPATCH               60U
 #define TRS_MBOX_DSMI_RPC_CALL              61U
 #define TRS_MBOX_NOTICE_TS_CMDLIST_INFO     62U
@@ -508,10 +515,14 @@ struct trs_event_msg {
 
 struct trs_mem_dispatch_msg {
     struct trs_mb_header header;
-    u64 paddr;
+    void *addr;
     u64 size;
     u32 hostpid;
     u8 vfid;
+    u8 is_addr_ext; /* 0 use paddr 1 use ext_addr */
+    u8 flag; /* 0 disable 1 enable */
+    u8 rsv;
+    u32 addr_len;
 };
 
 #define TRS_MBOX_NOTIFY_TYPE     0
@@ -548,6 +559,12 @@ struct trs_res_map_msg {
 struct trs_reset_event_id_msg {
     struct trs_mb_header header;
     u32 event_id;
+};
+
+struct trs_accelerator_util_mailbox {
+    struct trs_mb_header header;
+    u32 core_type;
+    u32 reserved; /* reserved */
 };
 
 struct trs_mbox_ack_irq_msg {

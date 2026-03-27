@@ -13,6 +13,12 @@
 
 #include "dms/dms_devdrv_info_comm.h"
 
+#ifdef STATIC_SKIP
+#define STATIC
+#else
+#define STATIC    static
+#endif
+
 #define DEVDRV_IPV4 (0)
 #define DEVDRV_IPV6 (1)
 #define DEVDRV_MAX_IP_LEN (16)

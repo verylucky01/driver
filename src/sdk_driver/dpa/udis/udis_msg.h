@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -15,6 +15,8 @@
 #define _UDIS_MSG_H_
 
 #include "udis_define.h"
+#include "ka_list_pub.h"
+#include "ka_task_pub.h"
 
 #define UDIS_MSG_VALID 0x5A5A
 #define UDIS_MSG_INVALID_RESULT 0x1A
@@ -23,7 +25,7 @@
 #define UDIS_NEED_SEND_ALL_NODE_FLAG 2
 
 struct udis_dma_addr {
-    struct list_head node;
+    ka_list_head_t node;
     ka_dma_addr_t host_dma_addr;
     ka_dma_addr_t dev_dma_addr;
     u32 data_len; /* Length of source data. */
@@ -40,7 +42,8 @@ struct udis_msg_head {
     unsigned int tsid;
     unsigned int vfid;
 };
-#define UDIS_MSG_INFO_LEN 128UL
+
+#define UDIS_MSG_INFO_LEN 512UL
 #define UDIS_MSG_PAYLOAD_LEN (UDIS_MSG_INFO_LEN - sizeof(struct udis_msg_head))
 struct udis_msg_info {
     struct udis_msg_head head;
@@ -60,17 +63,17 @@ enum udis_h2d_chan_type {
 };
 
 struct udis_msg_notify_work {
-    struct work_struct work;
+    ka_work_struct_t work;
     unsigned int udevid;
     unsigned long privilege_data;
 };
 
 int udis_common_chan_init(void);
 void udis_common_chan_uninit(void);
-int udis_send_dma_node_to_host(unsigned int udevid, struct udis_dma_node *dma_node, enum udis_d2h_chan_type udis_chan);
+int udis_send_addr_node_to_host(unsigned int udevid, struct udis_node *addr_node, enum udis_d2h_chan_type udis_chan);
 void udis_msg_send_work_init(unsigned int udevid);
 void udis_msg_send_work_uninit(unsigned int udevid);
-void udis_all_dma_node_op_to_host(unsigned int udevid, struct udis_ctrl_block *ucb, enum udis_d2h_chan_type chan_type);
+void udis_all_addr_node_op_to_host(unsigned int udevid, struct udis_ctrl_block *ucb, enum udis_d2h_chan_type chan_type);
 int udis_send_host_ready_msg_to_device(unsigned int udevid);
 int udis_send_host_vf_uninit_notify(unsigned int udevid);
 

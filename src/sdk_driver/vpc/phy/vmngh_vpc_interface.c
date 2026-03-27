@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,9 +11,9 @@
  * GNU General Public License for more details.
  */
 
+#include "ka_kernel_def_pub.h"
 #include "vmng_mem_alloc_interface.h"
 #include "vpc_kernel_interface.h"
-#include "ka_kernel_def_pub.h"
 
 int vpc_register_client(u32 dev_id, u32 fid, const struct vmng_vpc_client *vpc_client)
 {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,7 +14,6 @@
 #ifndef __DAVINCI_INTF_COMMON_H__
 #define __DAVINCI_INTF_COMMON_H__
 
-#include <linux/sched.h>
 #include "dmc_kernel_interface.h"
 
 

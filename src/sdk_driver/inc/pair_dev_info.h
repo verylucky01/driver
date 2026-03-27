@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -21,7 +21,15 @@ struct devdrv_pair_info_eid {
     unsigned char raw[DEVDRV_PAIR_DEV_EID_LENGTH];
 };
 
+struct devdrv_dev_id_info {
+    u16 device_id;
+    u16 vendor_id;
+    u16 module_vendor_id;
+    u16 module_id;
+};
+
 int devdrv_get_d2d_eid(u32 udevid, struct devdrv_pair_info_eid *eid);
 int devdrv_get_bus_instance_eid(u32 udevid, struct devdrv_pair_info_eid *eid);
+int devdrv_get_dev_id_info(u32 udevid, struct devdrv_dev_id_info *info);
 
 #endif

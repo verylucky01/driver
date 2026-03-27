@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -67,10 +67,10 @@ STATIC int dms_topology_check_in_the_same_os(unsigned int dev_id1, unsigned int 
     int ret;
     unsigned int i;
     unsigned int dev_num = 0;
-    unsigned int devids[DEVDRV_PF_DEV_MAX_NUM] = {0};
+    unsigned int devids[ASCEND_PDEV_MAX_NUM] = {0};
 
     ret = devdrv_get_devnum(&dev_num);
-    if ((ret != 0) || (dev_num > DEVDRV_PF_DEV_MAX_NUM)) {
+    if ((ret != 0) || (dev_num > ASCEND_PDEV_MAX_NUM)) {
         dms_err("Failed to obtain the number of devices. (dev_id=%u; ret=%d)\n", dev_id1, ret);
         return ret;
     }
@@ -287,8 +287,6 @@ static dms_topology_check_t g_topology_check_info[] = {
     {TOPOLOGY_HCCS, DMS_TOPOLOGY_CHECK_HCCS},
 };
 
-/* In device side, dev_id2 is phy id on host, so, the max dev_id in device is also 64 */
-#define DMS_MAX_DEV_NUM_IN_HOST 64
 /*
   In host side invoke, dev_id1 and dev_id2 is physic id on the host.
   In device side invoke, dev_id1 is physic id on the device, dev_id2 is physic id on the host.
@@ -299,7 +297,7 @@ int dms_get_dev_topology(unsigned int dev_id1, unsigned int dev_id2, int *topolo
     u32 check_num;
     bool result = false;
 
-    if ((dev_id1 >= DEVDRV_PF_DEV_MAX_NUM) || (dev_id2 >= DMS_MAX_DEV_NUM_IN_HOST) || (topology_type == NULL)) {
+    if ((dev_id1 >= ASCEND_PDEV_MAX_NUM) || (dev_id2 >= ASCEND_HOST_PDEV_MAX_NUM) || (topology_type == NULL)) {
         dms_err("Invalid parameter. (dev_id1=%u; dev_id2=%u; topology_type=%d)\n",
             dev_id1, dev_id2, (topology_type != NULL));
         return -EINVAL;
@@ -374,7 +372,7 @@ int dms_feature_get_dev_topology(void *feature, char *in, u32 in_len, char *out,
         return -EOPNOTSUPP;
     }
 
-#ifdef CFG_FEATURE_ASCEND910_95_STUB
+#ifdef CFG_FEATURE_ASCEND950_STUB
     ret = soc_get_dev_topology(phy_id_1, phy_id_2, &topology_type);
 #else
     ret = dms_get_dev_topology(phy_id_1, phy_id_2, &topology_type);
@@ -433,7 +431,7 @@ int dms_feature_get_phy_devices_topology(void *feature, char *in, u32 in_len, ch
         return -EOPNOTSUPP;
     }
 
-#ifdef CFG_FEATURE_ASCEND910_95_STUB
+#ifdef CFG_FEATURE_ASCEND950_STUB
     ret = soc_get_dev_topology(input->dev_id1, input->dev_id2, &topology_type);
 #else
     ret = dms_get_dev_topology(input->dev_id1, input->dev_id2, &topology_type);
@@ -466,7 +464,7 @@ int hal_kernel_get_d2d_topology_type(u32 dev_id1, u32 dev_id2, HAL_KERNEL_TOPOLO
         return -EOPNOTSUPP;
     }
 
-#ifdef CFG_FEATURE_ASCEND910_95_STUB
+#ifdef CFG_FEATURE_ASCEND950_STUB
     return soc_get_dev_topology(dev_id1, dev_id2, (int *)topology_type);
 #else
     return dms_get_dev_topology(dev_id1, dev_id2, (int *)topology_type);

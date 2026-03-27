@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -19,6 +19,7 @@
 #include "trs_proc.h"
 #include "trs_ioctl.h"
 #include "trs_pub_def.h"
+#include "trs_ts_inst.h"
 
 static inline struct trs_core_ts_inst *trs_core_inst_get_for_res_map(struct trs_id_inst *id_inst, struct trs_proc_ctx *proc_ctx, struct trs_cmd_res_map para)
 {
@@ -33,5 +34,12 @@ static inline void trs_core_printf_avail_num(struct trs_core_ts_inst *ts_inst, k
     ka_fs_seq_printf(seq, "idx %d res %s avail_num %u\n", i, trs_id_type_to_name(i), avail_num);
 }
 
+static inline int trs_core_get_stars_die_id(u32 devid, u32 tsid, u32 *die_id)
+{
+    (void)devid;
+    (void)tsid;
+    *die_id = 0;
+    return 0;
+}
 #endif
 

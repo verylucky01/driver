@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -23,16 +23,22 @@
 #include "ka_memory_pub.h"
 #include "ka_hashtable_pub.h"
 
+static void devmm_free_notifier(ka_mmu_notifier_t *mn);
+
 void devmm_mmu_notifier_unregister_no_release(struct devmm_svm_process *svm_proc)
 {
 #ifndef ADAPT_KP_OS_FOR_EMU_TEST
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
-    if (svm_proc->notifier != NULL) {
-        ka_mm_mmu_notifier_put(svm_proc->notifier);
+    if (ka_mm_is_support_mmu_notifier_get_put()) {
+        if (svm_proc->notifier != NULL) {
+            ka_mm_mmu_notifier_put(svm_proc->notifier);
+        }
+    } else {
+        if (svm_proc->notifier != NULL) {
+            ka_mm_mmu_notifier_unregister_no_release(svm_proc->notifier, svm_proc->mm);
+            devmm_free_notifier(svm_proc->notifier);
+            svm_proc->notifier = NULL;
+        }
     }
-#else
-    ka_mm_mmu_notifier_unregister_no_release(&svm_proc->notifier, svm_proc->mm);
-#endif
 #endif
 }
 
@@ -60,7 +66,6 @@ void devmm_svm_mmu_notifier_unreg(struct devmm_svm_process *svm_proc)
         notifier_release_flag = true;
     }
     ka_task_mutex_unlock(&svm_proc->proc_lock);
-
     if (notifier_release_flag == true) {
         devmm_mmu_notifier_unregister_no_release(svm_proc);
         devmm_notifier_release_private(svm_proc);
@@ -170,6 +175,7 @@ bool devmm_mem_is_in_vma_range(ka_vm_area_struct_t *vma[], u32 vma_num, u64 star
 STATIC int _devmm_notifier_start(ka_mmu_notifier_t *mn, ka_mm_struct_t *mm,
     unsigned long start, unsigned long end, bool blockable)
 {
+#ifndef EMU_ST
     struct devmm_svm_process *svm_proc = NULL;
     bool unexpected_munmap = false;
 
@@ -187,6 +193,11 @@ STATIC int _devmm_notifier_start(ka_mmu_notifier_t *mn, ka_mm_struct_t *mm,
     if (svm_is_da_match(svm_proc, start, end - start)) {
         if (blockable == false) {
             return -EAGAIN;
+        }
+
+        /* ioctl unmap should do nothing, only munmap should enter */
+        if (svm_is_da_unmap(svm_proc, start, end - start)) {
+            return 0;
         }
 
         /*
@@ -212,33 +223,9 @@ STATIC int _devmm_notifier_start(ka_mmu_notifier_t *mn, ka_mm_struct_t *mm,
         devmm_svm_mmu_notifier_unreg(svm_proc);
         devmm_svm_ioctl_unlock(svm_proc, DEVMM_CMD_WLOCK);
     }
-
+#endif
     return 0;
 }
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0))
-STATIC int devmm_notifier_start(ka_mmu_notifier_t *mn, const ka_mmu_notifier_range_t *range)
-{
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 2, 0))
-    bool blockable = ka_mm_mmu_notifier_range_blockable(range);
-#else
-    bool blockable = range->blockable;
-#endif
-
-    return _devmm_notifier_start(mn, range->mm, range->start, range->end, blockable);
-}
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
-STATIC int devmm_notifier_start(ka_mmu_notifier_t *mn, ka_mm_struct_t *mm, unsigned long start, unsigned long end,
-    bool blockable)
-{
-    return _devmm_notifier_start(mn, mm, start, end, blockable);
-}
-#else
-STATIC void devmm_notifier_start(ka_mmu_notifier_t *mn, ka_mm_struct_t *mm, unsigned long start, unsigned long end)
-{
-    (void)_devmm_notifier_start(mn, mm, start, end, true);
-}
-#endif
 
 STATIC void devmm_notifier_release(ka_mmu_notifier_t *mn, ka_mm_struct_t *mm)
 {
@@ -253,7 +240,6 @@ STATIC void devmm_notifier_release(ka_mmu_notifier_t *mn, ka_mm_struct_t *mm)
     devmm_svm_mmu_notifier_unreg(svm_proc);
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
 static ka_mmu_notifier_t *devmm_alloc_notifier(ka_mm_struct_t *mm)
 {
     ka_mmu_notifier_t *notifier = NULL;
@@ -273,37 +259,50 @@ static void devmm_free_notifier(ka_mmu_notifier_t *mn)
     devmm_kfree_ex(mn);
     return;
 }
+
+#ifndef EMU_ST
+KA_DEFINE_MMU_NOTIFIER_INVALIDATE_RANGE_START_FN(_devmm_notifier_start)
 #endif
 
 ka_mmu_notifier_ops_t devmm_process_mmu_notifier = {
-    .invalidate_range_start = devmm_notifier_start,
+#ifndef EMU_ST    
+    KA_MM_MMU_NOTIFIER_OPS_INIT_INVALIDATE_RANGE_START(_devmm_notifier_start)
+#endif    
     .release = devmm_notifier_release,
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
-    .alloc_notifier = devmm_alloc_notifier,
-    .free_notifier = devmm_free_notifier,
-#endif
+    KA_MM_MMU_NOTIFIER_OPS_INIT_ALLOC_NOTIFIER(devmm_alloc_notifier)
+    KA_MM_MMU_NOTIFIER_OPS_INIT_FREE_NOTIFIER(devmm_free_notifier)
 };
 #endif
 
 int devmm_mmu_notifier_register(struct devmm_svm_process *svm_proc)
 {
     int ret = 0;
+    ka_mmu_notifier_t *mn = NULL;
+
 #ifndef ADAPT_KP_OS_FOR_EMU_TEST
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
-    {
-        ka_mmu_notifier_t *mn = NULL;
-        mn = mmu_notifier_get(&devmm_process_mmu_notifier, svm_proc->mm);
+    if (ka_mm_is_support_mmu_notifier_get_put()) {
+        mn = ka_mm_mmu_notifier_get(&devmm_process_mmu_notifier, svm_proc->mm);
         if (KA_IS_ERR(mn)) {
             ret = (int)KA_PTR_ERR(mn);
             svm_proc->notifier = NULL;
         } else {
             svm_proc->notifier = mn;
         }
+    } else {
+        if (svm_proc->notifier == NULL) {
+            svm_proc->notifier = devmm_alloc_notifier(svm_proc->mm);
+            if (svm_proc->notifier == NULL) {
+                return -ENOMEM;
+            }
+        }
+        svm_proc->notifier->ops = &devmm_process_mmu_notifier;
+        ret = ka_mm_mmu_notifier_register(svm_proc->notifier, svm_proc->mm);
+        if (ret != 0) {
+            devmm_free_notifier(svm_proc->notifier);
+            svm_proc->notifier = NULL;
+        }
     }
-#else
-    svm_proc->notifier.ops = &devmm_process_mmu_notifier;
-    ret = ka_mm_mmu_notifier_register(&svm_proc->notifier, svm_proc->mm);
-#endif
+
     if (ret == 0) {
         /*
          * Fd release will judge this value, if mmu notifier register failed

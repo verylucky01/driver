@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,6 +13,7 @@
 
 #include "ka_task_pub.h"
 #include "ka_memory_pub.h"
+#include "ka_driver_pub.h"
 #include "kernel_cgroup_mem_adapt.h"
 
 #include "trs_ts_inst.h"
@@ -246,7 +247,7 @@ static void trs_sq_reg_remap(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_i
 
     /* head reg addr not page align */
     trs_remap_fill_para(&map_para, TRS_MAP_TYPE_RO_REG,
-        uio_info->sq_ctrl_addr[TRS_UIO_HEAD_REG], ALIGN_DOWN(sq_info->head_addr, KA_MM_PAGE_SIZE), KA_MM_PAGE_SIZE);
+        uio_info->sq_ctrl_addr[TRS_UIO_HEAD_REG], KA_DRIVER_ALIGN_DOWN(sq_info->head_addr, KA_MM_PAGE_SIZE), KA_MM_PAGE_SIZE);
     ret = trs_remap_sq(proc_ctx, ts_inst, &map_para);
     if (ret == 0) {
         sq_ctx->head_reg.uva = map_para.va;
@@ -259,7 +260,7 @@ static void trs_sq_reg_remap(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_i
 
     /* tail reg addr not page align */
     trs_remap_fill_para(&map_para, TRS_MAP_TYPE_RO_REG,
-        uio_info->sq_ctrl_addr[TRS_UIO_TAIL_REG], ALIGN_DOWN(sq_info->tail_addr, KA_MM_PAGE_SIZE), KA_MM_PAGE_SIZE);
+        uio_info->sq_ctrl_addr[TRS_UIO_TAIL_REG], KA_DRIVER_ALIGN_DOWN(sq_info->tail_addr, KA_MM_PAGE_SIZE), KA_MM_PAGE_SIZE);
     ret = trs_remap_sq(proc_ctx, ts_inst, &map_para);
     if (ret == 0) {
         sq_ctx->tail_reg.uva = map_para.va;
@@ -339,7 +340,7 @@ int trs_sq_remap(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst *ts_inst
 
     /* head addr not page align */
     trs_remap_fill_para(&map_para, sq_reg_type, uio_info->sq_ctrl_addr[TRS_UIO_HEAD],
-        ALIGN_DOWN(sq_info->head_addr, KA_MM_PAGE_SIZE), KA_MM_PAGE_SIZE);
+        KA_DRIVER_ALIGN_DOWN(sq_info->head_addr, KA_MM_PAGE_SIZE), KA_MM_PAGE_SIZE);
     uio_info->sq_ctrl_addr[TRS_UIO_HEAD] += sq_info->head_addr % KA_MM_PAGE_SIZE;
     ret = trs_sq_head_remap(proc_ctx, ts_inst, sq_ctx, &map_para);
     if (ret != 0) {
@@ -348,7 +349,7 @@ int trs_sq_remap(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst *ts_inst
 
     /* tail addr not page align */
     trs_remap_fill_para(&map_para, sq_reg_type, uio_info->sq_ctrl_addr[TRS_UIO_TAIL],
-        ALIGN_DOWN(sq_info->tail_addr, KA_MM_PAGE_SIZE), KA_MM_PAGE_SIZE);
+        KA_DRIVER_ALIGN_DOWN(sq_info->tail_addr, KA_MM_PAGE_SIZE), KA_MM_PAGE_SIZE);
     uio_info->sq_ctrl_addr[TRS_UIO_TAIL] += sq_info->tail_addr % KA_MM_PAGE_SIZE;
     ret = trs_sq_tail_remap(proc_ctx, ts_inst, sq_ctx, &map_para);
     if (ret != 0) {
@@ -357,7 +358,7 @@ int trs_sq_remap(struct trs_proc_ctx *proc_ctx, struct trs_core_ts_inst *ts_inst
 
     /* db addr not page align */
     trs_remap_fill_para(&map_para, TRS_MAP_TYPE_REG, uio_info->sq_ctrl_addr[TRS_UIO_DB],
-        ALIGN_DOWN(sq_info->db_addr, KA_MM_PAGE_SIZE), KA_MM_PAGE_SIZE);
+        KA_DRIVER_ALIGN_DOWN(sq_info->db_addr, KA_MM_PAGE_SIZE), KA_MM_PAGE_SIZE);
     uio_info->sq_ctrl_addr[TRS_UIO_DB] += sq_info->db_addr % KA_MM_PAGE_SIZE;
     ret = trs_sq_db_remap(proc_ctx, ts_inst, sq_ctx, &map_para);
     if (ret != 0) {

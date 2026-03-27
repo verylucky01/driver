@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,12 +10,12 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
-#include <linux/module.h>
-#include <linux/init.h>
-#include <linux/ioctl.h>
-#include <linux/fs.h>
-#include <linux/uaccess.h>
+#include "ka_common_pub.h"
+#include "ka_fs_pub.h"
+#include "ka_base_pub.h"
+#include "ka_kernel_def_pub.h"
+#include "ka_ioctl_pub.h"
+#include "ka_compiler_pub.h"
 
 #include "pbl/pbl_davinci_api.h"
 
@@ -25,10 +25,7 @@
 #include "uda_proc_fs.h"
 #include "uda_pub_def.h"
 #include "uda_fops.h"
-#include "ka_base_pub.h"
-#include "ka_kernel_def_pub.h"
-#include "ka_ioctl_pub.h"
-#include "ka_compiler_pub.h"
+#include "spod_info.h"
 
 static int ioctl_uda_get_user_info(unsigned int cmd, unsigned long arg)
 {
@@ -183,7 +180,7 @@ static int ioctl_uda_devid_trans(unsigned int cmd, unsigned long arg)
     return (int)ka_base_put_user(trans.trans_devid, &usr_arg->trans_devid);
 }
 
-#ifdef CFG_FEATURE_ASCEND910_95_STUB
+#ifdef CFG_FEATURE_ASCEND950_STUB
 static u32 g_raw_proc_contain_flag = 0;
 
 static int ioctl_uda_set_raw_proc_is_contain_flag(unsigned int cmd, unsigned long arg)
@@ -224,14 +221,14 @@ static int (*const uda_ioctl_handles[UDA_MAX_CMD])(unsigned int cmd, unsigned lo
     [_KA_IOC_NR(UDA_DEVID_TO_UDEVID)] = ioctl_uda_devid_trans,
     [_KA_IOC_NR(UDA_LUDEVID_TO_RUDEVID)] = ioctl_uda_devid_trans,
     [_KA_IOC_NR(UDA_RUDEVID_TO_LUDEVID)] = ioctl_uda_devid_trans,
-#ifdef CFG_FEATURE_ASCEND910_95_STUB
+#ifdef CFG_FEATURE_ASCEND950_STUB
     [_KA_IOC_NR(UDA_SET_RAW_PROC_IS_CONTAIN_FLAG)] = ioctl_uda_set_raw_proc_is_contain_flag,
     [_KA_IOC_NR(UDA_GET_RAW_PROC_IS_CONTAIN_FLAG)] = ioctl_uda_get_raw_proc_is_contain_flag,
 #endif
 };
 
 #ifdef CFG_FEATURE_DEVID_TRANS
-static long uda_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+static long uda_ioctl(ka_file_t *file, unsigned int cmd, unsigned long arg)
 {
     int cmd_nr = _KA_IOC_NR(cmd);
     if ((cmd_nr < 0) || (cmd_nr >= UDA_MAX_CMD) || (uda_ioctl_handles[cmd_nr] == NULL)) {
@@ -242,21 +239,21 @@ static long uda_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
     return (long)uda_ioctl_handles[cmd_nr](cmd, arg);
 }
 
-static int uda_open(struct inode *inode, struct file *file)
+static int uda_open(ka_inode_t *inode, ka_file_t *file)
 {
     return 0;
 }
 
-static int uda_release(struct inode *inode, struct file *file)
+static int uda_release(ka_inode_t *inode, ka_file_t *file)
 {
     return 0;
 }
 
-static struct file_operations uda_fops = {
-    .owner = KA_THIS_MODULE,
-    .open = uda_open,
-    .release = uda_release,
-    .unlocked_ioctl = uda_ioctl,
+static ka_file_operations_t uda_fops = {
+    ka_fs_init_f_owner(KA_THIS_MODULE)
+    ka_fs_init_f_open(uda_open)
+    ka_fs_init_f_release(uda_release)
+    ka_fs_init_f_unlocked_ioctl(uda_ioctl)
 };
 #endif
 
@@ -294,6 +291,12 @@ int uda_init_module(void)
 #endif
 
     uda_proc_fs_init();
+
+#ifdef DRV_HOST
+#ifdef CFG_FEATURE_SPOD_INFO
+    spod_info_init();
+#endif
+#endif
 
     return 0;
 }

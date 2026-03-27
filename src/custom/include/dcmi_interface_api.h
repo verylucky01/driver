@@ -471,6 +471,26 @@ struct dcmi_hccs_statues {
     unsigned char reserve[DCMI_HCCS_STATUS_RESERVED_LEN];
 };
 
+#define DCMI_UB_PORT_NUM 36        // NPU芯片端口数量
+typedef enum {
+    DCMI_UB_ALL_PORT_NO_LINK = 0,  // 所有端口未建链
+    DCMI_UB_ALL_PORT_LINK,         // 所有端口建链
+    DCMI_UB_PARTIAL_PORT_LINK,     // 部分端口建链
+    DCMI_UB_NO_NEED_LINK,          // 断链标记 无需建链
+} dcmi_entire_ub_status;           /* 芯片维度：0-2：actual link status，3：link requirement */
+
+typedef enum {
+    DCMI_UB_PORT_STATUS_NONE_LANE = 0,  // 芯片端口不存在
+    DCMI_UB_PORT_STATUS_FULL_LANE,      // 端口建链 全带宽
+    DCMI_UB_PORT_STATUS_PARTIAL_LANE,   // 端口建链 部分带宽
+    DCMI_UB_PORT_STATUS_INITIAL,        // 初始化状态 未建链
+} dcmi_ub_port_status;                  /* 芯片端口维度 */
+
+struct dcmi_ub_port_link_status {
+    dcmi_entire_ub_status ub_link_status;
+    dcmi_ub_port_status ub_port_status[DCMI_UB_PORT_NUM];
+};
+
 /* DCMI sub commond for SIO */
 typedef enum {
     DCMI_SIO_SUB_CMD_CRC_ERR_STATISTICS = 0,
@@ -775,6 +795,9 @@ typedef struct dcmi_ufs_status_stru {
 
 /* DCMI sub commond for DCMI_MAIN_CMD_SEC */
 #define DCMI_SEC_SUB_CMD_PSS 0
+
+/* DCMI sub command for DCMI_MAIN_CMD_CHIP_INF */
+#define DCMI_CHIP_INF_SUB_CMD_CUST_BOARD_INF 3
 
 #define DCMI_SRIOV_DISABLE 0
 #define DCMI_SRIOV_ENABLE  1
@@ -2055,6 +2078,8 @@ DCMIDLLEXPORT int dcmi_get_hccs_link_bandwidth_info(int card_id, int device_id,
     struct dcmi_hccs_bandwidth_info *hccs_bandwidth_info);
 
 DCMIDLLEXPORT int dcmi_get_netdev_brother_device(int card_id, int device_id, int *brother_card_id);
+
+DCMIDLLEXPORT int dcmi_get_ub_port_link_status_info(int card_id, int device_id, struct dcmi_ub_port_link_status *ub_status);
 
 #if defined DCMI_VERSION_1
 /* The following interfaces are V1 version interfaces. In order to ensure the compatibility is temporarily reserved,

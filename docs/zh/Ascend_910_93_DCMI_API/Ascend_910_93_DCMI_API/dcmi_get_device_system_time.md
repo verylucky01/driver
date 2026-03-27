@@ -145,7 +145,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001251307155_zh-cn_topic_0000001223172943_zh-cn_topic_0000001101564712_toc533412083"></a>**
 
-```c
+```
 … 
 int ret = 0;
 unsigned int time = 0;
@@ -158,3 +158,4 @@ if (ret != 0){
 }
 …
 ```
+

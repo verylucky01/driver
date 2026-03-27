@@ -267,7 +267,7 @@ function config_recover()
 }
 
 if [ ! -f "$DEVICE_SHARE_CONF" ]; then
-    log "DEVICE_SHARE_CONF path is not exist, do not need to recover, exit."
+    log "DEVICE_SHARE_CONF path is not exist, restore to default, exit."
     exit 0
 fi
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -30,8 +30,9 @@
 
 #include "runenv_config_module.h"
 #include "docker_query.h"
+#include "ka_common_pub.h"
+#include "ka_task_pub.h"
 
-#define PER_BIT_U32            32
 extern struct task_struct init_task;
 
 static bool is_admin_task(struct task_struct *tsk)
@@ -46,31 +47,30 @@ static bool is_admin_task(struct task_struct *tsk)
     kernel_cap_t privileged = CAP_FULL_SET;
 #endif
     const struct cred *cred = NULL;
-    unsigned int user_id, cap, idx;
+    kernel_cap_t effective;
+    unsigned int user_id;
 
     rcu_read_lock();
     cred = __task_cred(tsk); //lint !e1058 !e64 !e666
     user_id = cred->uid.val;
+    effective = cred->cap_effective;
     rcu_read_unlock();
 
+#ifndef EMU_ST
+    if (cred->user_ns != &init_user_ns) {
+        return false;
+    }
+#endif
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
-    for (idx = 0; idx < CAP_LAST_CAP; idx++) {
-        if (((privileged.val >> idx) & 0x1) == 0x1) {
-            cap = idx;
-            if (capable(cap) == false) {
-                return false;
-            }
-        }
+    if ((effective.val & privileged.val) != privileged.val) {
+        return false;
     }
 #else
-    CAP_FOR_EACH_U32(i) {
-        for (idx = 0; idx < PER_BIT_U32; idx++) {
-            if (((privileged.cap[i] >> idx) & 0x1) == 0x1) {
-                cap = i * PER_BIT_U32 + idx;
-                if (capable(cap) == false) {
-                    return false;
-                }
-            }
+    CAP_FOR_EACH_U32(i)
+    {
+        if ((effective.cap[i] & privileged.cap[i]) != privileged.cap[i]) {
+            return false;
         }
     }
 #endif
@@ -142,7 +142,7 @@ static struct mnt_namespace *get_current_mnt_ns(void)
         return NULL;
     }
 
-    return current->nsproxy->mnt_ns;
+    return ka_task_get_current_mnt_ns();
 }
 
 static struct mnt_namespace *get_host_mnt_ns(void)
@@ -203,3 +203,29 @@ bool run_in_docker(void)
     return false;
 }
 EXPORT_SYMBOL(run_in_docker);
+
+int dbl_host_pid_to_container_pid(pid_t host_pid, pid_t *container_pid)
+{
+#ifndef DMS_UT
+    ka_struct_pid_t *pgrp = NULL;
+    ka_task_struct_t *tsk = NULL;
+
+    if (!run_in_docker()) {
+        *container_pid = host_pid;
+        return 0;
+    }
+    ka_for_each_process(tsk) {
+        if ((tsk != NULL) && (tsk->pid == host_pid)) {
+            pgrp = task_pid(tsk);
+            if (pgrp == NULL) {
+                recfg_err("The process group parameter is NULL.\n");
+                return -EINVAL;
+            }
+            *container_pid = pgrp->numbers[pgrp->level].nr;
+            break;
+        }
+    }
+#endif
+    return 0;
+}
+EXPORT_SYMBOL(dbl_host_pid_to_container_pid);

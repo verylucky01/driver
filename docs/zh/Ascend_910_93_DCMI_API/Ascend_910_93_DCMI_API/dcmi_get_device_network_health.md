@@ -157,32 +157,32 @@
 
 在调用**dcmi\_get\_device\_network\_health**接口前，需在Host侧以root用户执行如下命令设置IP地址：
 
-- 配置RoCE网卡的IP地址、子网掩码
+-   配置RoCE网卡的IP地址、子网掩码
 
-    ```sh
+    ```
     hccn_tool -i devid -ip -s address %s netmask %s
     ```
 
     您需要根据实际情况，修改如下内容：
 
-    - _devid_  ：设置为设备ID。
-    - **address**后的_%s_：设置为RoCE网卡的IP地址。
-    - **netmask**后的_%s_：设置为子网掩码。
+    -   _devid_  ：设置为设备ID。
+    -   **address**后的_%s_：设置为RoCE网卡的IP地址。
+    -   **netmask**后的_%s_：设置为子网掩码。
 
-- 配置用于检测RoCE网卡的IP地址是否连通的IP地址
+-   配置用于检测RoCE网卡的IP地址是否连通的IP地址
 
-    ```sh
+    ```
     hccn_tool -i devid -netdetect -s address %s
     ```
 
     您需要根据实际情况，修改如下内容：
 
-    - _devid_  ：设置为设备ID。
-    - **address**后的_%s_：设置为用于检测RoCE网卡的IP地址是否连通的IP地址，例如路由器的IP地址。
+    -   _devid_  ：设置为设备ID。
+    -   **address**后的_%s_：设置为用于检测RoCE网卡的IP地址是否连通的IP地址，例如路由器的IP地址。
 
 **调用示例<a name="zh-cn_topic_0000001206147228_zh-cn_topic_0000001178213206_zh-cn_topic_0000001101611602_toc533412083"></a>**
 
-```c
+```
 … 
 int ret = 0;
 enum dcmi_rdfx_detect_result health = DCMI_RDFX_DETECT_MAX;
@@ -191,3 +191,4 @@ int device_id = 0;
 ret = dcmi_get_device_network_health(card_id, device_id, &health);
 …
 ```
+

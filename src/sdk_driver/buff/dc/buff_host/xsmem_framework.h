@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,34 +14,18 @@
 #ifndef XSMEM_FRAMEWORK_H
 #define XSMEM_FRAMEWORK_H
 
-#include <linux/types.h>
-#include <linux/rbtree.h>
-#include <linux/mm.h>
-#include <linux/seq_file.h>
-#include <linux/version.h>
-#include <linux/proc_fs.h>
-#include <linux/wait.h>
-#include <linux/gfp.h>
 #include "xsmem_drv_alloc_interface.h"
 #include "buff_ioctl.h"
 #include "ka_task_pub.h"
 #include "ka_system_pub.h"
 #include "ka_memory_pub.h"
+#include "ka_list_pub.h"
+#include "ka_compiler_pub.h"
 
 #define XSMEM_DEVICE_NAME "xsmem_dev"
 
 #define XSMEM_NOT_CONFIRM_USER_ID   0xffffffff
 #define XSMEM_ROOT_USER_ID          0x0
-
-#ifndef __GFP_ACCOUNT
-#ifdef __GFP_KMEMCG
-#define __GFP_ACCOUNT __GFP_KMEMCG /* for linux version 3.10 */
-#endif
-
-#ifdef __GFP_NOACCOUNT
-#define __GFP_ACCOUNT 0 /* for linux version 4.1 */
-#endif
-#endif
 
 #ifdef EMU_ST
 #define STATIC
@@ -55,27 +39,27 @@ struct xsm_adding_task {
     int pid;
     GroupShareAttr attr;
     TASK_TIME_TYPE start_time;
-    struct list_head    pool_node;
+    ka_list_head_t    pool_node;
 };
 
 struct xsm_pool {
     int         pool_id;
     unsigned int priv_mbuf_flag;
-    atomic_t        refcnt;
+    ka_atomic_t        refcnt;
     int     task_id;
-    struct mutex        mutex;
+    ka_mutex_t        mutex;
 
-    struct list_head    node_list_head;
-    struct list_head    register_task_list;
-    struct hlist_node   hnode;
+    ka_list_head_t    node_list_head;
+    ka_list_head_t    register_task_list;
+    ka_hlist_node_t   hnode;
 
     struct xsm_pool_algo    *algo;
 
     /* Used to serialize the alloc and free operation on the POOL */
-    struct mutex        xp_block_mutex;
-    struct rb_root      block_root; /* for all alloced block */
+    ka_mutex_t        xp_block_mutex;
+    ka_rb_root_t      block_root; /* for all alloced block */
     void            *private;
-    struct proc_dir_entry *entry;
+    ka_proc_dir_entry_t *entry;
 
     unsigned long alloc_size;
     unsigned long real_alloc_size;
@@ -84,10 +68,10 @@ struct xsm_pool {
     int         create_pid;
     int         adding_id;
     unsigned int cache_type;
-    wait_queue_head_t   adding_task_wq;
-    struct list_head    adding_task_list_head;
+    ka_wait_queue_head_t   adding_task_wq;
+    ka_list_head_t    adding_task_list_head;
     u64                 adding_task_num;
-    struct list_head    prop_list_head;
+    ka_list_head_t    prop_list_head;
     unsigned long       mnt_ns;
     unsigned int         key_len;
     /* MUST be the last element */
@@ -95,33 +79,33 @@ struct xsm_pool {
 };
 
 struct xsm_task {
-    pid_t           pid;
-    pid_t           vpid; /* pid in container */
+    ka_pid_t           pid;
+    ka_pid_t           vpid; /* pid in container */
     int             attached_pool_count;
     u64             uid;    /* uniqueue id for each process */
-    atomic_t        pool_num;
-    struct hlist_node link; /* hash task link */
-    struct list_head    node_list_head;
-    struct list_head    register_xp_list_head;
-    struct mutex        mutex;
-    struct mm_struct *mm;
-    struct proc_dir_entry *entry;
+    ka_atomic_t        pool_num;
+    ka_hlist_node_t link; /* hash task link */
+    ka_list_head_t    node_list_head;
+    ka_list_head_t    register_xp_list_head;
+    ka_mutex_t        mutex;
+    ka_mm_struct_t *mm;
+    ka_proc_dir_entry_t *entry;
 };
 
 struct xsm_exit_task {
-    pid_t           pid;
+    ka_pid_t           pid;
     u64             uid;
-    struct list_head    node;
+    ka_list_head_t    node;
 };
 
 struct xsm_task_pool_node {
-    struct list_head    task_node; /* list node in TASK */
-    struct list_head    pool_node; /* list node in POOL */
+    ka_list_head_t    task_node; /* list node in TASK */
+    ka_list_head_t    pool_node; /* list node in POOL */
     struct xsm_task *task;
     struct xsm_pool *pool;
 
-    struct mutex        mutex;
-    struct list_head    exit_task_head;
+    ka_mutex_t        mutex;
+    ka_list_head_t    exit_task_head;
 
     GroupShareAttr attr;
     int task_id;
@@ -129,8 +113,8 @@ struct xsm_task_pool_node {
     u64     alloc_size;
     u64     real_alloc_size;
     u64     alloc_peak_size;
-    struct list_head    task_blk_head;
-    struct list_head    task_prop_head;
+    ka_list_head_t    task_blk_head;
+    ka_list_head_t    task_prop_head;
 };
 
 struct xsm_block {
@@ -142,15 +126,15 @@ struct xsm_block {
     unsigned long       alloc_size;
     unsigned long       real_size;
 
-    struct rb_node      block_rb_node;
+    ka_rb_node_t      block_rb_node;
     void            *private;
-    struct list_head    task_blk_head;
+    ka_list_head_t    task_blk_head;
 };
 
 struct xsm_task_block_node {
     int refcnt;
-    struct list_head    node_list; /* list node in TASK node */
-    struct list_head    blk_list;  /* list node in BLOCK */
+    ka_list_head_t    node_list; /* list node in TASK node */
+    ka_list_head_t    blk_list;  /* list node in BLOCK */
     struct xsm_block    *blk;
     struct xsm_task_pool_node *node;
 };
@@ -159,7 +143,7 @@ struct xsm_task_block_node {
 struct xsm_pool_algo {
     int num;
     char name[ALGO_NAME_MAX];
-    struct list_head algo_node;
+    ka_list_head_t algo_node;
     int (*xsm_pool_init)(struct xsm_pool *xp, struct xsm_reg_arg *arg);
     int (*xsm_pool_free)(struct xsm_pool *xp);
     int (*xsm_pool_cache_create)(struct xsm_pool *xp, struct xsm_cache_create_arg *arg);
@@ -168,7 +152,7 @@ struct xsm_pool_algo {
         GrpQueryGroupAddrInfo *cache_buff, unsigned int *cache_cnt);
     int (*xsm_pool_perm_add)(struct xsm_pool *xp, int pid, unsigned long prop);
     int (*xsm_pool_va_check)(struct xsm_pool *xp, unsigned long va, int *result);
-    void (*xsm_pool_show)(struct xsm_pool *xp, struct seq_file *seq);
+    void (*xsm_pool_show)(struct xsm_pool *xp, ka_seq_file_t *seq);
     int (*xsm_block_alloc)(struct xsm_pool *xp, struct xsm_block *blk);
     int (*xsm_block_free)(struct xsm_pool *xp, struct xsm_block *blk);
 };
@@ -180,7 +164,7 @@ void xsmem_pool_put(struct xsm_pool *xp);
 
 struct xsm_task_pool_node *task_pool_node_find(struct xsm_task *task, const struct xsm_pool *xp);
 
-int copy_from_user_safe(void *to, const void __user *from, unsigned long n);
+int copy_from_user_safe(void *to, const void __ka_user *from, unsigned long n);
 bool blk_is_alloced_from_os(struct xsm_block *blk);
 
 #endif

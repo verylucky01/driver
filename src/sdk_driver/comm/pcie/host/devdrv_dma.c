@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -21,6 +21,8 @@
 #undef CONFIG_DEBUG_BUGVERBOSE
 #endif
 
+#include "ka_driver_pub.h"
+#include "ka_barrier_pub.h"
 #include "devdrv_dma.h"
 #include "devdrv_util.h"
 #include "devdrv_pci.h"
@@ -34,13 +36,7 @@
 #include "devdrv_pcie_dump_dfx.h"
 #endif
 #include "devdrv_adapt.h"
-#ifdef CFG_ENV_HOST
 #include "securec.h"
-#else
-#include <linux/securec.h>
-#endif
-#include "ka_driver_pub.h"
-#include "ka_barrier_pub.h"
 
 /* dma channel sq submit interface */
 STATIC void devdrv_dma_ch_sq_submit(struct devdrv_dma_channel *dma_chan)
@@ -872,10 +868,11 @@ int devdrv_peh_dma_node_addr_check(struct devdrv_dma_node *dma_node)
 STATIC struct devdrv_dma_soft_bd *devdrv_dma_fill_sq_desc_and_soft_bd(struct devdrv_dma_channel *dma_chan,
     struct devdrv_dma_node *dma_node, u32 node_cnt, struct devdrv_dma_copy_para *para)
 {
-    struct devdrv_dma_sq_node *sq_desc = NULL;
-    struct devdrv_dma_soft_bd *soft_bd = NULL;
     int intr_flag = (para->wait_type == DEVDRV_DMA_WAIT_INTR) ? 1 : 0;
     int connect_protocol = devdrv_get_connect_protocol_by_dev(dma_chan->dev);
+    struct devdrv_dma_sq_node *sq_desc = NULL;
+    struct devdrv_dma_soft_bd *soft_bd = NULL;
+    u32 dev_id = dma_chan->dma_dev->dev_id;
     u32 last_sq_id, sq_index;
     u64 pasid;
     int ret;
@@ -885,16 +882,22 @@ STATIC struct devdrv_dma_soft_bd *devdrv_dma_fill_sq_desc_and_soft_bd(struct dev
         if (connect_protocol == CONNECT_PROTOCOL_HCCS) {
             ret = devdrv_peh_dma_node_addr_check(&dma_node[sq_index]);
             if (ret != 0) {
-                devdrv_err_spinlock("Peh dma addr range check.(dev_id=%u)\n", dma_chan->dma_dev->dev_id);
+                devdrv_err_spinlock("Peh dma addr range check.(dev_id=%u)\n", dev_id);
                 return NULL;
             }
+        }
+
+        pasid = dma_node[sq_index].loc_passid;
+        if ((pasid != 0) && (!devdrv_dma_pasid_valid_check(dev_id, pasid, dma_chan->dma_dev->pci_ctrl->env_boot_mode))) {
+            devdrv_err_spinlock("Pasid no in rbtree failed. (devid=%u; pasid=%llu)\n", dev_id, pasid);
+            return NULL;
         }
 
         sq_desc = devdrv_get_sq_desc(dma_chan);
         soft_bd = devdrv_get_soft_bd(dma_chan);
 
         if (memset_s((void *)sq_desc, DEVDRV_DMA_SQ_DESC_SIZE, 0, DEVDRV_DMA_SQ_DESC_SIZE) != 0) {
-            devdrv_err_spinlock("memset_s failed.\n");
+            devdrv_err_spinlock("memset_s failed. (dev_id=%u)\n", dev_id);
             return NULL;
         }
 
@@ -909,16 +912,7 @@ STATIC struct devdrv_dma_soft_bd *devdrv_dma_fill_sq_desc_and_soft_bd(struct dev
         }
         ret = devdrv_vpc_dma_iova_addr_check(dma_chan->dma_dev->pci_ctrl, sq_desc, dma_node[sq_index].direction);
         if (ret != 0) {
-            devdrv_err_spinlock("Vm's dma_iova_addr_check check failed.(dev_id=%u)\n", dma_chan->dma_dev->dev_id);
-            soft_bd->valid = DEVDRV_DISABLE;
-            return NULL;
-        }
-
-        pasid = dma_node[sq_index].loc_passid;
-        if ((pasid != 0) && (!devdrv_dma_pasid_valid_check(dma_chan->dma_dev->dev_id, pasid,
-            dma_chan->dma_dev->pci_ctrl->env_boot_mode))) {
-            devdrv_err_spinlock("Pasid no in rbtree failed. (devid=%u; pasid=%llu)\n",
-                dma_chan->dma_dev->dev_id, pasid);
+            devdrv_err_spinlock("Vm's dma_iova_addr_check check failed. (dev_id=%u)\n", dev_id);
             soft_bd->valid = DEVDRV_DISABLE;
             return NULL;
         }
@@ -1045,7 +1039,7 @@ int devdrv_dma_chan_copy_by_vpc(u32 dev_id, struct devdrv_dma_channel *dma_chan,
     err_code = dma_chan->sq_submit->error_code;
     if ((ret != 0) || (err_code != 0)) {
         soft_bd->valid = DEVDRV_DISABLE;
-        if ((ret != 0) || (err_code == -ENOSPC)) {
+        if ((ret != 0) || (err_code == -ENOSPC) || (err_code == -EPERM)) {
             devdrv_updata_sq_tail(dma_chan, node_cnt, DEVDRV_DMA_SQ_TAIL_SUB_CNT);
             if (para->copy_type == DEVDRV_DMA_SYNC) {
                 dma_chan->status.sync_submit_cnt--;
@@ -1130,8 +1124,8 @@ int devdrv_dma_chan_copy(u32 dev_id, struct devdrv_dma_channel *dma_chan, struct
 {
     struct devdrv_dma_soft_bd_wait_status wait_status;
     struct devdrv_dma_soft_bd *soft_bd = NULL;
-    u32 chan_id;
     int sq_idle_bd_cnt;
+    u32 chan_id;
     int ret = 0;
 #ifdef CFG_FEATURE_S2S
     u8 retry_cnt = 0;
@@ -1159,7 +1153,7 @@ retry:
         ka_task_spin_unlock_bh(&dma_chan->lock);
         devdrv_warn_spinlock("No space. (dev_id=%u; chan_id=%u; idle_bd=%d; need=%u)\n",
             dev_id, chan_id, sq_idle_bd_cnt, node_cnt);
-        return -ENOSPC;
+        return -ENOSPC; // must be -ENOSPC, user(svm or hdc) will retry when no idle sq
     }
 
     soft_bd = devdrv_dma_fill_sq_desc_and_soft_bd(dma_chan, dma_node, node_cnt, para);
@@ -1170,7 +1164,7 @@ retry:
 #endif
         devdrv_warn_spinlock("Fill sq_desc and soft_bd fail. (dev_id=%u; chan_id=%u; idle_bd=%d; need=%d)\n",
             dev_id, chan_id, sq_idle_bd_cnt, node_cnt);
-        return -EINVAL;
+        return -EPERM; // must be -EPERM, mdev vm will backtrack sq tail when fill sq_desc fail
     }
 
     if (para->copy_type == DEVDRV_DMA_SYNC) {
@@ -1220,10 +1214,10 @@ int devdrv_dma_copy(struct devdrv_dma_dev *dma_dev, struct devdrv_dma_node *dma_
 {
     struct devdrv_dma_channel *dma_chan = NULL;
     struct data_type_chan *data_chan = NULL;
+    u32 device_status;
     u32 entry, i;
     int dev_id;
     int ret = 0;
-    u32 device_status;
 
     if (dma_dev == NULL) {
         devdrv_err_spinlock("dma_dev is null.\n");
@@ -1389,17 +1383,13 @@ void devdrv_free_dma_sq_cq(struct devdrv_dma_channel *dma_chan)
     devdrv_set_dma_chan_status(dma_chan, DEVDRV_DMA_CHAN_DISABLED);
     if (dma_chan->sq_desc_base != NULL) {
         sq_size = ((u64)sizeof(struct devdrv_dma_sq_node)) * dma_chan->sq_depth;
-
-        hal_kernel_devdrv_dma_free_coherent(dma_chan->dev, sq_size, dma_chan->sq_desc_base, dma_chan->sq_desc_dma);
-
+        devdrv_pci_dma_free_coherent(dma_chan->dev, sq_size, dma_chan->sq_desc_base, dma_chan->sq_desc_dma);
         dma_chan->sq_desc_base = NULL;
     }
 
     if (dma_chan->cq_desc_base != NULL) {
         cq_size = ((u64)sizeof(struct devdrv_dma_cq_node)) * dma_chan->cq_depth;
-
-        hal_kernel_devdrv_dma_free_coherent(dma_chan->dev, cq_size, dma_chan->cq_desc_base, dma_chan->cq_desc_dma);
-
+        devdrv_pci_dma_free_coherent(dma_chan->dev, cq_size, dma_chan->cq_desc_base, dma_chan->cq_desc_dma);
         dma_chan->cq_desc_base = NULL;
     }
 
@@ -1411,12 +1401,12 @@ void devdrv_free_dma_sq_cq(struct devdrv_dma_channel *dma_chan)
 
 int devdrv_alloc_dma_sq_cq(struct devdrv_dma_channel *dma_chan)
 {
+    struct devdrv_dma_res *dma_res = &((struct devdrv_pci_ctrl *)(dma_chan->dma_dev->drvdata))->res.dma_res;
     struct devdrv_dma_soft_bd *soft_virt_addr = NULL;
+    u64 soft_size, sq_size, cq_size;
     void *sq_virt_addr = NULL;
     void *cq_virt_addr = NULL;
     ka_device_t *dev = NULL;
-    u64 soft_size, sq_size, cq_size;
-    struct devdrv_dma_res *dma_res = &((struct devdrv_pci_ctrl *)(dma_chan->dma_dev->drvdata))->res.dma_res;
     u32 i;
 
     dev = dma_chan->dev;
@@ -1424,7 +1414,7 @@ int devdrv_alloc_dma_sq_cq(struct devdrv_dma_channel *dma_chan)
     cq_size = DEVDRV_DMA_CQ_DESC_SIZE * (dma_res->cq_depth);
     soft_size = sizeof(struct devdrv_dma_soft_bd) * (dma_res->sq_depth);
 
-    sq_virt_addr = hal_kernel_devdrv_dma_zalloc_coherent(dev, sq_size, &dma_chan->sq_desc_dma, KA_GFP_KERNEL);
+    sq_virt_addr = devdrv_pci_dma_zalloc_coherent(dev, sq_size, &dma_chan->sq_desc_dma, KA_GFP_KERNEL);
     if (sq_virt_addr == NULL) {
         devdrv_err("Sq alloc failed. (chan_id=%d)\n", dma_chan->chan_id);
         return -ENOMEM;
@@ -1432,7 +1422,7 @@ int devdrv_alloc_dma_sq_cq(struct devdrv_dma_channel *dma_chan)
     dma_chan->sq_desc_base = (struct devdrv_dma_sq_node *)sq_virt_addr;
     dma_chan->sq_depth = dma_res->sq_depth;
 
-    cq_virt_addr = hal_kernel_devdrv_dma_zalloc_coherent(dev, cq_size, &dma_chan->cq_desc_dma, KA_GFP_KERNEL);
+    cq_virt_addr = devdrv_pci_dma_zalloc_coherent(dev, cq_size, &dma_chan->cq_desc_dma, KA_GFP_KERNEL);
     if (cq_virt_addr == NULL) {
         devdrv_err("Cq alloc failed. (chan_id=%d)\n", dma_chan->chan_id);
         devdrv_free_dma_sq_cq(dma_chan);

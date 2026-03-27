@@ -159,7 +159,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001206467194_zh-cn_topic_0000001223494367_zh-cn_topic_0000001102270938_toc533412083"></a>**
 
-```c
+```
 … 
 struct dcmi_elabel_info_stru elabelInfo;
 int ret = 0;
@@ -172,3 +172,4 @@ if (ret != 0) {
 }
 …
 ```
+

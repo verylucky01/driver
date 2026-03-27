@@ -29,15 +29,19 @@ ifneq ($(filter $(PRODUCT), ascend910B),)
     EXTRA_CFLAGS += -DCFG_FEATURE_DEVID_TRANS
     EXTRA_CFLAGS += -DCFG_FEATURE_PROCESS_GROUP
     EXTRA_CFLAGS += -DCFG_FEATURE_KA
+    EXTRA_CFLAGS += -DCFG_FEATURE_SPOD_INFO
 endif
 
-ifneq ($(filter $(PRODUCT), ascend910_95),)
+ifneq ($(filter $(PRODUCT), ascend950),)
     EXTRA_CFLAGS += -DCFG_FEATURE_HOST_LOG
     EXTRA_CFLAGS += -DCFG_FEATURE_PROCESS_GROUP
     EXTRA_CFLAGS += -DCFG_FEATURE_SURPORT_UDEV_MNG
     EXTRA_CFLAGS += -DCFG_FEATURE_DEVID_TRANS
     EXTRA_CFLAGS += -DCFG_FEATURE_KA
     EXTRA_CFLAGS += -DASCEND_BACKUP_DEV_NUM=1
+    EXTRA_CFLAGS += -DCFG_FEATURE_SPOD_INFO
+    EXTRA_CFLAGS += -DCFG_FEATURE_CHAR_NUMBERING_BY_LOGIC_ID
+    EXTRA_CFLAGS += -DCFG_FEATURE_REMOTE_DEV_CHECK
 endif
 
 $(MODULE_NAME)-objs += uda/spod_info.o
@@ -51,3 +55,4 @@ EXTRA_CFLAGS += -fno-common -fstack-protector-all -funsigned-char -pipe -s -Wall
 $(MODULE_NAME)-objs += uda/uda_access.o uda/uda_dev.o uda/uda_fops.o uda/uda_notifier.o uda/uda_proc_fs.o
 $(MODULE_NAME)-objs += uda/dc/uda_proc_fs_adapt.o
 $(MODULE_NAME)-objs += uda/dc/uda_access_adapt.o
+$(MODULE_NAME)-objs += uda/dc/uda_dev_adapt.o

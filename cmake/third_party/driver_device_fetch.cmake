@@ -9,9 +9,13 @@
 # ------------------------------------------------------------------------------------------------------------
 
 set(DRIVER_DEVICE_NAME "driver-device")
-set(DRIVER_DEVICE_SERVER "https://ascend.devcloud.huaweicloud.com/artifactory/cann-run-release/dependency")
+set(DRIVER_DEVICE_SERVER "https://ascend.devcloud.huaweicloud.com/artifactory/cann-run-mirror/dependency")
 set(DRIVER_DEVICE_VERSION "8.5.0-beta.1")
-set(DRIVER_DEVICE_DATE "20260127000324761")
+if(${PRODUCT} STREQUAL ascend950)
+    set(DRIVER_DEVICE_DATE "20260325000325538")
+else()
+    set(DRIVER_DEVICE_DATE "20260325000325538")
+endif()
 
 if(POLICY CMP0135)
     cmake_policy(SET CMP0135 NEW)
@@ -36,6 +40,8 @@ if(NOT DRIVER_DEVICE_ARCHIVE_FILE)
         else()
             set(DRIVER_DEVICE_PRODUCT "910b")
         endif()
+    elseif(${PRODUCT} STREQUAL ascend950)
+        set(DRIVER_DEVICE_PRODUCT "950")
     else()
         message(FATAL_ERROR "Unknown COMPUTE_UNIT: ${PRODUCT}")
     endif()
@@ -44,6 +50,11 @@ if(NOT DRIVER_DEVICE_ARCHIVE_FILE)
         set(DRIVER_DEVICE_RELEASE "product")
     else()
         set(DRIVER_DEVICE_RELEASE "demo")
+    endif()
+
+    if(${PRODUCT} STREQUAL ascend950)
+        # current only support --demo but need product package
+        set(DRIVER_DEVICE_RELEASE "product")
     endif()
 
     set(DRIVER_DEVICE_FILE "cann-driver-device-${DRIVER_DEVICE_PRODUCT}-${DRIVER_DEVICE_RELEASE}_${DRIVER_DEVICE_VERSION}_linux-${CMAKE_HOST_SYSTEM_PROCESSOR}.tar.gz")
@@ -83,23 +94,42 @@ else()
 endif()
 
 function(get_driver_device)
-    add_custom_target(extract_driver_device ALL
-        COMMAND echo "copying driver-device file to ${CMAKE_BINARY_DIR}."
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/lib/host
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/lib/tools
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/lib/lib64/common
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/lib/script
-        COMMAND ${CMAKE_COMMAND} -E copy ${DRV_DEV_ARCHIVE_PREFIX}/device/* ${CMAKE_BINARY_DIR}/lib/host/
-        COMMAND ${CMAKE_COMMAND} -E copy ${DRV_DEV_ARCHIVE_PREFIX}/tools/ascend_check.bin ${CMAKE_BINARY_DIR}/lib/tools/
-        COMMAND ${CMAKE_COMMAND} -E copy ${DRV_DEV_ARCHIVE_PREFIX}/tools/upgrade-tool ${CMAKE_BINARY_DIR}/lib/tools/
-        COMMAND ${CMAKE_COMMAND} -E copy ${DRV_DEV_ARCHIVE_PREFIX}/tools/hccn_tool ${CMAKE_BINARY_DIR}/lib/tools/
-        COMMAND ${CMAKE_COMMAND} -E copy ${DRV_DEV_ARCHIVE_PREFIX}/lib64/common/dcache_lock_mix.o ${CMAKE_BINARY_DIR}/lib/lib64/common/
-        COMMAND ${CMAKE_COMMAND} -E copy ${DRV_DEV_ARCHIVE_PREFIX}/lib64/common/libtls_adp.so ${CMAKE_BINARY_DIR}/lib/lib64/common/
-        COMMAND ${CMAKE_COMMAND} -E copy ${DRV_DEV_ARCHIVE_PREFIX}/lib64/common/libascend_kms.so ${CMAKE_BINARY_DIR}/lib/lib64/common/
-        COMMAND ${CMAKE_COMMAND} -E copy ${DRV_DEV_ARCHIVE_PREFIX}/script/hccn_weak_dict.conf ${CMAKE_BINARY_DIR}/lib/script/
-        DEPENDS extract_driver_device_pre
-        WORKING_DIRECTORY ${DRIVER_DEVICE_INSTALL_DIR}
-    )
+    if(${PRODUCT} STREQUAL ascend910B)
+        add_custom_target(extract_driver_device ALL
+            COMMAND echo "copying driver-device file to ${CMAKE_BINARY_DIR}."
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/lib/device
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/lib/tools
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/lib/lib64/common
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/lib/script
+            COMMAND ${CMAKE_COMMAND} -E copy ${DRV_DEV_ARCHIVE_PREFIX}/device/* ${CMAKE_BINARY_DIR}/lib/device/
+            COMMAND ${CMAKE_COMMAND} -E copy ${DRV_DEV_ARCHIVE_PREFIX}/tools/ascend_check.bin ${CMAKE_BINARY_DIR}/lib/tools/
+            COMMAND ${CMAKE_COMMAND} -E copy ${DRV_DEV_ARCHIVE_PREFIX}/tools/upgrade-tool ${CMAKE_BINARY_DIR}/lib/tools/
+            COMMAND ${CMAKE_COMMAND} -E copy ${DRV_DEV_ARCHIVE_PREFIX}/tools/hccn_tool ${CMAKE_BINARY_DIR}/lib/tools/
+            COMMAND ${CMAKE_COMMAND} -E copy ${DRV_DEV_ARCHIVE_PREFIX}/lib64/common/dcache_lock_mix.o ${CMAKE_BINARY_DIR}/lib/lib64/common/
+            COMMAND ${CMAKE_COMMAND} -E copy ${DRV_DEV_ARCHIVE_PREFIX}/lib64/common/libtls_adp.so ${CMAKE_BINARY_DIR}/lib/lib64/common/
+            COMMAND ${CMAKE_COMMAND} -E copy ${DRV_DEV_ARCHIVE_PREFIX}/lib64/common/libascend_kms.so ${CMAKE_BINARY_DIR}/lib/lib64/common/
+            COMMAND ${CMAKE_COMMAND} -E copy ${DRV_DEV_ARCHIVE_PREFIX}/script/hccn_weak_dict.conf ${CMAKE_BINARY_DIR}/lib/script/
+            DEPENDS extract_driver_device_pre
+            WORKING_DIRECTORY ${DRIVER_DEVICE_INSTALL_DIR}
+        )
+    elseif(${PRODUCT} STREQUAL ascend950)
+        add_custom_target(extract_driver_device ALL
+            COMMAND echo "copying driver-device file to ${CMAKE_BINARY_DIR}."
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/lib/device
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/lib/tools
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/lib/lib64/common
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/lib/script
+            COMMAND ${CMAKE_COMMAND} -E copy ${DRV_DEV_ARCHIVE_PREFIX}/device/* ${CMAKE_BINARY_DIR}/lib/device/
+            COMMAND ${CMAKE_COMMAND} -E copy ${DRV_DEV_ARCHIVE_PREFIX}/tools/ascend_check.bin ${CMAKE_BINARY_DIR}/lib/tools/
+            COMMAND ${CMAKE_COMMAND} -E copy ${DRV_DEV_ARCHIVE_PREFIX}/tools/upgrade-tool ${CMAKE_BINARY_DIR}/lib/tools/
+            COMMAND ${CMAKE_COMMAND} -E copy ${DRV_DEV_ARCHIVE_PREFIX}/tools/hccn_tool ${CMAKE_BINARY_DIR}/lib/tools/
+            COMMAND ${CMAKE_COMMAND} -E copy ${DRV_DEV_ARCHIVE_PREFIX}/lib64/common/libascend_kms.so ${CMAKE_BINARY_DIR}/lib/lib64/common/
+            COMMAND ${CMAKE_COMMAND} -E copy ${DRV_DEV_ARCHIVE_PREFIX}/script/hccn_weak_dict.conf ${CMAKE_BINARY_DIR}/lib/script/
+            DEPENDS extract_driver_device_pre
+            WORKING_DIRECTORY ${DRIVER_DEVICE_INSTALL_DIR}
+        )
+    endif()
+
     if(ENABLE_BUILD_PRODUCT)
         include(${CMAKE_SOURCE_DIR}/src/custom/cmake/driver_device_fetch.cmake)
     endif()

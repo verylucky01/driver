@@ -78,6 +78,10 @@ STATIC struct share_log_module_mng g_module_mng[HAL_MODULE_TYPE_MAX][SHARE_LOG_T
         {(void *)(uintptr_t)COMMON_SHARE_LOG_START, SHARE_LOG_NO_INIT},
         {(void *)(uintptr_t)COMMON_SHARE_LOG_RUNINFO_START, SHARE_LOG_NO_INIT}
     },
+    [HAL_MODULE_TYPE_APM] = {
+ 	    {(void *)(uintptr_t)APM_SHARE_LOG_START, SHARE_LOG_NO_INIT},
+ 	    {(void *)(uintptr_t)APM_SHARE_LOG_RUNINFO_START, SHARE_LOG_NO_INIT}
+ 	},
 };
 
 STATIC pthread_mutex_t share_log_mutex[SHARE_LOG_TYPE_MAX] = {PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER};

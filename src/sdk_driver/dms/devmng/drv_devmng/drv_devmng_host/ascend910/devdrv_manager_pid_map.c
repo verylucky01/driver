@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,18 +10,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
-#include <linux/delay.h>
-#include <linux/errno.h>
-#include <linux/slab.h>
-#include <linux/types.h>
-#include <linux/version.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
-#include <linux/sched/task.h>
-#endif
-#ifdef CFG_HOST_ENV
-    #include <linux/pid_namespace.h>
-#endif
 
 #include "securec.h"
 #ifndef DEVDRV_MANAGER_HOST_UT_TEST
@@ -45,6 +33,8 @@
 #include "ka_hashtable_pub.h"
 #include "ka_memory_pub.h"
 #include "ka_list_pub.h"
+#include "ka_common_pub.h"
+#include "ka_base_pub.h"
 #include "devdrv_manager_pid_map.h"
 
 extern struct devdrv_manager_info *dev_manager_info;
@@ -53,8 +43,8 @@ extern struct devdrv_manager_info *dev_manager_info;
 #if defined(CFG_HOST_ENV)
 STATIC int get_pid_start_time(ka_pid_t pid, u64* start_time)
 {
-    struct pid *pid_struct;
-    struct task_struct *task;
+    ka_struct_pid_t *pid_struct;
+    ka_task_struct_t *task;
 
     pid_struct = ka_task_find_get_pid(pid);
     if (pid_struct == NULL) {
@@ -425,9 +415,9 @@ STATIC int devdrv_verify_sign(char *sign, int mode, ka_pid_t host_pid, ka_pid_t 
     }
 
     /* Compatible with early HIVA scenarios and RC mode */
-    if ((mode == AICPUFW_OFFLINE_PLAT) && (host_pid == current->tgid)) {
-        *dev_tgid = current->tgid;
-        *dev_pid = current->tgid;
+    if ((mode == AICPUFW_OFFLINE_PLAT) && (host_pid == ka_task_get_current_tgid())) {
+        *dev_tgid = ka_task_get_current_tgid();
+        *dev_pid = ka_task_get_current_tgid();
         ret = devdrv_devpid_container_convert(dev_pid);
         if (ret != 0) {
             devdrv_drv_err("Failed to convert pid. (ret=%d; dev_pid=%d)\n", ret, *dev_pid);
@@ -635,7 +625,7 @@ STATIC int devdrv_pid_map_sync_to_peer(struct devdrv_ioctl_para_bind_host_pid *p
     }
 
     ret = agentdrv_common_msg_send(para_info->chip_id, &dev_manager_msg_info, sizeof(struct devdrv_manager_msg_info),
-        sizeof(struct devdrv_manager_msg_info), (u32 *)&out_len, AGENTDRV_COMMON_MSG_DEVDRV_MANAGER);
+        sizeof(struct devdrv_manager_msg_info), (u32 *)&out_len, DEVDRV_COMMON_MSG_DEVDRV_MANAGER);
 
     return devdrv_pid_map_sync_result_check(ret, &dev_manager_msg_info, out_len);
 #endif
@@ -665,7 +655,7 @@ STATIC bool devdrv_is_master_pid(ka_pid_t master_pid)
 STATIC int devdrv_wait_pid_init(ka_pid_t proc_pid, ka_pid_t proc_tgid, int mode)
 {
     u32 times = 0;
-    struct pid *pid_proc = NULL;
+    ka_struct_pid_t *pid_proc = NULL;
 #if defined(CFG_FEATURE_WAIT_PID_OFFLINE_NOT_CHECK)
     if (mode == AICPUFW_OFFLINE_PLAT) {
         return 0;
@@ -696,9 +686,9 @@ static int check_parent_child_relationship(ka_pid_t master_pid, char *sign)
 {
     int ret;
     ka_pid_t slave_pid = -1;
-    ka_pid_t cur_tgid = current->tgid;
-    struct task_struct *tsk = NULL;
-    struct pid *pro_id = NULL;
+    ka_pid_t cur_tgid = ka_task_get_current_tgid();
+    ka_task_struct_t *tsk = NULL;
+    ka_struct_pid_t *pro_id = NULL;
 
     ret = memcpy_s(&slave_pid, sizeof(ka_pid_t), sign, sizeof(ka_pid_t));
     if (ret != 0 || slave_pid == -1) {
@@ -1676,7 +1666,7 @@ int devdrv_check_hostpid(ka_pid_t hostpid, unsigned int chip_id, unsigned int vf
             continue;
         }
         for (i = DEVDRV_PROCESS_CP1; i < DEVDRV_PROCESS_CPTYPE_MAX; i++) {
-            if (d_sign->devpid[chip_id][vfid][i].slave_pid == current->tgid) {
+            if (d_sign->devpid[chip_id][vfid][i].slave_pid == ka_task_get_current_tgid()) {
                 ka_task_spin_unlock_bh(&d_info->proc_hash_table_lock);
                 return 0;
             }
@@ -1841,7 +1831,7 @@ int devdrv_notice_process_exit(u32 dev_id, u32 host_pid)
     return 0;
 }
 
-int devdrv_fop_query_host_pid(struct file *filep, unsigned int cmd, unsigned long arg)
+int devdrv_fop_query_host_pid(ka_file_t *filep, unsigned int cmd, unsigned long arg)
 {
     struct devdrv_ioctl_para_query_pid para_info = {0};
     int node_id = ka_system_numa_node_id();
@@ -1888,7 +1878,7 @@ int devdrv_fop_query_host_pid(struct file *filep, unsigned int cmd, unsigned lon
     }
     devdrv_drv_debug("Query host_pid information. "
         "(node_id=%d; dev_id=%u, dev_pid=%d, tgid=%d, vfid=%u, hostpid=%d)",
-        node_id, para_info.chip_id, tgid, current->tgid, para_info.vfid, para_info.host_pid);
+        node_id, para_info.chip_id, tgid, ka_task_get_current_tgid(), para_info.vfid, para_info.host_pid);
 #if defined(CFG_HOST_ENV) || defined(CFG_FEATURE_DEVICE_CONTAINER)
     if (devdrv_devpid_container_convert(&para_info.host_pid) != 0) {
         devdrv_drv_err("Failed to convert devpid. (pid=%d)\n", para_info.host_pid);
@@ -1967,7 +1957,7 @@ void devdrv_release_try_to_sync_to_peer(ka_pid_t slave_pid)
 #endif
 
 STATIC void devdrv_manager_release_devpid(struct devdrv_process_sign *d_sign, ka_pid_t devpid,
-    struct devdrv_process_sign *sign_print, u32 *out_chip_id, u32 *out_vfid, struct list_head *free_list)
+    struct devdrv_process_sign *sign_print, u32 *out_chip_id, u32 *out_vfid, ka_list_head_t *free_list)
 {
     int current_side = devdrv_get_cur_run_side();
     struct devdrv_process_user_info *user_proc = devdrv_query_user_proc(d_sign, current_side, devpid);
@@ -2035,7 +2025,7 @@ STATIC void devdrv_manager_release_devpid(struct devdrv_process_sign *d_sign, ka
 
 /* The devdrv_release_pid_with_start_time function is used only by the host. */
 void devdrv_release_pid_with_start_time(struct devdrv_process_sign *d_sign, ka_pid_t devpid, u64 start_time,
-    struct list_head *free_list, int *release_flag)
+    ka_list_head_t *free_list, int *release_flag)
 {
     int current_side = devdrv_get_cur_run_side();
     struct devdrv_process_user_info *user_proc = devdrv_query_user_proc(d_sign, current_side, devpid);
@@ -2101,15 +2091,15 @@ void devdrv_manager_process_sign_release(ka_pid_t devpid)
 {
     struct devdrv_manager_info *d_info = devdrv_get_manager_info();
     struct devdrv_process_sign *d_sign_hostpid = NULL, *d_sign_devpid = NULL;
-    struct hlist_node *local_sign = NULL;
+    ka_hlist_node_t *local_sign = NULL;
     struct devdrv_process_sign *free_sign = NULL, *free_sign_tmp = NULL;
     struct devdrv_process_sign *sign_print = NULL;
     u32 bkt;
     u32 chip_id = 0;
     u32 vfid = 0;
-    struct list_head *pos = NULL;
-    struct list_head *n = NULL;
-    struct list_head free_list_head;
+    ka_list_head_t *pos = NULL;
+    ka_list_head_t *n = NULL;
+    ka_list_head_t free_list_head;
     KA_INIT_LIST_HEAD(&free_list_head);
 
     if (d_info == NULL) {
@@ -2181,7 +2171,7 @@ void devdrv_manager_process_sign_release(ka_pid_t devpid)
 void devdrv_manager_free_hashtable(void)
 {
     struct devdrv_process_sign *d_sign = NULL;
-    struct hlist_node *local_sign = NULL;
+    ka_hlist_node_t *local_sign = NULL;
     u32 bkt;
 
     if (dev_manager_info == NULL) {

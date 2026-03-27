@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -71,6 +71,27 @@ int trs_chan_ops_get_hw_irq(struct trs_id_inst *inst, int irq_type, u32 irq, u32
     return soc_resmng_get_hwirq(&res_inst, (u32)irq_type, irq, hwirq);
 }
 
+static void trs_chan_ops_hw_create_mbox_pack_host_streamid(struct trs_id_inst *inst, u32 *host_ssid)
+{
+    u32 pcie_vfid = 0;
+    int ret = 0;
+
+    if (uda_is_phy_dev(inst->devid) == true) {
+        pcie_vfid = 0;
+    } else {
+        struct uda_mia_dev_para mia_para = {0};
+        ret = uda_udevid_to_mia_devid(inst->devid, &mia_para);
+        if (ret != 0) {
+            trs_warn("Get mia vf id faild. (devid=%u; ret=%d)\n", inst->devid, ret);
+            pcie_vfid = 0;
+        } else {
+            pcie_vfid = mia_para.sub_devid + 1;
+        }
+    }
+
+    *host_ssid = pcie_vfid; /* see swapbuffer host streamid */
+}
+
 static void trs_chan_ops_hw_create_mbox_fill_ext_info(struct trs_id_inst *inst, struct trs_chan_info *chan_info,
     struct trs_normal_cqsq_mailbox *mbox_data)
 {
@@ -118,7 +139,8 @@ static void trs_chan_ops_hw_create_mbox_fill_ext_info(struct trs_id_inst *inst, 
 #endif
             trs_debug("(current=%d; cp_pid=%d; hccp_pid=%d)\n", ka_task_get_current_tgid(), header->cp_pid, header->hccp_pid);
         }
-        header->host_ssid = 0;
+
+        trs_chan_ops_hw_create_mbox_pack_host_streamid(inst, &header->host_ssid);
         if (chan_info->types.sub_type == CHAN_SUB_TYPE_HW_RTS) {
             trs_debug("Mailbox info. (cmd_type=%u; sq_index=%u; cq0_index=%u; "
                 "app_type=%u; sw_reg_flag=%u; fid=%u; sq_cq_side=%u; master_pid_flag=%u; sq_addr_is_virtual=%u; "

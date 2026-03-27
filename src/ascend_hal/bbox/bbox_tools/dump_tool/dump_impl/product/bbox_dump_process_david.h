@@ -1,0 +1,74 @@
+/**
+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
+
+#ifndef BBOX_DUMP_PROCESS_DAVID_H
+#define BBOX_DUMP_PROCESS_DAVID_H
+
+// hdr reserve ddr: 0x18620000-0x186A0000
+#define BBOX_DDR_HDR_OFFSET             0xB20000U
+#define BBOX_DDR_HDR_LEN                0x80000UL // 512K
+
+// kernel log redirect: 0x17B00000-0x17D00000
+#define BBOX_DDR_KLOG_OFFSET            0x00001000UL
+#define BBOX_DDR_KLOG_LEN               0x001FF000UL // 2M - 4k
+
+// bbox reserve ddr: 0x17D00000-0x18700000
+#define BBOX_DDR_BASE_OFFSET            0x200000U
+#define BBOX_DDR_DMA_BASE_OFFSET        0x0U
+#define BBOX_DDR_BASE_LEN               0xA00000UL // 10M
+#define BBOX_DDR_BASE_RSV_LEN           0x60000UL  // 384K
+
+#define BBOX_BIOS_KEYPOINT_LEN          4U
+#define BBOX_BIOS_KEYPOINT_OFFSET       0xFC04UL
+#define BOOTUP_STAGE_BIOS_SUCC          99U
+
+#define BBOX_DDR_CHIP_DFX_LEN           0x1400000UL  // 20M
+#define BBOX_DDR_CHIP_DFX_OFFSET        0xC00000U
+#define BBOX_DDR_CHIP_DFX_DMA_OFFSET    0x0U
+
+/* dump sram binary data before boot */
+#define BBOX_SRAM_CHIP_DFX_LEN          0x18000UL    // 96k
+#define BBOX_SRAM_CHIP_DFX_OFFSET       0x22000UL
+
+#define BBOX_SRAM_SNAPSHOT_LEN         0xA000UL    // 40k
+#define BBOX_SRAM_SNAPSHOT_OFFSET      0x8000UL
+
+#define BBOX_SRAM_HBM_DFX_LEN          0x10000UL    // 64k
+#define BBOX_SRAM_HBM_DFX_OFFSET       0x12000UL
+
+#define BBOX_SRAM_BIOS_HISS_LEN        0x6000UL    // 8k
+#define BBOX_SRAM_BIOS_HISS_OFFSET     0x3A000UL
+
+#define BBOX_SRAM_HBOOT_LEN            0x400000UL    // 4M
+#define BBOX_SRAM_HBOOT_OFFSET         0x0UL
+
+// device slog
+#define BBOX_DDR_DEBUG_DEVICE_OS_LOG_LEN      0x00300000UL // 3M
+#define BBOX_DDR_DEBUG_DEVICE_OS_LOG_OFFSET   0X0UL
+#define BBOX_DDR_SEC_DEVICE_OS_LOG_LEN        0x00200000UL // 2M
+#define BBOX_DDR_SEC_DEVICE_OS_LOG_OFFSET     0X0UL
+#define BBOX_DDR_RUN_DEVICE_OS_LOG_LEN        0x00300000UL // 3M
+#define BBOX_DDR_RUN_DEVICE_OS_LOG_OFFSET     BBOX_DDR_DEBUG_DEVICE_OS_LOG_LEN
+#define BBOX_DDR_RUN_EVENT_LOG_LEN            0x00200000UL // 2M
+#define BBOX_DDR_RUN_EVENT_LOG_OFFSET         (BBOX_DDR_DEBUG_DEVICE_OS_LOG_LEN + BBOX_DDR_RUN_DEVICE_OS_LOG_OFFSET)
+#define BBOX_DDR_DEBUG_DEVICE_FW_LOG_LEN      0x01400000UL // 20M
+#define BBOX_DDR_DEBUG_DEVICE_FW_LOG_OFFSET   0x0UL
+
+/* vmcore file*/
+#define BBOX_HBM_VMCORE_FLAG_LEN       (sizeof(unsigned int))
+#define BBOX_HBM_VMCORE_FLAG_OFFSET    (BBOX_DDR_KLOG_OFFSET + BBOX_DDR_KLOG_LEN + BBOX_DDR_BASE_LEN - BBOX_DDR_BASE_RSV_LEN)
+#define BBOX_HBM_VMCORE_STAT_LEN       (2 * sizeof(unsigned int))
+#define BBOX_HBM_VMCORE_STAT_OFFSET    (BBOX_HBM_VMCORE_FLAG_OFFSET + BBOX_HBM_VMCORE_FLAG_LEN)
+#define BBOX_HBM_VMCORE_LEN            (0xFFFFFFFFUL)
+#define BBOX_HBM_VMCORE_OFFSET         0x0UL
+
+#define KDUMP_TIMEOUT_TIMES 600
+#define FLAG_ALL_DONE 5
+#endif

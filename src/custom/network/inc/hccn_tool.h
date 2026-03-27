@@ -462,7 +462,6 @@ int tool_cfg_dcqcn_alg_recovery(struct tool_param *param);
 int tool_cfg_dcqcn_enable_recovery(struct tool_param *param);
 int tool_cfg_dcqcn_cnp_dscp_recovery(struct tool_param *param);
 int tool_get_board_type(struct tool_param *param, int *board_type);
-int tool_local_lldp_cmd_execute(int argc, char **argv, struct tool_param *param);
 int tool_cfg_lldp_portid_recovery(struct tool_param *param);
 int ATLAS_900_A3_SUPERPOD_logic_id_convert(int phy_id);
 bool check_udhcpc_write_hccn_conf(struct tool_param *param, int is_ipv6);

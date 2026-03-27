@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -102,7 +102,7 @@ static inline void trs_sq_ctx_init(struct trs_id_inst *inst, struct trs_sq_ctx *
 static inline void trs_sq_ctx_uninit(struct trs_sq_ctx *sq_ctx)
 {
     sq_ctx->chan_id = -1;
-    sq_ctx->stream_id = U32_MAX;
+    sq_ctx->stream_id = KA_U32_MAX;
 }
 
 static inline void trs_set_sq_status(struct trs_sq_ctx *sq_ctx, u32 status)

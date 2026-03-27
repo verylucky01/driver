@@ -145,7 +145,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001206147236_zh-cn_topic_0000001178054666_zh-cn_topic_0000001102027876_toc533412083"></a>**
 
-```c
+```
 … 
 int ret = 0;
 int device_logic_id = 0;
@@ -158,3 +158,4 @@ if (ret != 0){
 }
 …
 ```
+

@@ -28,6 +28,7 @@
 bool svm_support_get_user_malloc_attr(uint32_t dev_id);
 bool svm_support_vmm_normal_granularity(uint32_t dev_id);
 bool svm_support_mem_host_uva(uint32_t dev_id);
+bool svm_support_mem_register_query_and_get_attr(uint32_t dev_id);
 
 drvError_t drvMemDeviceOpenInner(uint32_t devid, halDevOpenIn *in, halDevOpenOut *out);
 drvError_t drvMemDeviceCloseInner(uint32_t devid, halDevCloseIn *in);
@@ -42,10 +43,14 @@ bool svm_va_is_in_svm_range(uint64_t va);
 
 /* only support device addr(svm addr, apm maped reg addr) register to host to access */
 
-/* halSvmRegister return access_va which may be same or diff from va */
-uint64_t halSvmRegister(uint32_t devid, uint64_t va, uint32_t size);
-int halSvmUnRegister(uint32_t devid, uint64_t va, uint32_t size);
-int halSvmAccess(uint32_t devid, uint64_t access_va, uint64_t local_va, uint32_t size, uint32_t flag);
+#define SVM_REGISTER_FLAG_WITH_ACCESS_VA    (1ULL << 0ULL)
+/**
+ * (1) halSvmRegister return access_va which may be same or diff from va
+ * (2) addr should not overlap with halHostRegister addr
+ */
+drvError_t halSvmRegister(uint32_t devid, uint64_t va, uint64_t size, uint64_t flag, uint64_t *access_va);
+drvError_t halSvmUnRegister(uint32_t devid, uint64_t va, uint64_t size, uint64_t flag);
+drvError_t halSvmAccess(uint32_t devid, uint64_t access_va, uint64_t local_va, uint64_t size, uint32_t flag);
 
 int halMemGet(unsigned long long addr, unsigned long long size);
 int halMemPut(unsigned long long addr, unsigned long long size);

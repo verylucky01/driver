@@ -209,7 +209,7 @@
 
 **调用示例<a name="section20288321102711"></a>**
 
-```c
+```
 …
 int ret;
 int card_id = 0;
@@ -225,3 +225,4 @@ ping_operate_info.timeout = 20;
 ret = dcmi_get_ping_info_v2(card_id, device_id, port_id, &ping_operate_info, &ping_reply_info);
 …
 ```
+

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,11 +10,13 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-#include <linux/kthread.h>
+#include "ka_common_pub.h"
+#include "ka_memory_pub.h"
 #include "securec.h"
 #include "pbl/pbl_uda.h"
 #include "pbl/pbl_urd.h"
 #include "pbl/pbl_feature_loader.h"
+#include "pbl/pbl_soc_res.h"
 #include "ascend_kernel_hal.h"
 #include "pbl/pbl_user_cfg_interface.h"
 #include "dms_define.h"
@@ -79,6 +81,8 @@ STATIC chip_value_name_map_t g_chip_value_name_map[] = {
 STATIC char g_mac_info[ASCEND_PDEV_MAX_NUM][UUID_MAX_LEN];
 STATIC ka_atomic_t g_mac_init_flag[ASCEND_PDEV_MAX_NUM] = {KA_BASE_ATOMIC_INIT(0)};
 #define UUID_VENDOR_ID 0xCC08
+#define GUID_BASE_ADDR 0x24804181E38
+#define GUID_BASE_LEN  0x04
 #endif
 
 STATIC int dms_get_chip_aicore_info(unsigned int dev_id, unsigned int vfid, bool is_container_split,
@@ -467,43 +471,100 @@ int dms_get_chip_info(unsigned int virt_id, devdrv_query_chip_info_t *chip_info)
     return 0;
 }
 
-#ifdef CFG_FEATURE_GET_DEV_UUID
-/**********************************************  UUID  ***************************************************
-*  UUID format: |---0--|--1--|--2--|-------3--------|--4--|--5--|-6-|-7--|--8---|-- -9------|-----10-----|
-*     type:     |  Rsv | Vendor ID | Rsv1 | version | Device id |  Rsv2  | Vnpu id |  Rsv3  |     SN     |
-*     size:     | 8bit |   16bit   | 4bit |  4bit   |   16bit   |  16bit |  6bit   |  10bit |   48bit    |
-----------------|------|-----------|------|---------|-----------|--------|---------|--------|------------|
-* value(910B):  |   0  |  0xCC08   |  0   |    0    |  0xD000   |   0    |  vfid   |   0    |  mac_addr  |
-* value(910_93):|   0  |  0xCC08   |  0   |    0    |  0xD001   |   0    |  vfid   |   0    |  mac_addr  |
----------------------------------------------------------------------------------------------------------|
-*********************************************************************************************************/
-#define DEVICE_VERSION 0
-#define VENDOR_ID 0xCC08
-STATIC int dms_make_up_uuid(unsigned int phy_id, unsigned int vfid, unsigned int soc_type,
-                            struct dms_hal_device_info_stru *output)
+STATIC int dms_get_phy_device_info(void *feature, char *in, u32 in_len, char *out, u32 out_len)
 {
-    char uuid_info[UUID_MAX_LEN];
-    unsigned int device_id = 0;
-    int i = 0;
-    int ret = 0;
+    unsigned int phy_id;
+    struct devdrv_info *dev_info = NULL;
+    struct dms_dev_ctrl_block *dev_cb = NULL;
+    struct dms_get_phy_dev_info_out *output = (struct dms_get_phy_dev_info_out *)out;
 
-    if (ka_base_atomic_read(&g_mac_init_flag[phy_id]) == 0) {
-        dms_err("Mac info init failed. (phy_id=%u; vfid=%u; ret=%d)\n", phy_id, vfid, ret);
+    if ((feature == NULL) ||
+        (in == NULL) || (in_len < sizeof(unsigned int)) ||
+        (out == NULL) || (out_len < sizeof(struct dms_get_phy_dev_info_out))) {
+        dms_err("Invalid parameter. (feature=%s; in=%s; in_len=%u; out=%s; out_len=%u)\n",
+            (feature == NULL) ? "NULL" : "OK",
+            (in == NULL) ? "NULL" : "OK", in_len, (out == NULL) ? "NULL" : "OK", out_len);
         return -EINVAL;
     }
 
-    if (soc_type == SOC_TYPE_CLOUD_V3) {
-        device_id = 0xD001;
-    } else {
-        device_id = 0xD000;
+    phy_id = *(unsigned int *)in;
+    if (!uda_is_udevid_exist(phy_id)) {
+        dms_err("Physical id is invalid. (phy_id=%u)\n", phy_id);
+        return -EINVAL;
     }
 
-    ret = memset_s(uuid_info, UUID_MAX_LEN, 0, UUID_MAX_LEN);
+    dev_cb = dms_get_dev_cb(phy_id);
+    if (dev_cb == NULL) {
+        dms_err("Get device ctrl block failed. (phy_id=%u)\n", phy_id);
+        return -ENODEV;
+    }
+
+    dev_info = (struct devdrv_info *)dev_cb->dev_info;
+    if (dev_info == NULL) {
+        dms_err("Get device info structure failed. (phy_id=%u)\n", phy_id);
+        return -ENODEV;
+    }
+
+    output->chip_id = dev_info->chip_id;
+    output->die_id = dev_info->die_id;
+    return 0;
+}
+
+#ifdef CFG_FEATURE_GET_DEV_UUID
+/************************************************  UUID  ********************************************************
+*  UUID format: |---0--|--1--|--2--|-------3--------|--4--|--5--|--6--|--7---|-----8-----|--9---|-----10~15-----|
+*     type:     |  Rsv | Vendor ID | Rsv1 | version | Device id |    Rsv2    | Vnpu id |  Rsv3  |       SN      |
+*     size:     | 8bit |   16bit   | 4bit |  4bit   |   16bit   |    16bit   |  6bit   |  10bit |     48bit     |
+----------------|------|-----------|------|---------|-----------|------------|---------|--------|---------------|
+* value(910B):  |   0  |  0xCC08   |  0   |    0    |  0xD000   |     0      |  vfid   |   0    |    mac_addr   |
+* value(910_93):|   0  |  0xCC08   |  0   |    0    |  0xD001   |     0      |  vfid   |   0    |    mac_addr   |
+----------------------------------------------------------------------------------------------------------------|
+*  UUID format: |---0--|--1--|--2--|-------3--------|--4--|--5--|--6--|--7---|-----8-----|--9---|-10-|--11~15---|
+*     type:     |  Rsv | Vendor ID | type | version | Device id | class code | Vnpu id |    Rsv1     |    SN    |
+*     size:     | 8bit |   16bit   | 4bit |  4bit   |   16bit   |    16bit   |  6bit   |    18bit    |  40bit   |
+----------------|------|-----------|------|---------|-----------|------------|---------|-------------|----------|
+* value(950):   |   0  |  0xCC08   | type | version | Device_id | class_code |  vfid   |      0      |    sn    |
+----------------------------------------------------------------------------------------------------------------|
+****************************************************************************************************************/
+#define DEVICE_VERSION 0
+#define VENDOR_ID 0xCC08
+STATIC int dms_make_up_uuid_by_guid(unsigned int phy_id, unsigned int vfid, char *uuid_info)
+{
+    void __ka_mm_iomem *guid_addr = NULL;
+    char guid_info[GUID_BASE_LEN];
+
+    int ret = memset_s(guid_info, GUID_BASE_LEN, 0, GUID_BASE_LEN);
     if (ret != 0) {
         dms_err("memset_s failed. (phy_id=%u; vfid=%u; ret=%d)\n", phy_id, vfid, ret);
         return -EINVAL;
     }
+    for(int i = 0; i < UUID_MAX_LEN / GUID_BASE_LEN; i++) {
+        guid_addr = ka_mm_ioremap(GUID_BASE_ADDR + GUID_BASE_LEN * i, GUID_BASE_LEN);
+        if (guid_addr == NULL) {
+            dms_err("guid addr ioremap fail. (phy_id=%u; vfid=%u)\n", phy_id, vfid);
+            return -EINVAL;
+        }
+        ka_mm_memcpy_fromio(guid_info, guid_addr, GUID_BASE_LEN);
 
+        ka_mm_iounmap(guid_addr);
+        guid_addr = NULL;
+        for (int j = 0; j < GUID_BASE_LEN; j++) {
+            uuid_info[UUID_MAX_LEN - GUID_BASE_LEN * i - j - 1] = guid_info[j];
+        }
+    }
+    /* The UUID has reserved part at index 0. */
+    uuid_info[0] = 0x00;
+    /* The UUID starts with Vnpu ID at index 8, and the vfid(6 bits in total) needs to be left-shifted by 2 bits. */
+    uuid_info[8] = (((uint8_t)vfid) & 0x3F) << 2;
+    /* The UUID has reserved part at index 9. */
+    uuid_info[9] = 0x00;
+    /* The UUID has reserved part at index 10. */
+    uuid_info[10] = 0x00;
+    return 0;
+}
+
+STATIC int dms_make_up_uuid_by_devid(unsigned int device_id, unsigned int phy_id, unsigned int vfid, char *uuid_info)
+{
     uuid_info[1] = (VENDOR_ID >> 8) & 0xFF;
     uuid_info[2] = VENDOR_ID & 0xFF;
     uuid_info[3] = (0 << 4) | DEVICE_VERSION;
@@ -512,8 +573,44 @@ STATIC int dms_make_up_uuid(unsigned int phy_id, unsigned int vfid, unsigned int
     uuid_info[8] = (((uint8_t)vfid) & 0x3F) << 2;
 
     /* The UUID starts with SN at index 10, and the MAC address starts at index 5, 48 bits in total.*/
-    for(i = 0; i < 6; i ++) {
+    for(int i = 0; i < 6; i++) {
         uuid_info[10 + i] = g_mac_info[phy_id][5 + i];
+    }
+    return 0;
+}
+
+STATIC int dms_make_up_uuid(unsigned int phy_id, unsigned int vfid, unsigned int soc_type,
+                            struct dms_hal_device_info_stru *output)
+{
+    char uuid_info[UUID_MAX_LEN];
+    unsigned int device_id = 0;
+    int ret = 0;
+
+    if (ka_base_atomic_read(&g_mac_init_flag[phy_id]) == 0) {
+        dms_err("Mac info init failed. (phy_id=%u; vfid=%u; ret=%d)\n", phy_id, vfid, ret);
+        return -EINVAL;
+    }
+
+     if (soc_type == SOC_TYPE_CLOUD_V3) { 
+         device_id = 0xD001; 
+     } else { 
+         device_id = 0xD000; 
+     }
+
+    ret = memset_s(uuid_info, UUID_MAX_LEN, 0, UUID_MAX_LEN);
+    if (ret != 0) {
+        dms_err("memset_s failed. (phy_id=%u; vfid=%u; ret=%d)\n", phy_id, vfid, ret);
+        return -EINVAL;
+    }
+
+    if (soc_type == SOC_TYPE_CLOUD_V4) {
+        ret = dms_make_up_uuid_by_guid(phy_id, vfid, uuid_info);
+    } else {
+        ret = dms_make_up_uuid_by_devid(device_id, phy_id, vfid, uuid_info);
+    }
+    if (ret != 0) {
+        dms_ex_notsupport_err(ret, "Failed to get uuid. (phy_id=%u; vfid=%u; ret=%d)\n", phy_id, vfid, ret);
+        return ret;
     }
 
     ret = memcpy_s(output->payload, sizeof(output->payload), uuid_info, UUID_MAX_LEN);
@@ -600,7 +697,7 @@ STATIC int dms_get_uuid_thread(void *arg)
 
 STATIC void dms_mac_info_init(unsigned int dev_id)
 {
-    struct task_struct *release_task = NULL;
+    ka_task_struct_t *release_task = NULL;
 
     if (!uda_is_phy_dev(dev_id)) {
         dms_info("Only support pf device. (dev_id=%d)\n", dev_id);
@@ -624,6 +721,70 @@ STATIC void dms_mac_info_uninit(unsigned int dev_id)
 }
 #endif
 
+#ifdef CFG_FEATURE_GET_DEV_INDEX_IN_GROUP
+#define SINGLE_PCIE_CARD 0b01101000
+
+STATIC int dms_get_index_in_group_para_check(void *feature, char *in, u32 in_len, char *out, u32 out_len)
+{
+    if ((feature ==NULL) ||
+        (in == NULL) || (in_len != sizeof(struct dms_get_device_info_in)) ||
+        (out == NULL) || (out_len != sizeof(struct dms_get_device_info_out))) {
+            dms_err("Invalid parameter. (feature=%s; in=%s; in_len=%u; out=%s;out_len=%u)\n",
+                (feature == NULL) ? "NULL" : "OK",
+                (in == NULL) ? "NULL" : "OK", in_len, (out == NULL) ? "NULL" : "OK", out_len);
+            return -EINVAL;
+    }
+    return 0;
+}
+
+STATIC int dms_get_device_index_in_group(void *feature, char *in, u32 in_len, char *out, u32 out_len)
+{
+    int ret;
+    unsigned int udevid = 0;
+    struct dms_get_device_info_in *input = NULL;
+    struct dms_get_device_info_out *output = NULL;
+    soc_res_board_hw_info_t hw_info = {0};
+
+    ret = dms_get_index_in_group_para_check(feature, in, in_len, out, out_len);
+    if (ret != 0) {
+        return ret;
+    }
+
+    input = (struct dms_get_device_info_in *)in;
+    if ((input->buff == NULL) || (input->buff_size == 0)) {
+        dms_err("Input buff is NULL or buff_size is zero. (dev_id=%u; buff_size=%u)\n", input->dev_id, input->buff_size);
+        return -EINVAL;
+    }
+
+    ret = uda_devid_to_udevid(input->dev_id, &udevid);
+    if (ret != 0) {
+        dms_err("Fail to convert devid to udevid. (ret=%d; devid=%u)\n", ret, input->dev_id);
+        return -EINVAL;
+    }
+
+    ret = soc_resmng_dev_get_attr(udevid, BOARD_HW_INFO, &hw_info, sizeof(hw_info));
+    if (ret != 0) {
+        devdrv_drv_err("Get board hardware info from soc res fail. (dev_id=%u; ret=%d)\n", input->dev_id, ret);
+        return ret;
+    }
+
+    if (hw_info.mainboard_id == SINGLE_PCIE_CARD) {
+        dms_info("This is a 1p pcie card. (dev_id=%u)\n", input->dev_id);
+        hw_info.chip_id = 0;
+    }
+
+    output = (struct dms_get_device_info_out *)out;
+    ret = (int)copy_to_user(input->buff, &hw_info.chip_id, sizeof(unsigned char));
+    if (ret != 0) {
+        dms_err("Copy_to_user failed. (udevid=%u; ret=%d)\n", input->dev_id, ret);
+        return -EINVAL;
+    }
+    output->out_size = sizeof(unsigned char);
+
+    return ret;
+}
+#endif
+
 #define DMS_CHIP_INFO_CMD_NAME "DMS_CHIPINFO"
 BEGIN_DMS_MODULE_DECLARATION(DMS_CHIP_INFO_CMD_NAME)
 BEGIN_FEATURE_COMMAND()
@@ -635,6 +796,22 @@ ADD_FEATURE_COMMAND(DMS_CHIP_INFO_CMD_NAME,
     NULL,
     DMS_SUPPORT_ALL,
     dms_get_device_uuid)
+#endif
+ADD_FEATURE_COMMAND(DMS_CHIP_INFO_CMD_NAME,
+    DMS_MAIN_CMD_BASIC,
+    DMS_SUBCMD_GET_PHY_DEVICE_INFO,
+    NULL,
+    NULL,
+    DMS_SUPPORT_ALL_USER,
+    dms_get_phy_device_info)
+#ifdef CFG_FEATURE_GET_DEV_INDEX_IN_GROUP
+ADD_FEATURE_COMMAND(DMS_CHIP_INFO_CMD_NAME,
+    DMS_GET_GET_DEVICE_INFO_CMD,
+    ZERO_CMD,
+    "main_cmd=0xc,sub_cmd=0x5",
+    NULL,
+    DMS_ACC_NOT_LIMIT_USER | DMS_ENV_ALL | DMS_VDEV_NOTSUPPORT,
+    dms_get_device_index_in_group)
 #endif
 END_FEATURE_COMMAND()
 END_MODULE_DECLARATION()

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,8 +14,6 @@
 #ifndef URD_INIT_H
 #define URD_INIT_H
 
-#include <linux/atomic.h>
-#include <linux/types.h>
 #include "dms/dms_cmd_def.h"
 #include "ka_task_pub.h"
 #include "ka_base_pub.h"

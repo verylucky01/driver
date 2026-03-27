@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,30 +13,9 @@
 #ifndef DVT_H_
 #define DVT_H_
 
-#include <linux/version.h>
-#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(4,10,0)) || (defined(DRV_UT)))
-#include <linux/pci_regs.h>
-#endif
-#include <linux/types.h>
-#include <linux/mutex.h>
-#include <linux/workqueue.h>
-#include <linux/notifier.h>
-#include <linux/device.h>
-#include <linux/cdev.h>
-#include <linux/hashtable.h>
-#include <linux/vfio.h>
-#include <linux/slab.h>
-#include <linux/pci.h>
-#include <linux/uuid.h>
-#include <linux/kvm_types.h>
-#include <linux/iommu.h>
-#include <linux/eventfd.h>
-#include <linux/iova.h>
-
-#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(4,10,0)) || (defined(DRV_UT)))
-#include <linux/mdev.h>
-#endif
-
+#include "ka_kvm_pub.h"
+#include "ka_type.h"
+#include "ka_driver_pub.h"
 #include "hw_vdavinci.h"
 #include "log.h"
 
@@ -80,7 +59,7 @@
 #define PCI_DEVICE_ID_ASCEND910   0xd801
 #define PCI_DEVICE_ID_ASCEND910B  0xd802
 #define PCI_DEVICE_ID_ASCEND910_93  0xd803
-#define PCI_DEVICE_ID_ASCEND910D  0xd806
+#define PCI_DEVICE_ID_ASCEND950  0xd806
 #define DVT_MMIO_BAR0_SIZE      0x20000
 #define DVT_MMIO_BAR2_SIZE      0x2000000
 #define DVT_MMIO_BAR4_SIZE      0x4500000
@@ -117,9 +96,9 @@
 #define VF_MMIO_BAR0_SIZE_910_93      0x8000000
 #define VF_MMIO_BAR2_SIZE_910_93      0x4000000
 #define VF_MMIO_BAR4_SIZE_910_93      0x100000000
-#define VF_MMIO_BAR0_SIZE_910D      0x8000000
-#define VF_MMIO_BAR2_SIZE_910D      0x4000000
-#define VF_MMIO_BAR4_SIZE_910D      0x100000000
+#define VF_MMIO_BAR0_SIZE_950      0x8000000
+#define VF_MMIO_BAR2_SIZE_950      0x4000000
+#define VF_MMIO_BAR4_SIZE_950      0x100000000
 #define VDAVINCI_NAME           "vnpu"
 #define VDAVINCI_PREFIX         VDAVINCI_NAME"-"
 #define VDAVINCI_VFG_MAX        4
@@ -437,6 +416,8 @@ struct  vdavinci_drv_ops {
 
 extern struct hw_vdavinci_ops g_hw_vdavinci_ops;
 struct device *vdavinci_resource_dev(struct hw_vdavinci *vdavinci);
+struct device *vdavinci_get_device(struct hw_vdavinci *vdavinci);
+struct device *vdavinci_to_dev(struct hw_vdavinci *vdavinci);
 extern int hw_dvt_get_mode(int *mode);
 extern struct hw_kvmdt_ops g_hw_kvmdt_ops;
 bool hw_vdavinci_sriov_support(struct hw_dvt *dvt);

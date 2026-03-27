@@ -51,9 +51,9 @@ static int is_ipv6_v4_mapped(const struct in6_addr *address)
 
 static unsigned short reverse_8_bits(unsigned short value)
 {
-    unsigned char high = (value >> 0x8) & 0xFF;
-    unsigned char low = value & 0xFF;
-    return ((unsigned short)low << 0x8) | high;
+    unsigned char high = (unsigned char)((value >> 0x8) & 0xFF);
+    unsigned char low = (unsigned char)(value & 0xFF);
+    return (unsigned short)(((unsigned short)low << 0x8) | high);
 }
 
 static int dgid_to_ip(char *ip, int ip_address_len, unsigned int *qpc, int is_ipv4_flag)
@@ -69,7 +69,7 @@ static int dgid_to_ip(char *ip, int ip_address_len, unsigned int *qpc, int is_ip
     int offset_24 = 24;
 
     if (is_ipv4_flag) {
-        ret = sprintf_s(ip, ip_address_len, "%u.%u.%u.%u",
+        ret = sprintf_s(ip, (size_t)ip_address_len, "%u.%u.%u.%u",
             *(qpc + dgid_offset + offset_3) & 0xFF,
             (*(qpc + dgid_offset + offset_3) >> offset_8) & 0xFF,
             (*(qpc + dgid_offset + offset_3) >> offset_16) & 0xFF,
@@ -79,7 +79,7 @@ static int dgid_to_ip(char *ip, int ip_address_len, unsigned int *qpc, int is_ip
             return -ENOMEM;
         }
     } else {
-        ret = sprintf_s(ip, ip_address_len, "%x:%x:%x:%x:%x:%x:%x:%x",
+        ret = sprintf_s(ip, (size_t)ip_address_len, "%x:%x:%x:%x:%x:%x:%x:%x",
             reverse_8_bits(*(qpc + dgid_offset) & 0xFFFF),
             reverse_8_bits((*(qpc + dgid_offset) >> offset_16) & 0xFFFF),
             reverse_8_bits(*(qpc + dgid_offset + offset_1) & 0xFFFF),
@@ -104,12 +104,12 @@ static int dsmi_parse_qp_info(unsigned int qpn, char *context, struct ds_qp_info
     char ip[IP_ADDRESS_LEN] = {0};
     qpc = (unsigned int *)context;
 
-    unsigned char status = (*(qpc + 14) >>29) & 0x07;       //bypte_60_qpst bit 29-31
-    unsigned char type = (*(qpc + 19) >> 24) & 0x01;        //byte_80_xrc_qp_type bit 24
-    unsigned short src_port = (*(qpc + 12) >> 16) & 0xFFFF; //byte_52_updspn bit 16-31
-    unsigned int dst_qpn = *(qpc + 13) & 0xFFFFFF;          //byte_56_dqpn bit 0-23
-    unsigned int send_psn = (*(qpc + 42) >> 8) & 0xFFFFFF;  //byte_172_sq_cur_psn bit 8-31
-    unsigned int recv_psn = (*(qpc + 26) >> 8) & 0xFFFFFF;  //byte_108_rap_psn bit 8-31
+    unsigned char status = (unsigned char)((*(qpc + 14) >>29) & 0x07);       //bypte_60_qpst bit 29-31
+    unsigned char type = (unsigned char)((*(qpc + 19) >> 24) & 0x01);        //byte_80_xrc_qp_type bit 24
+    unsigned short src_port = (unsigned short)((*(qpc + 12) >> 16) & 0xFFFF); //byte_52_updspn bit 16-31
+    unsigned int dst_qpn = (unsigned int)(*(qpc + 13) & 0xFFFFFF);          //byte_56_dqpn bit 0-23
+    unsigned int send_psn = (unsigned int)((*(qpc + 42) >> 8) & 0xFFFFFF);  //byte_172_sq_cur_psn bit 8-31
+    unsigned int recv_psn = (unsigned int)((*(qpc + 26) >> 8) & 0xFFFFFF);  //byte_108_rap_psn bit 8-31
 
     if (is_ipv6_v4_mapped((struct in6_addr *)(qpc + dgid_offset))) {
         ret = dgid_to_ip(ip, sizeof(ip), qpc, 1);
@@ -217,7 +217,7 @@ int dsmi_set_tls_machine_type(int logic_id, struct tls_enable_info *enable_info)
     long int val;
     int ret;
  
-    ret = halGetDeviceInfo(logic_id, MODULE_TYPE_SYSTEM, INFO_TYPE_RUN_MACH, &val);
+    ret = halGetDeviceInfo((unsigned int)logic_id, MODULE_TYPE_SYSTEM, INFO_TYPE_RUN_MACH, &val);
     if (ret != 0) {
         roce_err("HalGetDeviceInfo failed. (ret=%d; logic_id=%d)", ret, logic_id);
         return ret;
@@ -256,7 +256,7 @@ int dsmi_get_tls_ca_cfg(int logic_id, int port_id, struct tls_ca_new_certs *ca_c
         return -EINVAL;
     }
 
-    size = sizeof(struct tls_ca_new_certs) * num;
+    size = (unsigned int)sizeof(struct tls_ca_new_certs) * num;
     DSMI_SET_TRANS_DATA(trans_data, DS_GET_TLS_CA_CFG, NULL, 0, (char*)ca_cert_info, &size);
 
     ret = dsmi_network_transmission_channel(logic_id, &trans_data);
@@ -334,7 +334,7 @@ int dsmi_get_port_shaping(int logic_id, unsigned int port_id, struct dsmi_shapin
     struct ds_trans_data trans_data = {0};
     unsigned int size;
 
-    if ((logic_id > DS_MAX_LOGIC_ID) || (logic_id < 0) || (port_id > MAX_PORT_ID) || (port_id < 0)) {
+    if ((logic_id > DS_MAX_LOGIC_ID) || (logic_id < 0) || (port_id > MAX_PORT_ID)) {
         roce_err("Logic id or port id is invalid. (logic_id:%d; port_id:%d)", logic_id, port_id);
         return -EINVAL;
     }
@@ -404,7 +404,7 @@ int dsmi_get_hccs_ping_result(int logic_id, hccs_ping_operate_info *operate_info
     return ret;
 }
 
-int dsmi_hccs_ping(int logic_id, int port_id, hccs_ping_operate_info *operate_info,
+int dsmi_hccs_ping(int logic_id, int port_id __attribute__((unused)), hccs_ping_operate_info *operate_info,
                    hccs_ping_reply_info *reply_info)
 {
     int ret;
@@ -480,7 +480,7 @@ int dsmi_get_traceroute_status(int logic_id, int *troute_status)
         roce_err("Dsmi channel got traceroute status failed. (ret=%d; logic_id=%d)", ret, logic_id);
         return ret;
     }
-    *troute_status = strtol(status, &p_tmp, STR_TO_INT_TEN);
+    *troute_status = (int)strtol(status, &p_tmp, STR_TO_INT_TEN);
     if (*p_tmp != '\0') {
         roce_err("Strtol current status got invalid param. (status=%s)", status);
         return -EINVAL;
@@ -518,7 +518,7 @@ int dsmi_start_traceroute(int logic_id, struct dsmi_traceroute_info *traceroute_
         roce_err("Dsmi channel start traceroute cmd failed. (ret=%d; logic_id=%d)", ret, logic_id);
         return ret;
     }
-    *troute_start_result = strtol(result, &p_tmp, STR_TO_INT_TEN);
+    *troute_start_result = (int)strtol(result, &p_tmp, STR_TO_INT_TEN);
     if (*p_tmp != '\0') {
         roce_err("Strtol traceroute result got invalid param. (result=%s)", result);
         return -EINVAL;
@@ -579,7 +579,7 @@ int dsmi_reset_traceroute(int logic_id, int *troute_reset)
         roce_err("Dsmi channel got traceroute reset failed. (ret=%d; logic_id=%d)", ret, logic_id);
         return ret;
     }
-    *troute_reset = strtol(reset, &p_tmp, STR_TO_INT_TEN);
+    *troute_reset = (int)strtol(reset, &p_tmp, STR_TO_INT_TEN);
     if (*p_tmp != '\0') {
         roce_err("Strtol traceroute reset got invalid param. (reset=%s)", reset);
         return -EINVAL;
@@ -633,7 +633,7 @@ int dsmi_prbs_adapt_in_order(unsigned int mode, unsigned int logic_id, unsigned 
         mode, logic_id, master_flag);
     DSMI_SET_TRANS_DATA(trans_data, DS_SET_PRBS_ADAPT_IN_ORDER,
                         (char *)&mode_info, sizeof(struct prbs_adapt_mode_info), NULL, &size);
-    ret = dsmi_network_transmission_channel(logic_id, &trans_data);
+    ret = dsmi_network_transmission_channel((int)logic_id, &trans_data);
     if (ret) {
         roce_err("dsmi set prbs adapt in order failed. (mode=%u, ret=%d; logic_id=%d)", mode, ret, logic_id);
         return ret;
@@ -955,6 +955,30 @@ int dsmi_stop_hccs_ping_mesh(int logic_id, int task_id)
 
     return trans_data.result;
 }
+
+int dsmi_set_device_offline_nic_down_flag(int logic_id, int enable_flag)
+{
+    unsigned int size_out = 0;
+    struct ds_trans_data trans_data = {0};
+    int ret;
+
+    if (logic_id > DS_MAX_LOGIC_ID || logic_id < 0) {
+        roce_err("logic id is invalid, expect [0]-[%d]. (logic_id=%d)", DS_MAX_LOGIC_ID, logic_id);
+        return -EINVAL;
+    }
+    DSMI_SET_TRANS_DATA(trans_data, DS_SET_DEVICE_OFFLINE_NET_DOWN, (char *)(&enable_flag), sizeof(int), NULL, &size_out);
+    ret = dsmi_network_transmission_channel(logic_id, &trans_data);
+    if (ret != 0) {
+        roce_err("Dsmi set device offline net down flag failed. (ret=%d; logic_id=%d)", ret, logic_id);
+        return ret;
+    }
+
+    if (trans_data.result != 0) {
+        roce_err("Dsmi set device offline net down flag failed. (result=%d)", trans_data.result);
+    }
+    return trans_data.result;
+}
+
 
 int dsmi_get_extra_statistics_info(int logic_id, int port_id, struct ds_extra_statistics_info *info)
 {

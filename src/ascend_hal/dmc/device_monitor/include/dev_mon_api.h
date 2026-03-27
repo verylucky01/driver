@@ -283,4 +283,6 @@ int get_davinci_info(unsigned int dev_id, unsigned int vfid, REQ_CMD_D_INFO_ARG 
 void dev_mon_get_ecc_record_info(SYSTEM_CB_T *cb, DM_INTF_S *intf, DM_RECV_ST *msg);
 void dev_mon_api_get_chip_expand_version(SYSTEM_CB_T *cb, DM_INTF_S *intf, DM_RECV_ST *msg);
 int dev_mon_get_mgnt_clockid(int *clockid);
+void dev_mon_api_get_ub_link_status(SYSTEM_CB_T *cb, DM_INTF_S *intf, DM_RECV_ST *msg);
+void dev_mon_api_get_ub_port_status(SYSTEM_CB_T *cb, DM_INTF_S *intf, DM_RECV_ST *msg);
 #endif

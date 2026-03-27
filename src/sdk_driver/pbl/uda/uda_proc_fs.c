@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,10 +10,13 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
-#include <linux/proc_fs.h>
-#include <linux/seq_file.h>
-#include <linux/version.h>
+#include "ka_base_pub.h"
+#include "ka_common_pub.h"
+#include "ka_system_pub.h"
+#include "ka_list_pub.h"
+#include "ka_task_pub.h"
+#include "ka_kernel_def_pub.h"
+#include "ka_fs_pub.h"
 
 #include "securec.h"
 
@@ -22,14 +25,10 @@
 #include "uda_access.h"
 #include "uda_proc_fs.h"
 #include "uda_proc_fs_adapt.h"
-#include "ka_list_pub.h"
-#include "ka_task_pub.h"
-#include "ka_kernel_def_pub.h"
-#include "ka_fs_pub.h"
 
 #define PROC_FS_MODE 0400
 
-static void uda_udev_single_show(struct seq_file *seq, struct uda_dev_inst *dev_inst)
+static void uda_udev_single_show(ka_seq_file_t *seq, struct uda_dev_inst *dev_inst)
 {
     char buf[TYPE_BUF_LEN];
 
@@ -42,6 +41,10 @@ static void uda_udev_single_show(struct seq_file *seq, struct uda_dev_inst *dev_
 
     if (dev_inst->para.remote_udevid != UDA_INVALID_UDEVID) {
         ka_fs_seq_printf(seq, "        remote udevid %u\n", dev_inst->para.remote_udevid);
+    }
+
+    if (dev_inst->para.add_id != UDA_INVALID_UDEVID) {
+        ka_fs_seq_printf(seq, "        add_id %u\n", dev_inst->para.add_id);
     }
 
     if (dev_inst->para.dev != NULL) {
@@ -75,7 +78,7 @@ static void uda_udev_single_show(struct seq_file *seq, struct uda_dev_inst *dev_
     ka_fs_seq_printf(seq, "\n");
 }
 
-static int uda_udev_show(struct seq_file *seq, void *offset)
+static int uda_udev_show(ka_seq_file_t *seq, void *offset)
 {
     u32 i;
 
@@ -90,14 +93,14 @@ static int uda_udev_show(struct seq_file *seq, void *offset)
     return 0;
 }
 
-int uda_udev_open(struct inode *inode, struct file *file)
+int uda_udev_open(ka_inode_t *inode, ka_file_t *file)
 {
     return ka_fs_single_open(file, uda_udev_show, inode->i_private);
 }
 
 static void uda_ns_node_single_show(struct uda_ns_node *ns_node, void *priv)
 {
-    struct seq_file *seq = (struct seq_file *)priv;
+    ka_seq_file_t *seq = (ka_seq_file_t *)priv;
     u32 devid;
 
     ka_fs_seq_printf(seq, "ns_id %u identify %llx root_tgid %u dev_num %u namespace %pK%s, udev list:\n",
@@ -110,21 +113,21 @@ static void uda_ns_node_single_show(struct uda_ns_node *ns_node, void *priv)
     ka_fs_seq_printf(seq, "\n\n");
 }
 
-static int uda_ns_node_show(struct seq_file *seq, void *offset)
+static int uda_ns_node_show(ka_seq_file_t *seq, void *offset)
 {
     uda_recycle_idle_ns_node_immediately();
     uda_for_each_ns_node_safe(seq, uda_ns_node_single_show);
     return 0;
 }
 
-int uda_ns_node_open(struct inode *inode, struct file *file)
+int uda_ns_node_open(ka_inode_t *inode, ka_file_t *file)
 {
     return ka_fs_single_open(file, uda_ns_node_show, inode->i_private);
 }
 
 static void _uda_notifier_show(struct uda_dev_type *type, struct uda_notifiers *notifiers, void *priv)
 {
-    struct seq_file *seq = (struct seq_file *)priv;
+    ka_seq_file_t *seq = (ka_seq_file_t *)priv;
     char buf[TYPE_BUF_LEN];
     int i;
     bool has_notifier = false;
@@ -143,7 +146,7 @@ static void _uda_notifier_show(struct uda_dev_type *type, struct uda_notifiers *
     }
 
     for (i = 0; i < UDA_PRI_MAX; i++) {
-        struct list_head *nf_head = &notifiers->pri_head[i];
+        ka_list_head_t *nf_head = &notifiers->pri_head[i];
         struct uda_notifier_node *nf = NULL;
 
         if (!ka_list_empty(nf_head)) {
@@ -160,73 +163,41 @@ static void _uda_notifier_show(struct uda_dev_type *type, struct uda_notifiers *
     }
 }
 
-static int uda_notifier_show(struct seq_file *seq, void *offset)
+static int uda_notifier_show(ka_seq_file_t *seq, void *offset)
 {
     uda_for_each_notifiers(seq, _uda_notifier_show);
     return 0;
 }
 
-int uda_notifier_open(struct inode *inode, struct file *file)
+int uda_notifier_open(ka_inode_t *inode, ka_file_t *file)
 {
     return ka_fs_single_open(file, uda_notifier_show, inode->i_private);
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 5, 0)
-static const struct file_operations udevice_ops = {
-    .owner = KA_THIS_MODULE,
-    .open    = uda_udev_open,
-    .read    = ka_fs_seq_read,
-    .llseek  = ka_fs_seq_lseek,
-    .release = ka_fs_single_release,
-};
+static int uda_detected_device_show(ka_seq_file_t *seq, void *offset)
+{
+    ka_fs_seq_printf(seq, "detected_dev_num: %u\n", uda_get_detected_phy_dev_num());
+    return 0;
+}
 
-static const struct file_operations namespace_node_ops = {
-    .owner = KA_THIS_MODULE,
-    .open    = uda_ns_node_open,
-    .read    = ka_fs_seq_read,
-    .llseek  = ka_fs_seq_lseek,
-    .release = ka_fs_single_release,
-};
+int uda_detected_device_open(ka_inode_t *inode, ka_file_t *file)
+{
+    return ka_fs_single_open(file, uda_detected_device_show, inode->i_private);
+}
 
-static const struct file_operations notifier_ops = {
-    .owner = KA_THIS_MODULE,
-    .open    = uda_notifier_open,
-    .read    = ka_fs_seq_read,
-    .llseek  = ka_fs_seq_lseek,
-    .release = ka_fs_single_release,
-};
-
-#else
-
-static const struct proc_ops udevice_ops = {
-    .proc_open    = uda_udev_open,
-    .proc_read    = ka_fs_seq_read,
-    .proc_lseek   = ka_fs_seq_lseek,
-    .proc_release = ka_fs_single_release,
-};
-
-static const struct proc_ops namespace_node_ops = {
-    .proc_open    = uda_ns_node_open,
-    .proc_read    = ka_fs_seq_read,
-    .proc_lseek   = ka_fs_seq_lseek,
-    .proc_release = ka_fs_single_release,
-};
-
-static const struct proc_ops notifier_ops = {
-    .proc_open    = uda_notifier_open,
-    .proc_read    = ka_fs_seq_read,
-    .proc_lseek   = ka_fs_seq_lseek,
-    .proc_release = ka_fs_single_release,
-};
-#endif
+static STATIC_PROCFS_FILE_FUNC_OPS_OPEN(udevice_ops, uda_udev_open);
+static STATIC_PROCFS_FILE_FUNC_OPS_OPEN(namespace_node_ops, uda_ns_node_open);
+static STATIC_PROCFS_FILE_FUNC_OPS_OPEN(notifier_ops, uda_notifier_open);
+static STATIC_PROCFS_FILE_FUNC_OPS_OPEN(detected_device_ops, uda_detected_device_open);
 
 void uda_proc_fs_init(void)
 {
-    struct proc_dir_entry *top_entry = ka_fs_proc_mkdir("uda", NULL);
+    ka_proc_dir_entry_t *top_entry = ka_fs_proc_mkdir("uda", NULL);
     if (top_entry != NULL) {
         (void)ka_fs_proc_create_data("udevice", PROC_FS_MODE, top_entry, &udevice_ops, NULL);
         (void)ka_fs_proc_create_data("namespace_node", PROC_FS_MODE, top_entry, &namespace_node_ops, NULL);
         (void)ka_fs_proc_create_data("notifiers", PROC_FS_MODE, top_entry, &notifier_ops, NULL);
+        (void)ka_fs_proc_create_data("detected_device", PROC_FS_MODE, top_entry, &detected_device_ops, NULL);
     }
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,7 +14,8 @@
 #ifndef DEVDRV_MANAGER_VDEVICE_H
 #define DEVDRV_MANAGER_VDEVICE_H
 
-#include <linux/fs.h>
+#include "ka_common_pub.h"
+#include "ka_list_pub.h"
 #include "devdrv_user_common.h"
 #include "ka_task_pub.h"
 
@@ -40,13 +41,13 @@ enum MNT_VDAVINCI_TYPE {
 struct dev_mnt_vdev_action {
     unsigned int vdev_id;
     vdev_action action;
-    struct mnt_namespace *ns;
+    ka_mnt_namespace_t *ns;
     u64 container_id;
-    struct list_head list_node;
+    ka_list_head_t list_node;
 };
 
 struct dev_mnt_vdev_inform {
-    struct list_head vdev_action_head;
+    ka_list_head_t vdev_action_head;
     ka_task_spinlock_t spinlock;
 };
 
@@ -62,29 +63,29 @@ struct vdavinci_info {
 
 typedef struct dev_mnt_vdev_engine {
     u32 alloc_state;
-    struct mutex lock;
-    struct cdev cdev;
-    struct device *dev;
+    ka_mutex_t lock;
+    ka_cdev_t cdev;
+    ka_device_t *dev;
     struct vdavinci_info info;
 } DEV_MNT_VDEV_ENGINE_T;
 
 typedef struct dev_mnt_vdev_cb {
     unsigned int vdev_major;
-    struct class *vdev_class;
-    struct mutex global_lock;
+    ka_class_t *vdev_class;
+    ka_mutex_t global_lock;
     DEV_MNT_VDEV_ENGINE_T vdev[ASCEND_VDEV_MAX_NUM];
 } DEV_MNT_VDEV_CB_T;
 
 int dev_mnt_vdevice_init(void);
-int dev_mnt_vdevice_add_inform(unsigned int vdev_id, vdev_action action, struct mnt_namespace *ns, u64 container_id);
+int dev_mnt_vdevice_add_inform(unsigned int vdev_id, vdev_action action, ka_mnt_namespace_t *ns, u64 container_id);
 int dev_mnt_create_one_vm_vdevice(unsigned int phy_id, unsigned int fid);
 void dev_mnt_vdevice_uninit(void);
 void dev_mnt_vdevice_inform(void);
 void dev_mnt_released_one_vm_vdevice(unsigned int phy_id, unsigned int fid);
 
-int devdrv_manager_ioctl_create_vdev(struct file *filep, unsigned int cmd, unsigned long arg);
-int devdrv_manager_ioctl_destroy_vdev(struct file *filep, unsigned int cmd, unsigned long arg);
-int devdrv_manager_ioctl_get_vdevinfo(struct file *filep, unsigned int cmd, unsigned long arg);
+int devdrv_manager_ioctl_create_vdev(ka_file_t *filep, unsigned int cmd, unsigned long arg);
+int devdrv_manager_ioctl_destroy_vdev(ka_file_t *filep, unsigned int cmd, unsigned long arg);
+int devdrv_manager_ioctl_get_vdevinfo(ka_file_t *filep, unsigned int cmd, unsigned long arg);
 #ifndef CFG_FEATURE_VFIO_SOC
 int devdrv_manager_get_vdev_resource_info(struct devdrv_resource_info *dinfo);
 #endif

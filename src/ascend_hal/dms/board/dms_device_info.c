@@ -377,6 +377,9 @@ drvError_t DmsGetMasterDevInTheSameOs(unsigned int phy_id, unsigned int *master_
     if (ret != 0) {
         DMS_EX_NOTSUPPORT_ERR(ret, "Get master device ioctl failed. (phy_id=%u; ret=%d)\n", phy_id, ret);
 #ifdef CFG_FEATURE_ERR_CODE_NOT_OPTIMIZATION
+        if (ret == DRV_ERROR_NOT_SUPPORT) {
+            return DRV_ERROR_NOT_SUPPORT;
+        }
         return DRV_ERROR_INVALID_VALUE;
 #else
         return ret;
@@ -831,3 +834,37 @@ drvError_t dms_get_sign_flag_ioctl(
     return ret;
 }
 
+drvError_t dms_get_phy_dev_info(unsigned int phy_id, int info_type, unsigned int *val)
+{
+    struct urd_cmd cmd = {0};
+    struct urd_cmd_para cmd_para = {0};
+    struct dms_get_phy_dev_info_out output = {0};
+    int ret;
+
+    if (val == NULL) {
+        DMS_ERR("The input parameter is NULL. (phy_id=%u)\n", phy_id);
+        return DRV_ERROR_INVALID_HANDLE;
+    }
+
+    urd_usr_cmd_fill(&cmd, DMS_MAIN_CMD_BASIC, DMS_SUBCMD_GET_PHY_DEVICE_INFO, NULL, 0);
+    urd_usr_cmd_para_fill(&cmd_para, (void *)&phy_id, sizeof(unsigned int),
+        (void *)&output, sizeof(struct dms_get_phy_dev_info_out));
+    ret = urd_usr_cmd(&cmd, &cmd_para);
+    if (ret != 0) {
+        DMS_EX_NOTSUPPORT_ERR(ret, "Get physical device info failed. (phy_id=%u; ret=%d)\n", phy_id, ret);
+        return ret;
+    }
+
+    switch(info_type) {
+        case PHY_INFO_TYPE_PHY_CHIP_ID:
+            *val = output.chip_id;
+            break;
+        case PHY_INFO_TYPE_PHY_DIE_ID:
+            *val = output.die_id;
+            break;
+        default:
+            return DRV_ERROR_NOT_SUPPORT;
+    }
+
+    return DRV_ERROR_NONE;
+}

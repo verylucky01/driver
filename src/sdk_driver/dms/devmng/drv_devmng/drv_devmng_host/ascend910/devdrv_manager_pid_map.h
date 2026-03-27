@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,17 +14,16 @@
 #ifndef DEVDRV_MANAGER_PID_MAP_H
 #define DEVDRV_MANAGER_PID_MAP_H
 
-#include <linux/types.h>
-#include <linux/list.h>
-#include <linux/hashtable.h>
+#include "ka_common_pub.h"
+#include "ka_list_pub.h"
+#include "ka_task_pub.h"
+#include "ka_system_pub.h"
 
 #include "dms/dms_devdrv_manager_comm.h"
 #include "devdrv_user_common.h"
 #include "devdrv_manager_common.h"
-#include "dpa/dpa_pids_map.h"
+#include "dpa_kernel_interface.h"
 #include "devdrv_spec_adapt.h"
-#include "ka_task_pub.h"
-#include "ka_system_pub.h"
 
 #define DEVMNG_PID_INVALID (-1)
 #define DEVMNG_PID_START_ONCE (-2)
@@ -80,9 +79,9 @@ struct devdrv_process_sign {
     u32 sync_proc_cnt;
     u32 docker_id;
     u32 in_use_count;
-    struct list_head list;
+    ka_list_head_t list;
 #ifndef DEVMNG_UT
-    struct hlist_node link; /* hash find link */
+    ka_hlist_node_t link; /* hash find link */
 #endif
 };
 
@@ -113,7 +112,7 @@ int devdrv_bind_hostpid(struct devdrv_ioctl_para_bind_host_pid para_info, struct
 int devdrv_unbind_hostpid(struct devdrv_ioctl_para_bind_host_pid para_info);
 void devdrv_manager_process_sign_release(ka_pid_t devpid);
 void devdrv_manager_free_hashtable(void);
-int devdrv_fop_query_host_pid(struct file *filep, unsigned int cmd, unsigned long arg);
+int devdrv_fop_query_host_pid(ka_file_t *filep, unsigned int cmd, unsigned long arg);
 int devdrv_notice_process_exit(u32 dev_id, u32 host_pid);
 #ifdef CFG_HOST_ENV
 int devdrv_pid_map_sync_proc(void *msg, u32 *ack_len);
@@ -125,6 +124,6 @@ int devdrv_query_slave_by_map_info(const devdrv_pid_map_info_t *q_info, ka_pid_t
 int devdrv_get_dev_process(ka_pid_t devpid);
 void devdrv_put_dev_process(ka_pid_t devpid);
 void devdrv_release_pid_with_start_time(struct devdrv_process_sign *d_sign, ka_pid_t devpid, u64 start_time,
-    struct list_head *free_list, int *release_flag);
+    ka_list_head_t *free_list, int *release_flag);
 void devdrv_release_try_to_sync_to_peer(ka_pid_t slave_pid);
 #endif

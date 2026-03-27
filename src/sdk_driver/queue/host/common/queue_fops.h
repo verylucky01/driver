@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,10 +13,7 @@
 
 #ifndef QUEUE_FOPS_H
 #define QUEUE_FOPS_H
-#include <linux/fs.h>
-#include <linux/types.h>
-#include <linux/semaphore.h>
-
+#include "ka_fs_pub.h"
 #include "queue_ioctl.h"
 #include "queue_dma.h"
 #include "queue_context.h"
@@ -36,11 +33,11 @@ extern long hdcdrv_kernel_send(int session, const char *session_id, void *buf, i
 extern long hdcdrv_kernel_send_timeout(int session, const char *session_id, void *buf, int len, int timeout);
 
 extern long (*const drv_queue_ioctl_handlers[QUEUE_CMD_MAX])
-    (struct file *filep, unsigned int cmd, unsigned long arg);
+    (ka_file_t *filep, unsigned int cmd, unsigned long arg);
 
-int queue_drv_open(struct inode *inode, struct file *file);
-int queue_drv_release(struct inode *inode, struct file *file);
-int queue_drv_module_init(const struct file_operations *ops);
+int queue_drv_open(ka_inode_t *inode, ka_file_t *file);
+int queue_drv_release(ka_inode_t *inode, ka_file_t *file);
+int queue_drv_module_init(const ka_file_operations_t *ops);
 void queue_drv_module_exit(void);
 int queue_wakeup_enqueue(struct queue_context *context, u64 que_chan_addr);
 

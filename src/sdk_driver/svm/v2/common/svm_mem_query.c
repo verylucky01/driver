@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -172,27 +172,80 @@ u32 devmm_get_mem_page_size(struct devmm_svm_process_id *process_id, u64 addr, u
 }
 KA_EXPORT_SYMBOL_GPL(devmm_get_mem_page_size);
 
-static int devmm_get_svm_mem_pa_list_proc(u32 devid, int tgid, u64 addr, u64 size, u32 pa_num, u64 *pa_list)
+STATIC int devmm_get_svm_mem_pa_list_proc(u32 devid, int tgid, struct ka_mem_attr *mem, u64 *pa_num,
+    struct ka_pa_wraper *pa_list)
 {
-    struct devmm_svm_process_id process_id = {.hostpid = tgid, .devid = devid, .vfid = 0};
+    struct devmm_svm_process_id process_id = {.hostpid = tgid, .devid = 0, .vfid = 0};
+    u64 *tmp_pa_list = NULL;
+    u32 page_size = 0;
+    int ret = 0;
+    int i;
 
-    return devmm_get_mem_pa_list(&process_id, addr, size, pa_list, pa_num);
-}
+    if ((mem == NULL) || (pa_num == NULL) || (pa_list == NULL) || (*pa_num == 0)) {
+        return -EINVAL;
+    }
 
-static int devmm_put_svm_mem_pa_list_proc(u32 devid, int tgid, u64 addr, u64 size, u32 pa_num, u64 *pa_list)
-{
-    struct devmm_svm_process_id process_id = {.hostpid = tgid, .devid = devid, .vfid = 0};
+    page_size = devmm_get_mem_page_size(&process_id, mem->addr, mem->size);
+    if (page_size == 0) {
+        return -EINVAL;
+    }
 
-    devmm_put_mem_pa_list(&process_id, addr, size, pa_list, pa_num);
+    tmp_pa_list = ka_mm_vzalloc(sizeof(u64) * (*pa_num));
+    if (tmp_pa_list == NULL) {
+        return -ENOMEM;
+    }
 
+    ret = devmm_get_mem_pa_list(&process_id, mem->addr, mem->size, tmp_pa_list, (u32)(*pa_num));
+    if (ret != 0) {
+#ifndef EMU_ST
+        ka_mm_vfree(tmp_pa_list);
+        return ret;
+#endif
+    }
+
+    for (i = 0; i < *pa_num; i++) {
+        pa_list[i].pa = tmp_pa_list[i];
+        pa_list[i].size = (tmp_pa_list[i] != 0) ? page_size: 0;
+    }
+
+    ka_mm_vfree(tmp_pa_list);
     return 0;
 }
 
-static u32 devmm_get_svm_mem_page_size_proc(u32 devid, int tgid, u64 addr, u64 size)
+STATIC int devmm_put_svm_mem_pa_list_proc(u32 devid, int tgid, struct ka_mem_attr *mem, u64 pa_num,
+    struct ka_pa_wraper *pa_list)
 {
-    struct devmm_svm_process_id process_id = {.hostpid = tgid, .devid = devid, .vfid = 0};
+    struct devmm_svm_process_id process_id = {.hostpid = tgid, .devid = 0, .vfid = 0};
+    u64 *tmp_pa_list = NULL;
+    int i;
 
-    return devmm_get_mem_page_size(&process_id, addr, size);
+    if ((mem == NULL) || (pa_list == NULL) || (pa_num == 0)) {
+        return -EINVAL;
+    }
+
+    tmp_pa_list = ka_mm_vzalloc(sizeof(u64) * pa_num);
+    if (tmp_pa_list == NULL) {
+        return -ENOMEM;
+    }
+
+    for (i = 0; i < pa_num; i++) {
+        tmp_pa_list[i] = pa_list[i].pa;
+    }
+
+    devmm_put_mem_pa_list(&process_id, mem->addr, mem->size, tmp_pa_list, (u32)pa_num);
+    ka_mm_vfree(tmp_pa_list);
+    return 0;
+}
+
+STATIC u32 devmm_get_svm_mem_page_size_proc(u32 devid, int tgid, struct ka_mem_attr *mem)
+{
+    struct devmm_svm_process_id process_id = {.hostpid = tgid, .devid = 0, .vfid = 0};
+
+    if (mem == NULL) {
+        return 0;
+    }
+
+    return devmm_get_mem_page_size(&process_id, mem->addr, mem->size);
 }
 
 int devmm_svm_mem_query_ops_register(void)

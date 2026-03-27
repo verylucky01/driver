@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,15 +10,13 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
- 
-#include "hw_vdavinci.h"
+
 #include "ka_pci_pub.h"
 #include "ka_kernel_def_pub.h"
 #include "ka_errno_pub.h"
 #include "ka_fs_pub.h"
 #include "ka_dfx_pub.h"
-#include "ka_common_pub.h"
-#include "ka_task_pub.h"
+#include "hw_vdavinci.h"
 
 bool hw_dvt_check_host_is_uvp(void);
 
@@ -39,7 +37,9 @@ static const ka_pci_device_id_t g_vmngh_tbl[] = {{ KA_PCI_VDEVICE(HUAWEI, HISI_E
                                                    { 0x203F, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
                                                    { 0x20C6, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
                                                    { 0x203F, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
-						   {}};
+                                                   { 0x20E9, 0xd802, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+                                                   { 0x20E9, 0xd500, KA_PCI_ANY_ID, KA_PCI_ANY_ID, 0, 0, 0 },
+                                                   {}};
 KA_MODULE_DEVICE_TABLE(pci, g_vmngh_tbl);
 
 struct vdavinci_mode_info g_vdev_mode = { 0 };

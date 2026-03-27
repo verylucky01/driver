@@ -17,7 +17,7 @@ set(ascend_trs_shrid_depends asdrv_pbl asdrv_dms drv_seclib_host asdrv_esched dr
 
 set(ascend_trs_sec_eh_adapt_depends drv_seclib_host asdrv_pbl asdrv_trsbase asdrv_vvpc drv_pcie_host asdrv_dpa ascend_kernel_open_adapt)
 
-set(ascend_trs_sec_eh_agent_depends asdrv_pbl asdrv_vmng drv_pcie_host asdrv_vpc drv_vascend_stub ascend_kernel_open_adapt)
+set(ascend_trs_sec_eh_agent_depends asdrv_pbl asdrv_vmng drv_pcie_host asdrv_vpc asdrv_vascend_adapt ascend_kernel_open_adapt)
 
 add_host_ko(LOCAL_MODULE asdrv_trs
     KO_SRC_FOLDER ${CMAKE_CURRENT_SOURCE_DIR}

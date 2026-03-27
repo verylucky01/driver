@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -77,10 +77,12 @@ void devmm_used_page_cnt_sub(struct devmm_page_cnt_stats *stats, u32 page_type, 
 
     page_num_offset = (page_type == DEVMM_GIANT_PAGE_TYPE) ? DEVMM_GIANT_TO_HUGE_PAGE_NUM : 1;
     for (i = 0; i < page_num; i += page_num_offset) {
-        if (devmm_is_normal_node(ka_mm_page_to_nid(pages[i])) == false) {
-            cdm_pg_cnt++;
-        } else {
-            cgroup_pg_cnt++;
+        if (pages[i] != NULL) {
+            if (devmm_is_normal_node(ka_mm_page_to_nid(pages[i])) == false) {
+                cdm_pg_cnt++;
+            } else {
+                cgroup_pg_cnt++;
+            }
         }
     }
 

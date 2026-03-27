@@ -58,7 +58,7 @@ bool devmm_is_host_pin_memory_map_failed()
 {
     return g_host_pin_memory_map_failed;
 }
-
+ 
 #ifndef EMU_ST
 STATIC DVresult devmm_davinci_open(int fd, const char *davinci_sub_name)
 {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,12 +10,12 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
+#include "ka_kernel_def_pub.h"
 #include "devdrv_atu_interface.h"
 #include "devdrv_atu.h"
 #include "devdrv_util.h"
 #include "devdrv_ctrl.h"
 #include "pbl/pbl_uda.h"
-#include "ka_kernel_def_pub.h"
 
 int devdrv_get_atu_info(struct devdrv_pci_ctrl *pci_ctrl, int atu_type, struct devdrv_iob_atu **atu,
     u64 *host_phy_base)

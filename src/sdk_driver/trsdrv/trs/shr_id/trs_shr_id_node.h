@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -23,10 +23,11 @@ struct shr_id_node_op_attr {
     int res_type;   /* trs id type */
     int type;       /* shr id type */
     u32 id;
-    pid_t pid;  /* create pid */
+    ka_pid_t pid;  /* create pid */
     u64 start_time;
     char name[SHR_ID_NSM_NAME_SIZE];
     u32 flag;   /* remote flag */
+    u32 stars_die_id;  /* die id of stars in this ts inst */
 
     int (*res_get)(struct trs_id_inst *inst, int res_type, u32 res_id);
     int (*res_put)(struct trs_id_inst *inst, int res_type, u32 res_id);
@@ -34,13 +35,13 @@ struct shr_id_node_op_attr {
 
 void shr_id_node_init(void);
 int shr_id_node_create(struct shr_id_node_op_attr *attr);
-int shr_id_node_destroy(const char *name, int type, pid_t pid, u32 mode);
-int shr_id_node_open(const char *name, pid_t pid, unsigned long start_time,
+int shr_id_node_destroy(const char *name, int type, ka_pid_t pid, u32 mode);
+int shr_id_node_open(const char *name, ka_pid_t pid, unsigned long start_time,
     struct shr_id_node_op_attr *attr);
-int shr_id_node_close(const char *name, int type, pid_t pid);
-int shr_id_node_set_pids(const char *name, int type, pid_t create_pid, pid_t pid[], u32 pid_num);
-int shr_id_node_record(const char *name, int type, pid_t pid);
-int shr_id_node_set_attr(const char *name, int type, pid_t pid);
+int shr_id_node_close(const char *name, int type, ka_pid_t pid);
+int shr_id_node_set_pids(const char *name, int type, ka_pid_t create_pid, ka_pid_t pid[], u32 pid_num);
+int shr_id_node_record(const char *name, int type, ka_pid_t pid);
+int shr_id_node_set_attr(const char *name, int type, ka_pid_t pid);
 int shr_id_node_get_info(const char *name, int type, struct shr_id_ioctl_info *info);
 int shr_id_node_get_attribute(const char *name, int type, struct shr_id_ioctl_info *info);
 

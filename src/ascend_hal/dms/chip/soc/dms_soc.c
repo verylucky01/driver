@@ -18,6 +18,7 @@
 #include "dms/dms_devdrv_info_comm.h"
 #include "ascend_dev_num.h"
 #include "dms_soc.h"
+#include "dms_device_info.h"
 
 drvError_t DmsGetBoardId(unsigned int dev_id, unsigned int *board_id)
 {
@@ -570,3 +571,18 @@ drvError_t DmsGetAllDeviceNode(unsigned int dev_id, DEV_DTM_CAP capability,
     *size = get_all_device_node_out.out_size;
     return DRV_ERROR_NONE;
 }
+
+#ifdef CFG_FEATURE_GET_DEV_INDEX_IN_GROUP
+drvError_t DmsGetIndexInGroup(unsigned int dev_id, unsigned int main_cmd, unsigned int sub_cmd,
+    void *buf, unsigned int *size)
+{
+    int ret = 0;
+
+    ret = DmsGetDeviceInfoEx(dev_id, main_cmd, sub_cmd, buf, size);
+    if (ret != 0) {
+        DMS_EX_NOTSUPPORT_ERR(ret, "Failed to obtain the device information. (dev_id=%u; ret=%d)\n", dev_id, ret);
+        return ret;
+    }
+    return DRV_ERROR_NONE;
+}
+#endif

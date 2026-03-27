@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,8 +14,8 @@
 #ifndef VIRTMNG_MSG_COMMON_H
 #define VIRTMNG_MSG_COMMON_H
 
-#include "vmng_kernel_interface.h"
 #include "ka_memory_pub.h"
+#include "vmng_kernel_interface.h"
 
 #define VMNG_MSG_CLUSTER_STATUS_DISABLE 0x0
 #define VMNG_MSG_CLUSTER_STATUS_INIT 0x1

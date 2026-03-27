@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -16,6 +16,7 @@
 #include "ka_base_pub.h"
 #include "ka_task_pub.h"
 #include "ka_list_pub.h"
+#include "ka_memory_pub.h"
 
 #include "kernel_version_adapt.h"
 #include "tsdrv_interface.h"
@@ -104,8 +105,8 @@ struct devdrv_mailbox_message {
 #define TSDRV_DFX_MAX_TIMES      3
 
 struct devdrv_mailbox {
-    u8 __iomem *send_sram;
-    u8 __iomem *receive_sram;
+    u8 __ka_mm_iomem *send_sram;
+    u8 __ka_mm_iomem *receive_sram;
 
     struct devdrv_mailbox_message message;
 

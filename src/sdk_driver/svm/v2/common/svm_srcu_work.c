@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -97,7 +97,7 @@ int devmm_srcu_subwork_add(struct devmm_srcu_work *srcu_work, u32 type, srcu_sub
 {
     struct devmm_srcu_work *srcu_work_tmp = srcu_work;
     struct devmm_srcu_node *srcu_node = NULL;
-    ka_gfp_t flags = (in_softirq() != 0) ? (KA_GFP_ATOMIC | __KA_GFP_ACCOUNT) : (KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
+    ka_gfp_t flags = (ka_base_in_softirq() != 0) ? (KA_GFP_ATOMIC | __KA_GFP_ACCOUNT) : (KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
     int ret;
 
     if (srcu_work_tmp == NULL) {

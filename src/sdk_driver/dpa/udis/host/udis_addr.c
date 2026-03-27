@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -18,11 +18,11 @@
 #include "udis_log.h"
 #include "udis_management.h"
 
-struct udis_dma_node *udis_addr_list_find_node(const struct udis_ctrl_block *udis_cb, UDIS_MODULE_TYPE module_type,
+struct udis_node *udis_addr_list_find_node(const struct udis_ctrl_block *udis_cb, UDIS_MODULE_TYPE module_type,
     const char *name)
 {
     int i;
-    struct udis_dma_node *addr_node, *next = NULL;
+    struct udis_node *addr_node, *next = NULL;
 
     for (i = UPDATE_ONLY_ONCE; i < UPDATE_TYPE_MAX; ++i) {
         ka_list_for_each_entry_safe(addr_node, next, &udis_cb->addr_list[i], list) {
@@ -35,14 +35,14 @@ struct udis_dma_node *udis_addr_list_find_node(const struct udis_ctrl_block *udi
 }
 
 int udis_addr_list_add_node(unsigned int udevid, struct udis_ctrl_block *udis_cb,
-    const struct udis_dma_node *addr_node)
+    const struct udis_node *addr_node)
 {
     int ret;
-    struct udis_dma_node *new_node = NULL;
+    struct udis_node *new_node = NULL;
 
-    new_node = dbl_kzalloc(sizeof(struct udis_dma_node), KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
+    new_node = dbl_kzalloc(sizeof(struct udis_node), KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
     if (new_node == NULL) {
-        udis_err("Failed to malloc for udis_dma_node. (udevid=%u; module_type=%u; name=%s)\n",
+        udis_err("Failed to malloc for udis_node. (udevid=%u; module_type=%u; name=%s)\n",
             udevid, addr_node->module_type, addr_node->name);
         return -ENOMEM;
     }
@@ -55,11 +55,29 @@ int udis_addr_list_add_node(unsigned int udevid, struct udis_ctrl_block *udis_cb
         return -ENOMEM;
     }
 
+    ret = strcpy_s(new_node->device_segment, UDIS_SEGMENT_MAX_LEN, addr_node->device_segment);
+    if (ret != 0) {
+        udis_err("strncpy_s failed. (module_type=%u; name=%s; ret=%d)\n",
+            addr_node->module_type, addr_node->name, ret);
+        dbl_kfree(new_node);
+        return -ENOMEM;
+    }
+
     new_node->module_type = addr_node->module_type;
     new_node->update_type = addr_node->update_type;
     new_node->dev_dma_addr = addr_node->dev_dma_addr;
     new_node->host_dma_addr = addr_node->host_dma_addr;
     new_node->data_len = addr_node->data_len;
+    new_node->host_va_addr = addr_node->host_va_addr;
+    new_node->dev_va_addr = addr_node->dev_va_addr;
+    new_node->dev_va_addr_attr = addr_node->dev_va_addr_attr;
+    new_node->host_segment = addr_node->host_segment;
+    new_node->device_segment_import = addr_node->device_segment_import;
+    new_node->host_segment_len = addr_node->host_segment_len;
+    new_node->device_segment_import_len = addr_node->device_segment_import_len;
+    new_node->token_value = addr_node->token_value;
+    new_node->device_segment_len = addr_node->device_segment_len;
+
 
     ka_list_add(&new_node->list, &udis_cb->addr_list[addr_node->update_type]);
 
@@ -67,9 +85,9 @@ int udis_addr_list_add_node(unsigned int udevid, struct udis_ctrl_block *udis_cb
 }
 
 void udis_addr_list_remove_node(unsigned int udevid, struct udis_ctrl_block *udis_cb,
-    const struct udis_dma_node *addr_node)
+    const struct udis_node *addr_node)
 {
-    struct udis_dma_node *node = NULL;
+    struct udis_node *node = NULL;
 
     node = udis_addr_list_find_node(udis_cb, addr_node->module_type, addr_node->name);
     if (node == NULL) {

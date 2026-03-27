@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,9 +11,8 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/export.h>
-#include "devdrv_manager_pid_map.h"
 #include "ka_kernel_def_pub.h"
+#include "devdrv_manager_pid_map.h"
 #ifndef CFG_FEATURE_NO_DP_PROC
 #include "dpa_kernel_interface.h"
 

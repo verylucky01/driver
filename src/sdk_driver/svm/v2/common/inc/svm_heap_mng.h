@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -19,6 +19,7 @@
 #include "svm_log.h"
 #include "svm_vmma_mng.h"
 #include "devmm_common.h"
+#include "ka_system_pub.h"
 
 /*
  * one va page has a byte to maintain va status
@@ -182,17 +183,13 @@ static inline bool devmm_test_and_set_bit(u32 mask_bit, unsigned int *p)
 static inline void devmm_page_bitmap_lock(u32 *bitmap)
 {
     while (devmm_test_and_set_bit(DEVMM_PAGE_BITMAP_LOCKED_MASK, bitmap) != 0) {
-        cpu_relax();
+        ka_system_cpu_relax();
     }
 }
 
 static inline void devmm_page_bitmap_unlock(u32 *bitmap)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 3, 0)
-    ka_base_atomic_and((int)(~DEVMM_PAGE_BITMAP_LOCKED_MASK), (ka_atomic_t *)bitmap);
-#else
-    atomic_clear_mask(DEVMM_PAGE_BITMAP_LOCKED_MASK, (ka_atomic_t *)bitmap);
-#endif
+    ka_base_atomic_clear_mask((unsigned long)DEVMM_PAGE_BITMAP_LOCKED_MASK, (unsigned long *)bitmap);
 }
 
 static inline void devmm_page_bitmap_set_value_nolock(u32 *bitmap, u32 shift, u32 wide, u32 value)
@@ -396,18 +393,14 @@ static inline void devmm_page_ref_lock(struct devmm_heap_ref *ref)
 {
     u32 stamp = (u32)ka_jiffies;
     while (devmm_test_and_set_bit(DEVMM_HEAP_PAGE_LOCK_FLAG_MASK, (u32 *)ref) != 0) {
-        cpu_relax();
+        ka_system_cpu_relax();
         devmm_try_cond_resched(&stamp);
     }
 }
 
 static inline void devmm_page_ref_unlock(struct devmm_heap_ref *ref)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 3, 0)
-    ka_base_atomic_and((int)(~DEVMM_HEAP_PAGE_LOCK_FLAG_MASK), (ka_atomic_t *)ref);
-#else
-    atomic_clear_mask(DEVMM_HEAP_PAGE_LOCK_FLAG_MASK, (ka_atomic_t *)ref);
-#endif
+    ka_base_atomic_clear_mask(DEVMM_HEAP_PAGE_LOCK_FLAG_MASK, (unsigned long *)ref);
 }
 
 static inline int devmm_set_page_ref_malloc(struct devmm_heap_ref *ref)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -12,13 +12,13 @@
  */
 
 #ifndef DAVINCI_INTF_UT
-#include <linux/io.h>
-#include <linux/kernel.h>
-#include <linux/slab.h>
-#include <linux/cdev.h>
-#include <linux/list.h>
-#include <linux/atomic.h>
-#include <linux/gfp.h>
+
+#include "ka_common_pub.h"
+#include "ka_task_pub.h"
+#include "ka_system_pub.h"
+#include "ka_list_pub.h"
+#include "ka_memory_pub.h"
+#include "ka_base_pub.h"
 
 #include "securec.h"
 #include "davinci_interface.h"
@@ -27,33 +27,11 @@
 #include "davinci_intf_common.h"
 #include "pbl_mem_alloc_interface.h"
 #include "davinci_intf_process.h"
-#include "ka_task_pub.h"
-#include "ka_system_pub.h"
-#include "ka_list_pub.h"
-#include "ka_memory_pub.h"
-#include "ka_base_pub.h"
-
-/*
- * *proc_start_time <  *start_time: return <0
- * *proc_start_time == *start_time: return 0
- * *proc_start_time >  *start_time: return >0
- */
-static inline int proc_start_time_compare(TASK_TIME_TYPE *proc_start_time, TASK_TIME_TYPE *start_time)
-{
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0)
-    if (*proc_start_time == *start_time)  {
-        return 0;
-    }
-    return (*proc_start_time - *start_time > 0) ? 1 : -1;
-#else
-    return timespec_compare(proc_start_time, start_time);
-#endif
-}
 
 /* create file node info */
 struct davinci_intf_file_stru *create_file_proc_entry(
     struct davinci_intf_process_stru *proc,
-    struct file *file)
+    ka_file_t *file)
 {
     int ret = 0;
     struct davinci_intf_file_stru *file_node = NULL;
@@ -66,7 +44,7 @@ struct davinci_intf_file_stru *create_file_proc_entry(
         return NULL;
     }
     file_node->file_op = file;
-    file_node->owner_pid = current->tgid;
+    file_node->owner_pid = ka_task_get_current_tgid();
     file_node->seq = seq++;
     file_node->open_time = ka_system_jiffies_to_msecs(ka_jiffies);
     ret = strcpy_s(file_node->module_name, DAVINIC_MODULE_NAME_MAX, DAVINIC_UNINIT_FILE);
@@ -82,10 +60,10 @@ struct davinci_intf_file_stru *create_file_proc_entry(
 
 struct davinci_intf_file_stru *get_file_proc_entry(
     struct davinci_intf_process_stru *proc,
-    struct file *file)
+    ka_file_t *file)
 {
     struct davinci_intf_file_stru *file_node = NULL;
-    struct list_head *file_list = NULL;
+    ka_list_head_t *file_list = NULL;
     struct davinci_intf_file_stru *next = NULL;
 
     file_list = &proc->file_list;
@@ -101,7 +79,7 @@ struct davinci_intf_file_stru *get_file_proc_entry(
 unsigned int get_file_module_cnt(struct davinci_intf_process_stru *proc, const char *module_name)
 {
     struct davinci_intf_file_stru *file_node = NULL;
-    struct list_head *file_list = NULL;
+    ka_list_head_t *file_list = NULL;
     struct davinci_intf_file_stru *next = NULL;
     unsigned int cnt = 0;
 
@@ -120,7 +98,7 @@ int check_module_file_close_in_process(
     const char *module_name)
 {
     struct davinci_intf_file_stru *file_node = NULL;
-    struct list_head *file_list = NULL;
+    ka_list_head_t *file_list = NULL;
     struct davinci_intf_file_stru *next = NULL;
 
     file_list = &proc->file_list;
@@ -137,7 +115,7 @@ int check_module_file_close_in_process(
 void destory_file_proc_list(struct davinci_intf_process_stru *proc)
 {
     struct davinci_intf_file_stru *file_node = NULL;
-    struct list_head *file_list = NULL;
+    ka_list_head_t *file_list = NULL;
     struct davinci_intf_file_stru *next = NULL;
     file_list = &proc->file_list;
 
@@ -181,7 +159,7 @@ struct davinci_intf_process_stru *create_process_entry(
     ka_pid_t  proc_pid, TASK_TIME_TYPE start_time)
 {
     struct davinci_intf_process_stru *proc_node = NULL;
-    struct list_head *process_list = NULL;
+    ka_list_head_t *process_list = NULL;
     process_list = &cb->process_list;
 
     proc_node = (struct davinci_intf_process_stru *)dbl_kzalloc(
@@ -207,14 +185,14 @@ struct davinci_intf_process_stru *get_process_entry(
     ka_pid_t proc_pid, TASK_TIME_TYPE start_time)
 {
     struct davinci_intf_process_stru *proc_node = NULL;
-    struct list_head *process_list = NULL;
+    ka_list_head_t *process_list = NULL;
     struct davinci_intf_process_stru *next = NULL;
 
     process_list = &cb->process_list;
 
     ka_list_for_each_entry_safe(proc_node, next, process_list, list)
     {
-        if ((proc_node->owner_pid == proc_pid) && (proc_start_time_compare(&proc_node->start_time, &start_time) == 0)) {
+        if ((proc_node->owner_pid == proc_pid) && (ka_system_xsm_proc_start_time_compare(&proc_node->start_time, &start_time) == 0)) {
             return proc_node;
         }
     }
@@ -226,7 +204,7 @@ struct davinci_intf_process_stru *get_process_entry_latest(
     ka_pid_t proc_pid)
 {
     struct davinci_intf_process_stru *proc_node = NULL;
-    struct list_head *process_list = NULL;
+    ka_list_head_t *process_list = NULL;
     struct davinci_intf_process_stru *next = NULL;
     struct davinci_intf_process_stru *latest_proc = NULL;
     TASK_TIME_TYPE *latest_time = NULL;
@@ -243,7 +221,7 @@ struct davinci_intf_process_stru *get_process_entry_latest(
             latest_proc = proc_node;
             continue;
         }
-        if (proc_start_time_compare(&proc_node->start_time, latest_time) > 0) {
+        if (ka_system_xsm_proc_start_time_compare(&proc_node->start_time, latest_time) > 0) {
             latest_time = &proc_node->start_time;
             latest_proc = proc_node;
         }
@@ -263,7 +241,7 @@ void free_process_entry(struct davinci_intf_process_stru *proc)
 void destroy_process_list(struct davinci_intf_stru *cb)
 {
     struct davinci_intf_process_stru *proc_node = NULL;
-    struct list_head *process_list = NULL;
+    ka_list_head_t *process_list = NULL;
     struct davinci_intf_process_stru *next = NULL;
 
     process_list = &cb->process_list;
@@ -283,7 +261,7 @@ int check_module_file_close(
     const char *module_name)
 {
     struct davinci_intf_process_stru *proc_node = NULL;
-    struct list_head *process_list = NULL;
+    ka_list_head_t *process_list = NULL;
     struct davinci_intf_process_stru *next = NULL;
 
     process_list = &cb->process_list;
@@ -354,13 +332,13 @@ STATIC int create_file_free_list_and_node(struct davinci_intf_process_stru *proc
     return 0;
 }
 
-int add_file_to_list(struct davinci_intf_stru *cb, struct file *file,
+int add_file_to_list(struct davinci_intf_stru *cb, ka_file_t *file,
     struct davinci_intf_private_stru *private_data)
 {
     int ret = 0;
     struct davinci_intf_process_stru *proc = NULL;
     struct davinci_intf_file_stru *file_op = NULL;
-    ka_pid_t proc_pid = current->tgid;
+    ka_pid_t proc_pid = ka_task_get_current_tgid();
     TASK_TIME_TYPE start_time = current->group_leader->start_time;
 
     proc = get_process_entry(cb, proc_pid, start_time);
@@ -402,7 +380,7 @@ int add_file_to_list(struct davinci_intf_stru *cb, struct file *file,
 
 int add_module_to_list(struct davinci_intf_stru *cb,
     struct davinci_intf_private_stru *file_private,
-    struct file *file,
+    ka_file_t *file,
     const char *module_name)
 {
     struct davinci_intf_process_stru *proc = NULL;

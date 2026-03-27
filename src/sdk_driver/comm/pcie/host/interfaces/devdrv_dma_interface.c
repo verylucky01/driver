@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,6 +11,7 @@
  * GNU General Public License for more details.
  */
 
+#include "ka_kernel_def_pub.h"
 #include "comm_kernel_interface.h"
 #include "devdrv_util.h"
 #include "devdrv_atu.h"
@@ -18,7 +19,6 @@
 #include "devdrv_pci.h"
 #include "devdrv_ctrl.h"
 #include "pbl/pbl_uda.h"
-#include "ka_kernel_def_pub.h"
 
 int devdrv_dma_sync_copy_plus_inner(u32 index_id, enum devdrv_dma_data_type type, int instance, u64 src, u64 dst,
     u32 size, enum devdrv_dma_direction direction)
@@ -269,7 +269,7 @@ int devdrv_dma_done_schedule_inner(u32 index_id, enum devdrv_dma_data_type type,
     return 0;
 }
 
-int hal_kernel_devdrv_dma_sync_copy_plus(u32 udevid, enum devdrv_dma_data_type type, int instance, u64 src, u64 dst, u32 size,
+int devdrv_pci_dma_sync_copy_plus(u32 udevid, enum devdrv_dma_data_type type, int instance, u64 src, u64 dst, u32 size,
                               enum devdrv_dma_direction direction)
 {
     u32 index_id;
@@ -277,9 +277,8 @@ int hal_kernel_devdrv_dma_sync_copy_plus(u32 udevid, enum devdrv_dma_data_type t
     (void)uda_udevid_to_add_id(udevid, &index_id);
     return devdrv_dma_sync_copy_plus_inner(index_id, type, instance, src, dst, size, direction);
 }
-KA_EXPORT_SYMBOL(hal_kernel_devdrv_dma_sync_copy_plus);
 
-int hal_kernel_devdrv_dma_sync_copy(u32 udevid, enum devdrv_dma_data_type type, u64 src, u64 dst, u32 size,
+int devdrv_pci_dma_sync_copy(u32 udevid, enum devdrv_dma_data_type type, u64 src, u64 dst, u32 size,
                          enum devdrv_dma_direction direction)
 {
     u32 index_id;
@@ -287,9 +286,8 @@ int hal_kernel_devdrv_dma_sync_copy(u32 udevid, enum devdrv_dma_data_type type, 
     (void)uda_udevid_to_add_id(udevid, &index_id);
     return devdrv_dma_sync_copy_inner(index_id, type, src, dst, size, direction);
 }
-KA_EXPORT_SYMBOL(hal_kernel_devdrv_dma_sync_copy);
 
-int hal_kernel_devdrv_dma_sync_link_copy_plus_extend(u32 udevid, enum devdrv_dma_data_type type, int wait_type, int instance,
+int devdrv_pci_dma_sync_link_copy_plus_extend(u32 udevid, enum devdrv_dma_data_type type, int wait_type, int instance,
     struct devdrv_dma_node *dma_node, u32 node_cnt)
 {
     u32 index_id;
@@ -297,9 +295,8 @@ int hal_kernel_devdrv_dma_sync_link_copy_plus_extend(u32 udevid, enum devdrv_dma
     (void)uda_udevid_to_add_id(udevid, &index_id);
     return devdrv_dma_sync_link_copy_plus_extend_inner(index_id, type, wait_type, instance, dma_node, node_cnt);
 }
-KA_EXPORT_SYMBOL(hal_kernel_devdrv_dma_sync_link_copy_plus_extend);
 
-int hal_kernel_devdrv_dma_sync_link_copy_extend(u32 udevid, enum devdrv_dma_data_type type, int wait_type,
+int devdrv_pci_dma_sync_link_copy_extend(u32 udevid, enum devdrv_dma_data_type type, int wait_type,
     struct devdrv_dma_node *dma_node, u32 node_cnt)
 {
     u32 index_id;
@@ -307,9 +304,8 @@ int hal_kernel_devdrv_dma_sync_link_copy_extend(u32 udevid, enum devdrv_dma_data
     (void)uda_udevid_to_add_id(udevid, &index_id);
     return devdrv_dma_sync_link_copy_extend_inner(index_id, type, wait_type, dma_node, node_cnt);
 }
-KA_EXPORT_SYMBOL(hal_kernel_devdrv_dma_sync_link_copy_extend);
 
-int hal_kernel_devdrv_dma_async_copy_plus(u32 udevid, enum devdrv_dma_data_type type, int instance, u64 src, u64 dst, u32 size,
+int devdrv_pci_dma_async_copy_plus(u32 udevid, enum devdrv_dma_data_type type, int instance, u64 src, u64 dst, u32 size,
                                enum devdrv_dma_direction direction, struct devdrv_asyn_dma_para_info *para_info)
 {
     u32 index_id;
@@ -317,9 +313,8 @@ int hal_kernel_devdrv_dma_async_copy_plus(u32 udevid, enum devdrv_dma_data_type 
     (void)uda_udevid_to_add_id(udevid, &index_id);
     return devdrv_dma_async_copy_plus_inner(index_id, type, instance, src, dst, size, direction, para_info);
 }
-KA_EXPORT_SYMBOL(hal_kernel_devdrv_dma_async_copy_plus);
 
-int hal_kernel_devdrv_dma_async_copy(u32 udevid, enum devdrv_dma_data_type type, u64 src, u64 dst, u32 size,
+int devdrv_pci_dma_async_copy(u32 udevid, enum devdrv_dma_data_type type, u64 src, u64 dst, u32 size,
                           enum devdrv_dma_direction direction, struct devdrv_asyn_dma_para_info *para_info)
 {
     u32 index_id;
@@ -327,9 +322,8 @@ int hal_kernel_devdrv_dma_async_copy(u32 udevid, enum devdrv_dma_data_type type,
     (void)uda_udevid_to_add_id(udevid, &index_id);
     return devdrv_dma_async_copy_inner(index_id, type, src, dst, size, direction, para_info);
 }
-KA_EXPORT_SYMBOL(hal_kernel_devdrv_dma_async_copy);
 
-int hal_kernel_devdrv_dma_sync_link_copy_plus(u32 udevid, enum devdrv_dma_data_type type, int wait_type, int instance,
+int devdrv_pci_dma_sync_link_copy_plus(u32 udevid, enum devdrv_dma_data_type type, int wait_type, int instance,
                                    struct devdrv_dma_node *dma_node, u32 node_cnt)
 {
     u32 index_id;
@@ -337,9 +331,8 @@ int hal_kernel_devdrv_dma_sync_link_copy_plus(u32 udevid, enum devdrv_dma_data_t
     (void)uda_udevid_to_add_id(udevid, &index_id);
     return devdrv_dma_sync_link_copy_plus_inner(index_id, type, wait_type, instance, dma_node, node_cnt);
 }
-KA_EXPORT_SYMBOL(hal_kernel_devdrv_dma_sync_link_copy_plus);
 
-int hal_kernel_devdrv_dma_sync_link_copy(u32 udevid, enum devdrv_dma_data_type type, int wait_type,
+int devdrv_pci_dma_sync_link_copy(u32 udevid, enum devdrv_dma_data_type type, int wait_type,
                               struct devdrv_dma_node *dma_node, u32 node_cnt)
 {
     u32 index_id;
@@ -347,9 +340,8 @@ int hal_kernel_devdrv_dma_sync_link_copy(u32 udevid, enum devdrv_dma_data_type t
     (void)uda_udevid_to_add_id(udevid, &index_id);
     return devdrv_dma_sync_link_copy_inner(index_id, type, wait_type, dma_node, node_cnt);
 }
-KA_EXPORT_SYMBOL(hal_kernel_devdrv_dma_sync_link_copy);
 
-int hal_kernel_devdrv_dma_async_link_copy_plus(u32 udevid, enum devdrv_dma_data_type type, int instance,
+int devdrv_pci_dma_async_link_copy_plus(u32 udevid, enum devdrv_dma_data_type type, int instance,
                                     struct devdrv_dma_node *dma_node, u32 node_cnt,
                                     struct devdrv_asyn_dma_para_info *para_info)
 {
@@ -358,9 +350,8 @@ int hal_kernel_devdrv_dma_async_link_copy_plus(u32 udevid, enum devdrv_dma_data_
     (void)uda_udevid_to_add_id(udevid, &index_id);
     return devdrv_dma_async_link_copy_plus_inner(index_id, type, instance, dma_node, node_cnt, para_info);
 }
-KA_EXPORT_SYMBOL(hal_kernel_devdrv_dma_async_link_copy_plus);
 
-int hal_kernel_devdrv_dma_async_link_copy(u32 udevid, enum devdrv_dma_data_type type, struct devdrv_dma_node *dma_node,
+int devdrv_pci_dma_async_link_copy(u32 udevid, enum devdrv_dma_data_type type, struct devdrv_dma_node *dma_node,
                                u32 node_cnt, struct devdrv_asyn_dma_para_info *para_info)
 {
     u32 index_id;
@@ -368,13 +359,11 @@ int hal_kernel_devdrv_dma_async_link_copy(u32 udevid, enum devdrv_dma_data_type 
     (void)uda_udevid_to_add_id(udevid, &index_id);
     return devdrv_dma_async_link_copy_inner(index_id, type, dma_node, node_cnt, para_info);
 }
-KA_EXPORT_SYMBOL(hal_kernel_devdrv_dma_async_link_copy);
 
-int devdrv_dma_done_schedule(u32 udevid, enum devdrv_dma_data_type type, int instance)
+int devdrv_pci_dma_done_schedule(u32 udevid, enum devdrv_dma_data_type type, int instance)
 {
     u32 index_id;
 
     (void)uda_udevid_to_add_id(udevid, &index_id);
     return devdrv_dma_done_schedule_inner(index_id, type, instance);
 }
-KA_EXPORT_SYMBOL(devdrv_dma_done_schedule);

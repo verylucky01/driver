@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -184,6 +184,9 @@ int trs_host_msg_send(u32 devid, void *msg, size_t size)
     }
     ret = devdrv_sync_msg_send(host_msg->chan, tmp_msg, sizeof(struct trs_msg_data),
         sizeof(struct trs_msg_data), &out_len);
+    if (ret != 0) {
+        trs_err("Send msg failed. (ret=%d; devid=%u)\n", ret, devid);
+    }
     trs_host_msg_put(host_msg);
 
     return (ret == 0) ? (int)tmp_msg->header.result : ret;

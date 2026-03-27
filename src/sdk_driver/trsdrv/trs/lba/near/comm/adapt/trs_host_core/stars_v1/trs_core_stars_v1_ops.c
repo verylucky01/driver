@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -117,23 +117,6 @@ int trs_core_ops_sqcq_reg_unmap(struct trs_id_inst *inst, struct trs_sqcq_reg_ma
     return ret;
 }
 
-static int trs_core_ops_mem_update(struct trs_id_inst *inst, u64 in_addr, u64 *out_addr, int flag)
-{
-    int ret;
-    if (flag == 0) {
-        ret = devdrv_devmem_addr_d2h(inst->devid, in_addr, (phys_addr_t *)out_addr);
-        if (ret != 0) {
-            trs_err("Failed to get bar. (ret=%d; devid=%u)\n", ret, inst->devid);
-        }
-    } else {
-        ret = devdrv_devmem_addr_h2d(inst->devid, in_addr, (phys_addr_t *)out_addr);
-        if (ret != 0) {
-            trs_err("Failed to get pa. (ret=%d; devid=%u)\n", ret, inst->devid);
-        }
-    }
-    return ret;
-}
-
 static bool trs_core_ops_is_drop_cqe(struct trs_id_inst *inst, struct trs_logic_cqe *logic_cqe)
 {
     return (logic_cqe->drop_flag == 1);
@@ -161,11 +144,13 @@ static struct trs_core_adapt_ops trs_core_stars_v1_ops = {
     .free_irq = trs_adapt_ops_free_irq,
     .get_ts_inst_status = trs_core_ops_get_ts_inst_status,
     .get_connect_protocol = trs_host_get_connect_protocol,
+    .get_host_mach_flag = trs_get_host_mach_flag,
     .trace_cqe_fill = trs_stars_trace_cqe_fill,
     .trace_sqe_fill = trs_stars_trace_sqe_fill,
     .ts_rpc_call = trs_core_ops_send_ctrl_msg,
     .ras_report = trs_host_ras_report,
     .mem_update = trs_core_ops_mem_update,
+    .res_num_query = trs_host_res_num_query,
 };
 
 struct trs_core_adapt_ops *trs_core_get_stars_v1_adapt_ops(void)

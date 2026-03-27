@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -128,7 +128,7 @@ int devmm_for_each_ref_server_occupier(struct devmm_ref_server_occupier_mng *mng
     int ret;
 
     ka_task_down_write(&mng->rw_sem);
-    rbtree_postorder_for_each_entry_safe(occupier, tmp, &mng->root, node) {
+    ka_base_rbtree_postorder_for_each_entry_safe(occupier, tmp, &mng->root, node) {
         devmm_try_cond_resched(&stamp);
         ret = func(occupier, priv);
         if (ret != 0) {
@@ -154,7 +154,7 @@ void devmm_ref_server_occupier_mng_uninit(struct devmm_ref_server_occupier_mng *
     u32 stamp = (u32)ka_jiffies;
 
     ka_task_down_write(&mng->rw_sem);
-    rbtree_postorder_for_each_entry_safe(occupier, tmp, &mng->root, node) {
+    ka_base_rbtree_postorder_for_each_entry_safe(occupier, tmp, &mng->root, node) {
         devmm_try_cond_resched(&stamp);
         devmm_ref_server_occupier_destroy(mng, occupier);
     }

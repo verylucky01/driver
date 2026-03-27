@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -73,7 +73,7 @@ static int trs_chan_ops_get_rsv_mem(struct trs_id_inst *inst, const char *name, 
 static int _trs_chan_ops_rsv_mem_init(struct trs_id_inst *inst, int type)
 {
     struct trs_rsv_mem_attr attr;
-    void __iomem *vaddr = NULL;
+    void __ka_mm_iomem *vaddr = NULL;
     phys_addr_t paddr;
     size_t size;
     int ret;

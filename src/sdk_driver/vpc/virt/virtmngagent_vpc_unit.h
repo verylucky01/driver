@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,13 +14,11 @@
 #ifndef VIRTMNGAGENT_VPC_UNIT_H
 #define VIRTMNGAGENT_VPC_UNIT_H
 
+#include "ka_pci_pub.h"
+#include "ka_base_pub.h"
 #include "virtmng_msg_pub.h"
 #include "virtmng_public_def.h"
 #include "vpc_kernel_interface.h"
-#include "ka_pci_pub.h"
-#include "ka_task_pub.h"
-#include "ka_base_pub.h"
-#include "ka_common_pub.h"
 
 struct vmnga_vpc_msxi_ctrl {
     ka_msix_entry_t entries[VIRTMNGAGENT_MSIX_MAX];
@@ -38,10 +36,10 @@ struct vmnga_vpc_start_dev {
 
 struct vmnga_vpc_unit {
     ka_pci_dev_t *pdev;                       /* pci dev */
-    void __iomem *db_base;                      /* doorbell base address VA , bar0 */
-    void __iomem *msg_base;                     /* msg base address VA ; part of bar2 */
-    void __iomem *ts_msg_base;                  /* ts msg base address VA, bar4 */
-    struct vmng_shr_para __iomem *shr_para;     /* share para address VA, use for host and agent; part of bar2 */
+    void __ka_mm_iomem *db_base;                      /* doorbell base address VA , bar0 */
+    void __ka_mm_iomem *msg_base;                     /* msg base address VA ; part of bar2 */
+    void __ka_mm_iomem *ts_msg_base;                  /* ts msg base address VA, bar4 */
+    struct vmng_shr_para __ka_mm_iomem *shr_para;     /* share para address VA, use for host and agent; part of bar2 */
     struct vmnga_vpc_msxi_ctrl msix_ctrl;       /* misx interrupts ctrl struct */
     struct vmnga_vpc_start_dev start_dev;       /* start dev info remote and wait remote reply */
     struct vmng_msg_dev *msg_dev;               /* msg dev total, alloc and store point. */
@@ -49,9 +47,9 @@ struct vmnga_vpc_unit {
     u32 fid;
 };
 
-void vmnga_bar_wr(void __iomem *io_base, u32 offset, u32 val);
-void vmnga_bar_rd(const void __iomem *io_base, u32 offset, u32 *val);
-void vmnga_set_doorbell(void __iomem *io_base, u32 db_id, u32 val);
+void vmnga_bar_wr(void __ka_mm_iomem *io_base, u32 offset, u32 val);
+void vmnga_bar_rd(const void __ka_mm_iomem *io_base, u32 offset, u32 *val);
+void vmnga_set_doorbell(void __ka_mm_iomem *io_base, u32 db_id, u32 val);
 int vmnga_register_vpc_irq_func(void *drvdata, u32 vector_index, ka_irqreturn_t (*callback_func)(int, void *), void *para,
     const char *name);
 int vmnga_unregister_vpc_irq_func(void *drvdata, u32 vector_index, void *para);

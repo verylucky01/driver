@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -49,7 +49,7 @@ static void devmm_proc_fs_rm_task_dir(ka_pid_t pid, ka_proc_dir_entry_t *parent)
 
 static void devmm_task_pg_cnt_stats_show(ka_seq_file_t *seq)
 {
-    struct devmm_svm_process *svm_proc = (struct devmm_svm_process *)seq->private;
+    struct devmm_svm_process *svm_proc = (struct devmm_svm_process *)ka_fs_get_seq_file_private(seq);
     u64 cgroup_used_page_cnt, cgroup_used_hpage_cnt, cgroup_used_gpage_cnt;
     u64 cdm_used_page_cnt, cdm_used_hpage_cnt, cdm_used_gpage_cnt;
     u64 peak_page_cnt, peak_hpage_cnt, peak_gpage_cnt;
@@ -78,7 +78,7 @@ static void devmm_task_pg_cnt_stats_show(ka_seq_file_t *seq)
 
 static void devmm_task_status_stats_show(ka_seq_file_t *seq)
 {
-    struct devmm_svm_process *svm_proc = (struct devmm_svm_process *)seq->private;
+    struct devmm_svm_process *svm_proc = (struct devmm_svm_process *)ka_fs_get_seq_file_private(seq);
     u32 i;
 
     ka_fs_seq_printf(seq, "\ntask status stats:\n");
@@ -103,7 +103,7 @@ static int devmm_task_info_show(ka_seq_file_t *seq, void *offset)
 {
 /* docker path cannot run in emu st */
 #ifndef EMU_ST
-    struct devmm_svm_process *svm_proc = (struct devmm_svm_process *)seq->private;
+    struct devmm_svm_process *svm_proc = (struct devmm_svm_process *)ka_fs_get_seq_file_private(seq);
     /* cat information action just can run in the same docker or host */
     if (devmm_thread_is_run_in_docker() == true) {
         if (ka_task_get_current_mnt_ns() != ka_task_get_mnt_ns(svm_proc->tsk)) {
@@ -122,22 +122,13 @@ STATIC int devmm_task_sum_open(ka_inode_t *inode, ka_file_t *file)
     return ka_fs_single_open(file, devmm_task_info_show, ka_base_pde_data(inode));
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0)
 static const ka_procfs_ops_t devmm_task_sum_ops = {
-    .proc_open    = devmm_task_sum_open,
-    .proc_read    = ka_fs_seq_read,
-    .proc_lseek   = ka_fs_seq_lseek,
-    .proc_release = ka_fs_single_release,
+    ka_fs_init_pf_owner(KA_THIS_MODULE) \
+    ka_fs_init_pf_open(devmm_task_sum_open) \
+    ka_fs_init_pf_read(ka_fs_seq_read) \
+    ka_fs_init_pf_lseek(ka_fs_seq_lseek) \
+    ka_fs_init_pf_release(ka_fs_single_release) \
 };
-#else
-static const ka_file_operations_t devmm_task_sum_ops = {
-    .owner = KA_THIS_MODULE,
-    .open    = devmm_task_sum_open,
-    .read    = ka_fs_seq_read,
-    .llseek  = ka_fs_seq_lseek,
-    .release = ka_fs_single_release,
-};
-#endif
 
 void devmm_proc_fs_add_task(struct devmm_svm_process *svm_proc)
 {
@@ -181,22 +172,13 @@ STATIC int devmm_sum_open(ka_inode_t *inode, ka_file_t *file)
     return ka_fs_single_open(file, devmm_info_show, ka_base_pde_data(inode));
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0)
 static const ka_procfs_ops_t devmm_sum_ops = {
-    .proc_open    = devmm_sum_open,
-    .proc_read    = ka_fs_seq_read,
-    .proc_lseek   = ka_fs_seq_lseek,
-    .proc_release = ka_fs_single_release,
+    ka_fs_init_pf_owner(KA_THIS_MODULE) \
+    ka_fs_init_pf_open(devmm_sum_open) \
+    ka_fs_init_pf_read(ka_fs_seq_read) \
+    ka_fs_init_pf_lseek(ka_fs_seq_lseek) \
+    ka_fs_init_pf_release(ka_fs_single_release) \
 };
-#else
-static const ka_file_operations_t devmm_sum_ops = {
-    .owner = KA_THIS_MODULE,
-    .open    = devmm_sum_open,
-    .read    = ka_fs_seq_read,
-    .llseek  = ka_fs_seq_lseek,
-    .release = ka_fs_single_release,
-};
-#endif
 
 static ka_proc_dir_entry_t *devmm_top_entry = NULL;
 void devmm_proc_fs_init(struct devmm_svm_dev *svm_dev)

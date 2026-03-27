@@ -17,7 +17,7 @@ ${MODULE_NAME}-objs += host/soc_adapt/virtmng_res_mini_v2.o host/soc_adapt/virtm
 
 EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/inc
 EXTRA_CFLAGS += -I${C_SEC_INCLUDE}
-EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/vmng/command
+EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/vmng/command/msg
 EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/vmng/inc
 EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/vpc/common
 EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/vpc/phy
@@ -44,7 +44,7 @@ ifneq ($(filter $(PRODUCT), ascend910B),)
 	EXTRA_CFLAGS += -DCFG_SOC_PLATFORM_CLOUD_V2
 endif
 
-ifneq ($(filter $(PRODUCT), ascend910_95),)
+ifneq ($(filter $(PRODUCT), ascend950),)
 	EXTRA_CFLAGS += -DCFG_SOC_PLATFORM_CLOUD_V4
 endif
 

@@ -151,7 +151,7 @@
 
 **调用示例<a name="zh-cn_topic_0000001533089933_zh-cn_topic_0000001277289337_zh-cn_topic_0000001178213212_zh-cn_topic_0000001167998163_toc533412083"></a>**
 
-```c
+```
 … 
 int card_id;
 unsigned char *work_mode; 
@@ -162,3 +162,4 @@ if (ret != 0){
 } 
 …
 ```
+

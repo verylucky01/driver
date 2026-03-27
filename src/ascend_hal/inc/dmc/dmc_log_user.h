@@ -113,6 +113,42 @@ void (*get_log_Print(void))(int32_t, int32_t, const char *, ...);
               drv_log_get_module_str(module), __func__, ##__VA_ARGS__)
 #endif
 
+int32_t __attribute__((weak)) drv_log_report_err_msg_handle_register(struct err_msg_report_handle *handle, size_t input_size);
+int32_t __attribute__((weak)) drv_log_report_err_msg_handle_unregister(void);
+register_format_err_msg_func get_format_err_msg_register_func(void);
+report_predefined_err_msg_func get_predefined_err_msg_report_func(void);
+report_inner_err_msg_func get_inner_err_msg_report_func(void);
+
+#define REGISTER_FORMAT_ERR_MSG(error_msg, error_msg_len)                            \
+do                                                                                   \
+{                                                                                    \
+    register_format_err_msg_func register_func = get_format_err_msg_register_func(); \
+    if (register_func == NULL) {                                                     \
+        break;                                                                       \
+    }                                                                                \
+    register_func((error_msg), (error_msg_len));                                     \
+} while (0)
+
+#define REPORT_PREDEFINED_ERR_MSG(error_code, key, value, arg_num)                     \
+do                                                                                     \
+{                                                                                      \
+    report_predefined_err_msg_func report_func = get_predefined_err_msg_report_func(); \
+    if (report_func == NULL) {                                                         \
+        break;                                                                         \
+    }                                                                                  \
+    report_func((error_code), (key), (value), (arg_num));                              \
+} while (0)
+
+#define REPORT_INNER_ERR_MSG(error_code, format, ...)                                     \
+do                                                                                        \
+{                                                                                         \
+    report_inner_err_msg_func report_func = get_inner_err_msg_report_func();              \
+    if (report_func == NULL) {                                                            \
+        break;                                                                            \
+    }                                                                                     \
+    report_func(__FILE__, __FUNCTION__, __LINE__, (error_code), (format), ##__VA_ARGS__); \
+} while (0)
+
 #ifdef __cplusplus
 }
 #endif

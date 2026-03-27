@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,7 +13,7 @@
 #ifndef __DMS_SENSOR_NOTIFY_H__
 #define __DMS_SENSOR_NOTIFY_H__
 
-#include <linux/spinlock.h>
+#include "ka_task_pub.h"
 #include "dms_sensor.h"
 
 /* Maximum notify sensor object number */
@@ -30,7 +30,7 @@ struct dms_sensor_notify_queue {
     unsigned int size;
     unsigned int count;
     struct dms_sensor_notify_item sensor_obj_queue[DMS_MAX_NOTIFY_SENSOR_OBJ_NUM];
-    spinlock_t notify_lock;
+    ka_task_spinlock_t notify_lock;
 };
 
 int dms_sensor_event_notify(unsigned int dev_id, struct dms_sensor_object_cfg *psensor_obj_cfg);

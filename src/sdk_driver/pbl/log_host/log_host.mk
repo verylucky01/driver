@@ -21,8 +21,6 @@ else
 	EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/kernel_adapt/include
 endif
 
-ifeq ($(filter $(PRODUCT), ascend910_95),)
-	EXTRA_CFLAGS += -DCFG_FEATURE_KA_ALLOC_INTERFACE
-endif
+EXTRA_CFLAGS += -DCFG_FEATURE_KA_ALLOC_INTERFACE
 
 ccflags-y += -fno-common -fstack-protector-all -funsigned-char -pipe -s -Wall -Wcast-align -Wdate-time -Wfloat-equal -Wformat -Wstack-usage=2048 -Wstrict-prototypes -Wtrampolines -Wundef -Wunused -Wvla

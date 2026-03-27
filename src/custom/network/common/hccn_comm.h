@@ -21,8 +21,8 @@
 #define HCCN_USER_NAME_LEN 32
 #define HCCN_USER_IP_LEN 32
 
-int hccn_check_usr_identify();
-int hccn_get_usr_name();
+int hccn_check_usr_identify(void);
+int hccn_get_usr_name(void);
 int hccn_get_usr_ip(void);
 char *hccn_get_g_usr_name(void);
 char *hccn_get_g_usr_ip(void);

@@ -42,10 +42,6 @@ endif
 ccflags-y += -Wall -Werror -funsigned-char -Wextra -Wformat=2 -Wfloat-equal -Wcast-align -Wvla -Wundef -Wstack-usage=2048 $(WDATE_TIME)
 ccflags-y += -Wno-unused-parameter -Wno-sign-compare -Wno-missing-field-initializers -Wno-missing-prototypes -Wno-missing-declarations
 
-EXTRA_CFLAGS += -DCFG_HOST_ENV
-EXTRA_CFLAGS += -DCFG_FEATURE_MEMALLOC_MODULE_TYPE=5
-EXTRA_CFLAGS += -DCFG_FEATURE_MEMALLOC_SUBMODULE_TYPE=0
-
 ifneq ($(filter $(PRODUCT), ascend910B),)
     EXTRA_CFLAGS += -DCFG_FEATURE_EP_MODE
     EXTRA_CFLAGS += -DCFG_FEATURE_KA_ALLOC_INTERFACE
@@ -55,9 +51,9 @@ ifneq ($(filter $(PRODUCT), ascend910B),)
     EXTRA_CFLAGS += -DCFG_FEATURE_DRV_KERNEL_SOFT_EVENT
 endif
 
-ifneq ($(filter $(PRODUCT), ascend910_95),)
+ifneq ($(filter $(PRODUCT), ascend950),)
     EXTRA_CFLAGS += -DCFG_FEATURE_SRIOV
-    EXTRA_CFLAGS += -DCFG_FEATURE_ASCEND910_95_STUB
+    EXTRA_CFLAGS += -DCFG_FEATURE_ASCEND950_STUB
     EXTRA_CFLAGS += -DCFG_FEATURE_EP_MODE
     EXTRA_CFLAGS += -DCFG_FEATURE_HOST_LOG
     EXTRA_CFLAGS += -DCFG_FEATURE_OS_INIT_EVENT

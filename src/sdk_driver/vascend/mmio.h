@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -52,15 +52,15 @@ int hw_vdavinci_910b_mmio_init(struct hw_vdavinci *vdavinci);
 void hw_vdavinci_910b_mmio_uninit(struct hw_vdavinci *vdavinci);
 int hw_vdavinci_910_93_mmio_init(struct hw_vdavinci *vdavinci);
 void hw_vdavinci_910_93_mmio_uninit(struct hw_vdavinci *vdavinci);
-int hw_vdavinci_910d_mmio_init(struct hw_vdavinci *vdavinci);
-void hw_vdavinci_910d_mmio_uninit(struct hw_vdavinci *vdavinci);
+int hw_vdavinci_950_mmio_init(struct hw_vdavinci *vdavinci);
+void hw_vdavinci_950_mmio_uninit(struct hw_vdavinci *vdavinci);
 
 int hw_vdavinci_910b_vf_mmio_init(struct hw_vdavinci *vdavinci);
 void hw_vdavinci_910b_vf_mmio_uninit(struct hw_vdavinci *vdavinci);
 int hw_vdavinci_910_93_vf_mmio_init(struct hw_vdavinci *vdavinci);
 void hw_vdavinci_910_93_vf_mmio_uninit(struct hw_vdavinci *vdavinci);
-int hw_vdavinci_910d_vf_mmio_init(struct hw_vdavinci *vdavinci);
-void hw_vdavinci_910d_vf_mmio_uninit(struct hw_vdavinci *vdavinci);
+int hw_vdavinci_950_vf_mmio_init(struct hw_vdavinci *vdavinci);
+void hw_vdavinci_950_vf_mmio_uninit(struct hw_vdavinci *vdavinci);
 
 int hw_dvt_set_mmio_device_info(struct hw_dvt *dvt);
 #endif

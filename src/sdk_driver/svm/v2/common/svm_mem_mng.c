@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -12,7 +12,7 @@
  */
 
 #include <linux/types.h>
-#include <linux/hugetlb.h>
+#include "ka_memory_pub.h"
 
 #include "kernel_version_adapt.h"
 #include "devmm_common.h"
@@ -38,13 +38,13 @@ ka_pgprot_t devmm_make_nocache_pgprot(u32 flg)
 
 ka_pgprot_t devmm_make_readonly_pgprot(ka_pgprot_t prot)
 {
-    u32 prot_val = pgprot_val(prot);
+    u32 prot_val = ka_pgprot_val(prot);
 #if defined(CONFIG_X86_64)
-    prot_val &= ~_PAGE_RW;
+    prot_val &= ~_KA_PAGE_RW;
 #elif defined(CONFIG_ARM64)
-    prot_val &= ~PTE_WRITE;
+    prot_val &= ~KA_PTE_WRITE;
 #endif
-    return __pgprot(prot_val);
+    return __ka_pgprot(prot_val);
 }
 
 bool devmm_is_readonly_mem(u32 page_prot)
@@ -156,22 +156,25 @@ int devmm_get_user_pages_remote(ka_task_struct_t *tsk, ka_mm_struct_t *mm,
     return -EFAULT;
 }
 
-u64 devmm_kpg_size(ka_page_t *pg)
+u64 devmm_kernel_pg_size(ka_page_t *pg)
 {
     u64 kpg_size;
 #ifndef EMU_ST
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
-    kpg_size = page_size(pg);
-#else
-    kpg_size = (KA_MM_PAGE_SIZE << ka_mm_compound_order(pg));
-#endif
+    kpg_size = ka_mm_page_size(pg);
 #else
     kpg_size = page_size(pg);
 #endif
     return kpg_size;
 }
 
-bool devmm_is_giant_page(ka_page_t **pages)
+bool devmm_is_giant_page(ka_page_t **pages, u64 pg_num)
 {
-    return (devmm_kpg_size(*pages) == DEVMM_GIANT_PAGE_SIZE);
+    u64 i;
+
+    for (i = 0; i < pg_num; i++) {
+        if (pages[i] != NULL) {
+            return (devmm_kernel_pg_size(pages[i]) == DEVMM_GIANT_PAGE_SIZE); 
+        }
+    }
+    return false;
 }

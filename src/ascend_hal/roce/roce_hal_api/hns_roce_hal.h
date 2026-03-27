@@ -10,6 +10,9 @@
 #ifndef _HNS_ROCE_HAL_H_
 #define _HNS_ROCE_HAL_H_
 
+int hns_roce_hal_alloc_buf(void **buf, unsigned int *length, unsigned int size, unsigned int page_size,
+    unsigned int dev_id);
+int hns_roce_hal_get_dev_id(unsigned int chip_id, unsigned int die_id, unsigned int *dev_id);
 int hns_roce_hal_alloc_ai_buf(void **buf, unsigned int *length, unsigned int size, unsigned int page_size,
     unsigned int dev_id, unsigned int grp_id);
 int hns_roce_hal_free_ai_buf(void *buf);

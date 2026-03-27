@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,10 +11,12 @@
  * GNU General Public License for more details.
  */
 
-
-#include <linux/errno.h>
-#include <linux/slab.h>
-#include <linux/pid.h>
+#include "ka_system_pub.h"
+#include "ka_list_pub.h"
+#include "ka_memory_pub.h"
+#include "ka_task_pub.h"
+#include "ka_base_pub.h"
+#include "ka_kernel_def_pub.h"
 
 #include "pbl/pbl_runenv_config.h"
 #include "pbl/pbl_uda.h"
@@ -27,12 +29,6 @@
 #include "devdrv_user_common.h"
 #include "smf_event_adapt.h"
 #include "dms_event_distribute.h"
-#include "ka_system_pub.h"
-#include "ka_list_pub.h"
-#include "ka_memory_pub.h"
-#include "ka_task_pub.h"
-#include "ka_base_pub.h"
-#include "ka_kernel_def_pub.h"
 
 struct pid_info_t {
     ka_pid_t tgid;
@@ -47,10 +43,10 @@ struct pid_info_t {
 /* ns_id 0-127 for normal container, 128 for host or admin container */
 STATIC DMS_EVENT_STRU_T* g_dms_event_ns_stu[UDA_NS_NUM + 1];
 static DMS_EVENT_DISTRIBUTE_HANDLE_T g_dms_event_handle_list[DMS_EVENT_DISTRIBUTE_FUNC_MAX];
-static struct mutex g_dms_event_handle_mutex;
-static struct mutex g_dms_event_ns_node_mutex;
+static ka_mutex_t g_dms_event_handle_mutex;
+static ka_mutex_t g_dms_event_ns_node_mutex;
 static struct dms_device_event g_remote_fault_event[ASCEND_PDEV_MAX_NUM];
-static struct mutex g_remote_fault_event_mutex;
+static ka_mutex_t g_remote_fault_event_mutex;
 
 STATIC void release_one_event_proc(DMS_EVENT_STRU_T* event_ns_stu, u32 proc_idx);
 
@@ -96,6 +92,7 @@ void dms_release_one_device_remote_event(unsigned int dev_id)
         pos = NULL;
     }
     remote_fault_event->event_num = 0;
+    remote_fault_event->highest_severity = 0;
     ka_task_mutex_unlock(&remote_fault_event->lock);
     remote_fault_event = NULL;
     return;
@@ -138,7 +135,7 @@ void dms_event_distribute_stru_init(void)
 static void dms_event_ns_stu_free(u32 ns_id)
 {
     if (g_dms_event_ns_stu[ns_id] != NULL) {
-        dbl_kfree(g_dms_event_ns_stu[ns_id]);
+        dbl_vfree(g_dms_event_ns_stu[ns_id]);
         g_dms_event_ns_stu[ns_id] = NULL;
     }
 }
@@ -294,8 +291,8 @@ static DMS_EVENT_PROCESS_STRU* alloc_new_event_proc(DMS_EVENT_STRU_T* event_ns_s
 STATIC bool get_pid_start_time(u32 pid, u64* start_time)
 {
 #if !defined(UT_VCAST) && !defined(DMS_UT)
-    struct pid *pid_struct;
-    struct task_struct *task = NULL;
+    ka_struct_pid_t *pid_struct;
+    ka_task_struct_t *task = NULL;
 
     pid_struct = ka_task_find_get_pid(pid);
     if (pid_struct == NULL) {
@@ -332,8 +329,12 @@ STATIC void check_and_release_event_procs(DMS_EVENT_STRU_T* event_ns_stu)
     }
 
     for (i = 0; i < DMS_EVENT_EXCEPTION_PROCESS_MAX; i++) {
-        tgid = event_ns_stu->event_process[i].process_pid;
-        pid = event_ns_stu->event_process[i].process_tid;
+        if ((dbl_host_pid_to_container_pid(event_ns_stu->event_process[i].process_pid, &tgid) != 0) ||
+            (dbl_host_pid_to_container_pid(event_ns_stu->event_process[i].process_tid, &pid) != 0)) {
+            dms_err("Get container pid failed. (pid=%d; tgid=%d)\n",
+                event_ns_stu->event_process[i].process_pid, event_ns_stu->event_process[i].process_tid);
+            return;
+        }
         record_start_time = event_ns_stu->event_process[i].start_time;
         process_status = event_ns_stu->event_process[i].process_status;
 
@@ -404,9 +405,9 @@ static DMS_EVENT_STRU_T* dms_event_ns_stu_create(u32 ns_id)
 {
     int i;
 
-    g_dms_event_ns_stu[ns_id] = dbl_kzalloc(sizeof(DMS_EVENT_STRU_T), KA_GFP_KERNEL | __KA_GFP_ACCOUNT);
+    g_dms_event_ns_stu[ns_id] = dbl_vzalloc(sizeof(DMS_EVENT_STRU_T));
     if ( g_dms_event_ns_stu[ns_id] == NULL) {
-        dms_err("Call ka_mm_kzalloc failed. (ns_id=%u)\n", ns_id);
+        dms_err("Call ka_mm_vzalloc failed. (ns_id=%u)\n", ns_id);
         return NULL;
     }
 
@@ -534,7 +535,7 @@ out:
 STATIC int dms_event_clear_exception_by_devid(DMS_EVENT_PROCESS_STRU *event_proc, u32 devid)
 {
     DMS_EVENT_NODE_STRU exception_node = {{0}, {0}};
-    struct kfifo fifo_buf;
+    ka_kfifo_t fifo_buf;
 
     ka_task_mutex_lock(&event_proc->process_mutex);
     if (event_proc->process_status != DMS_EVENT_PROCESS_STATUS_WORK) {
@@ -585,12 +586,12 @@ static int dms_event_wait_interrupt(int timeout, DMS_EVENT_PROCESS_STRU *event_p
 
     if (timeout == DMS_EVENT_NO_TIMEOUT_FLAG) {
         do {
-            ret = wait_event_interruptible_timeout(event_proc->event_wait,
+            ret = ka_task_wait_event_interruptible_timeout(event_proc->event_wait,
                                                    (event_proc->exception_num > 0),
                                                    ka_system_msecs_to_jiffies(DMS_EVENT_WAIT_TIME));
         } while (ret == 0);
     } else if ((timeout >= 0) && (timeout <= DMS_EVENT_WAIT_TIME_MAX)) {
-        ret = wait_event_interruptible_timeout(event_proc->event_wait,
+        ret = ka_task_wait_event_interruptible_timeout(event_proc->event_wait,
                                                (event_proc->exception_num > 0),
                                                ka_system_msecs_to_jiffies((unsigned int)timeout));
     } else {
@@ -612,11 +613,11 @@ int dms_event_get_exception(struct dms_event_para *fault_event, int timeout, enu
         return DRV_ERROR_PARA_ERROR;
     }
 
-    pid_info.tgid = current->tgid;
-    pid_info.pid = current->pid;
+    pid_info.tgid = ka_task_get_current_tgid();
+    pid_info.pid = ka_task_get_current_pid();
     ret = get_current_ns_event_proc(pid_info, cmd_src, &event_proc);
     if (ret != 0 || event_proc == NULL) {
-        dms_err("Alloc an event_proc failed. (tgid=%d; pid=%d; cmd_src=%d)\n", current->tgid, current->pid, cmd_src);
+        dms_err("Alloc an event_proc failed. (tgid=%d; pid=%d; cmd_src=%d)\n", ka_task_get_current_tgid(), ka_task_get_current_pid(), cmd_src);
         return ret;
     }
 
@@ -717,7 +718,7 @@ void dms_event_release_proc(int tgid, int pid)
             }
             ka_task_mutex_unlock(&g_dms_event_ns_node_mutex);
             dms_debug("Release one process. (ns_id=%d; tgid=%d; pid=%d; index=%u)\n",
-                      ns_id, current->tgid, current->pid, proc_idx);
+                      ns_id, ka_task_get_current_tgid(), ka_task_get_current_pid(), proc_idx);
             return;
         }
     }

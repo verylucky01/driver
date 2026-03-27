@@ -8,11 +8,15 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
+#include <dirent.h>
+#include <sys/stat.h>
 #include "msnpureport_file_mgr.h"
 #include <regex.h>
 #include "mmpa_api.h"
 #include "msnpureport_print.h"
 #include "msnpureport_utils.h"
+#define MAX_SCAN_FILES          14400
+#define TIME_SEC_LEN            15
 
 #define MAX_SLOG_TYPE           (FIRM_LOG_TYPE + 1)
 
@@ -57,12 +61,19 @@ static const char *g_notAgingFile[NOT_AGING_FILE_NUM] = {
 
 static const char *g_logDaemonFileNameRegex[LOG_DAEMON_FILE_TYPE_NUM] = {
     [STACKCORE_UDF] = "^stackcore/dev-os-[0-9]+/udf/stackcore.*",
-    [STACKCORE] = "^stackcore/dev-os-[0-9]+/./(stackcore|coretrace).*",
+    [STACKCORE] = "^stackcore/dev-os-[0-9]+/(./)?(stackcore|coretrace).*",
     [SLOGDLOG] = "^slog/dev-os-[0-9]+/slogd/slogdlog_[0-9]+",
     [DEVICE_APP_RUN_LOG] = "^slog/dev-os-[0-9]+/run/device-app-[0-9]+",
     [DEVICE_APP_DEBUG_LOG] = "^slog/dev-os-[0-9]+/debug/device-app-[0-9]+",
     [FAULT_EVENT] = "^system_info/device-[0-9A-F]+/fault_event_0x[0-9A-F]+_[0-9]+",
     [BBOX_EVENT] = "^hisi_logs/device-[0-9]+/[0-9]+-[0-9]+",
+};
+static const char *g_slogFileNameRegex[MAX_SLOG_TYPE] = {
+    [DEBUG_SYS_LOG_TYPE] = "^slog/dev-os-[0-9]+/debug/device-os/device-os_.*",
+    [SEC_SYS_LOG_TYPE] = "^slog/dev-os-[0-9]+/security/device-os/device-os_.*",
+    [RUN_SYS_LOG_TYPE] = "^slog/dev-os-[0-9]+/run/device-os/device-os_.*",
+    [EVENT_LOG_TYPE] = "^slog/dev-os-[0-9]+/run/event/event_.*",
+    [FIRM_LOG_TYPE] = "^slog/dev-os-[0-9]+/debug/device-[0-9]+/device-[0-9]+.*"
 };
 
 typedef struct {
@@ -76,6 +87,7 @@ typedef struct {
     struct {
         uint32_t maxFileNum;
         uint32_t maxFileSize;
+        regex_t fileRegex;
     } slogFileParam[MAX_SLOG_TYPE];
     struct {
         uint32_t maxFileNum;
@@ -87,6 +99,20 @@ typedef struct {
 } MsnFileMgr;
 
 STATIC MsnFileMgr g_fileMgr;
+typedef struct {
+    char fullPath[MMPA_MAX_PATH];
+    char fileName[MMPA_MAX_PATH];
+    time_t mtime;
+} FileEntry;
+FileEntry entries[MAX_SCAN_FILES];
+static bool g_validFile[MAX_SCAN_FILES] = {false};
+static bool g_deleteFile[MAX_SCAN_FILES] = {false};
+static int FileEntryCmp(const void *a, const void *b)
+{
+    time_t ta = ((const FileEntry *)a)->mtime;
+    time_t tb = ((const FileEntry *)b)->mtime;
+    return (ta < tb) ? -1 : (ta > tb);
+}
 
 /**
  * @brief          : initialize the file manager module, record related data
@@ -132,6 +158,10 @@ int32_t MsnFileMgrInit(const FileAgeingParam *param, const char *rootPath)
 
     for (int32_t i = 0; i < NOT_AGING_FILE_NUM; i++) {
         ret = regcomp(&g_fileMgr.noAgingFileRegex[i], g_notAgingFile[i], REG_EXTENDED);
+        ONE_ACT_ERR_LOG(ret != 0, return EN_ERROR, "Compile regex failed, file type:%d", i);
+    }
+    for (int32_t i = 0; i< (int32_t)MAX_SLOG_TYPE; i++) {
+        ret = regcomp(&g_fileMgr.slogFileParam[i].fileRegex, g_slogFileNameRegex[i], REG_EXTENDED);
         ONE_ACT_ERR_LOG(ret != 0, return EN_ERROR, "Compile regex failed, file type:%d", i);
     }
     return EN_OK;
@@ -215,6 +245,9 @@ void MsnFileMgrExit(void)
 {
     for (int32_t i = 0; i < DEVICE_MAX_DEV_NUM; ++i) {
         MsnFileMgrDeviceExit(i);
+    }
+    for (int32_t i = 0; i < MAX_SLOG_TYPE; i++) {
+        regfree(&g_fileMgr.slogFileParam[i].fileRegex);
     }
     for (int32_t i = 0; i < (int32_t)LOG_DAEMON_FILE_TYPE_NUM; i++) {
         regfree(&g_fileMgr.logDaemonFileParam[i].fileRegex);
@@ -302,6 +335,7 @@ STATIC void MsnFileMgrDeleteLogDaemonFile(const char *fileName, int32_t fileType
     char absolutePath[MMPA_MAX_PATH] = {0};
     int32_t ret = sprintf_s(absolutePath, MMPA_MAX_PATH, "%s/%s", g_fileMgr.rootPath, fileName);
     ONE_ACT_ERR_LOG(ret == -1, return, "Call sprintf_s failed for absolutePath.");
+    SELF_LOG_INFO("Will delete %s.", absolutePath);
     if ((fileType >= STACKCORE_UDF) && (fileType <= SLOGDLOG)) {
         ret = MsnFileMgrRemoveFile(absolutePath);
         ONE_ACT_WARN_LOG(ret != EN_OK, return, "Delete file %s failed,", absolutePath);
@@ -310,7 +344,6 @@ STATIC void MsnFileMgrDeleteLogDaemonFile(const char *fileName, int32_t fileType
         ONE_ACT_WARN_LOG(ret != EN_OK, return, "Delete directory %s failed, strerr: %s.",
                          absolutePath, strerror(ToolGetErrorCode()));
     }
-    SELF_LOG_INFO("Delete %s.", absolutePath);
 }
 
 /**
@@ -430,16 +463,21 @@ STATIC int32_t MsnFileMgrWriteData(const char *writeFile, const LogReportMsg *re
 
     int32_t ret = ToolWrite(fd, reportMsg->buf, reportMsg->bufLen);
     if ((ret < 0) || ((uint32_t)ret != reportMsg->bufLen)) {
+        int savedErrno = ToolGetErrorCode();        // save errno before LOG_CLOSE_FD may change it
         LOG_CLOSE_FD(fd);
+        if (savedErrno == ENOSPC) {                 // disk full: print screen error and abort
+            SELF_LOG_ERROR("Write log file failed due to insufficient disk space, strerr: %s.", strerror(savedErrno));
+            return EN_ERROR;
+        }
         if (timeVal.tv_sec == 0) {                  // print error log at the first time.
             SELF_LOG_ERROR("write log to file failed, data length: %u bytes, strerr: %s.",
-                reportMsg->bufLen, strerror(ToolGetErrorCode()));
+                reportMsg->bufLen, strerror(savedErrno));
             ONE_ACT_ERR_LOG(MsnFileMgrGetTime(&timeVal) != EN_OK, return EN_ERROR, "get current time failed.");
         } else {                                    // print error log every 15 minute
             struct timespec curTimeval = { 0, 0 };
             ONE_ACT_ERR_LOG(MsnFileMgrGetTime(&curTimeval) != EN_OK, return EN_ERROR, "get current time failed.");
             if (curTimeval.tv_sec - timeVal.tv_sec > NO_SPACE_LOG_INTERVAL) {
-                SELF_LOG_ERROR("Write log to file failed, strerr: %s.", strerror(ToolGetErrorCode()));
+                SELF_LOG_ERROR("Write log to file failed, strerr: %s.", strerror(savedErrno));
                 timeVal = curTimeval;
             }
         }
@@ -523,7 +561,7 @@ static int32_t MsnFileMgrGetFileType(char *filename, uint32_t len, int32_t *file
             return EN_OK;
         }
     }
-    SELF_LOG_WARN("Unexpected file name:%s", filename);
+    SELF_LOG_WARN("Unexpected log daemon file name:%s", filename);
     return EN_ERROR;
 }
 
@@ -586,5 +624,222 @@ int32_t MsnFileMgrSaveFile(char *filename, uint32_t len, uint32_t masterId)
     }
     fileList->curFileIndex = index;
 
+    return EN_OK;
+}
+static int32_t RemoveEmptyDirs(const char *rootPath, const char *relativePath) {
+    char absPath[MMPA_MAX_PATH];
+    int32_t ret = sprintf_s(absPath, sizeof(absPath), "%s/%s", rootPath, relativePath);
+    ONE_ACT_ERR_LOG(ret == EN_ERROR, return EN_ERROR, "sprintf abspath failed.");
+    DIR *dir = opendir(absPath);
+    if (!dir)
+        return EN_OK;
+    struct dirent *ent;
+    bool hasFiles = false;
+    while ((ent = readdir(dir)) != NULL) {
+        if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0)
+            continue;
+        char relFile[MMPA_MAX_PATH], fullFile[MMPA_MAX_PATH];
+        ret = sprintf_s(relFile, sizeof(relFile), "%s/%s", relativePath, ent->d_name);//  /rel/name
+        ONE_ACT_WARN_LOG(ret == EN_ERROR, continue, "sprintf relFile failed.");
+        ret = sprintf_s(fullFile, sizeof(fullFile), "%s/%s", rootPath, relFile);// root/rel/name
+        ONE_ACT_WARN_LOG(ret == EN_ERROR, continue, "sprintf fullFile failed.");
+        struct stat st;
+        ret = stat(fullFile, &st);
+        ONE_ACT_WARN_LOG(ret != EN_OK, continue, "get fullFile stat failed.");
+        if (S_ISDIR(st.st_mode)) {
+            RemoveEmptyDirs(rootPath, relFile);
+        }
+        if (!S_ISDIR(st.st_mode) || access(fullFile, F_OK) == 0) {
+            hasFiles = true;
+        }
+    }
+    closedir(dir);
+    if (strcmp(relativePath, "") != 0 && strcmp(relativePath, "/") != 0 && !hasFiles) {
+        char fullPath[MMPA_MAX_PATH];
+        if (sprintf_s(fullPath, sizeof(fullPath), "%s/%s", rootPath, relativePath) != -1) {
+            ret = rmdir(fullPath);
+            ONE_ACT_WARN_LOG(ret != EN_OK, return EN_OK, "rmdir %s failed.", fullPath);
+        }
+    }
+    return EN_OK;
+}
+static void PurgeInvalidDirs(uint32_t cnt)
+{
+    ONE_ACT_WARN_LOG(cnt == 0, return, "no file delete.");
+    uint32_t deleted_count = 0;
+    for (uint32_t i = 0; i < cnt; ++i) {
+        if (g_validFile[i])
+            continue;
+        char absolutePath[MMPA_MAX_PATH] = { 0 };
+        int32_t ret = sprintf_s(absolutePath, MMPA_MAX_PATH, "%s/%s", g_fileMgr.rootPath, entries[i].fullPath);
+        ONE_ACT_WARN_LOG(ret == EN_ERROR, continue, "can not sprintf write file, strerr: %d.", ret);
+        ret = MsnFileMgrRemoveFile(absolutePath);
+        ONE_ACT_WARN_LOG(ret != EN_OK, continue, "can not remove file %s, ret: %d", absolutePath, ret);
+        deleted_count++;
+    }
+    ONE_ACT_INFO_LOG(deleted_count == EN_OK, return, "no file delete");
+    RemoveEmptyDirs(g_fileMgr.rootPath, "");
+}
+static int32_t GetFilenameDeviceId(char *filename) {
+    int dev_os_id = -1;
+    int dev_os_id_len = 7;
+    const char *pos = strstr(filename, "dev-os-");
+    if (pos != NULL) {
+        pos += dev_os_id_len;
+        if (sscanf_s(pos, "%d", &dev_os_id) != 1) {
+            dev_os_id = -1;
+        }
+    }
+    if (dev_os_id != -1 && dev_os_id < DEVICE_MAX_DEV_NUM) {
+        return dev_os_id;
+    }
+    int device_id = -1;
+    int device_id_len = 7;
+    pos = strstr(filename, "device-");
+    if (pos != NULL) {
+        pos += device_id_len;
+        if (sscanf_s(pos, "%d", &device_id) != 1) {
+            device_id = -1;
+        }
+    }
+    if (device_id != -1 && device_id < DEVICE_MAX_DEV_NUM) {
+        return device_id;
+    }
+    return EN_ERROR;
+}
+static int32_t MsnFileMgrGetFileDevice(char *filename, uint32_t len, uint32_t deviceId, regex_t regex)
+{
+    int32_t dev = GetFilenameDeviceId(filename);
+    if (dev != (int32_t)deviceId) {
+        return EN_ERROR;
+    }
+    regmatch_t match[1];
+    int32_t ret = 0;
+    for (int32_t i = 0; i < NOT_AGING_FILE_NUM; i++) {
+        ret = regexec(&g_fileMgr.noAgingFileRegex[i], filename, 0, NULL, 0);
+        if (ret == 0) {
+            return EN_ERROR;        // return error not save file name
+        }
+    }
+    ret = regexec(&regex, filename, 1, match, 0);
+    if (ret == 0) {
+        if ((uint32_t)match[0].rm_eo < len) {
+            filename[match[0].rm_eo] = '\0';    // for bbox, system_info only save dir name
+        }
+        return EN_OK;
+    }
+    return EN_ERROR;
+}
+static void PrimeFileList(uint32_t cnt, MsnFileList *fileList, uint32_t deviceId, int32_t filetype, bool isDaemon)
+{
+    regex_t fileRegex = {0};
+    if (isDaemon) {
+        fileRegex = g_fileMgr.logDaemonFileParam[filetype].fileRegex;
+    } else {
+        fileRegex = g_fileMgr.slogFileParam[filetype].fileRegex;
+    }
+    uint32_t matchSize = 0;
+    for (uint32_t i = 0; i < cnt &&matchSize < cnt; ++i) {
+        if (g_validFile[i] || g_deleteFile[i])continue;
+        int32_t ret = MsnFileMgrGetFileDevice(entries[i].fullPath, MMPA_MAX_PATH, deviceId, fileRegex);
+        if (ret == EN_ERROR) {
+            continue;
+        }
+        if (MsnFileMgrFilterDuplicates(fileList, entries[i].fullPath) == EN_OK) {
+            g_validFile[i] = true;
+            matchSize++;
+            continue;
+        }
+        uint32_t index = (fileList->curFileIndex + 1) % fileList->maxFileNum;
+        if (strlen(fileList->fileName[index]) != 0) {
+            if (isDaemon) {
+                MsnFileMgrDeleteLogDaemonFile(fileList->fileName[index], filetype);
+            } else {
+                char* lastSlash = strrchr(entries[i].fullPath, '/');
+                size_t dir_len = lastSlash - entries[i].fullPath;
+                char path[MMPA_MAX_PATH] = { 0 };
+                ret = memcpy_s(path, MMPA_MAX_PATH, entries[i].fullPath, dir_len);
+                ONE_ACT_WARN_LOG(ret != EN_OK, continue, "memcpy failed, strerr: %s", strerror(ToolGetErrorCode()));
+                char oldFileName[MMPA_MAX_PATH] = { 0 };
+                ret = sprintf_s(oldFileName, MMPA_MAX_PATH, "%s/%s/%s", g_fileMgr.rootPath, path, fileList->fileName[index]);
+                ONE_ACT_WARN_LOG(ret == EN_ERROR, continue, "can not sprintf write file, strerr: %s", strerror(ToolGetErrorCode()));
+                ret = MsnFileMgrRemoveFile(oldFileName);
+                ONE_ACT_WARN_LOG(ret != EN_OK, continue, "can not remove file %s, ret: %d", oldFileName, ret);
+            }
+            g_deleteFile[i] = true;
+            (void)memset_s(fileList->fileName[index], MAX_FILEPATH_LEN, 0, MAX_FILEPATH_LEN);
+        }
+        errno_t err = strcpy_s(fileList->fileName[index], MAX_FILEPATH_LEN, entries[i].fileName);
+        ONE_ACT_WARN_LOG(ret != EN_OK, continue, "Call strcpy_s %s to save filename failed, ret:%d.", entries[i].fileName, err);
+        fileList->curFileIndex = index;
+        g_validFile[i] = true;
+        matchSize++;
+    }
+}
+static int32_t MsnFileMgrScanDirectory(
+    const char *rootPath, const char *relativePath, uint32_t *cnt, uint32_t maxCnt)
+{
+    char absPath[MMPA_MAX_PATH];
+    int32_t ret = sprintf_s(absPath, sizeof(absPath), "%s/%s", rootPath, relativePath);
+    ONE_ACT_ERR_LOG(ret == EN_ERROR, return EN_ERROR, "sprintf abspath failed.");
+    DIR *dir = opendir(absPath);
+    if (!dir)
+        return EN_OK;
+    struct dirent *ent;
+    while ((ent = readdir(dir)) != NULL && *cnt < maxCnt) {
+        if (ent->d_name[0] == '.')
+            continue;
+        char relFile[MMPA_MAX_PATH], fullFile[MMPA_MAX_PATH];
+        ret = sprintf_s(relFile, sizeof(relFile), "%s/%s", relativePath, ent->d_name);//  /rel/name
+        ONE_ACT_WARN_LOG(ret == EN_ERROR, continue, "sprintf relFile failed.");
+        if (relFile[0] == '/') {
+            memmove_s(relFile, strlen(relFile), relFile + 1, strlen(relFile));
+        }
+        ret = sprintf_s(fullFile, sizeof(fullFile), "%s/%s", rootPath, relFile);// root/rel/name
+        ONE_ACT_ERR_LOG(ret == EN_ERROR, continue, "sprintf fullFile failed.");
+        struct stat st;
+        ret = stat(fullFile, &st);
+        ONE_ACT_WARN_LOG(ret != EN_OK, continue, "get fullFile stat failed.");
+        if (S_ISDIR(st.st_mode)) {
+            MsnFileMgrScanDirectory(rootPath, relFile, cnt, maxCnt);
+        } else {
+            int32_t fileType = -1;
+            MsnFileMgrGetFileType(relFile, MMPA_MAX_PATH, &fileType);
+            FileEntry *e = &entries[*cnt];
+            ret = strcpy_s(e->fullPath, sizeof(e->fullPath), relFile);
+            ONE_ACT_WARN_LOG(ret != EN_OK, continue, "sprintf e->fullPath failed.");
+            ret = strcpy_s(e->fileName, sizeof(e->fileName), (fileType != EN_ERROR) ? relFile : ent->d_name);
+            ONE_ACT_WARN_LOG(ret != EN_OK, continue, "sprintf e->fileName failed.");
+            e->mtime = st.st_mtime;
+            (*cnt)++;
+        }
+    }
+    closedir(dir);
+    return EN_OK;
+}
+int32_t MsnFileMgrScanAndAge(const char *rootPath)
+{    
+    int32_t ret = memset_s(g_validFile, sizeof(g_validFile), 0, sizeof(g_validFile));
+    ONE_ACT_INFO_LOG(ret != EN_OK, return EN_ERROR, "memset_s g_validFile failed.");
+    uint32_t cnt = 0;
+    MsnFileMgrScanDirectory(rootPath, "", &cnt, MAX_SCAN_FILES);
+    ONE_ACT_INFO_LOG(cnt == 0, return EN_OK, "Scan no file.");
+    qsort(entries, cnt, sizeof(FileEntry), FileEntryCmp);
+    for (uint32_t dev = 0; dev < DEVICE_MAX_DEV_NUM; ++dev) {
+        ret = MsnFileMgrDeviceInit(dev);
+        ONE_ACT_ERR_LOG(ret != EN_OK, return EN_ERROR, "Init file manage for device %u failed.", dev);
+        for (int32_t t = 0; t < MAX_SLOG_TYPE; ++t) {
+            if (g_fileMgr.slogFileParam[t].maxFileNum == 0) continue;
+            MsnFileList *list = &g_fileMgr.slogFileList[dev][t];
+            PrimeFileList(cnt, list, dev, t, false);
+        }
+        for (int32_t t = 0; t < LOG_DAEMON_FILE_TYPE_NUM; ++t) {
+            if (g_fileMgr.logDaemonFileParam[t].maxFileNum == 0) continue;
+            MsnFileList *list = &g_fileMgr.logDaemonFileList[dev][t];
+            PrimeFileList(cnt, list, dev, t, true);
+        }
+    }
+    SELF_LOG_INFO("Will delete files and empty dir in %s.", rootPath);
+    PurgeInvalidDirs(cnt);
     return EN_OK;
 }

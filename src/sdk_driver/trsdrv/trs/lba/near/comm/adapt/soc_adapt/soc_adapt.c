@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -94,6 +94,8 @@ static size_t(*const soc_get_notify_size[TRS_CHIP_TYPE_MAX])(void) = {
     [TRS_CHIP_TYPE_MINI_V3] = trs_soc_get_mini_v3_notify_size,
     [TRS_CHIP_TYPE_CLOUD_V2] = trs_soc_get_cloud_v2_notify_size,
     [TRS_CHIP_TYPE_MINI_V2] = trs_soc_get_mini_v2_notify_size,
+    [TRS_CHIP_TYPE_CLOUD_V4] = trs_soc_get_cloud_v4_notify_size,
+    [TRS_CHIP_TYPE_CLOUD_V5] = trs_soc_get_cloud_v5_notify_size,
 };
 int trs_soc_get_notify_size(struct trs_id_inst *inst, size_t *notify_size)
 {
@@ -114,6 +116,8 @@ static u32(*const soc_get_notify_offset[TRS_CHIP_TYPE_MAX])(u32 notify_id) = {
     [TRS_CHIP_TYPE_MINI_V3] = trs_soc_get_mini_v3_notify_offset,
     [TRS_CHIP_TYPE_CLOUD_V2] = trs_soc_get_cloud_v2_notify_offset,
     [TRS_CHIP_TYPE_MINI_V2] = trs_soc_get_mini_v2_notify_offset,
+    [TRS_CHIP_TYPE_CLOUD_V4] = trs_soc_get_cloud_v4_notify_offset,
+    [TRS_CHIP_TYPE_CLOUD_V5] = trs_soc_get_cloud_v5_notify_offset,
 };
 
 int trs_soc_get_notify_offset(struct trs_id_inst *inst, u32 notify_id, u32 *offset)
@@ -125,6 +129,45 @@ int trs_soc_get_notify_offset(struct trs_id_inst *inst, u32 notify_id, u32 *offs
 
     if (soc_get_notify_offset[chip_type] != NULL) {
         *offset = soc_get_notify_offset[chip_type](notify_id);
+        return 0;
+    }
+
+    return -EINVAL;
+}
+
+static size_t(*const soc_get_cnt_notify_size[TRS_CHIP_TYPE_MAX])(void) = {
+    [TRS_CHIP_TYPE_CLOUD_V4] = trs_soc_get_cloud_v4_cnt_notify_size,
+    [TRS_CHIP_TYPE_CLOUD_V5] = trs_soc_get_cloud_v5_cnt_notify_size,
+};
+int trs_soc_get_cnt_notify_size(struct trs_id_inst *inst, size_t *cnt_notify_size)
+{
+    int chip_type = trs_soc_get_chip_type(inst->devid);
+    if (chip_type == TRS_CHIP_TYPE_UNKNOWN) {
+        return -ENODEV;
+    }
+
+    if (soc_get_cnt_notify_size[chip_type] != NULL) {
+        *cnt_notify_size = soc_get_cnt_notify_size[chip_type]();
+        return 0;
+    }
+
+    return -EINVAL;
+}
+
+static u32(*const soc_get_cnt_notify_offset[TRS_CHIP_TYPE_MAX])(u32 cnt_notify_id) = {
+    [TRS_CHIP_TYPE_CLOUD_V4] = trs_soc_get_cloud_v4_cnt_notify_offset,
+    [TRS_CHIP_TYPE_CLOUD_V5] = trs_soc_get_cloud_v5_cnt_notify_offset,
+};
+
+int trs_soc_get_cnt_notify_offset(struct trs_id_inst *inst, u32 cnt_notify_id, u32 *offset)
+{
+    int chip_type = trs_soc_get_chip_type(inst->devid);
+    if (chip_type == TRS_CHIP_TYPE_UNKNOWN) {
+        return -ENODEV;
+    }
+
+    if (soc_get_cnt_notify_offset[chip_type] != NULL) {
+        *offset = soc_get_cnt_notify_offset[chip_type](cnt_notify_id);
         return 0;
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,7 +11,6 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/vmalloc.h>
 #include "dvt.h"
 #include "vfio_ops.h"
 #include "mmio.h"
@@ -22,9 +21,9 @@
 #define DVT_MMIO_BAR0_SIZE_910_93 0x40000000
 #define DVT_MMIO_BAR2_SIZE_910_93 0x20000000
 #define DVT_MMIO_BAR4_SIZE_910_93 0x1000000000
-#define DVT_MMIO_BAR0_SIZE_910D 0x40000000
-#define DVT_MMIO_BAR2_SIZE_910D 0x20000000
-#define DVT_MMIO_BAR4_SIZE_910D 0x1000000000
+#define DVT_MMIO_BAR0_SIZE_950 0x40000000
+#define DVT_MMIO_BAR2_SIZE_950 0x20000000
+#define DVT_MMIO_BAR4_SIZE_950 0x1000000000
 
 #define reg_is_mmio(dvt, reg)                                 \
     ((reg) >= 0 && (reg) < (dvt)->device_info.mmio_size)
@@ -45,7 +44,7 @@ static struct hw_dvt_mmio_info mmio_info_table[MMIO_INFO_TYPE_MAX] = {
 STATIC const struct mmio_device_init_info mmio_init_info[] = {
     { PCI_DEVICE_ID_ASCEND910B, PCI_CFG_SPACE_EXP_SIZE, DVT_MMIO_BAR0_SIZE_910B, 0 },
     { PCI_DEVICE_ID_ASCEND910_93, PCI_CFG_SPACE_EXP_SIZE, DVT_MMIO_BAR0_SIZE_910_93, 0 },
-    { PCI_DEVICE_ID_ASCEND910D, PCI_CFG_SPACE_EXP_SIZE, DVT_MMIO_BAR0_SIZE_910D, 0 },
+    { PCI_DEVICE_ID_ASCEND950, PCI_CFG_SPACE_EXP_SIZE, DVT_MMIO_BAR0_SIZE_950, 0 },
     { PCI_ANY_ID, PCI_CFG_SPACE_EXP_SIZE, DVT_MMIO_BAR0_SIZE, 0 },
     {}
 };
@@ -536,7 +535,7 @@ void hw_vdavinci_910_93_vf_mmio_uninit(struct hw_vdavinci *vdavinci)
     vascend_info(vdavinci_to_dev(vdavinci), "vf mmio uninit success\n");
 }
 
-void hw_vdavinci_910d_vf_mmio_uninit(struct hw_vdavinci *vdavinci)
+void hw_vdavinci_950_vf_mmio_uninit(struct hw_vdavinci *vdavinci)
 {
     hw_vdavinci_sparse_mmio_uninit(&vdavinci->mmio.bar0_sparse);
     hw_vdavinci_sparse_mmio_uninit(&vdavinci->mmio.bar2_sparse);
@@ -779,7 +778,7 @@ int hw_vdavinci_910_93_vf_mmio_init(struct hw_vdavinci *vdavinci)
     return 0;
 }
 
-int hw_vdavinci_910d_vf_mmio_init(struct hw_vdavinci *vdavinci)
+int hw_vdavinci_950_vf_mmio_init(struct hw_vdavinci *vdavinci)
 {
     struct pci_dev *pdev = container_of(vdavinci_resource_dev(vdavinci), struct pci_dev, dev);
     phys_addr_t bar0_base, bar2_base, bar4_base;
@@ -824,12 +823,12 @@ void hw_vdavinci_910_93_mmio_uninit(struct hw_vdavinci *vdavinci)
 {
 }
 
-int hw_vdavinci_910d_mmio_init(struct hw_vdavinci *vdavinci)
+int hw_vdavinci_950_mmio_init(struct hw_vdavinci *vdavinci)
 {
     return 0;
 }
 
-void hw_vdavinci_910d_mmio_uninit(struct hw_vdavinci *vdavinci)
+void hw_vdavinci_950_mmio_uninit(struct hw_vdavinci *vdavinci)
 {
 }
 

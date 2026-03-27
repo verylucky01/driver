@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,11 +10,12 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-#include <asm/io.h>
-#include <linux/uaccess.h>
-#include <linux/timekeeping.h>
 
 #include "securec.h"
+#include "ka_type.h"
+#include "ka_memory_pub.h"
+#include "ka_system_pub.h"
+#include "ka_base_pub.h"
 #include "devdrv_user_common.h"
 #include "dms_define.h"
 #include "ascend_kernel_hal.h"
@@ -26,18 +27,16 @@
 #include "dms/dms_cmd_def.h"
 #include "devdrv_common.h"
 #ifndef CFG_HOST_ENV
+#include "devdrv_cache_flush.h"
 #include "ascend_platform.h"
 #include "hsm_norflash.h"
 #endif
-#include "ka_system_pub.h"
-#include "ka_memory_pub.h"
-#include "ka_base_pub.h"
 #include "dms_hccs_credit.h"
 
 #ifdef CFG_HOST_ENV
 #define CREDIT_NUM_NO_UPDATE_WARN_THD 24
 #define CREDIT_NUM_NO_UPDATE_WARN_THD_93 48
-static hccs_credit_update_info g_hccs_credit_update_info[DEVDRV_PF_DEV_MAX_NUM];
+static hccs_credit_update_info g_hccs_credit_update_info[ASCEND_PDEV_MAX_NUM];
 
 STATIC int get_hccs_credit_update_expire_times(u32 devid, int *expire_times)
 {
@@ -103,7 +102,7 @@ STATIC int dms_read_hccs_credit_num_from_shm(u32 dev_id, hccs_credit_num *credit
     int ret = 0;
     u64 shm_addr;
     size_t shm_size;
-    void __iomem *credit_info_addr = NULL;
+    void __ka_mm_iomem *credit_info_addr = NULL;
 
     ret = devdrv_get_addr_info(dev_id, DEVDRV_ADDR_DEVMNG_INFO_MEM_BASE, 0, &shm_addr, &shm_size);
     if (ret != 0) {
@@ -145,7 +144,7 @@ STATIC int dms_get_hccs_credit_num(struct dms_get_device_info_in *in, unsigned i
         return -EOPNOTSUPP;
     }
 
-    if (dev_id >= DEVDRV_PF_DEV_MAX_NUM || in->buff_size < sizeof(hccs_credit_info_t)) {
+    if (dev_id >= ASCEND_PDEV_MAX_NUM || in->buff_size < sizeof(hccs_credit_info_t)) {
         dms_err("Invalid parameter. (dev_id=%u; buff_size=%u; min_size=%zu)\n",
             dev_id, in->buff_size, sizeof(hccs_credit_info_t));
         return -EINVAL;
@@ -307,7 +306,7 @@ STATIC int write_credit_num_to_shm(u32 dev_id, hccs_credit_num *info)
 {
     int ret = 0;
     unsigned long long base_addr = 0;
-    void __iomem *credit_num_addr = NULL;
+    void __ka_mm_iomem *credit_num_addr = NULL;
     if (info == NULL || dev_id >= ASCEND_DIE_NUM_MAX) {
         dms_err("Invalid input. (dev_id=%u; info=%s)\n", dev_id, info == NULL ? "null" : "not null");
         return -EINVAL;
@@ -331,6 +330,7 @@ STATIC int write_credit_num_to_shm(u32 dev_id, hccs_credit_num *info)
         ret = -ENOMEM;
     }
 
+    devdrv_flush_cache((u64)credit_num_addr, sizeof(hccs_credit_num));
     ka_mm_iounmap(credit_num_addr);
     credit_num_addr = NULL;
     return ret;
@@ -340,7 +340,7 @@ STATIC int write_credit_num_to_shm(u32 dev_id, hccs_credit_num *info)
 #define CREDIT_NUM_QUERY_TIMER_EXPIRE_NS (CREDIT_NUM_QUERY_TIMER_EXPIRE_MS * 1000 * 1000)
 #define DEFUALT_CREDIT_NUM_L 0xFEFFEFFE
 #define DEFUALT_CREDIT_NUM_H 0x0000FFEF
-#define TASK_REGISTE_FALIED UINT_MAX
+#define TASK_REGISTE_FALIED KA_UINT_MAX
 STATIC bool is_need_update_credit_num(void)
 {
     static u64 last_update_time = 0;

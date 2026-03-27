@@ -40,6 +40,11 @@
 #include "devdrv_pcie.h"
 #include "ascend_dev_num.h"
 
+#define DRV_P2P_TYPE_ALL    0
+#define DRV_P2P_TYPE_MEM    1
+#define DRV_P2P_TYPE_NOTIFY 2
+#define DRV_P2P_TYPE_MAX    3
+
 #define I2C_24CXX_ADDR 0x20
 #define WRITE_VALUE 0xCF
 #define CMD_READ_PORT0 0x00
@@ -779,20 +784,50 @@ drvError_t drvGetP2PStatus(uint32_t dev, uint32_t peer_dev, uint32_t *status)
 drvError_t halDeviceEnableP2P(uint32_t dev, uint32_t peer_dev, uint32_t flag)
 {
     (void)(flag);
-    return DmsEnableP2P(dev, peer_dev);
+    return DmsEnableP2P(dev, peer_dev, DRV_P2P_TYPE_MEM);
 }
 
 drvError_t halDeviceDisableP2P(uint32_t dev, uint32_t peer_dev, uint32_t flag)
 {
     (void)(flag);
-    return DmsDisableP2P(dev, peer_dev);
+    return DmsDisableP2P(dev, peer_dev, DRV_P2P_TYPE_MEM);
 }
+
+#ifdef CFG_FEATURE_P2P_NOTIFY
+drvError_t halDeviceEnableP2PNotify(uint32_t phy_dev, uint32_t peer_phy_dev, uint32_t flag)
+{
+    drvError_t ret;
+    uint32_t logical_id;
+
+    (void)(flag);
+    ret = drvDeviceGetIndexByPhyId(phy_dev, &logical_id);
+    if (ret != 0) {
+        DEVDRV_DRV_WARN("invalid phy_dev %u.\n", phy_dev);
+        return DRV_ERROR_INVALID_DEVICE;
+    }
+    return DmsEnableP2P(logical_id, peer_phy_dev, DRV_P2P_TYPE_NOTIFY);
+}
+
+drvError_t halDeviceDisableP2PNotify(uint32_t phy_dev, uint32_t peer_phy_dev, uint32_t flag)
+{
+    drvError_t ret;
+    uint32_t logical_id;
+
+    (void)(flag);
+    ret = drvDeviceGetIndexByPhyId(phy_dev, &logical_id);
+    if (ret != 0) {
+        DEVDRV_DRV_WARN("invalid phy_dev %u.\n", phy_dev);
+        return DRV_ERROR_INVALID_DEVICE;
+    }
+    return DmsDisableP2P(logical_id, peer_phy_dev, DRV_P2P_TYPE_NOTIFY);
+}
+#endif //CFG_FEATURE_P2P_NOTIFY
 
 drvError_t halDeviceCanAccessPeer(int *canAccessPeer, uint32_t dev, uint32_t peer_dev)
 {
     return DmsCanAccessPeer(dev, peer_dev, canAccessPeer);
 }
-#endif
+#endif //PCIE_HOST
 
 int drvGetDeviceDevIDByHostDevID(uint32_t host_dev_id, uint32_t *local_dev_id)
 {
@@ -801,7 +836,7 @@ int drvGetDeviceDevIDByHostDevID(uint32_t host_dev_id, uint32_t *local_dev_id)
     int fd = -1;
     mmIoctlBuf buf = {0};
 
-    if (host_dev_id >= ASCEND_DEV_MAX_NUM) {
+    if (host_dev_id >= ASCEND_HOST_PDEV_MAX_NUM) {
         DEVDRV_DRV_ERR("invalid host device id %u.\n", host_dev_id);
         return DRV_ERROR_INVALID_DEVICE;
     }

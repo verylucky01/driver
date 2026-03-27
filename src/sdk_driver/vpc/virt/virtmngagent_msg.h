@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,8 +14,8 @@
 #ifndef VIRTMNGAGENT_MSG_H
 #define VIRTMNGAGENT_MSG_H
 
-#include "virtmng_msg_pub.h"
 #include "ka_base_pub.h"
+#include "virtmng_msg_pub.h"
 
 struct vmng_msg_dev *vmnga_get_msg_dev_by_id(u32 dev_id);
 int vmnga_rx_irq_init(struct vmng_msg_chan_rx *msg_chan);

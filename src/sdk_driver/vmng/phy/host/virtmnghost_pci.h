@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,19 +14,15 @@
 #ifndef __VIRTMNGHOST_PCI_H__
 #define __VIRTMNGHOST_PCI_H__
 
+#include "ka_system_pub.h"
+#include "ka_memory_pub.h"
+#include "ka_barrier_pub.h"
+#include "ka_kernel_def_pub.h"
+#include "ka_pci_pub.h"
 #include "vmng_kernel_interface.h"
 #include "ascend_dev_num.h"
 #include "virtmng_public_def.h"
-
-#include "ka_system_pub.h"
-#include "ka_task_pub.h"
-#include "ka_base_pub.h"
-#include "ka_common_pub.h"
-#include "ka_memory_pub.h"
-#include "ka_barrier_pub.h"
-#include "ka_system_pub.h"
-#include "ka_kernel_def_pub.h"
-#include "ka_pci_pub.h"
+#include "vmng_cmd_msg.h"
 
 #ifndef TRUE
 #define TRUE 1

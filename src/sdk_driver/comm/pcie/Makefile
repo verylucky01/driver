@@ -39,7 +39,7 @@ EXTRA_CFLAGS += -I$(DRIVER_HAL_INC_DIR)
 EXTRA_CFLAGS += -I${C_SEC_INCLUDE}/
 EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/inc/
 EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/kernel_adapt/include/
-EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/comm/pcie/command/
+EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/comm/pcie/command/msg/
 EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/comm/pcie/dc/host/
 EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/comm/pcie/dc/host/cloud_v1/
 EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/comm/pcie/dc/host/cloud_v2/
@@ -51,7 +51,7 @@ EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/comm/pcie/host/
 EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/comm/pcie/host/soc_adapt/
 EXTRA_CFLAGS += -I$(DRIVER_KERNEL_DIR)/kernel_adapt/include/
 EXTRA_CFLAGS += -isystem $(shell $(CC) -print-file-name=include)
-ifneq ($(filter $(PRODUCT), ascend910_95),)
+ifneq ($(filter $(PRODUCT), ascend950),)
 	EXTRA_CFLAGS += -Iinclude/linux
 endif
 
@@ -65,7 +65,7 @@ ifneq ($(filter $(PRODUCT), ascend910B),)
 	EXTRA_CFLAGS += -DCFG_FEATURE_KA_ALLOC_INTERFACE
 endif
 
-ifneq ($(filter $(PRODUCT), ascend910_95),)
+ifneq ($(filter $(PRODUCT), ascend950),)
 	EXTRA_CFLAGS += -DCFG_FEATURE_PCIE_PROTO_DIP
 	EXTRA_CFLAGS += -DCFG_FEATURE_LOAD_TEE_IMAGE
 	ifeq ($(ENABLE_EQUIP), true)

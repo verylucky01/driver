@@ -19,7 +19,7 @@ from typing import Callable, Dict, Iterator, List, Optional, TypeVar, Set
 
 TOP_DIR = str(Path(__file__).resolve().parents[5])
 TOP_SOURCE_DIR = TOP_DIR + '/scripts/'
-DELIVERY_PATH = "build/_CPack_Packages/makeself_staging"
+DELIVERY_PATH = "build"
 CONFIG_SCRIPT_PATH = 'package'
 BLOCK_CONFIG_PATH = 'package/module'
 
@@ -140,28 +140,6 @@ def path_join(base: Optional, *others: str) -> Optional:
 def yield_if(data, predicate: Callable) -> Iterator:
     if predicate(data):
         yield data
-
-
-def config_feature_to_set(feature_str: str, feature_type: str = 'feature') -> Set[str]:
-    if feature_str is None:
-        return set()
-
-    if isinstance(feature_str, set):
-        return feature_str
-
-    if feature_str == '':
-        raise PackageConfigError(f"Not allow to config {feature_type} empty.")
-
-    features = set(feature_str.split(';'))
-    if 'all' in features:
-        raise PackageConfigError(f"Not allow to config {feature_type} all.")
-    return features
-
-
-def config_feature_to_string(features: Set[str]) -> str:
-    if not features:
-        return 'all'
-    return ';'.join(sorted(features))
 
 
 def each_file_line(filepath: str) -> Iterator[str]:

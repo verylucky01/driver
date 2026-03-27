@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,20 +10,20 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-#include "nvme_adapt.h"
 #include "ka_memory_pub.h"
+#include "nvme_adapt.h"
 
-static void devdrv_nvme_reg_wr(void __iomem *io_base, u32 offset, u32 val)
+static void devdrv_nvme_reg_wr(void __ka_mm_iomem *io_base, u32 offset, u32 val)
 {
     ka_mm_writel(val, io_base + offset);
 }
 
-void devdrv_set_sq_doorbell(void __iomem *io_base, u32 val)
+void devdrv_set_sq_doorbell(void __ka_mm_iomem *io_base, u32 val)
 {
     devdrv_nvme_reg_wr(io_base, 0, val);
 }
 
-void devdrv_set_cq_doorbell(void __iomem *io_base, u32 val)
+void devdrv_set_cq_doorbell(void __ka_mm_iomem *io_base, u32 val)
 {
     devdrv_nvme_reg_wr(io_base, DEVDRV_MSG_CHAN_DB_OFFSET, val);
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,8 +13,6 @@
 
 #ifndef HCCS_CREDIT_H
 #define HCCS_CREDIT_H
-
-#include <linux/time.h>
 
 #define MACRO_PORT_NUM 8
 typedef struct hccs_credit_num {

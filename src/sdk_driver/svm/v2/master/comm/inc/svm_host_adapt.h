@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -15,8 +15,6 @@
 
 #ifndef SVM_HOST_ADAPT_H
 #define SVM_HOST_ADAPT_H
-
-#include <linux/hugetlb.h>
 
 #include <securec.h>
 
@@ -71,7 +69,7 @@ static inline u32 devmm_get_alloc_mask(bool is_compound_page)
 static inline int devmm_get_nids(u32 devid, u32 vfid, u32 mem_type, int nids[], u32 *nid_num)
 {
     *nid_num = 1;
-    nids[0] = KA_NUMA_NO_NODE;
+    nids[0] = ka_mm_numa_mem_id();
     return 0;
 }
 

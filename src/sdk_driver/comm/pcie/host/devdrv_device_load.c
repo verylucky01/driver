@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -22,17 +22,17 @@
 #undef CONFIG_DEBUG_BUGVERBOSE
 #endif
 
+#include "ka_errno_pub.h"
+#include "ka_fs_pub.h"
+#include "ka_barrier_pub.h"
+#include "ka_driver_pub.h"
+#include "ka_common_pub.h"
 #include "devdrv_device_load.h"
 #include "devdrv_ctrl.h"
 #include "devdrv_pci.h"
 #include "devdrv_dma.h"
 #include "devdrv_util.h"
 #include "devdrv_mem_alloc.h"
-#include "ka_errno_pub.h"
-#include "ka_fs_pub.h"
-#include "ka_barrier_pub.h"
-#include "ka_driver_pub.h"
-#include "ka_common_pub.h"
 
 #ifdef DRV_UT
 #define STATIC
@@ -57,7 +57,7 @@ static inline void ka_mm_writeq(u64 value, volatile void *addr)
 #endif
 
 #ifndef ka_mm_readq
-static inline u64 ka_mm_readq(void __iomem *addr)
+static inline u64 ka_mm_readq(void __ka_mm_iomem *addr)
 {
     return ka_mm_readl(addr) + ((u64)ka_mm_readl(addr + 4) << 32);
 }
@@ -213,7 +213,7 @@ direct_out:
 
 STATIC loff_t devdrv_get_i_size_read(ka_file_t *p_file)
 {
-    return i_size_read(ka_fs_file_inode(p_file));
+    return ka_fs_i_size_read(ka_fs_file_inode(p_file));
 }
 
 /*
@@ -221,8 +221,8 @@ STATIC loff_t devdrv_get_i_size_read(ka_file_t *p_file)
  */
 STATIC void devdrv_load_notice(struct devdrv_agent_load *loader, struct devdrv_load_blocks *blocks, u64 flag)
 {
-    void __iomem *sram_complet_addr = NULL;
-    void __iomem *sram_reg = NULL;
+    void __ka_mm_iomem *sram_complet_addr = NULL;
+    void __ka_mm_iomem *sram_reg = NULL;
     u64 value = 0;
     u64 j;
 
@@ -713,7 +713,7 @@ void devdrv_notify_blackbox_err(u32 devid, u32 code)
 {
     ka_timespec_t stamp;
 
-    stamp = current_kernel_time();
+    stamp = ka_system_current_kernel_time();
 
     if (g_black_box.callback != NULL) {
         devdrv_info("Get blaclbox code. (dev_id=%u; blaclbox_code=%u)\n", devid, code);
@@ -724,7 +724,6 @@ void devdrv_notify_blackbox_err(u32 devid, u32 code)
 STATIC void devdrv_timer_task(ka_timer_list_t *t)
 {
     struct devdrv_agent_load *loader = ka_system_from_timer(loader, t, load_timer);
-    struct devdrv_pci_ctrl *pci_ctrl = ka_container_of(&loader, struct devdrv_pci_ctrl, agent_loader);
 
     u32 device_id = loader->dev_id;
 
@@ -740,11 +739,6 @@ STATIC void devdrv_timer_task(ka_timer_list_t *t)
         ka_system_add_timer(&loader->load_timer);
     } else {
         devdrv_err("Device os load failed. (loader_devid=%u; dev_id=%u)\n", loader->dev_id, device_id);
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
-        devdrv_set_startup_status(pci_ctrl, DEVDRV_STARTUP_STATUS_TIMEOUT);
-#endif
-        (void)pci_ctrl;
         /* reset device */
         devdrv_notify_blackbox_err(device_id, DEVDRV_SYSTEM_START_FAIL);
     }

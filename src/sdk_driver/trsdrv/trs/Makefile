@@ -17,7 +17,7 @@ endif
 obj-m += $(MODULE_NAME).o
 $(MODULE_NAME)-objs := trs_init.o
 
-ifneq ($(filter $(PRODUCT), ascend910_95),)
+ifneq ($(filter $(PRODUCT), ascend950),)
     EXTRA_CFLAGS += -DCFG_FEATURE_SUPPORT_APM
     EXTRA_CFLAGS += -DCFG_FEATURE_NOTSUPPORT_BOARD_CONFIG
 endif

@@ -21,7 +21,6 @@
 
 #define QUEUE_MODULE "QUEUE"
 #define QUE_INTER_DEV_INVALID_VALUE   (-1)
-#define QUEUE_INTER_DEV_STATE_IMPORTED  2
 
 #define CAS(ptr, old, new) __sync_bool_compare_and_swap(ptr, old, new)
 
@@ -100,13 +99,16 @@ drvError_t queue_init_local(unsigned int dev_id);
 drvError_t queue_sub_event_local(struct QueueSubPara *sub_para);
 drvError_t queue_unsub_event_local(struct QueueUnsubPara *unsub_para);
 drvError_t queue_attach_local(unsigned int dev_id, unsigned int qid, int time_out);
-drvError_t queue_en_queue_local(unsigned int dev_id, unsigned int qid, void *mbuf);
+drvError_t queue_enqueue_local(unsigned int dev_id, unsigned int qid, void *mbuf);
+drvError_t queue_dequeue_local(unsigned int dev_id, unsigned int qid, void **mbuf);
 void send_f_to_nf_event(unsigned int dev_id, struct queue_manages *que_manage);
 drvError_t queue_reset_local(unsigned int dev_id, unsigned int qid);
 drvError_t queue_query_info_local(unsigned int dev_id, unsigned int qid, QueueInfo *que_info);
 drvError_t queue_get_status_local(unsigned int dev_id, unsigned int qid, QUEUE_QUERY_ITEM query_item,
     unsigned int len, void *data);
 drvError_t queue_set_local(unsigned int dev_id, QueueSetCmdType cmd, QueueSetInputPara *input);
+drvError_t queue_peek_data_local(unsigned int dev_id, unsigned int qid, unsigned int flag, QueuePeekDataType type, void **mbuf);
 drvError_t queue_query_alive(unsigned int devid, unsigned int qid);
 drvError_t queue_get_qid_create_time(unsigned int dev_id, unsigned int qid, unsigned long *create_time);
+bool queue_is_inter_dev(unsigned int dev_id, unsigned int qid);
 #endif

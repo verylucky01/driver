@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -20,7 +20,7 @@
 #include "pbl/pbl_soc_res.h"
 #include "trs_chan_irq.h"
 
-static RADIX_TREE(irq_tree, KA_GFP_KERNEL);
+static KA_BASE_RADIX_TREE(irq_tree, KA_GFP_KERNEL);
 KA_TASK_DEFINE_MUTEX(irq_mutex);
 
 struct trs_chan_irq_node {
@@ -161,7 +161,7 @@ static struct trs_chan_irq *trs_create_chan_irq(struct trs_id_inst *inst, u32 ir
             return NULL;
         }
 #ifdef CFG_FEATURE_IRQ_BIND
-        (void)ka_base_irq_set_affinity_hint(irq, get_cpu_mask(0));
+        (void)ka_base_irq_set_affinity_hint(irq, ka_system_get_cpu_mask(0));
 #endif
         trs_debug("Request irq success. (irq=%u)\n", irq);
     }
