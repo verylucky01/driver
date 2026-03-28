@@ -1,6 +1,8 @@
 # driver
 ## 🔥Latest News
-- [2025/12] driver项目首次上线。
+- **[2026/03] 增加昇腾A5芯片（PCIE形态）支持**；
+
+- [2025/12] driver项目首次上线；
 ## 🚀概述
 Driver仓的代码是CANN（Compute Architecture for Neural Networks）的驱动模块，提供基础驱动和资源管理及调度等功能，使能昇腾芯片。当前开源仓内主要包含了如图所示三部分内容：DCMI层（DaVinci Card Management Interface，达芬奇卡管理接口层）、HAL层（Hardware Abstraction Layer，硬件抽象层）和SDK-driver层（Driver Software Development Kit，驱动软件开发套件层）。
 
@@ -18,6 +20,9 @@ Driver在CANN软件栈的位置参考[昇腾社区](https://www.hiascend.com/can
 若您希望快速体验driver的调用和开发过程，请访问如下文档获取简易教程。
 - [QUICKSTART](./docs/zh/QUICKSTART.md)：端到端快速上手指南，包括搭建环境、编译部署、源码开发、调试、贡献等过程。
 - [参考用例](./examples/README.md)：介绍设备管理等模块基础用例。
+
+## 🔍FAQ
+- [FAQ](./docs/zh/FAQ.md)：汇总了源码编译、安装部署等问题(持续)。
 
 ## 📝目录结构
 关键目录结构如下：
@@ -102,8 +107,6 @@ Driver在CANN软件栈的位置参考[昇腾社区](https://www.hiascend.com/can
 └── test                                           # UT用例文件目录
 ```
 
-## 🔍FAQ
-- [FAQ](./docs/zh/FAQ.md)：汇总了源码编译、安装部署等问题。
 
 ## 相关信息
 - [贡献指南](./CONTRIBUTING.md)
