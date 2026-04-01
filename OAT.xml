@@ -13,7 +13,7 @@
         <licensefile></licensefile>
         <policylist>
             <policy name="projectPolicy" desc="">
-                <policyitem type="license" name="CANN License" path=".*" desc="License for CANN Open Software"/>
+                <policyitem type="license" name="CANN-2.0" path=".*" desc="License for CANN Open Software"/>
                 <policyitem type="license" name="GPL-2.0-only" path=".*" desc="License for CANN Open Software"/>
                 <policyitem type="license" name="GPLStyleLicense" path=".*" desc="License for CANN Open Software"/>
                 <policyitem type="license" name="SPDX:GPL-2.0 WITH Linux-syscall-note" path=".*" desc="License for CANN Open Software"/>
