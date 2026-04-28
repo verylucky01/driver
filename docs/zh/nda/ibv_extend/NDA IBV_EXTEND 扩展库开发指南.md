@@ -152,6 +152,18 @@ ibv\_extend组件提供了以下核心功能：
         <td><p>使用自定义 rdma-core 源码。</p><code>bash ./build.sh -s=/path/to/rdma-core</code></td>
     </tr>
     <tr>
+        <td><p>-x=PATH</p></td>
+        <td><p>--libboundscheck-build-dir=PATH</p></td>
+        <td><p>指定预编译的 libboundscheck 构建目录。与 <strong>-e</strong> 参数互斥，不能同时使用。</p></td>
+        <td><p>使用预编译的 libboundscheck 构建库。</p><code>bash ./build.sh -x=/path/to/libboundscheck</code></td>
+    </tr>
+    <tr>
+        <td><p>-e=PATH</p>    </td>
+        <td><p>--libboundscheck-source-dir=PATH</p>    </td>
+        <td><p>指定 libboundscheck 源码目录。与 <strong>-x</strong> 参数互斥，不能同时使用。</p></td>
+        <td><p>使用自定义 libboundscheck 源码。</p><code>bash ./build.sh -e=/path/to/libboundscheck</code></td>
+    </tr>
+    <tr>
         <td><p>-h</p></td>
         <td><p>--help</p></td>
         <td><p>显示帮助信息。</p></td>
@@ -180,6 +192,29 @@ ibv\_extend组件提供了以下核心功能：
     > - /path/to/为变量，请替换为实际路径。
     > - 用户也可自行拷贝output/lib下的动态库或output/include下的头文件到其他自定义路径或系统路径，用于后续使用。
 
+6. 编译安全函数库。
+
+    进入[libboundscheck发布页](https://gitcode.com/cann-src-third-party/libboundscheck/releases)获取最新源码压缩包，例如下载[libboundscheck-v1.1.16.tar.gz](https://gitcode.com/cann-src-third-party/libboundscheck/releases/download/v1.1.16/libboundscheck-v1.1.16.tar.gz)。
+
+    编译libc_sec.so动态库。
+
+    ```bash
+    # 解压到当前目录
+    tar zxvf libboundscheck-v1.1.16.tar.gz
+    # 进入当前目录
+    cd libboundscheck-v1.1.16
+    # 编译
+    make -j
+    # 编译成功后会在lib目录下生成动态链接库，需要重命名为libc_sec.so。
+    cp lib/libboundscheck.so lib/libc_sec.so
+    ```
+
+    使用时需要依赖libc_sec.so动态库。
+
+    ```bash
+    export LD_LIBRARY_PATH=/path/to/libboundscheck-v1.1.16/lib:$LD_LIBRARY_PATH
+    ```
+
 ## 方式二：通过HDK包安装
 
 1. 安装支持NDA特性的HDK软件包。
@@ -200,12 +235,16 @@ ibv\_extend组件提供了以下核心功能：
     - 如果未安装cann-toolkit等开发工具包，可执行如下命令加载环境变量。
 
         ```bash
-        export LD_LIBRARY_PATH=/usr/local/Ascend/driver/lib64/driver/:$LD_LIBRARY_PATH
+        export LD_LIBRARY_PATH=/usr/local/Ascend/driver/lib64/driver:/usr/local/Ascend/driver/lib64/common:$LD_LIBRARY_PATH
         ```
 
 # 使用
 
-ibv\_extend组件允许上层通信库通过**配置环境变量**或**配置文件**两种方式动态加载扩展驱动。运行前需要确保已正确安装libibverbs.so、libibv\_extend.so，具体操作请参考下表。
+ibv\_extend组件允许上层通信库通过**配置环境变量**或**配置文件**两种方式动态加载扩展驱动。
+
+运行前可通过配置环境变量`export IBV_EXTEND_SHOW_WARNINGS=1`，让ibv\_extend组件打印Warning级别日志到控制台，Warning级别日志默认不打印。
+
+运行前需要确保已正确安装libibverbs.so、libibv\_extend.so，具体操作请参考下表。
 
 **表 1**  运行前检查
 
@@ -974,7 +1013,7 @@ SRQ创建成功后返回给应用的扩展信息，该内存为驱动分配的ho
 
 **问题描述**
 
-上层通信组件调用ibv\_open\_extend接口返回空指针，报错如下：
+上层通信组件调用ibv\_open\_extend接口返回空指针，在配置**IBV_EXTEND_SHOW_WARNINGS**环境变量后，报错如下：
 
 ```text
 ibv_extend: Warning: no available ops for open extend context

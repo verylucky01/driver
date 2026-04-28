@@ -12,7 +12,7 @@
 # Description   : Build configuration for ibv_extend library
 
 cmake_minimum_required(VERSION 3.13)
-project(ibv_extend VERSION 3.1.0 LANGUAGES C)
+project(ibv_extend VERSION 3.2.0 LANGUAGES C)
 
 # 设置构建目录路径
 set(BUILD_INCLUDE ${PROJECT_BINARY_DIR}/include)
@@ -136,8 +136,6 @@ else()
             message(FATAL_ERROR "Failed to extract rdma-core archive")
         endif()
 
-        # 移动解压后的内容到目标目录（跳过顶层目录 rdma-core-58.1/）
-        # rdma-core 压缩包内部结构: rdma-core-58.1/CMakeLists.txt, rdma-core-58.1/...
         file(REMOVE_RECURSE ${LIBIBVERBS_SOURCE_DIR})
         file(RENAME "${EXTRACT_DIR}/rdma-core-${RDMA_CORE_VERSION}" ${LIBIBVERBS_SOURCE_DIR})
         file(REMOVE_RECURSE ${EXTRACT_DIR})
@@ -159,6 +157,7 @@ else()
         if(YUM)
             # openEuler/CentOS/RHEL 使用 yum
             message(STATUS "Detected yum package manager (openEuler/CentOS/RHEL)")
+            message(STATUS "Installing gcc gcc-c++ make cmake libnl3-devel libudev-devel pkgconfig python3-devel")
             execute_process(
                 COMMAND sudo yum install -y gcc gcc-c++ make cmake libnl3-devel libudev-devel pkgconfig python3-devel
                 WORKING_DIRECTORY ${LIBIBVERBS_SOURCE_DIR}
@@ -170,6 +169,7 @@ else()
         elseif(APT_GET)
             # Ubuntu/Debian 使用 apt-get
             message(STATUS "Detected apt-get package manager (Ubuntu/Debian)")
+            message(STATUS "Installing gcc g++ make cmake libnl-3-dev libudev-dev pkg-config python3-dev")
             execute_process(
                 COMMAND sudo apt-get install -y gcc g++ make cmake libnl-3-dev libudev-dev pkg-config python3-dev
                 WORKING_DIRECTORY ${LIBIBVERBS_SOURCE_DIR}
@@ -214,11 +214,146 @@ message(STATUS "  Source:  ${LIBIBVERBS_SOURCE_DIR}")
 message(STATUS "  Include: ${IBVERBS_INCLUDE_DIRS}")
 message(STATUS "  Library: ${IBVERBS_LIBRARY_DIRS}")
 
+# 查找或构建libboundscheck安全函数库依赖
+if(DEFINED LIBBOUNDSCHECK_BUILD_DIR)
+    # 使用预编译的libboundscheck
+    set(BOUNDSCHECK_INCLUDE_DIRS ${LIBBOUNDSCHECK_BUILD_DIR}/include)
+    set(BOUNDSCHECK_LIBRARY_DIRS ${LIBBOUNDSCHECK_BUILD_DIR}/lib)
+    set(BOUNDSCHECK_LIBRARIES c_sec)
+    message(STATUS "Using pre-built libboundscheck:")
+    message(STATUS "  Include: ${BOUNDSCHECK_INCLUDE_DIRS}")
+    message(STATUS "  Library: ${BOUNDSCHECK_LIBRARY_DIRS}")
+else()
+    if(NOT DEFINED LIBBOUNDSCHECK_SOURCE_DIR)
+        # 确保3rd目录存在
+        if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/3rd")
+            file(MAKE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/3rd")
+        endif()
+        set(LIBBOUNDSCHECK_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/3rd/libboundscheck)
+    endif()
+
+    # 设置libboundscheck路径
+    set(BOUNDSCHECK_BUILD_DIR "${LIBBOUNDSCHECK_SOURCE_DIR}")
+
+    # 检查是否需要下载libboundscheck源码
+    if(NOT EXISTS "${LIBBOUNDSCHECK_SOURCE_DIR}/Makefile")
+        set(BOUNDSCHECK_VERSION "1.1.16")
+        set(BOUNDSCHECK_URL "https://gitcode.com/cann-src-third-party/libboundscheck/releases/download/v${BOUNDSCHECK_VERSION}/libboundscheck-v${BOUNDSCHECK_VERSION}.tar.gz")
+        set(BOUNDSCHECK_ARCHIVE "${CMAKE_BINARY_DIR}/libboundscheck-v${BOUNDSCHECK_VERSION}.tar.gz")
+
+        message(STATUS "==================================================")
+        message(STATUS "Downloading libboundscheck ${BOUNDSCHECK_VERSION}")
+        message(STATUS "URL: ${BOUNDSCHECK_URL}")
+        message(STATUS "This may take several minutes depending on network...")
+        message(STATUS "==================================================")
+
+        # 使用 file(DOWNLOAD) 以支持超时和进度显示
+        file(DOWNLOAD
+            ${BOUNDSCHECK_URL}
+            ${BOUNDSCHECK_ARCHIVE}
+            TIMEOUT 600            # 10分钟超时
+            INACTIVITY_TIMEOUT 60 # 60秒无数据传输则超时
+            SHOW_PROGRESS          # 显示下载进度
+            STATUS DOWNLOAD_STATUS
+        )
+
+        # 检查下载结果
+        list(GET DOWNLOAD_STATUS 0 DOWNLOAD_CODE)
+        list(GET DOWNLOAD_STATUS 1 DOWNLOAD_MESSAGE)
+        if(NOT DOWNLOAD_CODE EQUAL 0)
+            message(FATAL_ERROR "Failed to download libboundscheck: ${DOWNLOAD_MESSAGE}\n"
+                "Please check your network connection or download manually:\n"
+                "  wget ${BOUNDSCHECK_URL}\n"
+                "  Extract to: ${LIBBOUNDSCHECK_SOURCE_DIR}")
+        endif()
+
+        message(STATUS "Download completed, extracting...")
+
+        # 解压文件到临时目录
+        set(EXTRACT_DIR "${CMAKE_BINARY_DIR}/libboundscheck-extract")
+        file(MAKE_DIRECTORY ${EXTRACT_DIR})
+        execute_process(
+            COMMAND ${CMAKE_COMMAND} -E tar xzf ${BOUNDSCHECK_ARCHIVE}
+            WORKING_DIRECTORY ${EXTRACT_DIR}
+            RESULT_VARIABLE EXTRACT_RESULT
+        )
+
+        if(NOT EXTRACT_RESULT EQUAL 0)
+            message(FATAL_ERROR "Failed to extract libboundscheck archive")
+        endif()
+
+        file(REMOVE_RECURSE ${LIBBOUNDSCHECK_SOURCE_DIR})
+        file(RENAME "${EXTRACT_DIR}/libboundscheck-v${BOUNDSCHECK_VERSION}" ${LIBBOUNDSCHECK_SOURCE_DIR})
+        file(REMOVE_RECURSE ${EXTRACT_DIR})
+
+        # 清理压缩包
+        file(REMOVE ${BOUNDSCHECK_ARCHIVE})
+
+        message(STATUS "libboundscheck source ready at: ${LIBBOUNDSCHECK_SOURCE_DIR}")
+    endif()
+
+    # 检查是否需要编译libboundscheck
+    if(NOT EXISTS "${BOUNDSCHECK_BUILD_DIR}/lib/libc_sec.so")
+        message(STATUS "Building libboundscheck ${BOUNDSCHECK_VERSION}...")
+
+        # 直接使用make编译
+        execute_process(
+            COMMAND make -j
+            WORKING_DIRECTORY ${LIBBOUNDSCHECK_SOURCE_DIR}
+            RESULT_VARIABLE BUILD_RESULT
+        )
+
+        if(NOT BUILD_RESULT EQUAL 0)
+            message(WARNING "Failed to build libboundscheck, please build manually")
+        else()
+            message(STATUS "libboundscheck compiled successfully")
+            
+            # 重命名libboundscheck.so为libc_sec.so
+            if(EXISTS "${BOUNDSCHECK_BUILD_DIR}/lib/libboundscheck.so")
+                execute_process(
+                    COMMAND ${CMAKE_COMMAND} -E copy
+                    "${BOUNDSCHECK_BUILD_DIR}/lib/libboundscheck.so"
+                    "${BOUNDSCHECK_BUILD_DIR}/lib/libc_sec.so"
+                    RESULT_VARIABLE RENAME_RESULT
+                )
+                if(NOT RENAME_RESULT EQUAL 0)
+                    message(WARNING "Failed to rename libboundscheck.so to libc_sec.so")
+                else()
+                    message(STATUS "Renamed libboundscheck.so to libc_sec.so")
+                endif()
+            endif()
+        endif()
+    endif()
+
+    # 编译完成
+    if(EXISTS "${BOUNDSCHECK_BUILD_DIR}/lib/libc_sec.so")
+        message(STATUS "libboundscheck built successfully")
+        # 设置libboundscheck路径
+        set(BOUNDSCHECK_INCLUDE_DIRS "${BOUNDSCHECK_BUILD_DIR}/include")
+        set(BOUNDSCHECK_LIBRARY_DIRS "${BOUNDSCHECK_BUILD_DIR}/lib")
+        set(BOUNDSCHECK_LIBRARIES c_sec)
+    else()
+        message(FATAL_ERROR "Failed to build libboundscheck")
+    endif()
+
+    if(NOT "${BOUNDSCHECK_LIBRARIES}" STREQUAL "")
+        message(STATUS "Using libboundscheck from source build:")
+        message(STATUS "  Source:  ${LIBBOUNDSCHECK_SOURCE_DIR}")
+        message(STATUS "  Include: ${BOUNDSCHECK_INCLUDE_DIRS}")
+        message(STATUS "  Library: ${BOUNDSCHECK_LIBRARY_DIRS}")
+    endif()
+endif()
+
 # 添加库搜索路径（必须在add_library之前），兼容旧版CMake
 if(EXISTS "${IBVERBS_LIBRARY_DIRS}")
     link_directories(${IBVERBS_LIBRARY_DIRS})
 else()
     message(FATAL_ERROR "IBVERBS_LIBRARY_DIRS does not exist: ${IBVERBS_LIBRARY_DIRS}")
+endif()
+
+# 添加libboundscheck库搜索路径
+if(NOT "${BOUNDSCHECK_LIBRARIES}" STREQUAL "" AND EXISTS "${BOUNDSCHECK_LIBRARY_DIRS}")
+    link_directories(${BOUNDSCHECK_LIBRARY_DIRS})
 endif()
 
 # 创建共享库
@@ -247,7 +382,18 @@ else()
     message(FATAL_ERROR "IBVERBS_INCLUDE_DIRS does not exist: ${IBVERBS_INCLUDE_DIRS}")
 endif()
 
-target_link_libraries(ibv_extend PRIVATE ${IBVERBS_LIBRARIES})
+# 添加libboundscheck包含目录
+if(NOT "${BOUNDSCHECK_LIBRARIES}" STREQUAL "" AND EXISTS "${BOUNDSCHECK_INCLUDE_DIRS}")
+    target_include_directories(ibv_extend SYSTEM PRIVATE ${BOUNDSCHECK_INCLUDE_DIRS})
+endif()
+
+# 链接库
+if(NOT "${BOUNDSCHECK_LIBRARIES}" STREQUAL "")
+    target_link_libraries(ibv_extend PRIVATE ${IBVERBS_LIBRARIES} ${BOUNDSCHECK_LIBRARIES})
+else()
+    target_link_libraries(ibv_extend PRIVATE ${IBVERBS_LIBRARIES})
+endif()
+
 if(DEFINED IBVERBS_LDFLAGS AND NOT "${IBVERBS_LDFLAGS}" STREQUAL "")
     target_link_options(ibv_extend PRIVATE ${IBVERBS_LDFLAGS})
 endif()

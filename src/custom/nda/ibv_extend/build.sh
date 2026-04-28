@@ -23,6 +23,8 @@ COVERAGE_DIR="${SCRIPT_DIR}/coverage_report"
 # 可配置变量
 LIBIBVERBS_BUILD_DIR=""
 LIBIBVERBS_SOURCE_DIR=""
+LIBBOUNDSCHECK_BUILD_DIR=""
+LIBBOUNDSCHECK_SOURCE_DIR=""
 BUILD_TYPE="Release"
 ENABLE_COVERAGE=false
 RUN_UT=false
@@ -53,25 +55,29 @@ show_help() {
     echo "Usage: $0 [OPTIONS]"
     echo ""
     echo "Options:"
-    echo "  -b, --libibverbs-build-dir=PATH   Specify libibverbs build directory (pre-built)"
-    echo "  -s, --libibverbs-source-dir=PATH  Specify libibverbs source directory"
-    echo "  -t, --type=TYPE                   Build type: release or debug (default: release)"
-    echo "  -c, --coverage                    Run unit tests after build and enable code coverage"
-    echo "  -u, --run-ut                      Run unit tests after build"
-    echo "  -h, --help                        Show this help message"
+    echo "  -b, --libibverbs-build-dir=PATH        Specify libibverbs build directory (pre-built)"
+    echo "  -s, --libibverbs-source-dir=PATH       Specify libibverbs source directory"
+    echo "  -x, --libboundscheck-build-dir=PATH    Specify libboundscheck build directory (pre-built)"
+    echo "  -e, --libboundscheck-source-dir=PATH   Specify libboundscheck source directory"
+    echo "  -t, --type=TYPE                        Build type: release or debug (default: release)"
+    echo "  -c, --coverage                         Run unit tests after build and enable code coverage"
+    echo "  -u, --run-ut                           Run unit tests after build"
+    echo "  -h, --help                             Show this help message"
     echo ""
     echo "Notes:"
     echo "  -b and -s are mutually exclusive"
     echo "  If neither -b nor -s is specified, rdma-core will be auto-downloaded"
+    echo "  If -e is specified, libboundscheck will be auto-downloaded"
     echo "  --coverage-report will automatically enable coverage and run tests"
     echo ""
     echo "Examples:"
-    echo "  $0                                # Build with auto-download (release mode)"
-    echo "  $0 -t=debug                       # Build in debug mode"
-    echo "  $0 -t=debug -c                    # Build with coverage support"
-    echo "  $0 -t=debug -u                    # Build and run unit tests without coverage support"
-    echo "  $0 -b=/path/to/rdma-core/build    # Use custom built libibverbs"
-    echo "  $0 -s=/path/to/rdma-core          # Use custom rdma-core source"
+    echo "  $0                                     # Build with auto-download (release mode)"
+    echo "  $0 -t=debug                            # Build in debug mode"
+    echo "  $0 -t=debug -c                         # Build with coverage support"
+    echo "  $0 -t=debug -u                         # Build and run unit tests without coverage support"
+    echo "  $0 -b=/path/to/rdma-core/build         # Use custom built libibverbs"
+    echo "  $0 -s=/path/to/rdma-core               # Use custom rdma-core source"
+    echo "  $0 -e=/path/to/libboundscheck          # Use custom libboundscheck source"
     exit 0
 }
 
@@ -125,6 +131,54 @@ parse_args() {
                     shift 2
                 else
                     error "Option --libibverbs-source-dir requires an argument"
+                fi
+                ;;
+            -x=*)
+                LIBBOUNDSCHECK_BUILD_DIR="${1#*=}"
+                shift
+                ;;
+            -x)
+                if [ -n "$2" ] && [[ "$2" != -* ]]; then
+                    LIBBOUNDSCHECK_BUILD_DIR="$2"
+                    shift 2
+                else
+                    error "Option -x requires an argument"
+                fi
+                ;;
+            --libboundscheck-build-dir=*)
+                LIBBOUNDSCHECK_BUILD_DIR="${1#*=}"
+                shift
+                ;;
+            --libboundscheck-build-dir)
+                if [ -n "$2" ] && [[ "$2" != -* ]]; then
+                    LIBBOUNDSCHECK_BUILD_DIR="$2"
+                    shift 2
+                else
+                    error "Option --libboundscheck-build-dir requires an argument"
+                fi
+                ;;
+            -e=*)
+                LIBBOUNDSCHECK_SOURCE_DIR="${1#*=}"
+                shift
+                ;;
+            -e)
+                if [ -n "$2" ] && [[ "$2" != -* ]]; then
+                    LIBBOUNDSCHECK_SOURCE_DIR="$2"
+                    shift 2
+                else
+                    error "Option -e requires an argument"
+                fi
+                ;;
+            --libboundscheck-source-dir=*)
+                LIBBOUNDSCHECK_SOURCE_DIR="${1#*=}"
+                shift
+                ;;
+            --libboundscheck-source-dir)
+                if [ -n "$2" ] && [[ "$2" != -* ]]; then
+                    LIBBOUNDSCHECK_SOURCE_DIR="$2"
+                    shift 2
+                else
+                    error "Option --libboundscheck-source-dir requires an argument"
                 fi
                 ;;
             -t=*)
@@ -184,6 +238,10 @@ parse_args() {
     # 验证 -b 和 -s 互斥
     if [ -n "${LIBIBVERBS_BUILD_DIR}" ] && [ -n "${LIBIBVERBS_SOURCE_DIR}" ]; then
         error "Options -b and -s are mutually exclusive.\nUse -b for pre-built libibverbs or -s for source directory."
+    fi
+    # 验证 -x 和 -e 互斥
+    if [ -n "${LIBBOUNDSCHECK_BUILD_DIR}" ] && [ -n "${LIBBOUNDSCHECK_SOURCE_DIR}" ]; then
+        error "Options -x and -e are mutually exclusive.\nUse -x for pre-built libboundscheck or -e for source directory."
     fi
 }
 
@@ -259,6 +317,26 @@ configure() {
             info "Using libibverbs source from: ${LIBIBVERBS_SOURCE_DIR}"
         else
             error "libibverbs source directory not found: ${LIBIBVERBS_SOURCE_DIR}"
+        fi
+    fi
+
+    # 如果指定了libboundscheck构建目录,添加到CMake参数
+    if [ -n "${LIBBOUNDSCHECK_BUILD_DIR}" ]; then
+        if [ -d "${LIBBOUNDSCHECK_BUILD_DIR}" ]; then
+            cmake_args+=("-DLIBBOUNDSCHECK_BUILD_DIR=${LIBBOUNDSCHECK_BUILD_DIR}")
+            info "Using libboundscheck from: ${LIBBOUNDSCHECK_BUILD_DIR}"
+        else
+            error "libboundscheck build directory not found: ${LIBBOUNDSCHECK_BUILD_DIR}"
+        fi
+    fi
+
+    # 如果指定了libboundscheck源码目录,添加到CMake参数
+    if [ -n "${LIBBOUNDSCHECK_SOURCE_DIR}" ]; then
+        if [ -d "${LIBBOUNDSCHECK_SOURCE_DIR}" ]; then
+            cmake_args+=("-DLIBBOUNDSCHECK_SOURCE_DIR=${LIBBOUNDSCHECK_SOURCE_DIR}")
+            info "Using libboundscheck source from: ${LIBBOUNDSCHECK_SOURCE_DIR}"
+        else
+            error "libboundscheck source directory not found: ${LIBBOUNDSCHECK_SOURCE_DIR}"
         fi
     fi
 

@@ -19,11 +19,13 @@
 #include <string.h>
 #include <errno.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <dlfcn.h>
 #include <dirent.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <securec.h>
 #include "config.h"
 
 #include "ibv_extend.h"
@@ -31,6 +33,11 @@
 #define OUTPFX "ibv_extend: "
 
 const size_t driver_name_max_len = 128;
+const size_t trunc_first = 1;
+const size_t trunc_second = 2;
+const size_t trunc_last = 3;
+const size_t trunc_reserve_len = 4;
+const size_t warning_msg_buf_len = 512;
 
 #define API_EXPORT __attribute__((visibility("default")))
 
@@ -51,6 +58,59 @@ static LIST_HEAD(extend_driver_list);
 static LIST_HEAD(extend_driver_name_list);
 
 /**
+ * @brief Warning日志封装函数
+ * @param format 格式化字符串
+ * @param ... 可变参数
+ *
+ * 通过检查环境变量IBV_EXTEND_SHOW_WARNINGS来决定是否输出Warning日志
+ */
+static void ibv_extend_warning(const char *format, ...)
+{
+    static volatile int show_warning = -1;
+    char msg_buf[warning_msg_buf_len];  // 适中的缓冲区大小
+    va_list args;
+    int len;
+
+    // 参数校验
+    if (format == NULL) {
+        (void)fprintf(stderr, OUTPFX "Warning: (null format)\n");
+        return;
+    }
+
+    // 环境变量检查
+    if (show_warning == -1) {
+        int env_result = (getenv("IBV_EXTEND_SHOW_WARNINGS") != NULL) ? 1 : 0;
+        show_warning = env_result;
+    }
+
+    // 如果环境变量存在,则输出Warning日志
+    if (show_warning) {
+        // 先格式化用户消息
+        va_start(args, format);
+        len = vsnprintf_s(msg_buf, sizeof(msg_buf), sizeof(msg_buf) - 1, format, args);
+        va_end(args);
+
+        // 处理格式化错误
+        if (len < 0) {
+            (void)fprintf(stderr, OUTPFX "Warning: (format error)\n");
+            return;
+        }
+
+        // 如果消息被截断,添加省略号指示
+        if ((size_t)len >= sizeof(msg_buf) - 1) {
+            // 保留最后3个字符用于省略号
+            size_t truncate_pos = sizeof(msg_buf) - trunc_reserve_len;
+            msg_buf[truncate_pos] = '.';
+            msg_buf[truncate_pos + trunc_first] = '.';
+            msg_buf[truncate_pos + trunc_second] = '.';
+            msg_buf[truncate_pos + trunc_last] = '\0';
+        }
+
+        (void)fprintf(stderr, OUTPFX "Warning: %s\n", msg_buf);
+    }
+}
+
+/**
  * @brief 注册扩展驱动
  * @param ops 驱动操作结构体指针
  */
@@ -61,6 +121,12 @@ API_EXPORT void verbs_register_driver_extend(const struct verbs_device_extend_op
     if (!ops) {
         (void)fprintf(stderr,
             OUTPFX "Error: couldn't register driver for NULL ops\n");
+        return;
+    }
+
+    if (!ops->name) {
+        (void)fprintf(stderr,
+            OUTPFX "Error: couldn't register driver for NULL name\n");
         return;
     }
 
@@ -118,7 +184,7 @@ static int handle_driver_config(const char *driver_name)
     // 分配驱动名称结构体内存
     ext_driver_name = malloc(sizeof(struct ibv_extend_driver_name));
     if (!ext_driver_name) {
-        (void)fprintf(stderr, OUTPFX "Warning: couldn't allocate extend driver name '%s'.\n",
+        (void)fprintf(stderr, OUTPFX "Error: couldn't allocate extend driver name '%s'.\n",
             driver_name);
         return -1;
     }
@@ -126,7 +192,7 @@ static int handle_driver_config(const char *driver_name)
     // 复制驱动名称字符串
     ext_driver_name->ext_name = strdup(driver_name);
     if (!ext_driver_name->ext_name) {
-        (void)fprintf(stderr, OUTPFX "Warning: couldn't allocate extend driver name '%s'.\n",
+        (void)fprintf(stderr, OUTPFX "Error: couldn't allocate extend driver name '%s'.\n",
             driver_name);
         free(ext_driver_name);
         return -1;
@@ -160,21 +226,21 @@ static bool validate_config_driver_name(const char *driver_name, const char *pat
 {
     // 检查驱动名称有效性
     if (driver_name == NULL || driver_name[0] == '\0') {
-        fprintf(stderr, OUTPFX "Warning: missing driver name in file '%s'.\n", path);
+        ibv_extend_warning("missing driver name in file '%s'", path);
         return 0;
     }
 
     // 限制驱动名称长度
     if (strlen(driver_name) > driver_name_max_len) {
-        fprintf(stderr, OUTPFX "Warning: driver name too long in file '%s'.\n", path);
+        ibv_extend_warning("driver name too long in file '%s'", path);
         return 0;
     }
 
     // 校验驱动名称合法性（只允许字母、数字、下划线、连字符）
     for (const char *p = driver_name; *p != '\0'; p++) {
         if (!isalnum((unsigned char)*p) && *p != '_' && *p != '-') {
-            fprintf(stderr, OUTPFX "Warning: invalid character in driver name '%s' in file '%s'.\n",
-                    driver_name, path);
+            ibv_extend_warning("invalid character in driver name '%s' in file '%s'",
+                driver_name, path);
             return 0;
         }
     }
@@ -230,7 +296,7 @@ static void parse_config_line(char *line, const char *path)
     field = strsep(&ext_config, "\n\t ");
     // 检查第一个字段有效性
     if (field == NULL || field[0] == '\0') {
-        fprintf(stderr, OUTPFX "Warning: invalid config line in file '%s'.\n", path);
+        ibv_extend_warning("invalid config line in file '%s'", path);
         return;
     }
 
@@ -239,7 +305,7 @@ static void parse_config_line(char *line, const char *path)
         process_driver_config(ext_config, path);
     } else {
         // 未知的配置项，输出警告
-        (void)fprintf(stderr, OUTPFX "Warning: ignoring bad config directive '%s' in file '%s'.\n",
+        ibv_extend_warning("ignoring bad config directive '%s' in file '%s'",
             field, path);
     }
 }
@@ -260,7 +326,7 @@ static void read_extend_config_file(const char *path)
     // 打开配置文件
     ext_conf = fopen(path, "r" STREAM_CLOEXEC);
     if (!ext_conf) {
-        (void)fprintf(stderr, OUTPFX "Warning: couldn't read extend config file %s.\n", path);
+        ibv_extend_warning("couldn't read extend config file %s", path);
         return;
     }
 
@@ -312,9 +378,7 @@ static void read_extend_config()
 
         // 构造文件的完整路径
         if (asprintf(&tmp_path, "%s/%s", EXTEND_IBV_CONFIG_DIR, ext_dent->d_name) < 0) {
-            (void)fprintf(stderr,
-                OUTPFX
-                "Warning: couldn't read extend config file %s/%s.\n",
+            ibv_extend_warning("couldn't read extend config file %s/%s",
                 EXTEND_IBV_CONFIG_DIR, ext_dent->d_name);
             goto out;
         }
@@ -356,19 +420,19 @@ static int validate_driver_name(const char *name)
 {
     // 检查驱动程序名称是否为空
     if (!name) {
-        (void)fprintf(stderr, OUTPFX "Warning: couldn't load NULL extend file.\n");
+        ibv_extend_warning("couldn't load NULL extend file");
         return -1;
     }
 
     // 检查驱动程序名称是否为空字符串
     if (name[0] == '\0') {
-        (void)fprintf(stderr, OUTPFX "Warning: couldn't load empty extend file.\n");
+        ibv_extend_warning("couldn't load empty extend file");
         return -1;
     }
 
     // 限制驱动名称长度
     if (strlen(name) > driver_name_max_len) {
-        (void)fprintf(stderr, OUTPFX "Warning: driver name too long '%s'.\n", name);
+        ibv_extend_warning("driver name too long '%s'", name);
         return -1;
     }
 
@@ -384,7 +448,7 @@ static int validate_driver_name_chars(const char *name)
 {
     for (const char *p = name; *p != '\0'; p++) {
         if (!isalnum((unsigned char)*p) && *p != '_' && *p != '-') {
-            (void)fprintf(stderr, OUTPFX "Warning: invalid character in driver name '%s'.\n", name);
+            ibv_extend_warning("invalid character in driver name '%s'", name);
             return -1;
         }
     }
@@ -399,10 +463,21 @@ static int validate_driver_name_chars(const char *name)
 static int try_load_driver(const char *so_name)
 {
     void *dlhandle = dlopen(so_name, RTLD_NOW);
+    char *error;
+
     if (dlhandle) {
         // silent return
         return 0;
     }
+
+    // 获取错误信息并处理NULL情况
+    error = dlerror();
+    if (error) {
+        ibv_extend_warning("dlopen '%s' failed: %s", so_name, error);
+    } else {
+        ibv_extend_warning("dlopen '%s' failed: unknown error", so_name);
+    }
+
     return -1;
 }
 
@@ -418,12 +493,12 @@ static int load_absolute_path_driver(const char *name)
 
     // 校验绝对路径的合法性（防止路径遍历）
     if (strstr(name, "..") != NULL) {
-        (void)fprintf(stderr, OUTPFX "Warning: invalid path '%s' (path traversal detected).\n", name);
+        ibv_extend_warning("invalid path '%s' (path traversal detected)", name);
         return -1;
     }
 
     if (asprintf(&so_name, "%s", name) < 0) {
-        (void)fprintf(stderr, OUTPFX "Warning: couldn't load extend driver '%s'.\n", name);
+        ibv_extend_warning("couldn't load extend driver '%s'", name);
         return -1;
     }
 
@@ -447,7 +522,7 @@ static int load_relative_path_driver(const char *name)
     // 尝试在EXTEND_VERBS_PROVIDER_DIR目录下查找并加载驱动程序
     if (sizeof(EXTEND_VERBS_PROVIDER_DIR) > 1) {
         if (asprintf(&so_name, EXTEND_VERBS_PROVIDER_DIR "/lib%s.so", name) < 0) {
-            (void)fprintf(stderr, OUTPFX "Warning: couldn't load extend driver '%s'.\n", name);
+            ibv_extend_warning("couldn't load extend driver '%s'", name);
             return -1;
         }
         if (try_load_driver(so_name) == 0) {
@@ -459,7 +534,7 @@ static int load_relative_path_driver(const char *name)
 
     // 尝试在当前目录下加载驱动程序
     if (asprintf(&so_name, "lib%s.so", name) < 0) {
-        (void)fprintf(stderr, OUTPFX "Warning: couldn't load extend driver '%s'.\n", name);
+        ibv_extend_warning("couldn't load extend driver '%s'", name);
         return -1;
     }
     if (try_load_driver(so_name) == 0) {
@@ -514,7 +589,7 @@ static void load_drivers_from_env(const char *env)
     list = strdup(env);
     if (!list) {
         (void)fprintf(stderr,
-            OUTPFX "Warning: failed to allocate memory for IBV_EXTEND_DRIVERS.\n");
+            OUTPFX "Error: failed to allocate memory for IBV_EXTEND_DRIVERS.\n");
         return;
     }
 
@@ -575,8 +650,7 @@ API_EXPORT struct ibv_context_extend *ibv_open_extend(struct ibv_context *contex
 
     // 检查上下文是否为空
     if (context == NULL) {
-        (void)fprintf(stderr,
-            OUTPFX "Error: couldn't open extend context for NULL ibv_context\n");
+        ibv_extend_warning("couldn't open extend context for NULL ibv_context");
         return NULL;
     }
 
@@ -588,8 +662,7 @@ API_EXPORT struct ibv_context_extend *ibv_open_extend(struct ibv_context *contex
     // 如果找到扩展操作，则分配上下文
     if (ext_ops) {
         if (!ext_ops->alloc_context) {
-            (void)fprintf(stderr,
-                OUTPFX "Error: alloc_context is NULL for ops %s\n", ext_ops->name);
+            ibv_extend_warning("alloc_context is NULL for ops %s", ext_ops->name);
             return NULL;
         }
         return ext_ops->alloc_context(context);
@@ -603,16 +676,14 @@ API_EXPORT struct ibv_context_extend *ibv_open_extend(struct ibv_context *contex
     // 如果找到扩展操作，则分配上下文
     if (ext_ops) {
         if (!ext_ops->alloc_context) {
-            (void)fprintf(stderr,
-                OUTPFX "Error: alloc_context is NULL for ops %s\n", ext_ops->name);
+            ibv_extend_warning("alloc_context is NULL for ops %s", ext_ops->name);
             return NULL;
         }
         return ext_ops->alloc_context(context);
     }
 
     // 如果仍然没有找到扩展操作，则返回NULL
-    (void)fprintf(stderr,
-                  OUTPFX "Warning: no available ops for open extend context\n");
+    ibv_extend_warning("no available ops for open extend context");
     return NULL;
 }
 
@@ -835,7 +906,7 @@ API_EXPORT int ibv_extend_check_version(uint32_t driver_major, uint32_t driver_m
     /* 规则1: 主版本号必须完全一致 */
     if (driver_major != IBV_EXTEND_VERSION_MAJOR) {
         (void)fprintf(stderr,
-            OUTPFX "Version check failed: major version mismatch "
+            OUTPFX "Error: Version check failed: major version mismatch "
             "(driver: %u, library: %u)\n",
             driver_major, IBV_EXTEND_VERSION_MAJOR);
         return -1;
@@ -844,7 +915,7 @@ API_EXPORT int ibv_extend_check_version(uint32_t driver_major, uint32_t driver_m
     /* 规则2: 驱动的次版本号必须 <= 库的次版本号 */
     if (driver_minor > IBV_EXTEND_VERSION_MINOR) {
         (void)fprintf(stderr,
-            OUTPFX "Version check failed: driver minor version newer than library "
+            OUTPFX "Error: Version check failed: driver minor version newer than library "
             "(driver: %u.%u.%u, library: %u.%u.%u)\n",
             driver_major, driver_minor, driver_patch,
             IBV_EXTEND_VERSION_MAJOR, IBV_EXTEND_VERSION_MINOR, IBV_EXTEND_VERSION_PATCH);
@@ -855,7 +926,7 @@ API_EXPORT int ibv_extend_check_version(uint32_t driver_major, uint32_t driver_m
     if (driver_minor == IBV_EXTEND_VERSION_MINOR &&
         driver_patch > IBV_EXTEND_VERSION_PATCH) {
         (void)fprintf(stderr,
-            OUTPFX "Version check failed: driver patch version newer than library "
+            OUTPFX "Error: Version check failed: driver patch version newer than library "
             "(driver: %u.%u.%u, library: %u.%u.%u)\n",
             driver_major, driver_minor, driver_patch,
             IBV_EXTEND_VERSION_MAJOR, IBV_EXTEND_VERSION_MINOR, IBV_EXTEND_VERSION_PATCH);

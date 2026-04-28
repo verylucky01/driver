@@ -8,9 +8,9 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  *
  * File Name     : ibv_extend.h
- * Version       : v3.1.0
+ * Version       : v3.2.0
  * Created       : 2026/2/14
- * Updated       : 2026/3/13
+ * Updated       : 2026/4/24
  * Description   : The declaration invoked by the Application interface of RoCE NDA Function
  */
 
@@ -32,9 +32,9 @@
  * 3. 次版本号：驱动 <= 库
  */
 #define IBV_EXTEND_VERSION_MAJOR 3
-#define IBV_EXTEND_VERSION_MINOR 1
+#define IBV_EXTEND_VERSION_MINOR 2
 #define IBV_EXTEND_VERSION_PATCH 0
-#define IBV_EXTEND_VERSION_STRING "3.1.0"
+#define IBV_EXTEND_VERSION_STRING "3.2.0"
 
 /* RoCE队列内存的DMA寻址方式 */
 enum queue_buf_dma_mode {
