@@ -18,8 +18,12 @@
 #include "soft_fault_define.h"
 #include "devdrv_user_common.h"
 #include "pbl_mem_alloc_interface.h"
+#include "pbl_davinci_api.h"
+#include "pbl_runenv_config.h"
+#include "pbl_uda.h"
 #include "dms_sensor_interface.h"
 #include "ascend_dev_num.h"
+#include "drv_kernel_soft.h"
 
 #define SOFT_PARSE_HANDLE(node_type, sensor_idx, sensor_type, handle) \
 do { \
@@ -39,7 +43,222 @@ do { \
 STATIC DMS_SENSOR_TYPE_T g_sensor_type_list[] = {
     DMS_SEN_TYPE_HEARTBEAT, DMS_SEN_TYPE_GENERAL_SOFTWARE_FAULT, DMS_SEN_TYPE_SAFETY_SENSOR};
 
-STATIC int soft_sensor_whitelist_check(struct dms_sensor_node_cfg cfg)
+const struct soft_fault_acc g_soft_fault_whitelist[] = {
+#include "fms/soft_fault_whitelist.inc"
+};
+
+const struct soft_fault_acc g_soft_fault_whitelist_legacy[] = {
+#include "fms/soft_fault_whitelist_legacy.inc"
+};
+
+STATIC void soft_fault_get_whitelist(u32 devid, const struct soft_fault_acc **whitelist, u32 *num)
+{
+    u32 chip_type = uda_get_chip_type(devid);
+    if ((chip_type == HISI_CLOUD_V4) || (chip_type == HISI_CLOUD_V5)) {
+        *whitelist = g_soft_fault_whitelist;
+        *num = sizeof(g_soft_fault_whitelist) / sizeof(g_soft_fault_whitelist[0]);
+    } else {
+        *whitelist = g_soft_fault_whitelist_legacy;
+        *num = sizeof(g_soft_fault_whitelist_legacy) / sizeof(g_soft_fault_whitelist_legacy[0]);
+    }
+    soft_drv_event("Get fault whitelist. (devid=%u; chip_type=0x%x; num=0x%x)\n", devid, chip_type, *num);
+}
+
+STATIC int soft_fault_get_fault_index(uint64_t handle, int val, const struct soft_fault_acc *whitelist, u32 white_num,
+                                      u32 *fault_index)
+{
+    u32 i;
+    u32 node_type, sensor_idx, sensor_type;
+
+    SOFT_PARSE_HANDLE(node_type, sensor_idx, sensor_type, handle);
+    for (i = 0; i < white_num; i++) {
+        if ((whitelist[i].node_type == node_type) && (whitelist[i].sensor_type == sensor_type) &&
+            (whitelist[i].err_type == (u32)val)) {
+            *fault_index = i;
+            return 0;
+        }
+    }
+
+    soft_drv_err("Get fault index fail. (node_type=0x%x; sensor_type=0x%x; val=0x%x)\n", node_type, sensor_type, val);
+    return -EINVAL;
+}
+
+STATIC u32 soft_fault_get_cur_user_role(void)
+{
+    u32 acc;
+    const ka_cred_t *cred = ka_current_cred();
+
+    /* check user role */
+    if ((cred != NULL) && (cred->euid.val == 0)) {
+        acc = SOFT_FAULT_ACC_ROOT;
+    } else {
+        if ((cred != NULL) && davinci_intf_confirm_user()) {
+            if (davinci_intf_get_manage_group() == cred->egid.val) {
+                acc = SOFT_FAULT_ACC_DM_USER;
+            } else {
+                acc = SOFT_FAULT_ACC_OPERATE;
+            }
+        } else {
+            acc = SOFT_FAULT_ACC_USER;
+        }
+    }
+    return acc;
+}
+
+STATIC bool soft_fault_check_user_role(u32 user_role_cur, u32 user_role_white)
+{
+    if ((user_role_cur & user_role_white) == 0) {
+        return false;
+    }
+    return true;
+}
+
+STATIC int soft_fault_get_cur_run_env(u32 *run_env_cur)
+{
+    if (run_in_normal_docker() == true) {
+        *run_env_cur = SOFT_FAULT_ENV_DOCKER;
+    } else if (run_in_admin_docker() == true) {
+        *run_env_cur = SOFT_FAULT_ENV_ADMIN_DOCKER;
+    } else if (run_in_virtual_mach() == true) {
+        *run_env_cur = SOFT_FAULT_ENV_VIRTUAL;
+    } else {
+        *run_env_cur = SOFT_FAULT_ENV_PHYSICAL;
+    }
+
+    return 0;
+}
+
+STATIC bool soft_fault_check_run_env(u32 run_env_cur, u32 run_env_white)
+{
+    if ((run_env_cur & run_env_white) == 0) {
+        return false;
+    }
+
+    return true;
+}
+
+STATIC int soft_fault_get_cur_process_name(char **proc_name_cur)
+{
+#ifndef DMS_UT
+    struct mm_struct *active_mm = current->active_mm;
+
+    if ((active_mm == NULL) || (active_mm->exe_file == NULL) || (active_mm->exe_file->f_path.dentry == NULL) ||
+        (active_mm->exe_file->f_path.dentry->d_name.name == NULL)) {
+        soft_drv_err("The active_mm parameter is invalid.\n");
+        return -EINVAL;
+    }
+
+    *proc_name_cur = (char *)active_mm->exe_file->f_path.dentry->d_name.name;
+#else
+    *proc_name_cur = "";
+#endif
+    return 0;
+}
+
+STATIC bool soft_fault_check_proc_name(char *proc_name_cur, const char *proc_name_white)
+{
+    if (proc_name_white[0] == '\0') {
+        return true;
+    }
+
+    if (strlen(proc_name_cur) == strlen(proc_name_white)) {
+        if (memcmp(proc_name_cur, proc_name_white, strlen(proc_name_cur)) == 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+STATIC bool soft_fault_whitelist_check(u32 devid, uint64_t handle, int val)
+{
+    int ret;
+    u32 fault_index = 0;
+    u32 user_role_cur = 0;
+    u32 run_env_cur = 0;
+    char *proc_name_cur = NULL;
+    const struct soft_fault_acc *whitelist = NULL;
+    u32 white_num = 0;
+
+    soft_fault_get_whitelist(devid, &whitelist, &white_num);
+    if (soft_fault_get_fault_index(handle, val, whitelist, white_num, &fault_index) != 0) {
+        soft_drv_err("Get fault index fail. (handle=0x%llx; val=%d)\n", handle, val);
+        return false;
+    }
+
+    user_role_cur = soft_fault_get_cur_user_role();
+    if (!soft_fault_check_user_role(user_role_cur, whitelist[fault_index].user_acc)) {
+        soft_drv_err("Check user role fail. (fault_index=0x%x; user_role_cur=0x%x; user_role_white=0x%x)\n",
+                     fault_index, user_role_cur, whitelist[fault_index].user_acc);
+        return false;
+    }
+
+    ret = soft_fault_get_cur_run_env(&run_env_cur);
+    if (ret != 0) {
+        return false;
+    }
+    if (!soft_fault_check_run_env(run_env_cur, whitelist[fault_index].run_env)) {
+        soft_drv_err("Check run env fail. (fault_index=0x%x; run_env_cur=0x%x, run_env_white=0x%x)\n", fault_index,
+                     run_env_cur, whitelist[fault_index].run_env);
+        return false;
+    }
+
+    ret = soft_fault_get_cur_process_name(&proc_name_cur);
+    if (ret != 0) {
+        return false;
+    }
+
+    if (!soft_fault_check_proc_name(proc_name_cur, whitelist[fault_index].proc_name)) {
+        soft_drv_err("Check process name fail. (fault_index=0x%x; proc_name_cur=%s; proc_name_white=%s)\n", fault_index,
+                     proc_name_cur, whitelist[fault_index].proc_name);
+        return false;
+    }
+
+    return true;
+}
+
+STATIC bool soft_sensor_whitelist_check(u32 devid, unsigned short node_type, unsigned char sensor_type)
+{
+    int ret;
+    u32 i;
+    u32 user_role_cur = 0;
+    u32 run_env_cur = 0;
+    char *proc_name_cur = NULL;
+    const struct soft_fault_acc *whitelist = NULL;
+    u32 white_num = 0;
+
+    soft_fault_get_whitelist(devid, &whitelist, &white_num);
+    user_role_cur = soft_fault_get_cur_user_role();
+
+    ret = soft_fault_get_cur_run_env(&run_env_cur);
+    if (ret != 0) {
+        return false;
+    }
+
+    ret = soft_fault_get_cur_process_name(&proc_name_cur);
+    if (ret != 0) {
+        return false;
+    }
+
+    for (i = 0; i < white_num; i++) {
+        if ((whitelist[i].node_type == node_type) && (whitelist[i].sensor_type == sensor_type)) {
+            if ((soft_fault_check_user_role(user_role_cur, whitelist[i].user_acc)) &&
+                (soft_fault_check_run_env(run_env_cur, whitelist[i].run_env)) &&
+                (soft_fault_check_proc_name(proc_name_cur, whitelist[i].proc_name))) {
+                return true;
+            } else {
+                continue;
+            }
+        }
+    }
+
+    soft_drv_err("Check sensor whitelist fail. (node_type=0x%x; sensor_type=0x%x; user_role_cur=0x%x; "
+                 "run_env_cur=0x%x; proc_name_cur=%s)\n",
+                 node_type, sensor_type, user_role_cur, run_env_cur, proc_name_cur);
+    return false;
+}
+
+STATIC int soft_sensor_para_check(struct dms_sensor_node_cfg cfg)
 {
     int i;
 
@@ -529,7 +748,7 @@ int soft_node_register(void *feature, char *in, u32 in_len, char *out, u32 out_l
         return -EINVAL;
     }
 
-    ret = soft_sensor_whitelist_check(cfg);
+    ret = soft_sensor_para_check(cfg);
     if (ret != 0) {
         soft_drv_err("Sensor cfg check failed. (dev_id=%u; node_type=%d; sensor_type=%d; ret=%d;)\n",
             dev_id, cfg.node_type, cfg.sensor_type, ret);
@@ -540,6 +759,12 @@ int soft_node_register(void *feature, char *in, u32 in_len, char *out, u32 out_l
     if (ret != 0) {
         soft_drv_err("can't transform dev_id. (dev_id=%u; ret=%d)\n", dev_id, ret);
         return ret;
+    }
+
+    if (!soft_sensor_whitelist_check(phy_id, cfg.node_type, cfg.sensor_type)) {
+        soft_drv_err("whitelist check fail. (dev_id=%u; phy_id=%u; node_type=0x%x; sensor_type=0x%x)\n", dev_id, phy_id,
+                     cfg.node_type, cfg.sensor_type);
+        return -EINVAL;
     }
 
     ret = dms_soft_node_register(phy_id, &cfg, &handle);
@@ -559,6 +784,7 @@ int soft_node_unregister(void *feature, char *in, u32 in_len, char *out, u32 out
     uint64_t handle;
     unsigned int phy_id, vfid;
     struct dms_sensor_user *arg = NULL;
+    unsigned int node_type, sensor_idx, sensor_type;
 
     if ((in == NULL) || (in_len != sizeof(struct dms_sensor_user))) {
         soft_drv_err("Invalid para. (in_len=%u)\n", in_len);
@@ -572,6 +798,13 @@ int soft_node_unregister(void *feature, char *in, u32 in_len, char *out, u32 out
     if (ret != 0) {
         soft_drv_err("can't transform dev_id. (dev_id=%u; ret=%d)\n", arg->dev_id, ret);
         return ret;
+    }
+
+    SOFT_PARSE_HANDLE(node_type, sensor_idx, sensor_type, handle);
+    if (!soft_sensor_whitelist_check(phy_id, (unsigned short)node_type, (unsigned char)sensor_type)) {
+        soft_drv_err("whitelist check fail. (dev_id=%u; phy_id=%u; node_type=0x%x; sensor_type=0x%x)\n", arg->dev_id,
+                     phy_id, node_type, sensor_type);
+        return -EINVAL;
     }
 
     return dms_soft_node_unregister(phy_id, handle);
@@ -605,6 +838,12 @@ int soft_node_update_state(void *feature, char *in, u32 in_len, char *out, u32 o
     if (ret != 0) {
         soft_drv_err("can't transform dev_id. (dev_id=%u; ret=%d)\n", arg->dev_id, ret);
         return ret;
+    }
+
+    if (!soft_fault_whitelist_check(phy_id, handle, val)) {
+        soft_drv_err("Fault whitelist check failed. (dev_id=%u; phy_id=%u; handle=0x%llx; val=%d)\n", arg->dev_id,
+                     phy_id, handle, val);
+        return -EINVAL;
     }
 
     return dms_update_sensor_state(phy_id, handle, val, assertion);

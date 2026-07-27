@@ -41,7 +41,7 @@ ifneq ($(NOT_SUPPORT_SP), y)
 endif
 ccflags-y += -Wall -Werror -funsigned-char -Wextra -Wformat=2 -Wfloat-equal -Wcast-align -Wvla -Wundef -Wstack-usage=2048 $(WDATE_TIME)
 ccflags-y += -Wno-unused-parameter -Wno-sign-compare -Wno-missing-field-initializers -Wno-missing-prototypes -Wno-missing-declarations
-
+EXTRA_CFLAGS += -DCFG_HOST_ENV
 ifneq ($(filter $(PRODUCT), ascend910B),)
     EXTRA_CFLAGS += -DCFG_FEATURE_EP_MODE
     EXTRA_CFLAGS += -DCFG_FEATURE_KA_ALLOC_INTERFACE
